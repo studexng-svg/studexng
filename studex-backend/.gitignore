@@ -1,0 +1,74 @@
+# ===================================
+# General / OS
+# ===================================
+.DS_Store
+Thumbs.db
+*.log
+
+# ===================================
+# Python / Django (studex-backend)
+# ===================================
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+env/
+.venv/
+ENV/
+
+# Django
+local_settings.py
+db.sqlite3
+media/
+
+# Migrations (optional – some teams commit them, some don't)
+# */migrations/
+
+# Environment variables
+.env
+.env.local
+.env.development
+.env.production
+
+# Firebase – NEVER commit your service account key!
+firebase_service_account.json
+*.json  # Be extra safe – or name it specifically like studexng-firebase-adminsdk-*.json
+
+# Node / Next.js (frontend)
+# ===================================
+node_modules/
+.next/
+out/
+build/
+dist/
+
+# Next.js environment variables (local only)
+.env.local
+.env.development.local
+.env.production.local
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Vercel / Railway / other deployment
+.vercel
+.railway
+
+# IDE / Editor
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project
+
+# Testing / Coverage
+coverage/
+htmlcov/
+.pytest_cache/
+.coverage
+
+# Misc
+*.swp
+*.swo
+*~
