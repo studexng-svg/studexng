@@ -19,6 +19,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from "recharts";
 
+export const dynamic = 'force-dynamic';
 export default function AdminAnalytics() {
   const router = useRouter();
   const [stats, setStats] = useState({
