@@ -68,10 +68,6 @@ class WalletTransaction(models.Model):
             models.Index(fields=['wallet', '-created_at']),
             models.Index(fields=['status']),
         ]
-        indexes = [
-            models.Index(fields=['wallet', '-created_at']),
-            models.Index(fields=['status']),
-        ]
 
 
 class EscrowTransaction(models.Model):
@@ -108,10 +104,6 @@ class EscrowTransaction(models.Model):
     class Meta:
         verbose_name = "Escrow Transaction"
         verbose_name_plural = "Escrow Transactions"
-        indexes = [
-            models.Index(fields=['buyer', 'seller']),
-            models.Index(fields=['status']),
-        ]
         indexes = [
             models.Index(fields=['buyer', 'seller']),
             models.Index(fields=['status']),

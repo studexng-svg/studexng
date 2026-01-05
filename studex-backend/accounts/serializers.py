@@ -25,9 +25,42 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         return data
     
     def validate_email(self, value):
-        """Validate email is unique"""
+        """Validate email is unique and from allowed university domains"""
+        from django.conf import settings
+
+        # Check uniqueness
         if User.objects.filter(email=value).exists():
             raise serializers.ValidationError("Email already exists")
+
+        # Check university domain (if configured)
+        allowed_domains = getattr(settings, 'ALLOWED_UNIVERSITY_DOMAINS', None)
+        if allowed_domains:
+            domain = value.split('@')[-1].lower() if '@' in value else ''
+            if not any(domain == allowed_domain.lower() for allowed_domain in allowed_domains):
+                raise serializers.ValidationError(
+                    f"Only university email addresses are allowed. Accepted domains: {', '.join(allowed_domains)}"
+                )
+
+        return value
+
+    def validate_matric_number(self, value):
+        """Validate matriculation number is unique and properly formatted"""
+        import re
+
+        # If matric number is provided, validate it
+        if value:
+            # Check uniqueness
+            if User.objects.filter(matric_number=value).exists():
+                raise serializers.ValidationError("This matriculation number is already registered")
+
+            # Optional: Add format validation (customize pattern for your university)
+            # Example pattern: PAU/2023/12345 or 2023/12345
+            # pattern = r'^[A-Z]{2,4}/\d{4}/\d{4,6}$|^\d{4}/\d{4,6}$'
+            # if not re.match(pattern, value.upper()):
+            #     raise serializers.ValidationError(
+            #         "Invalid matriculation number format. Expected format: PAU/2023/12345 or 2023/12345"
+            #     )
+
         return value
     
     def create(self, validated_data):
@@ -67,14 +100,15 @@ class UserLoginSerializer(serializers.Serializer):
 
 class UserProfileSerializer(serializers.ModelSerializer):
     profile = serializers.SerializerMethodField()
-    
+
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'phone', 'user_type', 
+        fields = ['id', 'username', 'email', 'phone', 'user_type',
                   'matric_number', 'hostel', 'business_name', 'is_verified_vendor',
-                  'bio', 'profile_image', 'wallet_balance', 'created_at', 'profile']
-        read_only_fields = ['wallet_balance', 'is_verified_vendor', 'created_at']
-    
+                  'bio', 'profile_image', 'wallet_balance', 'created_at', 'profile',
+                  'is_staff', 'is_superuser']
+        read_only_fields = ['wallet_balance', 'is_verified_vendor', 'created_at', 'is_staff', 'is_superuser']
+
     def get_profile(self, obj):
         try:
             profile = obj.profile
@@ -92,11 +126,36 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
 class ProfileSerializer(serializers.ModelSerializer):
     user = serializers.StringRelatedField(read_only=True)
-    
+
     class Meta:
         model = Profile
         fields = '__all__'
         read_only_fields = ['total_orders', 'total_sales', 'rating', 'total_reviews']
+
+
+class UserSerializer(serializers.ModelSerializer):
+    """Serializer for admin user management endpoints"""
+    profile = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'email', 'phone', 'user_type',
+                  'is_active', 'is_staff', 'is_superuser', 'date_joined',
+                  'matric_number', 'hostel', 'business_name',
+                  'is_verified_vendor', 'profile']
+        read_only_fields = ['date_joined']
+
+    def get_profile(self, obj):
+        try:
+            profile = obj.profile
+            return {
+                'is_verified_vendor': profile.is_verified_vendor,
+                'matric_number': obj.matric_number,
+                'business_name': obj.business_name,
+                'hostel': obj.hostel,
+            }
+        except Profile.DoesNotExist:
+            return None
 
 
 # FIXED: Seller Application Serializer — for real document upload

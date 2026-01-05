@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     # Third party apps
     'rest_framework',
     'rest_framework_simplejwt',
+    'rest_framework_simplejwt.token_blacklist',  # For proper logout
     'corsheaders',
     'django_filters',
     
@@ -59,6 +60,7 @@ INSTALLED_APPS = [
     'services',
     'orders',
     'wallet',
+    'chat',
 ]
 
 MIDDLEWARE = [
@@ -210,8 +212,8 @@ REST_FRAMEWORK = {
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(days=int(config('JWT_ACCESS_TOKEN_LIFETIME', default=1))),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=int(config('JWT_REFRESH_TOKEN_LIFETIME', default=7))),
-    'ROTATE_REFRESH_TOKENS': True,
-    'BLACKLIST_AFTER_ROTATION': True,
+    'ROTATE_REFRESH_TOKENS': False,
+    'BLACKLIST_AFTER_ROTATION': False,
     'UPDATE_LAST_LOGIN': True,
     'ALGORITHM': 'HS256',
     'SIGNING_KEY': SECRET_KEY,
@@ -225,6 +227,18 @@ SIMPLE_JWT = {
 # =======================================
 PAYSTACK_PUBLIC_KEY = config('PAYSTACK_PUBLIC_KEY', default='')
 PAYSTACK_SECRET_KEY = config('PAYSTACK_SECRET_KEY', default='')
+
+# =======================================
+# University Email Domain Validation
+# =======================================
+# Set to None to allow any email domain (development mode)
+# Set to list of domains to restrict to university emails only (production mode)
+ALLOWED_UNIVERSITY_DOMAINS = config(
+    'ALLOWED_UNIVERSITY_DOMAINS',
+    default=None,  # None = allow all domains (development)
+    cast=lambda v: v.split(',') if v else None  # Comma-separated in .env
+)
+# Example: ALLOWED_UNIVERSITY_DOMAINS=pau.edu.ng,student.pau.edu.ng
 
 # =======================================
 # Blockchain Settings (Polygon)
@@ -248,6 +262,25 @@ EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
 # =======================================
 API_BASE_URL = config('API_BASE_URL', default='http://localhost:8000')
 FRONTEND_BASE_URL = config('FRONTEND_BASE_URL', default='http://localhost:3000')
+
+# =======================================
+# Security Settings (Production)
+# =======================================
+# Cookie security (enable in production with HTTPS)
+SESSION_COOKIE_SECURE = config('SESSION_COOKIE_SECURE', default=not DEBUG, cast=bool)
+SESSION_COOKIE_HTTPONLY = config('SESSION_COOKIE_HTTPONLY', default=True, cast=bool)
+SESSION_COOKIE_SAMESITE = config('SESSION_COOKIE_SAMESITE', default='Lax')
+
+CSRF_COOKIE_SECURE = config('CSRF_COOKIE_SECURE', default=not DEBUG, cast=bool)
+CSRF_COOKIE_HTTPONLY = config('CSRF_COOKIE_HTTPONLY', default=True, cast=bool)
+CSRF_COOKIE_SAMESITE = config('CSRF_COOKIE_SAMESITE', default='Lax')
+
+# Additional security headers (enable in production)
+if not DEBUG:
+    SECURE_SSL_REDIRECT = True
+    SECURE_BROWSER_XSS_FILTER = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    X_FRAME_OPTIONS = 'DENY'
 
 # =======================================
 # Logging Configuration

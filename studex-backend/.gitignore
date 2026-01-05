@@ -34,7 +34,7 @@ media/
 
 # Firebase – NEVER commit your service account key!
 firebase_service_account.json
-*.json  # Be extra safe – or name it specifically like studexng-firebase-adminsdk-*.json
+studexng-firebase-adminsdk-*.json
 
 # Node / Next.js (frontend)
 # ===================================

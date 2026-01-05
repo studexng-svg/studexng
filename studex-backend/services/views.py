@@ -25,6 +25,12 @@ class ListingViewSet(viewsets.ModelViewSet):
     queryset = Listing.objects.all()
     serializer_class = ListingSerializer
 
+    # CRITICAL FIX: Configure filtering and search
+    filterset_fields = ['category', 'is_available', 'vendor']
+    search_fields = ['title', 'description', 'vendor__username', 'vendor__business_name']
+    ordering_fields = ['price', 'created_at', 'title']
+    ordering = ['-created_at']  # Default ordering: newest first
+
     def get_permissions(self):
         if self.action in ['list', 'retrieve']:
             permission_classes = [AllowAny]

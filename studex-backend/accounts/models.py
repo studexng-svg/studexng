@@ -1,4 +1,3 @@
-# accounts/models.py
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.db.models.signals import post_save
@@ -13,11 +12,23 @@ class User(AbstractUser):
         ('vendor', 'Vendor'),
     )
 
+    # Firebase Authentication (NEW - FOR LAUNCH)
+    firebase_uid = models.CharField(
+        max_length=255,
+        unique=True,
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="Firebase UID for authentication"
+    )
+
     # Basic Info
     email = models.EmailField(
         unique=True,
-        db_index=True,  # Faster login lookups
-        help_text="Required. Must be a valid PAU email for students.",
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="User email address",
     )
     phone = models.CharField(max_length=15, blank=True, null=True, help_text="Optional phone number")
     user_type = models.CharField(
@@ -65,9 +76,9 @@ class User(AbstractUser):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    # Make email the primary login field
-    USERNAME_FIELD = 'email'
-    REQUIRED_FIELDS = ['username']
+    # Use username as primary login field (Firebase UID based)
+    USERNAME_FIELD = 'username'
+    REQUIRED_FIELDS = ['email']
 
     def __str__(self):
         return f"{self.username} ({self.email})"
@@ -80,6 +91,7 @@ class User(AbstractUser):
             models.Index(fields=['email']),
             models.Index(fields=['user_type']),
             models.Index(fields=['is_verified_vendor']),
+            models.Index(fields=['firebase_uid']),
         ]
 
 
@@ -110,7 +122,7 @@ class Profile(models.Model):
         verbose_name_plural = "Profiles"
 
 
-# NEW: Seller Application Model — real document verification
+# Seller Application Model — real document verification
 class SellerApplication(models.Model):
     STATUS_CHOICES = (
         ('pending', 'Pending Review'),

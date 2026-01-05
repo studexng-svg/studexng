@@ -10,12 +10,12 @@ from .serializers import (
     UserRegistrationSerializer, 
     UserLoginSerializer,
     UserProfileSerializer,
-    SellerApplicationSerializer  # ← NEW
+    SellerApplicationSerializer
 )
-from .models import User, SellerApplication  # ← NEW
+from .models import User, SellerApplication
 
 
-# Existing auth views (unchanged)
+# Existing auth views
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def register_user(request):
@@ -47,17 +47,24 @@ def login_user(request):
     if not serializer.is_valid():
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
-    email = serializer.validated_data['email']
+    email = serializer.validated_data['email'].lower()
     password = serializer.validated_data['password']
     
-    user = authenticate(request, username=email, password=password)
+    # Step 1: Find user by email (case-insensitive)
+    try:
+        user = User.objects.get(email__iexact=email)
+    except User.DoesNotExist:
+        return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
     
-    if user is not None:
-        if user.is_active:
-            refresh = RefreshToken.for_user(user)
+    # Step 2: Authenticate using the actual username field
+    authenticated_user = authenticate(request, username=user.username, password=password)
+    
+    if authenticated_user is not None:
+        if authenticated_user.is_active:
+            refresh = RefreshToken.for_user(authenticated_user)
             return Response({
                 'message': 'Login successful',
-                'user': UserProfileSerializer(user).data,
+                'user': UserProfileSerializer(authenticated_user).data,
                 'tokens': {
                     'refresh': str(refresh),
                     'access': str(refresh.access_token),
@@ -96,11 +103,24 @@ def update_user_profile(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def logout_user(request):
-    """Logout user (client-side only for JWT)"""
-    return Response({'message': 'Logged out successfully'}, status=status.HTTP_200_OK)
+    """Logout user and blacklist refresh token"""
+    try:
+        refresh_token = request.data.get('refresh')
+
+        if refresh_token:
+            from rest_framework_simplejwt.tokens import RefreshToken
+            token = RefreshToken(refresh_token)
+            token.blacklist()  # Blacklist the token server-side
+            return Response({'message': 'Logged out successfully'}, status=status.HTTP_200_OK)
+        else:
+            # If no refresh token provided, still return success for client-side logout
+            return Response({'message': 'Logged out successfully (client-side only)'}, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        return Response({'error': f'Logout failed: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
 
 
-# NEW: Seller Application API
+# Seller Application API
 class SellerApplicationViewSet(viewsets.ModelViewSet):
     """API for seller verification applications"""
     queryset = SellerApplication.objects.all()
