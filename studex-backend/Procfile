@@ -1,0 +1,2 @@
+﻿web: gunicorn studex.wsgi
+release: python manage.py migrate
