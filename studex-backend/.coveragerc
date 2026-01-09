@@ -1,0 +1,79 @@
+# Coverage.py configuration file
+# https://coverage.readthedocs.io/en/latest/config.html
+
+[run]
+# Source code directories to measure coverage for
+source = .
+
+# Include only these apps in coverage
+include =
+    accounts/*
+    orders/*
+    wallet/*
+    services/*
+    chat/*
+
+# Omit these files/directories from coverage
+omit =
+    */migrations/*
+    */tests.py
+    */test_*.py
+    */__pycache__/*
+    */venv/*
+    */env/*
+    manage.py
+    studex_backend/wsgi.py
+    studex_backend/asgi.py
+    integration_tests.py
+
+# Enable branch coverage (more thorough than line coverage)
+branch = True
+
+# Concurrency settings for Django
+concurrency = multiprocessing
+
+[report]
+# Precision for coverage percentages
+precision = 2
+
+# Show lines that weren't executed
+show_missing = True
+
+# Skip empty files
+skip_empty = True
+
+# Ignore errors for source code that doesn't exist
+ignore_errors = False
+
+# Exclude lines from coverage (e.g., debugging code)
+exclude_lines =
+    # Standard pragma
+    pragma: no cover
+
+    # Don't complain about missing debug-only code
+    def __repr__
+    def __str__
+
+    # Don't complain if tests don't hit defensive assertion code
+    raise AssertionError
+    raise NotImplementedError
+
+    # Don't complain if non-runnable code isn't run
+    if __name__ == .__main__.:
+    if TYPE_CHECKING:
+    if settings.DEBUG:
+
+    # Don't complain about abstract methods
+    @abstract
+    @abstractmethod
+
+[html]
+# Directory for HTML coverage report
+directory = htmlcov
+
+# Title for HTML report
+title = StudEx Platform - Test Coverage Report
+
+[xml]
+# Output file for XML coverage report (for CI/CD)
+output = coverage.xml

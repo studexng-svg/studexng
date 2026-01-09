@@ -1,13 +1,19 @@
 # services/models.py
 from django.db import models
 from django.contrib.auth import get_user_model
+from studex.validators import validate_image
 
 User = get_user_model()
 
 class Category(models.Model):
     title = models.CharField(max_length=100, unique=True)
     slug = models.SlugField(max_length=100, unique=True)
-    image = models.ImageField(upload_to='categories/', blank=True, null=True)
+    image = models.ImageField(
+        upload_to='categories/',
+        blank=True,
+        null=True,
+        validators=[validate_image]
+    )
 
     def __str__(self):
         return self.title
@@ -24,7 +30,13 @@ class Listing(models.Model):
     title = models.CharField(max_length=200, help_text="e.g., Jollof Rice + Chicken, Gel Nails")
     description = models.TextField(help_text="Full description of the product/service")
     price = models.DecimalField(max_digits=10, decimal_places=2, help_text="Price in NGN")
-    image = models.ImageField(upload_to='listings/', blank=True, null=True, help_text="Main product image")
+    image = models.ImageField(
+        upload_to='listings/',
+        blank=True,
+        null=True,
+        help_text="Main product image",
+        validators=[validate_image]
+    )
     is_available = models.BooleanField(default=True, help_text="Uncheck if sold out or paused")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

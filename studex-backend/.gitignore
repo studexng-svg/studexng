@@ -67,6 +67,9 @@ coverage/
 htmlcov/
 .pytest_cache/
 .coverage
+.coverage.*
+coverage.xml
+coverage.txt
 
 # Misc
 *.swp

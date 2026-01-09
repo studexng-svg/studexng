@@ -2,6 +2,7 @@ from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from studex.validators import validate_image, validate_document
 
 
 class User(AbstractUser):
@@ -62,6 +63,7 @@ class User(AbstractUser):
         null=True,
         default='profiles/default.jpg',
         help_text="Profile picture",
+        validators=[validate_image],
     )
 
     # Wallet
@@ -131,8 +133,16 @@ class SellerApplication(models.Model):
     )
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='seller_application')
-    id_document = models.FileField(upload_to='seller_verification/id/', help_text="Student ID card")
-    admission_letter = models.FileField(upload_to='seller_verification/admission/', help_text="Admission letter or proof of enrollment")
+    id_document = models.FileField(
+        upload_to='seller_verification/id/',
+        help_text="Student ID card",
+        validators=[validate_image]  # Accept images for ID cards
+    )
+    admission_letter = models.FileField(
+        upload_to='seller_verification/admission/',
+        help_text="Admission letter or proof of enrollment",
+        validators=[validate_document]  # Accept documents (PDF, DOC, DOCX)
+    )
     business_age_confirmed = models.BooleanField(default=False, help_text="Confirmed selling on campus for 6+ months")
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     submitted_at = models.DateTimeField(auto_now_add=True)

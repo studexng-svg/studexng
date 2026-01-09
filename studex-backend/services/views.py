@@ -26,7 +26,8 @@ class ListingViewSet(viewsets.ModelViewSet):
     serializer_class = ListingSerializer
 
     # CRITICAL FIX: Configure filtering and search
-    filterset_fields = ['category', 'is_available', 'vendor']
+    # Note: 'category' removed from filterset_fields, handled manually in get_queryset to support slug
+    filterset_fields = ['is_available', 'vendor']
     search_fields = ['title', 'description', 'vendor__username', 'vendor__business_name']
     ordering_fields = ['price', 'created_at', 'title']
     ordering = ['-created_at']  # Default ordering: newest first
@@ -39,9 +40,21 @@ class ListingViewSet(viewsets.ModelViewSet):
         return [perm() for perm in permission_classes]
 
     def get_queryset(self):
+        queryset = self.queryset
+
+        # Filter by category slug if provided (support both ID and slug)
+        category_param = self.request.query_params.get('category', None)
+        if category_param:
+            # Try filtering by slug first, then by ID
+            if category_param.isdigit():
+                queryset = queryset.filter(category__id=category_param)
+            else:
+                queryset = queryset.filter(category__slug=category_param)
+
+        # Vendors see their own listings, public sees only available ones
         if self.request.user.is_authenticated and self.request.user.user_type == 'vendor':
-            return self.queryset.filter(vendor=self.request.user)
-        return self.queryset.filter(is_available=True)
+            return queryset.filter(vendor=self.request.user)
+        return queryset.filter(is_available=True)
 
     def perform_create(self, serializer):
         serializer.save(vendor=self.request.user)

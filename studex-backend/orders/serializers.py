@@ -16,6 +16,9 @@ class OrderSerializer(serializers.ModelSerializer):
         read_only_fields = ['reference', 'amount', 'status', 'created_at', 'paid_at']
 
     def create(self, validated_data):
+        from wallet.models import EscrowTransaction
+        from decimal import Decimal
+
         listing_id = validated_data.pop('listing_id')
         listing = Listing.objects.get(id=listing_id)
 
@@ -26,22 +29,31 @@ class OrderSerializer(serializers.ModelSerializer):
         # Generate unique order reference
         reference = f"ORD-{uuid.uuid4().hex[:12].upper()}"
 
+        # Calculate amounts
+        total_amount = Decimal(str(listing.price))
+        platform_fee_percentage = Decimal('0.05')  # 5% platform fee
+        platform_fee = total_amount * platform_fee_percentage
+        seller_amount = total_amount - platform_fee
+
         # Create order
         order = Order.objects.create(
             reference=reference,
             buyer=self.context['request'].user,
             listing=listing,
-            amount=listing.price,
+            amount=total_amount,
+            status='pending',  # Order starts as pending
             **validated_data
         )
-        
-        # Create transaction in escrow
-        from services.models import Transaction
-        Transaction.objects.create(
-            vendor=listing.vendor,
+
+        # Create escrow transaction (money will be held here until buyer confirms)
+        EscrowTransaction.objects.create(
             order=order,
-            amount=listing.price,
-            status='in_escrow'
+            buyer=self.context['request'].user,
+            seller=listing.vendor,
+            total_amount=total_amount,
+            seller_amount=seller_amount,
+            platform_fee=platform_fee,
+            status='held'  # Escrow starts in held status
         )
 
         return order

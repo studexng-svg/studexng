@@ -25,21 +25,52 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         return data
     
     def validate_email(self, value):
-        """Validate email is unique and from allowed university domains"""
-        from django.conf import settings
-
+        """Validate email is unique and must end with @pau.edu.ng"""
         # Check uniqueness
         if User.objects.filter(email=value).exists():
             raise serializers.ValidationError("Email already exists")
 
-        # Check university domain (if configured)
-        allowed_domains = getattr(settings, 'ALLOWED_UNIVERSITY_DOMAINS', None)
-        if allowed_domains:
-            domain = value.split('@')[-1].lower() if '@' in value else ''
-            if not any(domain == allowed_domain.lower() for allowed_domain in allowed_domains):
-                raise serializers.ValidationError(
-                    f"Only university email addresses are allowed. Accepted domains: {', '.join(allowed_domains)}"
-                )
+        # CRITICAL: Enforce @pau.edu.ng domain
+        if not value.lower().endswith('@pau.edu.ng'):
+            raise serializers.ValidationError("Only @pau.edu.ng email addresses are allowed")
+
+        return value
+
+    def validate_phone(self, value):
+        """Validate phone number is numeric and exactly 11 digits"""
+        import re
+
+        if not value:
+            raise serializers.ValidationError("Phone number is required")
+
+        # Remove any whitespace
+        phone_cleaned = value.replace(' ', '').replace('-', '')
+
+        # Check if numeric
+        if not phone_cleaned.isdigit():
+            raise serializers.ValidationError("Phone number must be numeric")
+
+        # Check if exactly 11 digits
+        if len(phone_cleaned) != 11:
+            raise serializers.ValidationError("Phone number must be exactly 11 digits")
+
+        return phone_cleaned
+
+    def validate_password(self, value):
+        """Validate password is alphanumeric (contains both letters and numbers)"""
+        import re
+
+        # Check if contains at least one letter
+        if not re.search(r'[A-Za-z]', value):
+            raise serializers.ValidationError("Password must contain letters and numbers only")
+
+        # Check if contains at least one number
+        if not re.search(r'[0-9]', value):
+            raise serializers.ValidationError("Password must contain letters and numbers only")
+
+        # Check if only alphanumeric (no special characters)
+        if not re.match(r'^[A-Za-z0-9]+$', value):
+            raise serializers.ValidationError("Password must contain letters and numbers only")
 
         return value
 

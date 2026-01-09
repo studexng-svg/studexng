@@ -78,6 +78,8 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'studex.middleware.RateLimitMiddleware',  # Rate limiting
+    'studex.middleware.SecurityHeadersMiddleware',  # Additional security headers
 ]
 
 ROOT_URLCONF = 'studex.urls'
@@ -307,3 +309,42 @@ LOGGING = {
         'level': LOG_LEVEL,
     },
 }
+
+# =======================================
+# Rate Limiting Configuration
+# =======================================
+# Requests per minute for different endpoints
+RATE_LIMIT_LOGIN = config('RATE_LIMIT_LOGIN', default=10, cast=int)
+RATE_LIMIT_REGISTER = config('RATE_LIMIT_REGISTER', default=5, cast=int)
+RATE_LIMIT_API = config('RATE_LIMIT_API', default=60, cast=int)
+RATE_LIMIT_FILE_UPLOAD = config('RATE_LIMIT_FILE_UPLOAD', default=20, cast=int)
+
+# Cache backend for rate limiting
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'studex-rate-limit',
+    }
+}
+
+# =======================================
+# File Upload Security Configuration
+# =======================================
+# Maximum upload size in MB
+MAX_UPLOAD_SIZE_MB = config('MAX_UPLOAD_SIZE_MB', default=10, cast=int)
+
+# Allowed image file extensions
+ALLOWED_IMAGE_EXTENSIONS = config(
+    'ALLOWED_IMAGE_EXTENSIONS',
+    default='jpg,jpeg,png,gif,webp'
+)
+
+# Allowed document file extensions
+ALLOWED_DOCUMENT_EXTENSIONS = config(
+    'ALLOWED_DOCUMENT_EXTENSIONS',
+    default='pdf,doc,docx'
+)
+
+# Django's built-in upload handlers
+DATA_UPLOAD_MAX_MEMORY_SIZE = MAX_UPLOAD_SIZE_MB * 1024 * 1024  # Convert to bytes
+FILE_UPLOAD_MAX_MEMORY_SIZE = MAX_UPLOAD_SIZE_MB * 1024 * 1024

@@ -36,6 +36,112 @@ class OrderViewSet(viewsets.ModelViewSet):
         """Save order with current buyer"""
         serializer.save(buyer=self.request.user)
 
+    @action(detail=True, methods=['post'])
+    @transaction.atomic
+    def confirm_payment(self, request, pk=None):
+        """Confirm payment and create escrow after Paystack success"""
+        from wallet.models import Wallet, WalletTransaction, EscrowTransaction
+        from decimal import Decimal
+
+        order = self.get_object()
+
+        # Check if current user is the buyer
+        if order.buyer != request.user:
+            return Response(
+                {"detail": "You are not the buyer of this order"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # Check if order is pending payment
+        if order.status != 'pending':
+            return Response(
+                {"detail": f"Order is already {order.status}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Get payment details
+        payment_method = request.data.get('payment_method')  # 'wallet' or 'card'
+        paystack_reference = request.data.get('paystack_reference')  # For card payments
+
+        if payment_method == 'wallet':
+            # Wallet payment - deduct from buyer wallet and create escrow
+            buyer_wallet, _ = Wallet.objects.get_or_create(user=request.user)
+
+            total_amount = Decimal(str(order.amount))
+            current_balance = Decimal(str(buyer_wallet.balance))
+
+            # Check balance
+            if current_balance < total_amount:
+                return Response({
+                    'error': 'Insufficient wallet balance',
+                    'required': float(total_amount),
+                    'available': float(current_balance)
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            # Deduct from wallet
+            buyer_wallet.balance = current_balance - total_amount
+            buyer_wallet.save()
+
+            # Create wallet transaction
+            WalletTransaction.objects.create(
+                wallet=buyer_wallet,
+                type='debit',
+                amount=total_amount,
+                status='success',
+                description=f'Payment for order {order.reference}',
+                order=order,
+                reference=f"WALLET-{order.reference}"
+            )
+
+        elif payment_method == 'card':
+            # Card payment - verify Paystack payment
+            if not paystack_reference:
+                return Response(
+                    {"error": "Paystack reference required for card payments"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Verify payment with Paystack
+            import requests
+            from django.conf import settings
+
+            paystack_key = settings.PAYSTACK_SECRET_KEY
+            verify_url = f"https://api.paystack.co/transaction/verify/{paystack_reference}"
+            headers = {'Authorization': f'Bearer {paystack_key}'}
+
+            paystack_response = requests.get(verify_url, headers=headers)
+
+            if paystack_response.status_code != 200:
+                return Response({'error': 'Failed to verify payment'}, status=400)
+
+            paystack_data = paystack_response.json()
+
+            if not paystack_data.get('status') or paystack_data.get('data', {}).get('status') != 'success':
+                return Response({'error': 'Payment not verified'}, status=400)
+
+            # Verify amount matches
+            verified_amount = Decimal(str(paystack_data['data']['amount'])) / 100
+            if verified_amount != Decimal(str(order.amount)):
+                return Response({'error': 'Payment amount mismatch'}, status=400)
+
+        else:
+            return Response(
+                {"error": "Invalid payment method. Must be 'wallet' or 'card'"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Mark order as paid
+        order.status = 'paid'
+        order.paid_at = timezone.now()
+        order.save()
+
+        logger.info(f"Order {order.id} marked as paid via {payment_method}")
+
+        return Response({
+            "message": "Payment confirmed! Order is now in escrow.",
+            "order": self.get_serializer(order).data
+        }, status=status.HTTP_200_OK)
+
     # NEW: Get pending orders for seller
     @action(detail=False, methods=['get'])
     def pending(self, request):

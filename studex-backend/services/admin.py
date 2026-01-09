@@ -1,24 +1,73 @@
 # services/admin.py
 from django.contrib import admin
 from django.utils import timezone
+from django.utils.html import format_html
+from django.http import HttpResponse
+from django.db.models import Count
+import csv
 from .models import Category, Listing, Transaction
 
 
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):
-    list_display = ('title', 'slug')
+    list_display = ('title', 'slug', 'listing_count', 'active_listing_count')
     search_fields = ('title',)
     prepopulated_fields = {"slug": ("title",)}
     ordering = ('title',)
 
+    actions = ['export_to_csv']
+
+    def listing_count(self, obj):
+        """Show total listings in category"""
+        count = obj.listings.count()
+        return format_html(
+            '<span style="font-weight: bold;">{}</span>',
+            count
+        )
+    listing_count.short_description = 'Total Listings'
+
+    def active_listing_count(self, obj):
+        """Show active listings in category"""
+        count = obj.listings.filter(is_available=True).count()
+        return format_html(
+            '<span style="color: green; font-weight: bold;">{}</span>',
+            count
+        )
+    active_listing_count.short_description = 'Active Listings'
+
+    def export_to_csv(self, request, queryset):
+        """Export selected categories to CSV"""
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = 'attachment; filename="categories.csv"'
+
+        writer = csv.writer(response)
+        writer.writerow(['ID', 'Title', 'Slug', 'Total Listings', 'Active Listings'])
+
+        for category in queryset:
+            writer.writerow([
+                category.id,
+                category.title,
+                category.slug,
+                category.listings.count(),
+                category.listings.filter(is_available=True).count()
+            ])
+
+        return response
+    export_to_csv.short_description = "Export selected to CSV"
+
 
 @admin.register(Listing)
 class ListingAdmin(admin.ModelAdmin):
-    list_display = ('title', 'vendor', 'category', 'price', 'is_available', 'created_at')
-    list_filter = ('category', 'is_available', 'vendor__is_verified_vendor', 'vendor__user_type')
+    list_display = (
+        'title', 'vendor', 'vendor_status', 'category',
+        'price_display', 'availability_badge', 'order_count', 'created_at'
+    )
+    list_filter = ('category', 'is_available', 'vendor__is_verified_vendor', 'vendor__user_type', 'created_at')
     search_fields = ('title', 'description', 'vendor__username', 'vendor__business_name')
-    readonly_fields = ('created_at', 'updated_at')
+    readonly_fields = ('created_at', 'updated_at', 'get_total_orders', 'get_total_revenue')
     raw_id_fields = ('vendor',)
+    date_hierarchy = 'created_at'
+    list_per_page = 50
 
     fieldsets = (
         ('Product Info', {
@@ -27,11 +76,112 @@ class ListingAdmin(admin.ModelAdmin):
         ('Vendor & Availability', {
             'fields': ('vendor', 'is_available')
         }),
+        ('Statistics', {
+            'fields': ('get_total_orders', 'get_total_revenue'),
+            'classes': ('collapse',)
+        }),
         ('Timestamps', {
             'fields': ('created_at', 'updated_at'),
             'classes': ('collapse',),
         }),
     )
+
+    actions = ['mark_available', 'mark_unavailable', 'export_to_csv']
+
+    def vendor_status(self, obj):
+        """Show vendor verification status"""
+        if obj.vendor.is_verified_vendor:
+            return format_html(
+                '<span style="color: green;">✓ Verified</span>'
+            )
+        else:
+            return format_html(
+                '<span style="color: red;">✗ Unverified</span>'
+            )
+    vendor_status.short_description = 'Vendor Status'
+
+    def price_display(self, obj):
+        """Display price with currency formatting"""
+        return format_html(
+            '<span style="font-weight: bold;">₦{:,.2f}</span>',
+            float(obj.price)
+        )
+    price_display.short_description = 'Price'
+
+    def availability_badge(self, obj):
+        """Display availability with badge"""
+        if obj.is_available:
+            return format_html(
+                '<span style="background-color: green; color: white; padding: 2px 8px; border-radius: 3px;">AVAILABLE</span>'
+            )
+        else:
+            return format_html(
+                '<span style="background-color: gray; color: white; padding: 2px 8px; border-radius: 3px;">UNAVAILABLE</span>'
+            )
+    availability_badge.short_description = 'Availability'
+
+    def order_count(self, obj):
+        """Show number of orders for this listing"""
+        from orders.models import Order
+        count = Order.objects.filter(listing=obj).count()
+        return count
+    order_count.short_description = 'Orders'
+
+    def get_total_orders(self, obj):
+        """Get total number of orders"""
+        from orders.models import Order
+        count = Order.objects.filter(listing=obj).count()
+        return count
+    get_total_orders.short_description = 'Total Orders'
+
+    def get_total_revenue(self, obj):
+        """Calculate total revenue from this listing"""
+        from orders.models import Order
+        from django.db.models import Sum
+        revenue = Order.objects.filter(
+            listing=obj,
+            status='completed'
+        ).aggregate(total=Sum('amount'))['total'] or 0
+        return f"₦{revenue:,.2f}"
+    get_total_revenue.short_description = 'Total Revenue'
+
+    def mark_available(self, request, queryset):
+        """Mark selected listings as available"""
+        updated = queryset.update(is_available=True)
+        self.message_user(request, f"{updated} listing(s) marked as available.")
+    mark_available.short_description = "Mark as available"
+
+    def mark_unavailable(self, request, queryset):
+        """Mark selected listings as unavailable"""
+        updated = queryset.update(is_available=False)
+        self.message_user(request, f"{updated} listing(s) marked as unavailable.")
+    mark_unavailable.short_description = "Mark as unavailable"
+
+    def export_to_csv(self, request, queryset):
+        """Export selected listings to CSV"""
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = 'attachment; filename="listings.csv"'
+
+        writer = csv.writer(response)
+        writer.writerow([
+            'ID', 'Title', 'Vendor', 'Business Name', 'Category',
+            'Price', 'Is Available', 'Created At'
+        ])
+
+        for listing in queryset:
+            writer.writerow([
+                listing.id,
+                listing.title,
+                listing.vendor.username,
+                listing.vendor.business_name or 'N/A',
+                listing.category.title if listing.category else 'N/A',
+                float(listing.price),
+                'Yes' if listing.is_available else 'No',
+                listing.created_at.strftime('%Y-%m-%d %H:%M:%S')
+            ])
+
+        return response
+    export_to_csv.short_description = "Export selected to CSV"
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
@@ -42,11 +192,16 @@ class ListingAdmin(admin.ModelAdmin):
 
 @admin.register(Transaction)
 class TransactionAdmin(admin.ModelAdmin):
-    list_display = ('vendor', 'amount', 'status', 'created_at', 'released_at', 'withdrawn_at')  # ← Removed 'order'
+    list_display = (
+        'id', 'vendor', 'amount_display', 'colored_status',
+        'created_at', 'released_at', 'withdrawn_at'
+    )
     list_filter = ('status', 'created_at', 'released_at')
     search_fields = ('vendor__username', 'vendor__business_name')
-    readonly_fields = ('created_at', 'released_at', 'withdrawn_at')  # ← Removed 'order'
+    readonly_fields = ('created_at', 'released_at', 'withdrawn_at')
     raw_id_fields = ('vendor',)
+    date_hierarchy = 'created_at'
+    list_per_page = 50
 
     fieldsets = (
         ('Transaction Info', {
@@ -58,7 +213,30 @@ class TransactionAdmin(admin.ModelAdmin):
         }),
     )
 
-    actions = ['release_to_wallet', 'mark_as_withdrawn']
+    actions = ['release_to_wallet', 'mark_as_withdrawn', 'export_to_csv']
+
+    def amount_display(self, obj):
+        """Display amount with currency formatting"""
+        return format_html(
+            '<span style="font-weight: bold;">₦{:,.2f}</span>',
+            float(obj.amount)
+        )
+    amount_display.short_description = 'Amount'
+
+    def colored_status(self, obj):
+        """Display status with color coding"""
+        colors = {
+            'in_escrow': 'orange',
+            'released': 'green',
+            'withdrawn': 'blue'
+        }
+        color = colors.get(obj.status, 'black')
+        return format_html(
+            '<span style="color: {}; font-weight: bold;">{}</span>',
+            color,
+            obj.status.upper().replace('_', ' ')
+        )
+    colored_status.short_description = 'Status'
 
     def release_to_wallet(self, request, queryset):
         updated = 0
@@ -66,13 +244,13 @@ class TransactionAdmin(admin.ModelAdmin):
             txn.status = 'released'
             txn.released_at = timezone.now()
             txn.save()
-            
+
             # Add money to vendor wallet
             txn.vendor.wallet_balance += txn.amount
             txn.vendor.save()
-            
+
             updated += 1
-        
+
         self.message_user(request, f"{updated} transaction(s) released to vendor wallet.")
     release_to_wallet.short_description = "Release selected escrow to vendor wallet"
 
@@ -83,6 +261,32 @@ class TransactionAdmin(admin.ModelAdmin):
         )
         self.message_user(request, f"{updated} transaction(s) marked as withdrawn.")
     mark_as_withdrawn.short_description = "Mark selected as withdrawn to bank"
+
+    def export_to_csv(self, request, queryset):
+        """Export selected transactions to CSV"""
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = 'attachment; filename="transactions.csv"'
+
+        writer = csv.writer(response)
+        writer.writerow([
+            'ID', 'Vendor', 'Business Name', 'Amount', 'Status',
+            'Created At', 'Released At', 'Withdrawn At'
+        ])
+
+        for txn in queryset:
+            writer.writerow([
+                txn.id,
+                txn.vendor.username,
+                txn.vendor.business_name or 'N/A',
+                float(txn.amount),
+                txn.status,
+                txn.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+                txn.released_at.strftime('%Y-%m-%d %H:%M:%S') if txn.released_at else 'N/A',
+                txn.withdrawn_at.strftime('%Y-%m-%d %H:%M:%S') if txn.withdrawn_at else 'N/A'
+            ])
+
+        return response
+    export_to_csv.short_description = "Export selected to CSV"
 
     def has_add_permission(self, request):
         return False

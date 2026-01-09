@@ -2,6 +2,8 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils import timezone
+from django.http import HttpResponse
+import csv
 from .models import User, Profile, SellerApplication
 
 
@@ -69,7 +71,7 @@ class UserAdmin(BaseUserAdmin):
     ordering = ['-created_at']
 
     # Custom actions for easy vendor management
-    actions = ['approve_vendors', 'unverify_vendors']
+    actions = ['approve_vendors', 'unverify_vendors', 'export_to_csv']
 
     def approve_vendors(self, request, queryset):
         # Only approve actual vendors
@@ -81,6 +83,38 @@ class UserAdmin(BaseUserAdmin):
         updated = queryset.filter(user_type='vendor').update(is_verified_vendor=False)
         self.message_user(request, f"{updated} vendor(s) have been unverified.")
     unverify_vendors.short_description = "Unverify selected vendors"
+
+    def export_to_csv(self, request, queryset):
+        """Export selected users to CSV"""
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = 'attachment; filename="users.csv"'
+
+        writer = csv.writer(response)
+        writer.writerow([
+            'ID', 'Username', 'Email', 'User Type', 'Business Name',
+            'Phone', 'Matric Number', 'Hostel', 'Wallet Balance',
+            'Is Verified Vendor', 'Is Active', 'Is Staff', 'Created At'
+        ])
+
+        for user in queryset:
+            writer.writerow([
+                user.id,
+                user.username,
+                user.email,
+                user.user_type,
+                user.business_name or 'N/A',
+                user.phone or 'N/A',
+                user.matric_number or 'N/A',
+                user.hostel or 'N/A',
+                float(user.wallet_balance),
+                'Yes' if user.is_verified_vendor else 'No',
+                'Yes' if user.is_active else 'No',
+                'Yes' if user.is_staff else 'No',
+                user.created_at.strftime('%Y-%m-%d %H:%M:%S')
+            ])
+
+        return response
+    export_to_csv.short_description = "Export selected to CSV"
 
 
 # Optional: Separate Profile list view
