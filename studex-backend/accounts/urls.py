@@ -13,13 +13,14 @@ urlpatterns = [
     # Auth endpoints
     path('register/', views.register_user, name='register'),
     path('login/', views.login_user, name='login'),
+    path('firebase-login/', views.firebase_login, name='firebase-login'),
     path('logout/', views.logout_user, name='logout'),
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
-    
+
     # Profile endpoints
     path('profile/', views.get_user_profile, name='profile'),
     path('profile/update/', views.update_user_profile, name='profile-update'),
-    
+
     # Seller verification endpoints (via router)
     path('', include(router.urls)),
 ]

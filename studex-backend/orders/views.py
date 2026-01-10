@@ -42,6 +42,7 @@ class OrderViewSet(viewsets.ModelViewSet):
         """Confirm payment and create escrow after Paystack success"""
         from wallet.models import Wallet, WalletTransaction, EscrowTransaction
         from decimal import Decimal
+        from django.db.models import F
 
         order = self.get_object()
 
@@ -51,6 +52,14 @@ class OrderViewSet(viewsets.ModelViewSet):
                 {"detail": "You are not the buyer of this order"},
                 status=status.HTTP_403_FORBIDDEN
             )
+
+        # IDEMPOTENCY CHECK: Prevent duplicate payment processing
+        if order.status in ['paid', 'seller_completed', 'buyer_confirmed']:
+            return Response({
+                "message": "Payment already confirmed",
+                "order": self.get_serializer(order).data,
+                "status": order.status
+            }, status=status.HTTP_200_OK)
 
         # Check if order is pending payment
         if order.status != 'pending':
@@ -64,23 +73,26 @@ class OrderViewSet(viewsets.ModelViewSet):
         paystack_reference = request.data.get('paystack_reference')  # For card payments
 
         if payment_method == 'wallet':
+            # CRITICAL FIX: Use database-level locking to prevent race condition
             # Wallet payment - deduct from buyer wallet and create escrow
-            buyer_wallet, _ = Wallet.objects.get_or_create(user=request.user)
+            buyer_wallet = Wallet.objects.select_for_update().get(user=request.user)
 
             total_amount = Decimal(str(order.amount))
-            current_balance = Decimal(str(buyer_wallet.balance))
 
-            # Check balance
-            if current_balance < total_amount:
+            # Check balance with locked wallet
+            if buyer_wallet.balance < total_amount:
                 return Response({
                     'error': 'Insufficient wallet balance',
                     'required': float(total_amount),
-                    'available': float(current_balance)
+                    'available': float(buyer_wallet.balance)
                 }, status=status.HTTP_400_BAD_REQUEST)
 
-            # Deduct from wallet
-            buyer_wallet.balance = current_balance - total_amount
+            # ATOMIC UPDATE: Deduct from wallet using F() expression
+            buyer_wallet.balance = F('balance') - total_amount
             buyer_wallet.save()
+
+            # Refresh to get the updated balance
+            buyer_wallet.refresh_from_db()
 
             # Create wallet transaction
             WalletTransaction.objects.create(
@@ -101,6 +113,20 @@ class OrderViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
+            # IDEMPOTENCY CHECK: Prevent duplicate charges with same reference
+            from orders.models import Order
+            duplicate_order = Order.objects.filter(
+                payment_reference=paystack_reference,
+                status__in=['paid', 'seller_completed', 'buyer_confirmed']
+            ).exclude(id=order.id).first()
+
+            if duplicate_order:
+                return Response({
+                    'error': 'This payment reference has already been used',
+                    'duplicate_order_id': duplicate_order.id,
+                    'message': 'Payment already processed for another order'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
             # Verify payment with Paystack
             import requests
             from django.conf import settings
@@ -109,7 +135,14 @@ class OrderViewSet(viewsets.ModelViewSet):
             verify_url = f"https://api.paystack.co/transaction/verify/{paystack_reference}"
             headers = {'Authorization': f'Bearer {paystack_key}'}
 
-            paystack_response = requests.get(verify_url, headers=headers)
+            try:
+                paystack_response = requests.get(verify_url, headers=headers, timeout=10)
+            except requests.exceptions.RequestException as e:
+                logger.error(f"Paystack verification failed: {str(e)}")
+                return Response({
+                    'error': 'Failed to connect to payment provider',
+                    'details': 'Please try again in a moment'
+                }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
             if paystack_response.status_code != 200:
                 return Response({'error': 'Failed to verify payment'}, status=400)
@@ -124,6 +157,9 @@ class OrderViewSet(viewsets.ModelViewSet):
             if verified_amount != Decimal(str(order.amount)):
                 return Response({'error': 'Payment amount mismatch'}, status=400)
 
+            # Store payment reference on order for future idempotency checks
+            order.payment_reference = paystack_reference
+
         else:
             return Response(
                 {"error": "Invalid payment method. Must be 'wallet' or 'card'"},
@@ -137,9 +173,40 @@ class OrderViewSet(viewsets.ModelViewSet):
 
         logger.info(f"Order {order.id} marked as paid via {payment_method}")
 
+        # CRITICAL FIX: Create escrow transaction
+        from wallet.models import EscrowTransaction
+
+        total_amount = Decimal(str(order.amount))
+        platform_fee_rate = Decimal('0.05')  # 5% platform fee
+        platform_fee = total_amount * platform_fee_rate
+        seller_amount = total_amount - platform_fee
+
+        escrow, created = EscrowTransaction.objects.get_or_create(
+            order=order,
+            defaults={
+                'buyer': order.buyer,
+                'seller': order.listing.vendor,
+                'total_amount': total_amount,
+                'seller_amount': seller_amount,
+                'platform_fee': platform_fee,
+                'status': 'held'
+            }
+        )
+
+        if created:
+            logger.info(f"✅ Escrow created for order {order.id}: Total=₦{total_amount}, Seller=₦{seller_amount}, Platform=₦{platform_fee}")
+        else:
+            logger.info(f"Escrow already exists for order {order.id}")
+
         return Response({
             "message": "Payment confirmed! Order is now in escrow.",
-            "order": self.get_serializer(order).data
+            "order": self.get_serializer(order).data,
+            "escrow": {
+                "total": float(total_amount),
+                "seller_amount": float(seller_amount),
+                "platform_fee": float(platform_fee),
+                "status": "held"
+            }
         }, status=status.HTTP_200_OK)
 
     # NEW: Get pending orders for seller
