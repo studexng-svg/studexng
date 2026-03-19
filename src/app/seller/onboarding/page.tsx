@@ -7,8 +7,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import Image from "next/image";
-import { getAuth } from "firebase/auth";
-import { useAuth } from "@/lib/authStore";
+import { useAuth, getToken } from "@/lib/authStore";
 
 export default function SellerOnboarding() {
   const [step, setStep] = useState(1);
@@ -21,7 +20,7 @@ export default function SellerOnboarding() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, isLoggedIn } = useAuth();
 
   const handleFile = (type: "id" | "admission", file: File | null) => {
     setFiles(prev => ({ ...prev, [type]: file }));
@@ -37,6 +36,13 @@ export default function SellerOnboarding() {
       return;
     }
 
+    // Check Django JWT login
+    if (!isLoggedIn) {
+      setError("Please log in first");
+      router.push("/auth");
+      return;
+    }
+
     setLoading(true);
     setError("");
 
@@ -46,34 +52,25 @@ export default function SellerOnboarding() {
     formData.append("business_age_confirmed", "true");
 
     try {
-      // Get Firebase ID token (NOT JWT access token)
-      const auth = getAuth();
-      const currentUser = auth.currentUser;
-      
-      if (!currentUser) {
-        throw new Error("Please login first");
-      }
+      const token = getToken();
 
-      const firebaseToken = await currentUser.getIdToken();
-
-      const response = await fetch("http://127.0.0.1:8000/api/auth/seller/applications/", {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/api/auth/seller/applications/`, {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${firebaseToken}`,  // ✅ FIXED: Use Firebase token
+          Authorization: `Bearer ${token}`,
         },
         body: formData,
       });
 
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(data.detail || "Submission failed");
+        throw new Error(data.detail || data.error || "Submission failed");
       }
 
-      // Success - set success state and redirect after delay
       setSuccess(true);
       setTimeout(() => {
         router.push("/account");
-      }, 3000);  // Redirect after success message
+      }, 3000);
     } catch (err: any) {
       setError(err.message || "Failed to submit. Please try again.");
       setLoading(false);

@@ -1,16 +1,10 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Mail, Lock, Eye, EyeOff, Store, ArrowLeft, User, Phone, MapPin, IdCard } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff, Store, ArrowLeft, User, Phone, MapPin, AlertCircle } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { api } from "../../../lib/api";
-import Image from "next/image";
-import { auth } from "@/lib/firebase";
-import { 
-  signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword 
-} from "firebase/auth";
+import { api } from "@/lib/api";
 import { useAuth } from "@/lib/authStore";
 
 export default function AuthPage() {
@@ -23,46 +17,49 @@ export default function AuthPage() {
   const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
-  const [resetPhone, setResetPhone] = useState("");
+  const [resetEmail, setResetEmail] = useState("");
   const [resetSent, setResetSent] = useState(false);
+  const [resetLink, setResetLink] = useState("");
+  const [accountDisabled, setAccountDisabled] = useState(false);
 
   // Login state
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [loginError, setLoginError] = useState("");
+  const [rememberMe, setRememberMe] = useState(false);
 
   // Signup state
   const [signupForm, setSignupForm] = useState({
-    username: "",
-    email: "",
-    identifier: "",
-    phone: "",
-    hostel: "",
-    password: "",
-    password2: "",
-    matric_number: "",
+    username: "", email: "", phone: "", hostel: "", password: "", password2: "",
   });
 
   const router = useRouter();
   const { login: storeLogin, isLoggedIn, isHydrated } = useAuth();
 
-  const hostels = ["Cedar", "Trezadel", "Trinity", "Pearl", "Redwood", "Cooperative Quenns", "Aster Hall", "Cooperative kings", "Pod", "Faith", "Amethyst", "Emerald", "EDC"];
+  const hostels = ["Cedar", "Trezadel", "Trinity", "Pearl", "Redwood", "Cooperative Queens", "Aster Hall", "Cooperative Kings", "Pod", "Faith", "Amethyst", "Emerald", "EDC"];
 
   useEffect(() => {
     setMounted(true);
+    // Load remembered credentials
+    try {
+      const saved = localStorage.getItem("studex-remember");
+      if (saved) {
+        const { email, password } = JSON.parse(saved);
+        if (email) setLoginEmail(email);
+        if (password) setLoginPassword(password);
+        setRememberMe(true);
+      }
+    } catch {}
   }, []);
 
-  // CRITICAL FIX: Redirect logged-in users to home page
   useEffect(() => {
-    if (isHydrated && isLoggedIn) {
-      router.push("/home");
-    }
+    if (isHydrated && isLoggedIn) router.push("/home");
   }, [isHydrated, isLoggedIn, router]);
 
-  // LOGIN HANDLERS
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError("");
+    setAccountDisabled(false);
     setIsLoading(true);
 
     if (!loginEmail || !loginPassword) {
@@ -72,49 +69,54 @@ export default function AuthPage() {
     }
 
     try {
-      const result = await api.login({
-        email: loginEmail,
-        password: loginPassword,
-      });
-      
-      // Update Zustand auth store with user data and tokens
+      const result = await api.login({ email: loginEmail, password: loginPassword });
       storeLogin(result.user, result.tokens.access, result.tokens.refresh);
+
+      // Save or clear remembered credentials
+      if (rememberMe) {
+        localStorage.setItem("studex-remember", JSON.stringify({ email: loginEmail, password: loginPassword }));
+      } else {
+        localStorage.removeItem("studex-remember");
+      }
 
       setMessage("Login successful!");
       setTimeout(() => router.push("/home"), 1000);
     } catch (err: any) {
-      setLoginError(err.message || "Login failed");
+      const msg = err.message || "";
+      if (msg.includes("disabled") || err.disabled) {
+        setAccountDisabled(true);
+        setLoginError("Sorry, your account has been disabled. Contact support to get your account re-enabled.");
+      } else {
+        setLoginError(msg || "Invalid login details, please try again.");
+      }
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleResetPassword = (e: React.FormEvent) => {
+  const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Validate Nigerian phone number format (11 digits starting with 0, or 10 digits without 0)
-    const phoneRegex = /^(0[789][01]\d{8}|[789][01]\d{8})$/;
-    if (!resetPhone || !phoneRegex.test(resetPhone.replace(/\s+/g, ''))) {
-      setLoginError("Please enter a valid Nigerian phone number (e.g., 08012345678)");
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!resetEmail || !emailRegex.test(resetEmail)) {
+      setLoginError("Please enter a valid email address");
       return;
     }
-    setResetSent(true);
+    setIsLoading(true);
     setLoginError("");
+    try {
+      const result = await api.forgotPassword(resetEmail);
+      setResetLink((result as any).reset_url || "");
+      setResetSent(true);
+    } catch (err: any) {
+      setLoginError(err.message || "Something went wrong. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  // SIGNUP HANDLERS
   const handleSignupChange = (e: any) => {
     const { name, value } = e.target;
-    setSignupForm({ ...signupForm, [name]: value });
-    
-    // Auto-set email from identifier if it's an email
-    if (name === "identifier" && value.includes("@")) {
-      setSignupForm(prev => ({ ...prev, email: value, identifier: value }));
-    }
-    
-    // Auto-set matric_number from identifier if it's a matric
-    if (name === "identifier" && value.match(/^(PAU\/\d{4}\/\d{5}|\d{4}\/\d{4})$/i)) {
-      setSignupForm(prev => ({ ...prev, matric_number: value }));
-    }
+    setSignupForm(prev => ({ ...prev, [name]: value }));
   };
 
   const generateOTP = () => {
@@ -127,29 +129,21 @@ export default function AuthPage() {
   const handleSignupSubmit = async (e: any) => {
     e.preventDefault();
     setMessage("");
-    
+
     if (step === 1) {
-      // Validate first step
-      if (!signupForm.username || !signupForm.identifier || !signupForm.phone || !signupForm.hostel || !signupForm.password) {
+      if (!signupForm.username || !signupForm.email || !signupForm.phone || !signupForm.hostel || !signupForm.password) {
         setMessage("Please fill all fields");
         return;
       }
-      
-      // Set email if identifier is email
-      if (signupForm.identifier.includes("@")) {
-        signupForm.email = signupForm.identifier;
-      } else if (!signupForm.email) {
-        setMessage("Please provide a valid email address");
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(signupForm.email)) {
+        setMessage("Please enter a valid email address");
         return;
       }
-      
-      // Set password2 same as password
       signupForm.password2 = signupForm.password;
-      
       generateOTP();
       setStep(2);
     } else {
-      // Step 2: Verify OTP and register
       if (otp === sentOtp) {
         setIsLoading(true);
         try {
@@ -160,21 +154,9 @@ export default function AuthPage() {
             password: signupForm.password,
             password2: signupForm.password2,
             user_type: "student",
-            matric_number: signupForm.matric_number || undefined,
             hostel: signupForm.hostel,
           });
-          
-          // Update Zustand auth store
           storeLogin(result.user, result.tokens.access, result.tokens.refresh);
-          
-          // Create Firebase account after backend signup
-          try {
-            await createUserWithEmailAndPassword(auth, signupForm.email, signupForm.password);
-            console.log("Firebase account created successfully");
-          } catch (fbErr) {
-            console.warn("Firebase create failed (non-blocking):", fbErr);
-          }
-
           setMessage("Welcome to StudEx!");
           setTimeout(() => router.push("/home"), 1500);
         } catch (err: any) {
@@ -188,67 +170,37 @@ export default function AuthPage() {
     }
   };
 
-  const flipToSignup = () => {
-    setIsFlipped(true);
-    setIsForgotPassword(false);
-    setLoginError("");
-    setMessage("");
-  };
-
-  const flipToLogin = () => {
-    setIsFlipped(false);
-    setStep(1);
-    setMessage("");
-    setOtp("");
-  };
-
-  const isEmail = signupForm.identifier.includes("@");
-  const isMatric = signupForm.identifier.match(/^(PAU\/\d{4}\/\d{5}|\d{4}\/\d{4})$/i);
+  const flipToSignup = () => { setIsFlipped(true); setIsForgotPassword(false); setLoginError(""); setMessage(""); setAccountDisabled(false); };
+  const flipToLogin = () => { setIsFlipped(false); setStep(1); setMessage(""); setOtp(""); };
 
   if (!mounted) {
     return (
       <div className="min-h-screen bg-[#FFF8F0] dark:bg-gray-950 flex items-center justify-center">
-        <div className="w-20 h-20 border-4 border-transparent bg-gradient-to-r from-teal-500 to-purple-600 rounded-full animate-spin"></div>
+        <div className="w-20 h-20 border-4 border-transparent bg-gradient-to-r from-teal-500 to-purple-600 rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-[#FFF8F0] dark:bg-gray-950 flex items-center justify-center p-4 perspective-1000 relative overflow-hidden">
-      {/* Subtle pattern background */}
       <div className="absolute inset-0 opacity-5" style={{
         backgroundImage: `url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M20 0l5 15h16l-13 9 5 15-13-9-13 9 5-15-13-9h16z' fill='%237C3AED' fill-opacity='0.4'/%3E%3C/svg%3E")`,
       }} />
-      
-      {/* Back Button */}
-      <button
-        onClick={() => router.push("/")}
-        className="absolute top-6 left-6 z-50 text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/30 p-3 rounded-full transition-all shadow-lg bg-white/80 dark:bg-gray-800/80 backdrop-blur"
-      >
+
+      <button onClick={() => router.push("/")}
+        className="absolute top-6 left-6 z-50 text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/30 p-3 rounded-full transition-all shadow-lg bg-white/80 dark:bg-gray-800/80 backdrop-blur">
         <ArrowLeft className="w-7 h-7" />
       </button>
 
-      {/* FLIP CARD CONTAINER */}
       <div className="relative w-full max-w-md h-[700px]" style={{ perspective: "1000px" }}>
-        <motion.div
-          className="relative w-full h-full"
-          initial={false}
+        <motion.div className="relative w-full h-full" initial={false}
           animate={{ rotateY: isFlipped ? 180 : 0 }}
           transition={{ duration: 1.2, type: "spring", stiffness: 60, damping: 20 }}
-          style={{ transformStyle: "preserve-3d" }}
-        >
-          
-          {/* LOGIN SIDE (FRONT) */}
-          <div
-            className="absolute w-full h-full"
-            style={{
-              backfaceVisibility: "hidden",
-              WebkitBackfaceVisibility: "hidden"
-            }}
-          >
+          style={{ transformStyle: "preserve-3d" }}>
+
+          {/* ========== LOGIN SIDE ========== */}
+          <div className="absolute w-full h-full" style={{ backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden" }}>
             <div className="bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl rounded-3xl shadow-2xl p-8 border border-white/30 dark:border-gray-700/30 h-full overflow-y-auto">
-              
-              {/* Logo & Title - DESIGN 3.0 */}
               <div className="text-center mb-8">
                 <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-teal-500 to-purple-600 rounded-full flex items-center justify-center shadow-xl">
                   <Store className="w-12 h-12 text-white" />
@@ -257,29 +209,29 @@ export default function AuthPage() {
                   {isForgotPassword ? "Reset Password" : "Welcome Back"}
                 </h1>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mt-2 font-medium">
-                  {isForgotPassword ? "We'll send you an OTP via SMS" : "Login to your StudEx account"}
+                  {isForgotPassword ? "Enter your email to get a reset link" : "Login to your StudEx account"}
                 </p>
               </div>
 
-              {/* Forgot Password Form */}
               {isForgotPassword ? (
                 <form onSubmit={handleResetPassword} className="space-y-6">
                   {resetSent ? (
-                    <div className="text-center py-8">
-                      <div className="w-20 h-20 mx-auto mb-4 bg-emerald-100 dark:bg-emerald-900/30 rounded-full flex items-center justify-center">
-                        <Phone className="w-10 h-10 text-emerald-600 dark:text-emerald-400" />
+                    <div className="text-center py-4 space-y-5">
+                      <div className="w-20 h-20 mx-auto bg-emerald-100 dark:bg-emerald-900/30 rounded-full flex items-center justify-center">
+                        <Mail className="w-10 h-10 text-emerald-600 dark:text-emerald-400" />
                       </div>
-                      <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200">Check your phone!</h3>
-                      <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">We sent a password reset OTP to</p>
-                      <p className="font-bold text-purple-600 dark:text-purple-400 mt-1">{resetPhone}</p>
-                      <button
-                        onClick={() => {
-                          setIsForgotPassword(false);
-                          setResetSent(false);
-                          setResetPhone("");
-                        }}
-                        className="mt-6 text-purple-600 dark:text-purple-400 font-medium underline"
-                      >
+                      <div>
+                        <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200">Link Ready!</h3>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Click below to reset the password for</p>
+                        <p className="font-bold text-purple-600 dark:text-purple-400 mt-1 text-sm">{resetEmail}</p>
+                      </div>
+                      {resetLink && (
+                        <a href={resetLink} className="block w-full py-5 px-4 rounded-2xl bg-gradient-to-r from-teal-500 to-purple-600 text-white font-black text-lg text-center shadow-xl">
+                          Reset My Password →
+                        </a>
+                      )}
+                      <button type="button" onClick={() => { setIsForgotPassword(false); setResetSent(false); setResetEmail(""); setResetLink(""); setLoginError(""); }}
+                        className="w-full text-center text-purple-600 dark:text-purple-400 font-medium underline">
                         Back to Login
                       </button>
                     </div>
@@ -287,141 +239,99 @@ export default function AuthPage() {
                     <>
                       <div>
                         <label className="block text-sm font-medium mb-2 text-purple-700 dark:text-purple-400">
-                          <Phone className="w-4 h-4 inline mr-1" /> Phone Number
+                          <Mail className="w-4 h-4 inline mr-1" /> Email Address
                         </label>
-                        <input
-                          type="tel"
-                          value={resetPhone}
-                          onChange={(e) => setResetPhone(e.target.value)}
-                          placeholder="08012345678"
+                        <input type="email" value={resetEmail} onChange={e => setResetEmail(e.target.value)}
+                          placeholder="you@pau.edu.ng"
                           className="w-full p-4 rounded-2xl border-2 focus:outline-none transition-all bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400"
-                          style={{ borderColor: resetPhone ? "#7C3AED" : "#e2e8f0" }}
-                          required
-                        />
+                          style={{ borderColor: resetEmail ? "#7C3AED" : "#e2e8f0" }} required disabled={isLoading} />
                       </div>
-
-                      {loginError && <p className="text-sm text-red-600 dark:text-red-400 text-center -mt-2">{loginError}</p>}
-
-                      <button
-                        type="submit"
-                        className="w-full py-5 rounded-2xl font-black text-white text-lg shadow-xl bg-gradient-to-r from-teal-500 to-purple-600 hover:from-teal-600 hover:to-purple-700 transition-all"
-                      >
-                        Send Reset Link
+                      {loginError && <p className="text-sm text-red-600 dark:text-red-400 text-center">{loginError}</p>}
+                      <button type="submit" disabled={isLoading}
+                        className="w-full py-5 rounded-2xl font-black text-white text-lg shadow-xl bg-gradient-to-r from-teal-500 to-purple-600 disabled:opacity-50">
+                        {isLoading ? "Getting link..." : "Get Reset Link"}
                       </button>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsForgotPassword(false);
-                          setLoginError("");
-                        }}
-                        className="w-full text-center text-purple-600 dark:text-purple-400 font-medium underline mt-4"
-                      >
+                      <button type="button" onClick={() => { setIsForgotPassword(false); setLoginError(""); }}
+                        className="w-full text-center text-purple-600 dark:text-purple-400 font-medium underline">
                         Back to Login
                       </button>
                     </>
                   )}
                 </form>
               ) : (
-                /* Normal Login Form */
                 <form onSubmit={handleLogin} className="space-y-5">
                   <div>
                     <label className="block text-sm font-medium mb-2 text-purple-700 dark:text-purple-400">
                       <Mail className="w-4 h-4 inline mr-1" /> Email
                     </label>
-                    <input
-                      type="email"
-                      value={loginEmail}
-                      onChange={(e) => setLoginEmail(e.target.value)}
+                    <input type="email" value={loginEmail} onChange={e => setLoginEmail(e.target.value)}
                       placeholder="you@pau.edu.ng"
                       className="w-full p-4 rounded-2xl border-2 focus:outline-none transition-all bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400"
-                      style={{ borderColor: loginEmail ? "#7C3AED" : "#e2e8f0" }}
-                      required
-                      disabled={isLoading}
-                    />
+                      style={{ borderColor: loginEmail ? "#7C3AED" : "#e2e8f0" }} required disabled={isLoading || accountDisabled} />
                   </div>
-
                   <div className="relative">
                     <label className="block text-sm font-medium mb-2 text-purple-700 dark:text-purple-400">
                       <Lock className="w-4 h-4 inline mr-1" /> Password
                     </label>
-                    <input
-                      type={showPass ? "text" : "password"}
-                      value={loginPassword}
-                      onChange={(e) => setLoginPassword(e.target.value)}
+                    <input type={showPass ? "text" : "password"} value={loginPassword} onChange={e => setLoginPassword(e.target.value)}
                       placeholder="Enter your password"
                       className="w-full p-4 pr-14 rounded-2xl border-2 focus:outline-none transition-all bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400"
-                      style={{ borderColor: loginPassword ? "#7C3AED" : "#e2e8f0" }}
-                      required
-                      disabled={isLoading}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPass(!showPass)}
-                      className="absolute right-4 top-11 text-gray-500 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 transition"
-                    >
+                      style={{ borderColor: loginPassword ? "#7C3AED" : "#e2e8f0" }} required disabled={isLoading || accountDisabled} />
+                    <button type="button" onClick={() => setShowPass(!showPass)}
+                      className="absolute right-4 top-11 text-gray-500 dark:text-gray-400 hover:text-purple-600 transition">
                       {showPass ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                     </button>
                   </div>
-
                   <div className="flex justify-between items-center">
-                    <label className="flex items-center gap-2 text-sm">
-                      <input type="checkbox" className="rounded text-purple-600" />
+                    <label className="flex items-center gap-2 text-sm cursor-pointer">
+                      <input type="checkbox" checked={rememberMe} onChange={e => setRememberMe(e.target.checked)}
+                        className="rounded text-purple-600" />
                       <span className="text-gray-700 dark:text-gray-300">Remember me</span>
                     </label>
-                    <button
-                      type="button"
-                      onClick={() => setIsForgotPassword(true)}
-                      className="text-sm text-purple-600 dark:text-purple-400 font-medium hover:underline"
-                    >
+                    <button type="button" onClick={() => setIsForgotPassword(true)}
+                      className="text-sm text-purple-600 dark:text-purple-400 font-medium hover:underline">
                       Forgot password?
                     </button>
                   </div>
 
-                  {loginError && <p className="text-sm text-red-600 dark:text-red-400 text-center -mt-2">{loginError}</p>}
-                  {message && <p className="text-sm text-green-600 dark:text-green-400 text-center -mt-2">{message}</p>}
+                  {/* Error message */}
+                  {loginError && (
+                    <div className={`flex items-start gap-2 p-3 rounded-xl text-sm font-medium ${
+                      accountDisabled
+                        ? "bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400"
+                        : "text-red-600 dark:text-red-400 text-center"
+                    }`}>
+                      {accountDisabled && <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />}
+                      <span>{loginError}</span>
+                    </div>
+                  )}
 
-                  <button
-                    type="submit"
-                    disabled={isLoading}
-                    className="w-full py-5 rounded-2xl font-black text-white text-lg shadow-xl bg-gradient-to-r from-teal-500 to-purple-600 hover:from-teal-600 hover:to-purple-700 transition-all disabled:opacity-50"
-                  >
-                    {isLoading ? "Logging in..." : "Login to StudEx"}
+                  {message && <p className="text-sm text-green-600 dark:text-green-400 text-center">{message}</p>}
+
+                  <button type="submit" disabled={isLoading || accountDisabled}
+                    className="w-full py-5 rounded-2xl font-black text-white text-lg shadow-xl bg-gradient-to-r from-teal-500 to-purple-600 hover:from-teal-600 hover:to-purple-700 transition-all disabled:opacity-50">
+                    {isLoading ? "Logging in..." : accountDisabled ? "Account Disabled" : "Login to StudEx"}
                   </button>
                 </form>
               )}
 
-              {/* Navigate to Signup */}
               {!isForgotPassword && (
                 <p className="text-center text-sm text-gray-600 dark:text-gray-400 mt-8">
                   New to StudEx?{" "}
-                  <button
-                    type="button"
-                    onClick={flipToSignup}
-                    className="font-bold text-purple-600 dark:text-purple-400 underline hover:text-purple-700 dark:hover:text-purple-300 transition"
-                  >
+                  <button type="button" onClick={flipToSignup}
+                    className="font-bold text-purple-600 dark:text-purple-400 underline hover:text-purple-700 transition">
                     Create account
                   </button>
                 </p>
               )}
-
-              <p className="text-center text-xs text-gray-500 dark:text-gray-400 mt-8">© 2025 StudEx • Pan-Atlantic University Only</p>
+              <p className="text-center text-xs text-gray-500 dark:text-gray-400 mt-4">© 2025 StudEx • Pan-Atlantic University Only</p>
             </div>
           </div>
 
-          {/* SIGNUP SIDE (BACK) */}
-          <div
-            className="absolute w-full h-full"
-            style={{
-              backfaceVisibility: "hidden",
-              WebkitBackfaceVisibility: "hidden",
-              transform: "rotateY(180deg)"
-            }}
-          >
+          {/* ========== SIGNUP SIDE ========== */}
+          <div className="absolute w-full h-full" style={{ backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden", transform: "rotateY(180deg)" }}>
             <div className="bg-white/95 dark:bg-gray-900/95 backdrop-blur-2xl rounded-3xl shadow-2xl p-8 border border-purple-100 dark:border-gray-700/30 h-full overflow-y-auto">
-              
-              {/* Logo - DESIGN 3.0 */}
-              <div className="text-center mb-8">
+              <div className="text-center mb-6">
                 <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-teal-500 to-purple-600 rounded-full flex items-center justify-center shadow-xl">
                   <Store className="w-12 h-12 text-white" />
                 </div>
@@ -429,194 +339,105 @@ export default function AuthPage() {
                   {step === 1 ? "Create Account" : "Verify Phone"}
                 </h1>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mt-2 font-medium">
-                  {step === 1 ? "Join the PAU movement in 30 seconds" : "Enter 6-digit code"}
+                  {step === 1 ? "Join the PAU movement in 30 seconds" : "Enter the 6-digit code"}
                 </p>
               </div>
 
-              <form onSubmit={handleSignupSubmit} className="space-y-6">
-
+              <form onSubmit={handleSignupSubmit} className="space-y-5">
                 {step === 1 ? (
                   <>
-                    {/* USERNAME */}
                     <div>
                       <label className="text-sm font-bold text-purple-700 dark:text-purple-400 flex items-center gap-2 mb-2">
-                        <User className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                        Username
+                        <User className="w-4 h-4" /> Username
                       </label>
                       <div className="relative">
-                        <span className="absolute left-4 top-4 text-purple-500 dark:text-purple-400 font-bold text-lg">@</span>
-                        <input
-                          type="text"
-                          name="username"
-                          value={signupForm.username}
-                          onChange={handleSignupChange}
+                        <span className="absolute left-4 top-4 text-purple-500 font-bold text-lg">@</span>
+                        <input type="text" name="username" value={signupForm.username} onChange={handleSignupChange}
                           placeholder="chinedu_tech"
                           className="w-full pl-12 pr-4 py-4 rounded-2xl border-2 border-purple-200 dark:border-gray-700 focus:border-purple-500 focus:outline-none transition-all text-lg font-medium bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400"
-                          required
-                          disabled={isLoading}
-                        />
+                          required disabled={isLoading} />
                       </div>
                     </div>
-
-                    {/* MATRIC OR EMAIL */}
                     <div>
                       <label className="text-sm font-bold text-purple-700 dark:text-purple-400 flex items-center gap-2 mb-2">
-                        {isEmail || signupForm.identifier.includes("@") ? (
-                          <Mail className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                        ) : (
-                          <IdCard className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                        )}
-                        Matric Number or Student Email
+                        <Mail className="w-4 h-4" /> Email Address
                       </label>
-                      <input
-                        type="text"
-                        name="identifier"
-                        value={signupForm.identifier}
-                        onChange={handleSignupChange}
-                        placeholder="PAU/2021/12345  or  john.doe@pau.edu.ng"
+                      <input type="email" name="email" value={signupForm.email} onChange={handleSignupChange}
+                        placeholder="you@pau.edu.ng"
                         className="w-full px-4 py-4 rounded-2xl border-2 border-purple-200 dark:border-gray-700 focus:border-purple-500 focus:outline-none transition-all text-lg font-medium bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400"
-                        required
-                        disabled={isLoading}
-                      />
-                      <p className="text-xs text-purple-600 dark:text-purple-400 mt-2 font-medium">
-                        {signupForm.identifier === "" && "Enter your matric or student email"}
-                        {isMatric && "✓ Valid Matric Number"}
-                        {isEmail && "✓ Valid Student Email"}
-                        {signupForm.identifier && !isEmail && !isMatric && "Please use correct format"}
-                      </p>
+                        required disabled={isLoading} />
                     </div>
-
-                    {/* PHONE */}
                     <div>
                       <label className="text-sm font-bold text-purple-700 dark:text-purple-400 flex items-center gap-2 mb-2">
-                        <Phone className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                        Phone Number
+                        <Phone className="w-4 h-4" /> Phone Number
                       </label>
-                      <input
-                        type="tel"
-                        name="phone"
-                        value={signupForm.phone}
-                        onChange={handleSignupChange}
+                      <input type="tel" name="phone" value={signupForm.phone} onChange={handleSignupChange}
                         placeholder="08012345678"
                         className="w-full px-4 py-4 rounded-2xl border-2 border-purple-200 dark:border-gray-700 focus:border-purple-500 focus:outline-none transition-all text-lg font-medium bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400"
-                        required
-                        disabled={isLoading}
-                      />
+                        required disabled={isLoading} />
                     </div>
-
-                    {/* HOSTEL */}
                     <div>
                       <label className="text-sm font-bold text-purple-700 dark:text-purple-400 flex items-center gap-2 mb-2">
-                        <MapPin className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                        Hostel / Location
+                        <MapPin className="w-4 h-4" /> Hostel / Location
                       </label>
-                      <select
-                        name="hostel"
-                        value={signupForm.hostel}
-                        onChange={handleSignupChange}
+                      <select name="hostel" value={signupForm.hostel} onChange={handleSignupChange}
                         className="w-full px-4 py-4 rounded-2xl border-2 border-purple-200 dark:border-gray-700 focus:border-purple-500 focus:outline-none transition-all text-lg font-medium bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                        required
-                        disabled={isLoading}
-                      >
+                        required disabled={isLoading}>
                         <option value="">Select your hostel</option>
-                        {hostels.map((h) => (
-                          <option key={h} value={h}>{h}</option>
-                        ))}
+                        {hostels.map(h => <option key={h} value={h}>{h}</option>)}
                       </select>
                     </div>
-
-                    {/* PASSWORD */}
                     <div>
                       <label className="text-sm font-bold text-purple-700 dark:text-purple-400 flex items-center gap-2 mb-2">
-                        <Lock className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                        Password
+                        <Lock className="w-4 h-4" /> Password
                       </label>
                       <div className="relative">
-                        <input
-                          type={showPass ? "text" : "password"}
-                          name="password"
-                          value={signupForm.password}
-                          onChange={handleSignupChange}
+                        <input type={showPass ? "text" : "password"} name="password" value={signupForm.password} onChange={handleSignupChange}
                           placeholder="Create strong password"
                           className="w-full pr-12 pl-4 py-4 rounded-2xl border-2 border-purple-200 dark:border-gray-700 focus:border-purple-500 focus:outline-none transition-all text-lg font-medium bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder:text-gray-500 dark:placeholder:text-gray-400"
-                          required
-                          disabled={isLoading}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPass(!showPass)}
-                          className="absolute right-4 top-4 text-purple-500 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300"
-                        >
+                          required disabled={isLoading} />
+                        <button type="button" onClick={() => setShowPass(!showPass)}
+                          className="absolute right-4 top-4 text-purple-500 hover:text-purple-700">
                           {showPass ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                         </button>
                       </div>
                     </div>
                   </>
                 ) : (
-                  /* OTP STEP */
                   <div className="space-y-8">
                     <div className="text-center p-6 bg-purple-50 dark:bg-purple-900/20 rounded-2xl border-2 border-purple-200 dark:border-purple-700">
                       <p className="text-sm font-bold text-purple-800 dark:text-purple-300">We sent a code to</p>
                       <p className="text-xl font-black text-purple-900 dark:text-purple-200 mt-1">{signupForm.phone}</p>
                     </div>
-
-                    <input
-                      type="text"
-                      value={otp}
-                      onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                    <input type="text" value={otp} onChange={e => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
                       placeholder="000000"
                       className="w-full text-center text-5xl font-black tracking-widest py-8 rounded-2xl border-4 border-purple-300 dark:border-purple-700 focus:border-purple-600 focus:outline-none bg-purple-50 dark:bg-purple-900/20 text-gray-900 dark:text-white"
-                      maxLength={6}
-                      required
-                      disabled={isLoading}
-                    />
-
-                    <button
-                      type="button"
-                      onClick={generateOTP}
-                      className="text-purple-600 dark:text-purple-400 font-bold underline text-sm w-full text-center hover:text-purple-800 dark:hover:text-purple-300"
-                      disabled={isLoading}
-                    >
+                      maxLength={6} required disabled={isLoading} />
+                    <button type="button" onClick={generateOTP}
+                      className="text-purple-600 dark:text-purple-400 font-bold underline text-sm w-full text-center" disabled={isLoading}>
                       Resend Code
                     </button>
                   </div>
                 )}
 
-                {/* MESSAGE */}
                 {message && (
-                  <motion.p
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className={`text-center font-bold text-lg ${
-                      message.includes("Welcome") || message.includes("sent")
-                        ? "text-teal-600 dark:text-teal-400"
-                        : "text-red-600 dark:text-red-400"
-                    }`}
-                  >
+                  <motion.p initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
+                    className={`text-center font-bold text-lg ${message.includes("Welcome") || message.includes("sent") ? "text-teal-600 dark:text-teal-400" : "text-red-600 dark:text-red-400"}`}>
                     {message}
                   </motion.p>
                 )}
 
-                {/* SUBMIT BUTTON */}
-                <motion.button
-                  whileHover={{ scale: isLoading ? 1 : 1.02 }}
-                  whileTap={{ scale: isLoading ? 1 : 0.98 }}
-                  type="submit"
-                  disabled={isLoading}
-                  className="w-full py-5 rounded-2xl font-black text-white text-xl shadow-2xl bg-gradient-to-r from-teal-500 via-purple-500 to-purple-600 hover:from-teal-600 hover:to-purple-700 transition-all disabled:opacity-50"
-                >
+                <motion.button whileHover={{ scale: isLoading ? 1 : 1.02 }} whileTap={{ scale: isLoading ? 1 : 0.98 }}
+                  type="submit" disabled={isLoading}
+                  className="w-full py-5 rounded-2xl font-black text-white text-xl shadow-2xl bg-gradient-to-r from-teal-500 via-purple-500 to-purple-600 hover:from-teal-600 hover:to-purple-700 transition-all disabled:opacity-50">
                   {isLoading ? "Processing..." : step === 1 ? "Send Code" : "Complete Signup"}
                 </motion.button>
               </form>
 
-              <p className="text-center text-sm text-gray-600 dark:text-gray-400 mt-8 font-medium">
+              <p className="text-center text-sm text-gray-600 dark:text-gray-400 mt-6 font-medium">
                 Already have an account?{" "}
-                <button
-                  type="button"
-                  onClick={flipToLogin}
-                  className="font-black text-purple-600 dark:text-purple-400 underline hover:text-purple-800 dark:hover:text-purple-300"
-                  disabled={isLoading}
-                >
+                <button type="button" onClick={flipToLogin}
+                  className="font-black text-purple-600 dark:text-purple-400 underline hover:text-purple-800" disabled={isLoading}>
                   Login here
                 </button>
               </p>

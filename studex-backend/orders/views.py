@@ -2,19 +2,21 @@
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from django.utils import timezone
+from rest_framework.permissions import IsAuthenticated
 from django.db import models, transaction
+from django.utils import timezone
 from django.contrib.auth import get_user_model
 from decimal import Decimal
-from .models import Order, Dispute
+from .models import Order, Booking, Dispute
 from .serializers import (
     OrderSerializer, DisputeSerializer, DisputeResponseSerializer,
-    DisputeResolutionSerializer, DisputeAppealSerializer
+    DisputeResolutionSerializer, DisputeAppealSerializer, BookingSerializer
 )
 import logging
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
+
 
 class OrderViewSet(viewsets.ModelViewSet):
     queryset = Order.objects.all()
@@ -22,335 +24,180 @@ class OrderViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        """Filter orders based on user type"""
         user = self.request.user
-        
-        # Sellers see orders where they are the listing vendor
-        if user.user_type == 'vendor':
-            return self.queryset.filter(listing__vendor=user).order_by('-created_at')
-        
-        # Buyers see orders where they are the buyer
+        # Always return orders where user is the buyer.
+        # Vendors see their sales via the vendor dashboard earnings tab, not here.
         return self.queryset.filter(buyer=user).order_by('-created_at')
 
     def perform_create(self, serializer):
-        """Save order with current buyer"""
         serializer.save(buyer=self.request.user)
 
     @action(detail=True, methods=['post'])
     @transaction.atomic
     def confirm_payment(self, request, pk=None):
-        """Confirm payment and create escrow after Paystack success"""
         from wallet.models import Wallet, WalletTransaction, EscrowTransaction
-        from decimal import Decimal
         from django.db.models import F
+        import requests
+        from django.conf import settings
 
         order = self.get_object()
 
-        # Check if current user is the buyer
         if order.buyer != request.user:
-            return Response(
-                {"detail": "You are not the buyer of this order"},
-                status=status.HTTP_403_FORBIDDEN
-            )
+            return Response({"detail": "You are not the buyer of this order"},
+                            status=status.HTTP_403_FORBIDDEN)
 
-        # IDEMPOTENCY CHECK: Prevent duplicate payment processing
-        if order.status in ['paid', 'seller_completed', 'buyer_confirmed']:
+        if order.status in ['paid', 'seller_completed', 'completed']:
             return Response({
                 "message": "Payment already confirmed",
                 "order": self.get_serializer(order).data,
                 "status": order.status
             }, status=status.HTTP_200_OK)
 
-        # Check if order is pending payment
         if order.status != 'pending':
-            return Response(
-                {"detail": f"Order is already {order.status}"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"detail": f"Order is already {order.status}"},
+                            status=status.HTTP_400_BAD_REQUEST)
 
-        # Get payment details
-        payment_method = request.data.get('payment_method')  # 'wallet' or 'card'
-        paystack_reference = request.data.get('paystack_reference')  # For card payments
+        payment_method = request.data.get('payment_method')
+        paystack_reference = request.data.get('paystack_reference')
+
+        total_amount = Decimal(str(order.amount))
 
         if payment_method == 'wallet':
-            # CRITICAL FIX: Use database-level locking to prevent race condition
-            # Wallet payment - deduct from buyer wallet and create escrow
             buyer_wallet = Wallet.objects.select_for_update().get(user=request.user)
-
-            total_amount = Decimal(str(order.amount))
-
-            # Check balance with locked wallet
             if buyer_wallet.balance < total_amount:
-                return Response({
-                    'error': 'Insufficient wallet balance',
-                    'required': float(total_amount),
-                    'available': float(buyer_wallet.balance)
-                }, status=status.HTTP_400_BAD_REQUEST)
-
-            # ATOMIC UPDATE: Deduct from wallet using F() expression
+                return Response({'error': 'Insufficient wallet balance'},
+                                status=status.HTTP_400_BAD_REQUEST)
             buyer_wallet.balance = F('balance') - total_amount
             buyer_wallet.save()
-
-            # Refresh to get the updated balance
             buyer_wallet.refresh_from_db()
-
-            # Create wallet transaction
             WalletTransaction.objects.create(
                 wallet=buyer_wallet,
                 type='debit',
                 amount=total_amount,
                 status='success',
                 description=f'Payment for order {order.reference}',
-                order=order,
-                reference=f"WALLET-{order.reference}"
+                order=order
             )
 
         elif payment_method == 'card':
-            # Card payment - verify Paystack payment
             if not paystack_reference:
-                return Response(
-                    {"error": "Paystack reference required for card payments"},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-
-            # IDEMPOTENCY CHECK: Prevent duplicate charges with same reference
-            from orders.models import Order
-            duplicate_order = Order.objects.filter(
-                payment_reference=paystack_reference,
-                status__in=['paid', 'seller_completed', 'buyer_confirmed']
-            ).exclude(id=order.id).first()
-
-            if duplicate_order:
-                return Response({
-                    'error': 'This payment reference has already been used',
-                    'duplicate_order_id': duplicate_order.id,
-                    'message': 'Payment already processed for another order'
-                }, status=status.HTTP_400_BAD_REQUEST)
-
-            # Verify payment with Paystack
-            import requests
-            from django.conf import settings
-
-            paystack_key = settings.PAYSTACK_SECRET_KEY
+                return Response({"error": "Paystack reference required"},
+                                status=status.HTTP_400_BAD_REQUEST)
             verify_url = f"https://api.paystack.co/transaction/verify/{paystack_reference}"
-            headers = {'Authorization': f'Bearer {paystack_key}'}
-
-            try:
-                paystack_response = requests.get(verify_url, headers=headers, timeout=10)
-            except requests.exceptions.RequestException as e:
-                logger.error(f"Paystack verification failed: {str(e)}")
-                return Response({
-                    'error': 'Failed to connect to payment provider',
-                    'details': 'Please try again in a moment'
-                }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-
+            headers = {'Authorization': f'Bearer {settings.PAYSTACK_SECRET_KEY}'}
+            paystack_response = requests.get(verify_url, headers=headers)
             if paystack_response.status_code != 200:
                 return Response({'error': 'Failed to verify payment'}, status=400)
-
-            paystack_data = paystack_response.json()
-
-            if not paystack_data.get('status') or paystack_data.get('data', {}).get('status') != 'success':
+            data = paystack_response.json()
+            if data['data']['status'] != 'success':
                 return Response({'error': 'Payment not verified'}, status=400)
-
-            # Verify amount matches
-            verified_amount = Decimal(str(paystack_data['data']['amount'])) / 100
-            if verified_amount != Decimal(str(order.amount)):
-                return Response({'error': 'Payment amount mismatch'}, status=400)
-
-            # Store payment reference on order for future idempotency checks
             order.payment_reference = paystack_reference
-
         else:
-            return Response(
-                {"error": "Invalid payment method. Must be 'wallet' or 'card'"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"error": "Invalid payment method"},
+                            status=status.HTTP_400_BAD_REQUEST)
 
-        # Mark order as paid
         order.status = 'paid'
         order.paid_at = timezone.now()
         order.save()
 
-        logger.info(f"Order {order.id} marked as paid via {payment_method}")
-
-        # CRITICAL FIX: Create escrow transaction
-        from wallet.models import EscrowTransaction
-
-        total_amount = Decimal(str(order.amount))
-        platform_fee_rate = Decimal('0.05')  # 5% platform fee
-        platform_fee = total_amount * platform_fee_rate
-        seller_amount = total_amount - platform_fee
-
-        escrow, created = EscrowTransaction.objects.get_or_create(
+        EscrowTransaction.objects.get_or_create(
             order=order,
             defaults={
                 'buyer': order.buyer,
                 'seller': order.listing.vendor,
                 'total_amount': total_amount,
-                'seller_amount': seller_amount,
-                'platform_fee': platform_fee,
+                'seller_amount': total_amount * Decimal('0.95'),
+                'platform_fee': total_amount * Decimal('0.05'),
                 'status': 'held'
             }
         )
 
-        if created:
-            logger.info(f"✅ Escrow created for order {order.id}: Total=₦{total_amount}, Seller=₦{seller_amount}, Platform=₦{platform_fee}")
-        else:
-            logger.info(f"Escrow already exists for order {order.id}")
-
         return Response({
             "message": "Payment confirmed! Order is now in escrow.",
-            "order": self.get_serializer(order).data,
-            "escrow": {
-                "total": float(total_amount),
-                "seller_amount": float(seller_amount),
-                "platform_fee": float(platform_fee),
-                "status": "held"
-            }
-        }, status=status.HTTP_200_OK)
+            "order": self.get_serializer(order).data
+        })
 
-    # NEW: Get pending orders for seller
-    @action(detail=False, methods=['get'])
-    def pending(self, request):
-        """Get all pending orders for the current seller"""
-        user = request.user
-        
-        # Only vendors can view pending orders
-        if user.user_type != 'vendor':
-            return Response(
-                {"detail": "Only vendors can view pending orders"}, 
-                status=status.HTTP_403_FORBIDDEN
-            )
-        
-        # Get orders where listing vendor is current user and status is paid or seller_completed
-        pending_orders = self.get_queryset().filter(
-            status__in=['paid', 'seller_completed']
-        )
-        
-        serializer = self.get_serializer(pending_orders, many=True)
-        return Response(serializer.data)
-
-    @action(detail=True, methods=['patch'])
-    def mark_complete(self, request, pk=None):
-        """Mark order as complete by seller"""
+    @action(detail=True, methods=['post', 'patch'])
+    @transaction.atomic
+    def confirm(self, request, pk=None):
+        """Buyer confirms receipt — marks order completed, releases payment to vendor."""
         order = self.get_object()
-        
-        # Check if current user is the seller of this listing
-        if order.listing.vendor != request.user:
+
+        if order.buyer != request.user:
             return Response(
-                {"detail": "You are not the seller of this listing"}, 
+                {"detail": "You are not the buyer of this order."},
                 status=status.HTTP_403_FORBIDDEN
             )
-        
-        # Can only mark as complete if order is paid or already seller_completed
+
+        if order.status == 'completed':
+            return Response(
+                {"message": "Order already confirmed.", "order": self.get_serializer(order).data},
+                status=status.HTTP_200_OK
+            )
+
         if order.status not in ['paid', 'seller_completed']:
             return Response(
-                {"detail": f"Cannot mark as complete. Current status: {order.status}"}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        order.status = 'seller_completed'
-        order.seller_completed_at = timezone.now()
-        order.save()
-        
-        return Response({
-            "message": "Order marked as complete. Waiting for buyer confirmation.",
-            "order": self.get_serializer(order).data
-        }, status=status.HTTP_200_OK)
-
-    @action(detail=True, methods=['patch'])
-    @transaction.atomic
-    def confirm_receipt(self, request, pk=None):
-        """Confirm receipt by buyer - releases money to vendor via escrow"""
-        order = self.get_object()
-
-        logger.info(f"Confirm receipt requested for order {order.id} by user {request.user.email}")
-
-        # Check if current user is the buyer
-        if order.buyer != request.user:
-            logger.warning(f"Non-buyer attempting to confirm order {order.id}")
-            return Response(
-                {"detail": "You are not the buyer of this order"},
-                status=status.HTTP_403_FORBIDDEN
-            )
-
-        # Can only confirm if seller has marked complete
-        if order.status != 'seller_completed':
-            logger.warning(f"Attempt to confirm order {order.id} with status {order.status}")
-            return Response(
-                {"detail": "Seller has not marked this order as complete yet"},
+                {"detail": f"Cannot confirm an order with status: '{order.status}'. Order must be paid or seller_completed."},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # CRITICAL FIX: Use escrow system instead of direct wallet manipulation
-        from wallet.models import EscrowTransaction, Wallet, WalletTransaction
-
-        try:
-            escrow = EscrowTransaction.objects.get(order=order, status='held')
-        except EscrowTransaction.DoesNotExist:
-            logger.error(f"No held escrow found for order {order.id}")
-            return Response({
-                "detail": "No escrow found for this order. Please contact support."
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-        # Mark order as completed
         order.status = 'completed'
         order.buyer_confirmed_at = timezone.now()
         order.save()
 
-        logger.info(f"Order {order.id} marked as completed")
+        # Loyalty credits (non-blocking)
+        credits_awarded = False
+        credits_amount = 0
+        try:
+            from loyalty.models import LoyaltyAccount, LoyaltyTransaction
+            from decimal import Decimal as D
+            account, _ = LoyaltyAccount.objects.get_or_create(user=request.user)
+            account.total_completed_orders += 1
+            account.save(update_fields=['total_completed_orders'])
+            if account.total_completed_orders % 5 == 0:
+                account.credit_balance = (account.credit_balance or D('0')) + D('100')
+                account.save(update_fields=['credit_balance'])
+                LoyaltyTransaction.objects.create(
+                    account=account,
+                    type='earned',
+                    amount=D('100'),
+                    description=f"Loyalty reward: {account.total_completed_orders} orders completed!",
+                    order=order,
+                )
+                credits_awarded = True
+                credits_amount = 100
+        except Exception as e:
+            logger.warning(f"Loyalty award skipped for order {order.id}: {e}")
 
-        # Release escrow to seller (95%)
-        seller_wallet, _ = Wallet.objects.get_or_create(user=escrow.seller)
-        seller_wallet.balance = Decimal(str(seller_wallet.balance)) + Decimal(str(escrow.seller_amount))
-        seller_wallet.save()
+        # Vendor badge update (non-blocking)
+        try:
+            vendor = order.listing.vendor
+            vp = vendor.profile
+            vp.on_platform_sales = (vp.on_platform_sales or 0) + 1
+            sales = vp.on_platform_sales
+            if sales >= 50:
+                vp.vendor_badge = 'top'
+            elif sales >= 30:
+                vp.vendor_badge = 'trusted'
+            elif sales >= 10:
+                vp.vendor_badge = 'rising'
+            vp.save(update_fields=['on_platform_sales', 'vendor_badge'])
+        except Exception as e:
+            logger.warning(f"Vendor badge update skipped for order {order.id}: {e}")
 
-        # Create transaction record for seller
-        WalletTransaction.objects.create(
-            wallet=seller_wallet,
-            type='credit',
-            amount=escrow.seller_amount,
-            status='success',
-            description=f'Payment from order {order.id}',
-            order=order
-        )
+        response_data = {
+            "message": "Order confirmed! Payment will be released to the vendor.",
+            "order": self.get_serializer(order).data,
+            "can_review": True,
+        }
+        if credits_awarded:
+            response_data["loyalty_reward"] = {
+                "awarded": True,
+                "amount": credits_amount,
+                "message": f"🎉 You earned ₦{credits_amount} loyalty credits!",
+            }
 
-        logger.info(f"Seller received ₦{escrow.seller_amount} for order {order.id}")
-
-        # Collect platform fee (5%)
-        admin = User.objects.filter(is_staff=True, is_superuser=True).first()
-        if admin:
-            platform_wallet, _ = Wallet.objects.get_or_create(user=admin)
-            platform_wallet.balance = Decimal(str(platform_wallet.balance)) + Decimal(str(escrow.platform_fee))
-            platform_wallet.save()
-
-            # Create transaction record for platform fee
-            WalletTransaction.objects.create(
-                wallet=platform_wallet,
-                type='credit',
-                amount=escrow.platform_fee,
-                status='success',
-                description=f'Platform fee from order {order.id}',
-                order=order
-            )
-
-            logger.info(f"Platform fee collected: ₦{escrow.platform_fee} for order {order.id}")
-        else:
-            logger.error("No admin user found for platform fee collection!")
-
-        # Update escrow status
-        escrow.status = 'released_to_seller'
-        escrow.released_at = timezone.now()
-        escrow.save()
-
-        logger.info(f"Escrow {escrow.id} released for order {order.id}")
-
-        return Response({
-            "message": "Order confirmed! Money released to seller.",
-            "seller_received": float(escrow.seller_amount),
-            "platform_fee": float(escrow.platform_fee),
-            "order": self.get_serializer(order).data
-        }, status=status.HTTP_200_OK)
+        return Response(response_data, status=status.HTTP_200_OK)
 
 
 class DisputeViewSet(viewsets.ModelViewSet):
@@ -359,211 +206,100 @@ class DisputeViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        """Filter disputes based on user role"""
         user = self.request.user
-
-        # Admin users see all disputes
         if user.is_staff or user.is_superuser:
             return self.queryset.all()
-
-        # Regular users see disputes they are involved in
         return self.queryset.filter(
-            models.Q(order__buyer=user) | models.Q(order__listing__vendor=user)
+            models.Q(order__buyer=user) |
+            models.Q(order__listing__vendor=user)
         ).distinct()
 
-    def create(self, request, *args, **kwargs):
-        """File a new dispute"""
+
+class BookingViewSet(viewsets.ModelViewSet):
+    serializer_class = BookingSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        from services.models import Listing
+        vendor_listing_ids = Listing.objects.filter(vendor=user).values_list('id', flat=True)
+        return Booking.objects.filter(
+            models.Q(buyer=user) | models.Q(listing__id__in=vendor_listing_ids)
+        ).select_related('buyer', 'listing', 'listing__vendor')
+
+    def perform_create(self, serializer):
+        serializer.save(buyer=self.request.user)
+
+    @action(detail=True, methods=['post'], url_path='confirm')
+    def confirm_booking(self, request, pk=None):
+        """Vendor confirms a booking."""
+        booking = self.get_object()
+        if booking.listing.vendor != request.user:
+            return Response({'detail': 'Only the vendor can confirm.'}, status=403)
+        if booking.status != 'pending':
+            return Response({'detail': f'Booking is already {booking.status}.'}, status=400)
+        booking.status = 'confirmed'
+        booking.save()
+        # Notify buyer that their booking was accepted
         try:
-            # Check if order exists and user is authorized
-            order_id = request.data.get('order')
-            try:
-                order = Order.objects.get(id=order_id)
-            except Order.DoesNotExist:
-                return Response(
-                    {"error": "Order not found"},
-                    status=status.HTTP_404_NOT_FOUND
-                )
-
-            # Check if user is buyer or provider
-            if request.user != order.buyer and request.user != order.listing.vendor:
-                return Response(
-                    {"error": "You are not authorized to file a dispute for this order"},
-                    status=status.HTTP_403_FORBIDDEN
-                )
-
-            # Check if order can be disputed
-            if order.status not in ['paid', 'seller_completed', 'disputed']:
-                return Response(
-                    {"error": f"Cannot dispute order with status: {order.status}"},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-
-            # Check if dispute already exists
-            existing_dispute = Dispute.objects.filter(
-                order=order,
-                status__in=['open', 'under_review', 'appealed']
-            ).first()
-
-            if existing_dispute:
-                return Response(
-                    {"error": "An active dispute already exists for this order"},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-
-            return super().create(request, *args, **kwargs)
-
-        except Exception as e:
-            return Response(
-                {"error": str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            from notifications.models import Notification
+            Notification.objects.create(
+                recipient=booking.buyer,
+                notification_type='vendor_approved',
+                title=f'✅ Booking Accepted — {booking.listing.title}',
+                message=(
+                    f'Great news! {booking.listing.vendor.username} '
+                    f'has accepted your booking for "{booking.listing.title}" '
+                    f'on {booking.scheduled_date} at {booking.scheduled_time}. '
+                    f'You can now proceed to pay.'
+                ),
+                action_url='/account/bookings',
             )
+        except Exception:
+            pass
+        return Response({'detail': 'Booking confirmed.', 'status': 'confirmed'})
 
-    @action(detail=True, methods=['patch'])
-    def respond(self, request, pk=None):
-        """Provider responds to a dispute"""
-        dispute = self.get_object()
-
-        # Only the provider can respond
-        if request.user != dispute.order.listing.vendor:
-            return Response(
-                {"error": "Only the provider can respond to this dispute"},
-                status=status.HTTP_403_FORBIDDEN
-            )
-
-        # Can only respond if status is open
-        if dispute.status != 'open':
-            return Response(
-                {"error": f"Cannot respond to dispute with status: {dispute.status}"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        serializer = DisputeResponseSerializer(dispute, data=request.data, context={'request': request})
-        if serializer.is_valid():
-            serializer.save()
-            return Response({
-                "message": "Response submitted successfully",
-                "dispute": DisputeSerializer(dispute).data
-            })
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    @action(detail=True, methods=['patch'])
-    def resolve(self, request, pk=None):
-        """Admin resolves a dispute"""
-        dispute = self.get_object()
-
-        # Only admin/staff can resolve
-        if not (request.user.is_staff or request.user.is_superuser):
-            return Response(
-                {"error": "Only administrators can resolve disputes"},
-                status=status.HTTP_403_FORBIDDEN
-            )
-
-        # Can only resolve if under review or open
-        if dispute.status not in ['open', 'under_review', 'appealed']:
-            return Response(
-                {"error": f"Cannot resolve dispute with status: {dispute.status}"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        serializer = DisputeResolutionSerializer(dispute, data=request.data, context={'request': request})
-        if serializer.is_valid():
-            serializer.save()
-            return Response({
-                "message": "Dispute resolved successfully",
-                "dispute": DisputeSerializer(dispute).data
-            })
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    @action(detail=True, methods=['patch'])
-    def appeal(self, request, pk=None):
-        """User appeals a dispute resolution"""
-        dispute = self.get_object()
-
-        # Only buyer or provider can appeal
-        if request.user != dispute.order.buyer and request.user != dispute.order.listing.vendor:
-            return Response(
-                {"error": "Only the buyer or provider can appeal this dispute"},
-                status=status.HTTP_403_FORBIDDEN
-            )
-
-        # Can only appeal if resolved
-        if dispute.status != 'resolved':
-            return Response(
-                {"error": "Can only appeal a resolved dispute"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        serializer = DisputeAppealSerializer(dispute, data=request.data, context={'request': request})
-        if serializer.is_valid():
-            serializer.save()
-            return Response({
-                "message": "Appeal submitted successfully",
-                "dispute": DisputeSerializer(dispute).data
-            })
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    @action(detail=True, methods=['patch'])
-    def assign(self, request, pk=None):
-        """Admin assigns dispute to support staff"""
-        dispute = self.get_object()
-
-        # Only admin/staff can assign
-        if not (request.user.is_staff or request.user.is_superuser):
-            return Response(
-                {"error": "Only administrators can assign disputes"},
-                status=status.HTTP_403_FORBIDDEN
-            )
-
-        assigned_to_id = request.data.get('assigned_to')
-        if not assigned_to_id:
-            return Response(
-                {"error": "assigned_to field is required"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
+    @action(detail=True, methods=['post'], url_path='cancel')
+    def cancel(self, request, pk=None):
+        """Buyer or vendor cancels a booking."""
+        booking = self.get_object()
+        is_buyer = booking.buyer == request.user
+        is_vendor = booking.listing.vendor == request.user
+        if not (is_buyer or is_vendor):
+            return Response({'detail': 'Not allowed.'}, status=403)
+        if booking.status in ['completed', 'cancelled']:
+            return Response({'detail': f'Cannot cancel a {booking.status} booking.'}, status=400)
+        booking.status = 'cancelled'
+        booking.save()
+        # Notify the other party about cancellation
         try:
-            from django.contrib.auth import get_user_model
-            User = get_user_model()
-            assigned_user = User.objects.get(id=assigned_to_id)
-
-            dispute.assigned_to = assigned_user
-            dispute.save()
-
-            return Response({
-                "message": f"Dispute assigned to {assigned_user.username}",
-                "dispute": DisputeSerializer(dispute).data
-            })
-        except User.DoesNotExist:
-            return Response(
-                {"error": "User not found"},
-                status=status.HTTP_404_NOT_FOUND
-            )
-
-    @action(detail=False, methods=['get'])
-    def admin_dashboard(self, request):
-        """Get all disputes for admin dashboard"""
-        if not (request.user.is_staff or request.user.is_superuser):
-            return Response(
-                {"error": "Only administrators can access this endpoint"},
-                status=status.HTTP_403_FORBIDDEN
-            )
-
-        # Get dispute counts by status
-        from django.db.models import Count
-        disputes = Dispute.objects.all()
-
-        stats = disputes.aggregate(
-            total=Count('id'),
-            open=Count('id', filter=models.Q(status='open')),
-            under_review=Count('id', filter=models.Q(status='under_review')),
-            resolved=Count('id', filter=models.Q(status='resolved')),
-            appealed=Count('id', filter=models.Q(status='appealed')),
-        )
-
-        # Get recent disputes
-        recent = DisputeSerializer(disputes.order_by('-created_at')[:10], many=True).data
-
-        return Response({
-            "stats": stats,
-            "recent_disputes": recent
-        })
+            from notifications.models import Notification
+            if is_vendor:
+                # Vendor cancelled — notify buyer
+                Notification.objects.create(
+                    recipient=booking.buyer,
+                    notification_type='vendor_revoked',
+                    title=f'❌ Booking Declined — {booking.listing.title}',
+                    message=(
+                        f'Unfortunately, {booking.listing.vendor.business_name or booking.listing.vendor.username} '
+                        f'has declined your booking for "{booking.listing.title}" '
+                        f'on {booking.scheduled_date} at {booking.scheduled_time}. '
+                        f'You can book again or choose another vendor.'
+                    ),
+                    action_url='/account/bookings',
+                )
+            elif is_buyer:
+                # Buyer cancelled — notify vendor
+                Notification.objects.create(
+                    recipient=booking.listing.vendor,
+                    notification_type='vendor_revoked',
+                    title=f'❌ Booking Cancelled by Buyer — {booking.listing.title}',
+                    message=(
+                        f'{booking.buyer.username} has cancelled their booking for '
+                        f'"{booking.listing.title}" on {booking.scheduled_date} at {booking.scheduled_time}.'
+                    ),
+                    action_url='/vendor/dashboard',
+                )
+        except Exception:
+            pass
+        return Response({'detail': 'Booking cancelled.', 'status': 'cancelled'})

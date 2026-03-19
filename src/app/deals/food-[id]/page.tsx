@@ -1,196 +1,220 @@
-// src/app/deals/food-[id]/page.tsx
 "use client";
 
-import { Heart, Package, ArrowLeft } from "lucide-react";
+import { Heart, Package, ArrowLeft, Star, Clock, Loader } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { motion } from "framer-motion";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
+import { useCartStore } from "@/lib/cartStore";
+import { useWishlistStore } from "@/lib/wishlistStore";
 
-const foodDeals = {
-  1: {
-    id: 1,
-    title: "Jollof Rice + Chicken",
-    oldPrice: 1800,
-    newPrice: 1200,
-    image: "/images/deal-food-1.jpg",
-    description: "Spicy jollof rice with grilled chicken, plantain, and coleslaw.",
-    vendor: "Mama T's Kitchen",
-    rating: 4.8,
-    reviews: 124,
-    deliveryTime: "15 mins",
-  },
-  2: {
-    id: 2,
-    title: "Shawarma Wrap",
-    oldPrice: 1500,
-    newPrice: 1000,
-    image: "/images/deal-food-2.jpg",
-    description: "Beef shawarma in soft wrap with garlic sauce, fries inside.",
-    vendor: "Shawarma King",
-    rating: 4.6,
-    reviews: 89,
-    deliveryTime: "12 mins",
-  },
-  3: {
-    id: 3,
-    title: "Indomie + Egg",
-    oldPrice: 800,
-    newPrice: 500,
-    image: "/images/deal-food-3.jpg",
-    description: "Double pack Indomie, 2 eggs, pepper, onions. Campus classic.",
-    vendor: "Hostel Bites",
-    rating: 4.9,
-    reviews: 201,
-    deliveryTime: "10 mins",
-  },
-};
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+
+interface Listing {
+  id: number;
+  title: string;
+  description: string;
+  price: string;
+  image: string;
+  is_available: boolean;
+  category: string;
+  vendor: string;
+  vendor_business: string | null;
+  vendor_is_verified: boolean;
+}
 
 export default function DealPage() {
   const { id } = useParams();
-  const dealId = parseInt(id as string);
-  const deal = foodDeals[dealId as keyof typeof foodDeals];
+  const router = useRouter();
+  const { addToCart } = useCartStore();
+  const { wishlist, addToWishlist, removeFromWishlist } = useWishlistStore();
 
-  // Wishlist state
-  const [wishlist, setWishlist] = useState<any[]>([]);
-  const [isLiked, setIsLiked] = useState(false);
+  const [listing, setListing] = useState<Listing | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [toast, setToast] = useState("");
+  const [quantity, setQuantity] = useState(1);
+
+  const isLiked = wishlist.some((w) => w.id === Number(id));
 
   useEffect(() => {
-    const saved = localStorage.getItem("studex-wishlist");
-    if (saved) {
+    const fetchListing = async () => {
       try {
-        const parsed = JSON.parse(saved);
-        const wishlistArray = Array.isArray(parsed) ? parsed : [];
-        setWishlist(wishlistArray);
-        setIsLiked(wishlistArray.some((w: any) => w.id === dealId));
-      } catch (e) {
-        setWishlist([]);
+        const res = await fetch(`${API_URL}/api/services/listings/${id}/`);
+        if (!res.ok) throw new Error("Not found");
+        const data = await res.json();
+        setListing(data);
+      } catch {
+        setListing(null);
+      } finally {
+        setLoading(false);
       }
-    }
-  }, [dealId]);
+    };
+    fetchListing();
+  }, [id]);
 
-  const toggleWishlist = () => {
-    const newWishlist = isLiked
-      ? wishlist.filter((w: any) => w.id !== dealId)
-      : [...wishlist, { id: dealId, ...deal }];
-
-    setWishlist(newWishlist);
-    setIsLiked(!isLiked);
-    localStorage.setItem("studex-wishlist", JSON.stringify(newWishlist));
+  const showToast = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(""), 2000);
   };
 
-  if (!deal) {
+  const handleAddToCart = () => {
+    if (!listing) return;
+    for (let i = 0; i < quantity; i++) {
+      addToCart({
+        id: listing.id,           // ← real DB id from API
+        title: listing.title,
+        price: parseFloat(listing.price),
+        img: listing.image,
+      });
+    }
+    showToast("Added to Cart!");
+  };
+
+  const toggleWishlist = () => {
+    if (!listing) return;
+    if (isLiked) {
+      removeFromWishlist(listing.id);
+      showToast("Removed from wishlist");
+    } else {
+      addToWishlist({
+        id: listing.id,
+        title: listing.title,
+        price: parseFloat(listing.price),
+        img: listing.image,
+      });
+      showToast("Added to wishlist!");
+    }
+  };
+
+  if (loading) {
     return (
-      <div className="p-8 text-center">
-        <p className="text-black text-lg">Deal not found</p>
-        <Link href="/" className="text-primary text-sm mt-2 inline-block">
-          ← Back to Home
-        </Link>
+      <div className="min-h-screen flex items-center justify-center bg-[#FFF8F0]">
+        <Loader className="w-10 h-10 text-purple-600 animate-spin" />
+      </div>
+    );
+  }
+
+  if (!listing) {
+    return (
+      <div className="min-h-screen bg-[#FFF8F0] flex items-center justify-center p-6">
+        <div className="text-center">
+          <Package className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+          <p className="text-gray-600 text-lg font-medium">Product not found</p>
+          <Link href="/home">
+            <button className="mt-4 px-6 py-2 bg-purple-600 text-white rounded-full font-medium">
+              Back to Home
+            </button>
+          </Link>
+        </div>
       </div>
     );
   }
 
   return (
     <>
-      {/* Top Bar */}
+      {/* TOAST */}
+      {toast && (
+        <motion.div initial={{ y: -50, opacity: 0 }} animate={{ y: 60, opacity: 1 }}
+          className="fixed top-4 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full shadow-lg z-50 font-medium text-sm text-white bg-green-500">
+          {toast}
+        </motion.div>
+      )}
+
+      {/* TOP BAR */}
       <div className="sticky top-0 bg-white z-40 border-b shadow-sm">
         <div className="flex items-center justify-between p-4">
-          <Link href="/" className="text-black">
+          <button onClick={() => router.back()} className="text-gray-700">
             <ArrowLeft className="w-6 h-6" />
-          </Link>
-          <h1 className="text-xl font-bold text-black">Deal</h1>
-          <div />
+          </button>
+          <h1 className="text-xl font-bold text-gray-900">Product</h1>
+          <motion.button onClick={toggleWishlist} whileTap={{ scale: 0.9 }}>
+            <Heart className={`w-6 h-6 transition-all ${isLiked ? "fill-red-500 text-red-500" : "text-gray-400"}`} />
+          </motion.button>
         </div>
       </div>
 
-      <div className="p-4 pb-24">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-surface rounded-2xl overflow-hidden"
-        >
-          <div className="relative h-64">
-            <Image
-              src={deal.image}
-              alt={deal.title}
-              fill
-              className="object-cover"
-            />
-            <motion.button
-              onClick={toggleWishlist}
-              whileHover={{ scale: 1.2 }}
-              whileTap={{ scale: 0.9 }}
-              className="absolute top-4 right-4 p-2 bg-white rounded-full shadow-lg"
-            >
-              <Heart
-                className={`w-5 h-5 transition-all ${
-                  isLiked ? "fill-red-500 text-red-500" : "text-primary"
-                }`}
-              />
-            </motion.button>
+      <div className="pb-32 bg-[#FFF8F0] min-h-screen">
+        {/* IMAGE */}
+        <div className="relative h-72 w-full bg-gray-100">
+          <Image
+            src={listing.image?.startsWith("http") ? listing.image : `/images/${listing.image}`}
+            alt={listing.title}
+            fill
+            className="object-cover"
+            onError={(e) => { (e.target as HTMLImageElement).src = "/images/placeholder.jpg"; }}
+          />
+          {!listing.is_available && (
+            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+              <span className="text-white font-bold text-lg">Out of Stock</span>
+            </div>
+          )}
+        </div>
+
+        <div className="p-5 space-y-5">
+          {/* TITLE + VENDOR */}
+          <div>
+            <h2 className="text-2xl font-black text-gray-900">{listing.title}</h2>
+            <p className="text-sm text-purple-600 font-medium mt-1">
+              {listing.vendor_business || listing.vendor}
+              {listing.vendor_is_verified && (
+                <span className="ml-2 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-bold">✓ Verified</span>
+              )}
+            </p>
           </div>
 
-          <div className="p-5 space-y-4">
-            <div>
-              <h2 className="text-xl font-bold text-black">{deal.title}</h2>
-              <p className="text-sm text-black/70 mt-1">{deal.vendor}</p>
-            </div>
+          {/* PRICE */}
+          <div className="bg-white rounded-2xl p-4 shadow-sm">
+            <p className="text-3xl font-black text-purple-600">
+              ₦{parseFloat(listing.price).toLocaleString("en-NG", { minimumFractionDigits: 2 })}
+            </p>
+          </div>
 
-            <div className="flex items-center gap-2">
-              <div className="flex items-center">
-                <span className="text-yellow-500">★★★★★</span>
-                <span className="text-sm text-black ml-1">{deal.rating}</span>
-              </div>
-              <span className="text-xs text-black/60">({deal.reviews} reviews)</span>
-            </div>
+          {/* DESCRIPTION */}
+          <div className="bg-white rounded-2xl p-4 shadow-sm">
+            <p className="font-bold text-gray-800 mb-2">Description</p>
+            <p className="text-gray-600 text-sm leading-relaxed">{listing.description}</p>
+          </div>
 
-            <p className="text-black/80">{deal.description}</p>
-
-            <div className="flex items-center gap-2 text-sm">
-              <Package className="w-4 h-4 text-primary" />
-              <span className="text-black">Delivery in {deal.deliveryTime}</span>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-black/60 line-through">
-                  ₦{deal.oldPrice.toLocaleString()}
-                </p>
-                <p className="text-2xl font-bold text-red-500">
-                  ₦{deal.newPrice.toLocaleString()}
-                </p>
-              </div>
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="bg-primary text-white px-8 py-3 rounded-full font-bold shadow-lg"
-              >
-                Add to Cart
+          {/* QUANTITY */}
+          <div className="bg-white rounded-2xl p-4 shadow-sm flex items-center justify-between">
+            <p className="font-bold text-gray-800">Quantity</p>
+            <div className="flex items-center gap-4">
+              <motion.button whileTap={{ scale: 0.9 }}
+                onClick={() => setQuantity(q => Math.max(1, q - 1))}
+                className="w-9 h-9 rounded-full bg-purple-100 text-purple-700 font-black text-xl flex items-center justify-center">
+                −
+              </motion.button>
+              <span className="text-xl font-black text-gray-900 w-6 text-center">{quantity}</span>
+              <motion.button whileTap={{ scale: 0.9 }}
+                onClick={() => setQuantity(q => q + 1)}
+                className="w-9 h-9 rounded-full bg-purple-100 text-purple-700 font-black text-xl flex items-center justify-center">
+                +
               </motion.button>
             </div>
           </div>
-        </motion.div>
-      </div>
 
-      {/* Bottom Nav */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t z-50 shadow-lg">
-        <div className="flex justify-around py-2">
-          <Link href="/" className="text-black/60">
-            <span className="text-xs">Home</span>
-          </Link>
-          <Link href="/categories" className="text-black/60">
-            <span className="text-xs">Categories</span>
-          </Link>
-          <Link href="/cart" className="text-black/60">
-            <span className="text-xs">Cart</span>
-          </Link>
-          <Link href="/wishlist" className="text-black/60">
-            <span className="text-xs">Wishlist</span>
-          </Link>
-          <Link href="/account" className="text-black/60">
-            <span className="text-xs">Account</span>
-          </Link>
+          {/* TOTAL */}
+          <div className="bg-gradient-to-r from-purple-600 to-teal-500 rounded-2xl p-4 text-white flex justify-between items-center">
+            <span className="font-bold">Total</span>
+            <span className="text-2xl font-black">
+              ₦{(parseFloat(listing.price) * quantity).toLocaleString("en-NG", { minimumFractionDigits: 2 })}
+            </span>
+          </div>
+
+          {/* ADD TO CART */}
+          <motion.button
+            whileHover={{ scale: listing.is_available ? 1.02 : 1 }}
+            whileTap={{ scale: listing.is_available ? 0.98 : 1 }}
+            onClick={handleAddToCart}
+            disabled={!listing.is_available}
+            className={`w-full py-5 rounded-2xl font-black text-xl shadow-lg flex items-center justify-center gap-3
+              ${listing.is_available
+                ? "bg-gradient-to-r from-purple-600 to-teal-500 text-white"
+                : "bg-gray-200 text-gray-400 cursor-not-allowed"}`}>
+            <Package className="w-6 h-6" />
+            {listing.is_available ? "Add to Cart" : "Out of Stock"}
+          </motion.button>
         </div>
       </div>
     </>

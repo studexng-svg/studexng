@@ -6,107 +6,37 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { useAuth } from "@/lib/authStore";
 import { useCartStore } from "@/lib/cartStore";
-import { useState, useEffect } from "react";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+import { useWishlistStore } from "@/lib/wishlistStore"; // ✅ NEW
+import { useState } from "react";
 
 export default function WishlistPage() {
-  const { isLoggedIn, user } = useAuth();
+  const { isLoggedIn } = useAuth();
   const addToCart = useCartStore((state) => state.addToCart);
-  
-  const [wishlist, setWishlist] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+
+  // ✅ Zustand wishlist (NO backend anymore)
+  const wishlist = useWishlistStore((state) => state.wishlist);
+  const removeFromWishlist = useWishlistStore((state) => state.removeFromWishlist);
+
   const [toast, setToast] = useState("");
-
-  // Fetch wishlist from backend
-  useEffect(() => {
-    if (!isLoggedIn) {
-      setLoading(false);
-      return;
-    }
-
-    const fetchWishlist = async () => {
-      try {
-        setLoading(true);
-        const token = localStorage.getItem('access_token'); // Get auth token
-        
-        const res = await fetch(`${API_URL}/api/wishlist/`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-
-        if (!res.ok) throw new Error('Failed to fetch wishlist');
-        
-        const data = await res.json();
-        setWishlist(data.results || data || []);
-        setError("");
-      } catch (err) {
-        console.error("Failed to load wishlist:", err);
-        setError("Failed to load wishlist");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchWishlist();
-  }, [isLoggedIn]);
 
   const showToast = (msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(""), 2000);
   };
 
-  const removeFromWishlist = async (itemId: number) => {
-    try {
-      const token = localStorage.getItem('access_token');
-      
-      const res = await fetch(`${API_URL}/api/wishlist/${itemId}/`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (!res.ok) throw new Error('Failed to remove from wishlist');
-      
-      setWishlist(wishlist.filter(item => item.id !== itemId));
-      showToast("Removed from Wishlist");
-    } catch (err) {
-      console.error("Failed to remove from wishlist:", err);
-      showToast("Failed to remove");
-    }
-  };
-
-  const clearWishlist = async () => {
-    try {
-      const token = localStorage.getItem('access_token');
-      
-      const res = await fetch(`${API_URL}/api/wishlist/clear/`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (!res.ok) throw new Error('Failed to clear wishlist');
-      
-      setWishlist([]);
-      showToast("Wishlist cleared");
-    } catch (err) {
-      console.error("Failed to clear wishlist:", err);
-      showToast("Failed to clear");
-    }
+  const clearWishlist = () => {
+    wishlist.forEach((item) => removeFromWishlist(item.id));
+    showToast("Wishlist cleared");
   };
 
   const handleAddToCart = (item: any) => {
-    addToCart({ 
-      id: item.id, 
-      title: item.title, 
-      price: item.price, 
-      img: item.image 
+    addToCart({
+      id: item.id,
+      title: item.title,
+      price: item.price,
+      img: item.img,
     });
+
     removeFromWishlist(item.id);
     showToast("Added to Cart!");
   };
@@ -116,7 +46,9 @@ export default function WishlistPage() {
     return (
       <div className="p-8 text-center mt-20 bg-[#FFF8F0] dark:bg-gray-950 min-h-screen">
         <Heart className="w-16 h-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
-        <p className="text-black/70 dark:text-gray-300 text-lg">Please login to view your wishlist</p>
+        <p className="text-black/70 dark:text-gray-300 text-lg">
+          Please login to view your wishlist
+        </p>
         <Link href="/auth">
           <button className="mt-4 px-6 py-2 bg-purple-600 dark:bg-purple-700 text-white rounded-full font-medium hover:bg-purple-700 dark:hover:bg-purple-600">
             Login
@@ -126,24 +58,18 @@ export default function WishlistPage() {
     );
   }
 
-  // Loading
-  if (loading) {
-    return (
-      <div className="p-8 text-center mt-20 bg-[#FFF8F0] dark:bg-gray-950 min-h-screen">
-        <div className="w-12 h-12 border-4 border-purple-600 dark:border-purple-400 border-t-transparent rounded-full animate-spin mx-auto"></div>
-        <p className="text-black/60 dark:text-gray-400 mt-4">Loading wishlist...</p>
-      </div>
-    );
-  }
-
   // Empty wishlist
   if (wishlist.length === 0) {
     return (
       <div className="p-8 text-center mt-20 bg-[#FFF8F0] dark:bg-gray-950 min-h-screen">
         <Heart className="w-16 h-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
-        <p className="text-black/70 dark:text-gray-300 text-lg">Your wishlist is empty</p>
+        <p className="text-black/70 dark:text-gray-300 text-lg">
+          Your wishlist is empty
+        </p>
         <Link href="/deals">
-          <button className="mt-4 text-purple-600 dark:text-purple-400 font-medium underline">Browse Deals</button>
+          <button className="mt-4 text-purple-600 dark:text-purple-400 font-medium underline">
+            Browse Deals
+          </button>
         </Link>
       </div>
     );
@@ -171,8 +97,13 @@ export default function WishlistPage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </Link>
-          <h1 className="text-xl font-bold text-black dark:text-white">Wishlist ({wishlist.length})</h1>
-          <button onClick={clearWishlist} className="text-red-500 dark:text-red-400 text-sm font-medium">
+          <h1 className="text-xl font-bold text-black dark:text-white">
+            Wishlist ({wishlist.length})
+          </h1>
+          <button
+            onClick={clearWishlist}
+            className="text-red-500 dark:text-red-400 text-sm font-medium"
+          >
             Clear
           </button>
         </div>
@@ -191,17 +122,20 @@ export default function WishlistPage() {
             <Link href={`/deals/${item.id}`}>
               <div className="flex gap-3 p-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                 <div className="relative w-20 h-20 rounded-lg overflow-hidden flex-shrink-0">
-                  <Image
-                    src={`${API_URL}${item.image}`}
+                  <img
+                    src={item.img?.startsWith("http") || item.img?.startsWith("/images/") ? item.img : `/images/${item.img}`}
                     alt={item.title}
-                    fill
-                    className="object-cover"
+                    className="object-cover w-full h-full"
                   />
                 </div>
 
                 <div className="flex-1">
-                  <p className="font-medium text-black dark:text-white line-clamp-2">{item.title}</p>
-                  <p className="text-lg font-bold text-red-500 dark:text-red-400">₦{item.price?.toLocaleString()}</p>
+                  <p className="font-medium text-black dark:text-white line-clamp-2">
+                    {item.title}
+                  </p>
+                  <p className="text-lg font-bold text-red-500 dark:text-red-400">
+                    ₦{item.price?.toLocaleString()}
+                  </p>
                 </div>
               </div>
             </Link>
@@ -216,10 +150,13 @@ export default function WishlistPage() {
               </button>
 
               <button
-                onClick={() => removeFromWishlist(item.id)}
+                onClick={() => {
+                  removeFromWishlist(item.id);
+                  showToast("Removed from Wishlist");
+                }}
                 className="p-2 text-red-500 dark:text-red-400"
               >
-                <Heart className="w-5 h-5 fill-red-500 dark:fill-red-400 text-red-500 dark:text-red-400" />
+                <Heart className="w-5 h-5 fill-red-500 dark:fill-red-400" />
               </button>
             </div>
           </motion.div>

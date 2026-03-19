@@ -16,6 +16,10 @@ class RateLimitMiddleware(MiddlewareMixin):
     """
 
     def process_request(self, request):
+        # ── Completely skip rate limiting in development ──────────────────────
+        if settings.DEBUG:
+            return None
+
         # Skip rate limiting for admin and static files
         if request.path.startswith('/admin/') or request.path.startswith('/static/'):
             return None
@@ -53,26 +57,17 @@ class RateLimitMiddleware(MiddlewareMixin):
 
     def get_rate_limit(self, path):
         """Get rate limit for specific endpoint"""
-        # Login/Authentication endpoints
         if '/api/auth/login/' in path:
             return getattr(settings, 'RATE_LIMIT_LOGIN', 10)
-
         if '/api/auth/register/' in path:
             return getattr(settings, 'RATE_LIMIT_REGISTER', 5)
-
-        # File upload endpoints
         if '/api/services/listings/' in path or '/upload' in path:
             return getattr(settings, 'RATE_LIMIT_FILE_UPLOAD', 20)
-
-        # Wallet/Payment endpoints (more strict)
         if '/api/wallet/' in path or '/api/orders/' in path:
             return getattr(settings, 'RATE_LIMIT_API', 60)
-
-        # General API rate limit
         if path.startswith('/api/'):
             return getattr(settings, 'RATE_LIMIT_API', 60)
-
-        return None  # No rate limit for other paths
+        return None
 
 
 class SecurityHeadersMiddleware(MiddlewareMixin):
@@ -81,23 +76,13 @@ class SecurityHeadersMiddleware(MiddlewareMixin):
     """
 
     def process_response(self, request, response):
-        # Prevent clickjacking
         if not response.get('X-Frame-Options'):
             response['X-Frame-Options'] = 'DENY'
-
-        # Prevent MIME type sniffing
         response['X-Content-Type-Options'] = 'nosniff'
-
-        # Enable XSS protection
         response['X-XSS-Protection'] = '1; mode=block'
-
-        # Referrer policy
         response['Referrer-Policy'] = 'strict-origin-when-cross-origin'
-
-        # Permissions policy (formerly Feature Policy)
         response['Permissions-Policy'] = 'geolocation=(), microphone=(), camera=()'
 
-        # Content Security Policy (CSP)
         if not settings.DEBUG:
             response['Content-Security-Policy'] = (
                 "default-src 'self'; "
@@ -109,7 +94,6 @@ class SecurityHeadersMiddleware(MiddlewareMixin):
                 "frame-src 'self' https://checkout.paystack.com;"
             )
 
-        # HSTS (HTTP Strict Transport Security) - only in production with HTTPS
         if not settings.DEBUG and request.is_secure():
             response['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains; preload'
 

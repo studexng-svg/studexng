@@ -57,21 +57,13 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         return phone_cleaned
 
     def validate_password(self, value):
-        """Validate password is alphanumeric (contains both letters and numbers)"""
-        import re
-
-        # Check if contains at least one letter
-        if not re.search(r'[A-Za-z]', value):
-            raise serializers.ValidationError("Password must contain letters and numbers only")
-
-        # Check if contains at least one number
-        if not re.search(r'[0-9]', value):
-            raise serializers.ValidationError("Password must contain letters and numbers only")
-
-        # Check if only alphanumeric (no special characters)
-        if not re.match(r'^[A-Za-z0-9]+$', value):
-            raise serializers.ValidationError("Password must contain letters and numbers only")
-
+        """Validate password strength."""
+        if len(value) < 8:
+            raise serializers.ValidationError("Password must be at least 8 characters.")
+        if not any(c.isalpha() for c in value):
+            raise serializers.ValidationError("Password must contain at least one letter.")
+        if not any(c.isdigit() for c in value):
+            raise serializers.ValidationError("Password must contain at least one number.")
         return value
 
     def validate_matric_number(self, value):
@@ -114,19 +106,27 @@ class UserLoginSerializer(serializers.Serializer):
     password = serializers.CharField(write_only=True, required=True)
 
     def validate(self, data):
-        email = data.get('email')
+        email = data.get('email').lower()
         password = data.get('password')
 
-        if email and password:
-            user = authenticate(username=email, password=password)
-            if user:
-                if not user.is_active:
-                    raise serializers.ValidationError("User account is disabled.")
-                data['user'] = user
-                return data
-            else:
-                raise serializers.ValidationError("Invalid email or password.")
-        raise serializers.ValidationError("Both email and password are required.")
+        try:
+            user = User.objects.get(email__iexact=email)
+        except User.DoesNotExist:
+            raise serializers.ValidationError("Invalid email or password.")
+
+        user = authenticate(
+            username=user.username,   # 🔥 FIX
+            password=password
+        )
+
+        if not user:
+            raise serializers.ValidationError("Invalid email or password.")
+
+        if not user.is_active:
+            raise serializers.ValidationError("User account is disabled.")
+
+        data['user'] = user
+        return data
 
 
 class UserProfileSerializer(serializers.ModelSerializer):

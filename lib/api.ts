@@ -1,16 +1,18 @@
 // lib/api.ts
 // Central API service for communicating with Django backend
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
-// Types
+// ================= TYPES =================
+
 export interface RegisterData {
   username: string;
   email: string;
   phone: string;
   password: string;
   password2: string;
-  user_type: 'student' | 'vendor';
+  user_type: "student" | "vendor";
   matric_number?: string;
   hostel?: string;
   business_name?: string;
@@ -54,148 +56,212 @@ export interface AuthResponse {
   };
 }
 
-// Helper function to get auth headers
+export interface EmailOtpRequest {
+  email: string;
+}
+
+export interface VerifyEmailOtpRequest {
+  email: string;
+  code: string;
+}
+
+// ================= HELPERS =================
+
 const getAuthHeaders = () => {
-  const token = localStorage.getItem('access_token');
+  const token = localStorage.getItem("access_token");
   return {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 };
 
-// API Class
+// ================= API CLASS =================
+
 class API {
-  // Auth Endpoints
+  // ---------- AUTH ----------
+
   async register(data: RegisterData): Promise<AuthResponse> {
     const response = await fetch(`${API_BASE_URL}/api/auth/register/`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     });
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.detail || 'Registration failed');
+      throw new Error(error.detail || "Registration failed");
     }
 
     const result = await response.json();
-    
-    // Store tokens with snake_case to match authStore
-    localStorage.setItem('access_token', result.tokens.access);
-    localStorage.setItem('refresh_token', result.tokens.refresh);
-    localStorage.setItem('user', JSON.stringify(result.user));
+
+    localStorage.setItem("access_token", result.tokens.access);
+    localStorage.setItem("refresh_token", result.tokens.refresh);
+    localStorage.setItem("user", JSON.stringify(result.user));
 
     return result;
   }
 
   async login(data: LoginData): Promise<AuthResponse> {
     const response = await fetch(`${API_BASE_URL}/api/auth/login/`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email: data.email,
-        password: data.password,
-      }),
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
     });
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error || 'Login failed');
+      throw new Error(error.error || "Login failed");
     }
 
     const result = await response.json();
-    
-    // Store tokens with snake_case to match authStore
-    localStorage.setItem('access_token', result.tokens.access);
-    localStorage.setItem('refresh_token', result.tokens.refresh);
-    localStorage.setItem('user', JSON.stringify(result.user));
+
+    localStorage.setItem("access_token", result.tokens.access);
+    localStorage.setItem("refresh_token", result.tokens.refresh);
+    localStorage.setItem("user", JSON.stringify(result.user));
 
     return result;
   }
 
-  async logout(): Promise<void> {
-    try {
-      await fetch(`${API_BASE_URL}/api/auth/logout/`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-      });
-    } finally {
-      // Clear local storage regardless of API response
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('refresh_token');
-      localStorage.removeItem('user');
-    }
-  }
-
-  async getProfile(): Promise<UserProfile> {
-    const response = await fetch(`${API_BASE_URL}/api/auth/profile/`, {
-      method: 'GET',
-      headers: getAuthHeaders(),
+  async forgotPassword(email: string): Promise<{ detail: string; reset_url?: string }> {
+    const response = await fetch(`${API_BASE_URL}/api/auth/forgot-password/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
     });
 
     if (!response.ok) {
-      if (response.status === 401) {
-        // Token expired, try to refresh
-        await this.refreshToken();
-        // Retry the request
-        return this.getProfile();
+      const error = await response.json();
+      throw new Error(error.detail || error.email?.[0] || "Failed to send reset link");
+    }
+
+    return response.json(); // returns { detail, reset_url }
+  }
+
+  // ---------- EMAIL OTP ----------
+
+  async sendEmailOtp(
+    data: EmailOtpRequest
+  ): Promise<{ message: string }> {
+    const response = await fetch(
+      `${API_BASE_URL}/api/auth/email/send-otp/`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
       }
-      throw new Error('Failed to fetch profile');
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || "Failed to send email code");
     }
 
     return response.json();
   }
 
-  async updateProfile(data: Partial<UserProfile>): Promise<AuthResponse> {
-    const response = await fetch(`${API_BASE_URL}/api/auth/profile/update/`, {
-      method: 'PATCH',
+  async verifyEmailOtp(
+    data: VerifyEmailOtpRequest
+  ): Promise<{ message: string }> {
+    const response = await fetch(
+      `${API_BASE_URL}/api/auth/email/verify-otp/`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || "Invalid or expired code");
+    }
+
+    return response.json();
+  }
+
+  // ---------- USER ----------
+
+  async logout(): Promise<void> {
+    try {
+      await fetch(`${API_BASE_URL}/api/auth/logout/`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+      });
+    } finally {
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("refresh_token");
+      localStorage.removeItem("user");
+    }
+  }
+
+  async getProfile(): Promise<UserProfile> {
+    const response = await fetch(`${API_BASE_URL}/api/auth/profile/`, {
       headers: getAuthHeaders(),
-      body: JSON.stringify(data),
     });
 
     if (!response.ok) {
-      throw new Error('Failed to update profile');
+      if (response.status === 401) {
+        await this.refreshToken();
+        return this.getProfile();
+      }
+      throw new Error("Failed to fetch profile");
+    }
+
+    return response.json();
+  }
+
+  async updateProfile(
+    data: Partial<UserProfile>
+  ): Promise<AuthResponse> {
+    const response = await fetch(
+      `${API_BASE_URL}/api/auth/profile/update/`,
+      {
+        method: "PATCH",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(data),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error("Failed to update profile");
     }
 
     const result = await response.json();
-    localStorage.setItem('user', JSON.stringify(result.user));
+    localStorage.setItem("user", JSON.stringify(result.user));
     return result;
   }
 
   async refreshToken(): Promise<void> {
-    const refreshToken = localStorage.getItem('refresh_token');
-    
-    if (!refreshToken) {
-      throw new Error('No refresh token available');
-    }
+    const refreshToken = localStorage.getItem("refresh_token");
+    if (!refreshToken) throw new Error("No refresh token available");
 
-    const response = await fetch(`${API_BASE_URL}/api/auth/token/refresh/`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refresh: refreshToken }),
-    });
+    const response = await fetch(
+      `${API_BASE_URL}/api/auth/token/refresh/`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refresh: refreshToken }),
+      }
+    );
 
     if (!response.ok) {
-      // Refresh token is invalid, logout user
       this.logout();
-      throw new Error('Session expired. Please login again.');
+      throw new Error("Session expired. Please login again.");
     }
 
     const result = await response.json();
-    localStorage.setItem('access_token', result.access);
+    localStorage.setItem("access_token", result.access);
   }
 
-  // Helper to check if user is authenticated
   isAuthenticated(): boolean {
-    return !!localStorage.getItem('access_token');
+    return !!localStorage.getItem("access_token");
   }
 
-  // Get current user from localStorage
   getCurrentUser(): UserProfile | null {
-    const userStr = localStorage.getItem('user');
+    const userStr = localStorage.getItem("user");
     return userStr ? JSON.parse(userStr) : null;
   }
 }
 
-// Export singleton instance
+// ✅ SINGLE EXPORT
 export const api = new API();

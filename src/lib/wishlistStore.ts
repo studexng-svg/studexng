@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import { useAuth } from '@/lib/authStore';
 
 export interface WishlistItem {
   id: number;
@@ -13,7 +14,18 @@ interface WishlistStore {
   addToWishlist: (item: WishlistItem) => void;
   removeFromWishlist: (id: number) => void;
   isInWishlist: (id: number) => boolean;
+  clearWishlist: () => void;
 }
+
+// Returns a user-specific storage key so wishlists never bleed between accounts
+const getStorageKey = () => {
+  try {
+    const userId = useAuth.getState().user?.id;
+    return userId ? `studex-wishlist-${userId}` : 'studex-wishlist-guest';
+  } catch {
+    return 'studex-wishlist-guest';
+  }
+};
 
 export const useWishlistStore = create<WishlistStore>()(
   persist(
@@ -22,7 +34,6 @@ export const useWishlistStore = create<WishlistStore>()(
 
       addToWishlist: (item) =>
         set((state) => {
-          // ✅ Only add if it's not already in the wishlist
           if (state.wishlist.some((w) => w.id === item.id)) return state;
           return { wishlist: [...state.wishlist, item] };
         }),
@@ -33,9 +44,12 @@ export const useWishlistStore = create<WishlistStore>()(
         })),
 
       isInWishlist: (id) => get().wishlist.some((w) => w.id === id),
+
+      clearWishlist: () => set({ wishlist: [] }),
     }),
     {
-      name: 'studex-wishlist',
+      name: getStorageKey(),
+      storage: createJSONStorage(() => localStorage),
     }
   )
 );

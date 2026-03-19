@@ -2,35 +2,48 @@
 from rest_framework import viewsets, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.permissions import AllowAny  # ← ADD THIS LINE
+from rest_framework.permissions import AllowAny
 from .models import Category, Listing, Transaction
 from .serializers import CategorySerializer, ListingSerializer, TransactionSerializer
+from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
+
+
+class WalletBalanceView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        balance = getattr(request.user, 'wallet_balance', 0)
+        return Response({"balance": balance})
+
+
+class WalletFundView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        amount = request.data.get('amount', 0)
+        if not amount:
+            return Response({"detail": "Amount required"}, status=400)
+        if not hasattr(user, 'wallet_balance'):
+            user.wallet_balance = 0
+        user.wallet_balance += int(amount)
+        return Response({"new_balance": user.wallet_balance})
 
 
 class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
-    """
-    API endpoint that allows categories to be viewed.
-    """
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
-    permission_classes = [AllowAny]  # Now works!
+    permission_classes = [AllowAny]
 
 
 class ListingViewSet(viewsets.ModelViewSet):
-    """
-    API endpoint for vendor product/service listings
-    - Public can view available listings
-    - Verified vendors can create/update/delete their own listings
-    """
     queryset = Listing.objects.all()
     serializer_class = ListingSerializer
-
-    # CRITICAL FIX: Configure filtering and search
-    # Note: 'category' removed from filterset_fields, handled manually in get_queryset to support slug
     filterset_fields = ['is_available', 'vendor']
     search_fields = ['title', 'description', 'vendor__username', 'vendor__business_name']
     ordering_fields = ['price', 'created_at', 'title']
-    ordering = ['-created_at']  # Default ordering: newest first
+    ordering = ['-created_at']
 
     def get_permissions(self):
         if self.action in ['list', 'retrieve']:
@@ -42,32 +55,66 @@ class ListingViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         queryset = self.queryset
 
-        # Filter by category slug if provided (support both ID and slug)
+        # Filter by category slug or ID
         category_param = self.request.query_params.get('category', None)
         if category_param:
-            # Try filtering by slug first, then by ID
             if category_param.isdigit():
                 queryset = queryset.filter(category__id=category_param)
             else:
                 queryset = queryset.filter(category__slug=category_param)
 
-        # Vendors see their own listings, public sees only available ones
+        # Verified vendors see ONLY their own listings (vendor dashboard)
+        # Everyone else (buyers, guests, students) sees only available listings from all vendors
         if self.request.user.is_authenticated and self.request.user.user_type == 'vendor':
             return queryset.filter(vendor=self.request.user)
+
         return queryset.filter(is_available=True)
 
+    def update(self, request, *args, **kwargs):
+        # Vendors cannot change is_available — only admin can via Django Admin
+        if 'is_available' in request.data and not request.user.is_staff:
+            request.data._mutable = True if hasattr(request.data, '_mutable') else None
+            try:
+                request.data.pop('is_available')
+            except Exception:
+                pass
+        return super().update(request, *args, **kwargs)
+
     def perform_create(self, serializer):
-        serializer.save(vendor=self.request.user)
+        listing = serializer.save(vendor=self.request.user, is_available=False)
+        # Notify admin that a new listing needs review and approval
+        try:
+            from studex.notifications import notify_admin_new_listing
+            notify_admin_new_listing(listing)
+        except Exception:
+            pass
 
 
 class TransactionViewSet(viewsets.ReadOnlyModelViewSet):
-    """
-    API endpoint for vendor payout transactions
-    """
     serializer_class = TransactionSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
+        # Use is_verified_vendor, not user_type
         if self.request.user.user_type != 'vendor':
             return Transaction.objects.none()
         return Transaction.objects.filter(vendor=self.request.user)
+
+
+class ChangePasswordView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        old_password = request.data.get("old_password")
+        new_password = request.data.get("new_password")
+
+        if not old_password or not new_password:
+            return Response({"error": "Missing fields"}, status=400)
+
+        if not user.check_password(old_password):
+            return Response({"error": "Old password incorrect"}, status=400)
+
+        user.set_password(new_password)
+        user.save()
+        return Response({"message": "Password updated successfully"})

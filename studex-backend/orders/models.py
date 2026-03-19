@@ -1,5 +1,6 @@
 # orders/models.py
 from django.db import models
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from services.models import Listing
 
@@ -24,6 +25,8 @@ class Order(models.Model):
     paid_at = models.DateTimeField(null=True, blank=True)
     seller_completed_at = models.DateTimeField(null=True, blank=True)
     buyer_confirmed_at = models.DateTimeField(null=True, blank=True)
+
+    auto_released = models.BooleanField(default=False)
 
     def __str__(self):
         return f"Order {self.reference} - {self.buyer.username}"
@@ -109,3 +112,36 @@ class Dispute(models.Model):
             models.Index(fields=['status']),
             models.Index(fields=['order']),
         ]
+
+class Booking(models.Model):
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),       # buyer sent request
+        ('confirmed', 'Confirmed'),   # vendor confirmed
+        ('paid', 'Paid'),               # buyer paid
+        ('cancelled', 'Cancelled'),   # either party cancelled
+        ('completed', 'Completed'),   # service done
+    ]
+
+    buyer = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='bookings_made'
+    )
+    listing = models.ForeignKey(
+        'services.Listing',
+        on_delete=models.CASCADE,
+        related_name='bookings'
+    )
+    scheduled_date = models.DateField()
+    scheduled_time = models.CharField(max_length=20)  # e.g. "2:00 PM"
+    note = models.TextField(blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Booking by {self.buyer.username} for {self.listing.title} on {self.scheduled_date}"
+    

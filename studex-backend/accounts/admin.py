@@ -11,6 +11,7 @@ from .models import User, Profile, SellerApplication
 class ProfileInline(admin.StackedInline):
     model = Profile
     can_delete = False
+    extra = 0
     verbose_name_plural = "Profile"
     fields = (
         'whatsapp', 'instagram',
@@ -23,6 +24,11 @@ class ProfileInline(admin.StackedInline):
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
     inlines = [ProfileInline]
+
+    def get_inlines(self, request, obj):
+        if obj is None:
+            return []
+        return [ProfileInline]
 
     list_display = [
         'username', 'email', 'user_type', 'business_name', 'hostel',

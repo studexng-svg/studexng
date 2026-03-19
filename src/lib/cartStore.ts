@@ -1,6 +1,6 @@
 // src/lib/cartStore.ts
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { persist, createJSONStorage } from "zustand/middleware";
 
 type CartItem = {
   id: number;
@@ -16,6 +16,7 @@ type CartStore = {
   removeFromCart: (id: number) => void;
   updateQuantity: (id: number, quantity: number) => void;
   clearCart: () => void;
+  loadCartForUser: (userId: number | null) => void;
 };
 
 export const useCart = create<CartStore>()(
@@ -49,12 +50,38 @@ export const useCart = create<CartStore>()(
         })),
 
       clearCart: () => set({ cart: [] }),
+
+      // Called on login/logout to load the correct user's cart from localStorage
+      loadCartForUser: (userId) => {
+        try {
+          const key = userId ? `studex-cart-${userId}` : "studex-cart-guest";
+          const raw = localStorage.getItem(key);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            set({ cart: parsed?.state?.cart || [] });
+          } else {
+            set({ cart: [] });
+          }
+        } catch {
+          set({ cart: [] });
+        }
+      },
     }),
     {
-      name: "studex-cart",
+      name: "studex-cart-guest", // default key — overridden by loadCartForUser on login
+      storage: createJSONStorage(() => localStorage),
     }
   )
 );
 
-// 🔥 Backward compatibility export
+// Save cart to user-specific key whenever cart changes
+useCart.subscribe((state) => {
+  try {
+    const { useAuth } = require("@/lib/authStore");
+    const userId = useAuth.getState().user?.id;
+    const key = userId ? `studex-cart-${userId}` : "studex-cart-guest";
+    localStorage.setItem(key, JSON.stringify({ state: { cart: state.cart }, version: 0 }));
+  } catch {}
+});
+
 export const useCartStore = useCart;

@@ -4,6 +4,7 @@ from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenRefreshView
 from . import views
 from .views import SellerApplicationViewSet  # ← Import the ViewSet
+from .views import SellerApplicationViewSet, ForgotPasswordView, ResetPasswordView
 
 # Router for Seller Application endpoints
 router = DefaultRouter()
@@ -13,13 +14,15 @@ urlpatterns = [
     # Auth endpoints
     path('register/', views.register_user, name='register'),
     path('login/', views.login_user, name='login'),
-    path('firebase-login/', views.firebase_login, name='firebase-login'),
     path('logout/', views.logout_user, name='logout'),
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
 
     # Profile endpoints
     path('profile/', views.get_user_profile, name='profile'),
     path('profile/update/', views.update_user_profile, name='profile-update'),
+    path('forgot-password/', ForgotPasswordView.as_view(), name='forgot-password'), 
+    path('reset-password/', ResetPasswordView.as_view(), name='reset-password'), # ← ADD THIS
+    path("me/", views.me, name="me"),
 
     # Seller verification endpoints (via router)
     path('', include(router.urls)),

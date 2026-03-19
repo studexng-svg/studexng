@@ -19,28 +19,53 @@ export default function UserLogin() {
   const { login } = useAuth();
   const router = useRouter();
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
+const handleLogin = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setError("");
 
-    if (!email || !password) {
-      setError("Please fill in all fields");
-      return;
-    }
+  try {
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/auth/login/`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      }
+    );
 
-    login({ email, name: email.split("@")[0] });
+    if (!res.ok) throw new Error("Invalid credentials");
+
+    const data = await res.json();
+
+    login(data.user, data.access, data.refresh);
+
     router.push("/home");
-  };
+  } catch (err: any) {
+    setError(err.message);
+  }
+};
 
-  const handleResetPassword = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!resetEmail.includes("@") || !resetEmail.endsWith(".edu.ng")) {
-      setError("Please use your valid PAU email (ends with @pau.edu.ng)");
-      return;
-    }
+const handleResetPassword = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setError("");
+
+  try {
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/auth/password-reset/`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: resetEmail }),
+      }
+    );
+
+    if (!res.ok) throw new Error("Failed to send reset email");
+
     setResetSent(true);
-    setError("");
-  };
+  } catch (err: any) {
+    setError(err.message || "Reset failed");
+  }
+};
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-teal-50 flex items-center justify-center p-4">

@@ -1,6 +1,6 @@
 # orders/serializers.py
 from rest_framework import serializers
-from .models import Order, Dispute
+from .models import Order, Dispute, Booking
 from services.serializers import ListingSerializer
 from services.models import Listing
 import uuid
@@ -12,7 +12,7 @@ class OrderSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Order
-        fields = ['id', 'reference', 'listing', 'listing_id', 'amount', 'status', 'created_at', 'paid_at']
+        fields = ['id', 'reference', 'listing', 'listing_id', 'buyer', 'amount', 'status', 'created_at', 'paid_at']
         read_only_fields = ['reference', 'amount', 'status', 'created_at', 'paid_at']
 
     def create(self, validated_data):
@@ -22,30 +22,24 @@ class OrderSerializer(serializers.ModelSerializer):
         listing_id = validated_data.pop('listing_id')
         listing = Listing.objects.get(id=listing_id)
 
-        # Basic validation
         if not listing.is_available:
             raise serializers.ValidationError("This listing is no longer available.")
 
-        # Generate unique order reference
         reference = f"ORD-{uuid.uuid4().hex[:12].upper()}"
 
-        # Calculate amounts
         total_amount = Decimal(str(listing.price))
-        platform_fee_percentage = Decimal('0.05')  # 5% platform fee
+        platform_fee_percentage = Decimal('0.05')
         platform_fee = total_amount * platform_fee_percentage
         seller_amount = total_amount - platform_fee
 
-        # Create order
         order = Order.objects.create(
             reference=reference,
-            buyer=self.context['request'].user,
             listing=listing,
             amount=total_amount,
-            status='pending',  # Order starts as pending
+            status='pending',
             **validated_data
         )
 
-        # Create escrow transaction (money will be held here until buyer confirms)
         EscrowTransaction.objects.create(
             order=order,
             buyer=self.context['request'].user,
@@ -53,7 +47,7 @@ class OrderSerializer(serializers.ModelSerializer):
             total_amount=total_amount,
             seller_amount=seller_amount,
             platform_fee=platform_fee,
-            status='held'  # Escrow starts in held status
+            status='held'
         )
 
         return order
@@ -80,10 +74,8 @@ class DisputeSerializer(serializers.ModelSerializer):
         ]
 
     def create(self, validated_data):
-        # Automatically set the filer to the current user
         validated_data['filer'] = self.context['request'].user
 
-        # Determine filed_by based on user's relationship to the order
         order = validated_data['order']
         user = self.context['request'].user
 
@@ -94,7 +86,6 @@ class DisputeSerializer(serializers.ModelSerializer):
         else:
             raise serializers.ValidationError("Only the buyer or provider can file a dispute for this order.")
 
-        # Update order status to disputed
         order.status = 'disputed'
         order.save()
 
@@ -126,52 +117,34 @@ class DisputeResolutionSerializer(serializers.Serializer):
         instance.resolved_by = self.context['request'].user
         instance.save()
 
-        # Handle escrow based on resolution
         order = instance.order
         resolution = validated_data['resolution']
 
         if resolution == 'release_to_provider':
-            # Release funds to provider (same as completing order)
             from wallet.models import EscrowTransaction
-            escrow = EscrowTransaction.objects.filter(
-                order=order,
-                status='held'
-            ).first()
-
+            escrow = EscrowTransaction.objects.filter(order=order, status='held').first()
             if escrow:
                 escrow.status = 'released'
                 escrow.save()
-
-                # Update seller's wallet
                 seller = order.listing.vendor
                 seller.wallet_balance += escrow.seller_amount
                 seller.save()
-
             order.status = 'completed'
             order.save()
 
         elif resolution == 'refund_customer':
-            # Refund customer
             from wallet.models import EscrowTransaction
-            escrow = EscrowTransaction.objects.filter(
-                order=order,
-                status='held'
-            ).first()
-
+            escrow = EscrowTransaction.objects.filter(order=order, status='held').first()
             if escrow:
                 escrow.status = 'refunded'
                 escrow.save()
-
-                # Update buyer's wallet
                 buyer = order.buyer
                 buyer.wallet_balance += escrow.total_amount
                 buyer.save()
-
             order.status = 'cancelled'
             order.save()
 
         elif resolution == 'partial_split':
-            # Hold for manual processing
             instance.status = 'under_review'
             instance.save()
 
@@ -188,3 +161,40 @@ class DisputeAppealSerializer(serializers.Serializer):
         instance.status = 'appealed'
         instance.save()
         return instance
+
+
+class BookingSerializer(serializers.ModelSerializer):
+    buyer_username = serializers.CharField(source='buyer.username', read_only=True)
+    vendor_username = serializers.CharField(source='listing.vendor.username', read_only=True)
+    listing_title = serializers.CharField(source='listing.title', read_only=True)
+    listing_price = serializers.DecimalField(source='listing.price', max_digits=10, decimal_places=2, read_only=True)
+    vendor_name = serializers.SerializerMethodField()
+    vendor_subaccount_code = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Booking
+        fields = [
+            'id', 'buyer_username', 'vendor_username', 'listing', 'listing_title',
+            'listing_price', 'vendor_name', 'vendor_subaccount_code',
+            'scheduled_date', 'scheduled_time', 'note', 'status', 'created_at',
+        ]
+        read_only_fields = ['id', 'buyer_username', 'vendor_username', 'listing_title', 'listing_price', 'vendor_name', 'vendor_subaccount_code', 'status', 'created_at']
+
+    def get_vendor_name(self, obj):
+        vendor = obj.listing.vendor
+        return getattr(vendor, 'business_name', None) or vendor.username
+
+    def get_vendor_subaccount_code(self, obj):
+        """Return vendor's Paystack subaccount code so frontend can pass it at payment init."""
+        try:
+            from payments.models import SellerBankAccount
+            bank = SellerBankAccount.objects.filter(user=obj.listing.vendor).first()
+            return bank.paystack_subaccount_code if bank else None
+        except Exception:
+            return None
+
+    def validate_scheduled_date(self, value):
+        from datetime import date
+        if value < date.today():
+            raise serializers.ValidationError("Booking date cannot be in the past.")
+        return value

@@ -1,21 +1,29 @@
 # services/serializers.py
 from rest_framework import serializers
-from .models import Category, Listing, Transaction  # ← Added Transaction
+from .models import Category, Listing, Transaction
 
 
 class CategorySerializer(serializers.ModelSerializer):
-    """Serializer for Category model"""
     class Meta:
         model = Category
         fields = ['id', 'title', 'slug', 'image']
         read_only_fields = ['id']
 
 
+class VendorSerializer(serializers.Serializer):
+    """Minimal vendor info needed by frontend - includes id for chat"""
+    id = serializers.IntegerField(source='pk')
+    username = serializers.CharField()
+    business_name = serializers.SerializerMethodField()
+
+    def get_business_name(self, obj):
+        profile = getattr(obj, 'profile', None)
+        return profile.business_name if profile and hasattr(profile, 'business_name') else None
+
+
 class ListingSerializer(serializers.ModelSerializer):
-    """Serializer for vendor product/service listings"""
-    vendor = serializers.ReadOnlyField(source='vendor.username')
-    vendor_business = serializers.ReadOnlyField(source='vendor.business_name')
-    vendor_is_verified = serializers.ReadOnlyField(source='vendor.is_verified_vendor')  # CRITICAL FIX: Display verified badge
+    vendor = VendorSerializer(read_only=True)
+    vendor_is_verified = serializers.ReadOnlyField(source='vendor.is_verified_vendor')
     category = serializers.SlugRelatedField(
         slug_field='slug',
         queryset=Category.objects.all(),
@@ -27,30 +35,25 @@ class ListingSerializer(serializers.ModelSerializer):
         model = Listing
         fields = [
             'id', 'title', 'description', 'price', 'image',
-            'is_available', 'category', 'vendor', 'vendor_business', 'vendor_is_verified',
+            'is_available', 'listing_type', 'track_inventory', 'stock_quantity',
+            'category', 'vendor', 'vendor_is_verified',
             'created_at', 'updated_at'
         ]
-        read_only_fields = ['vendor', 'vendor_business', 'vendor_is_verified', 'created_at', 'updated_at']
+        read_only_fields = ['vendor', 'vendor_is_verified', 'created_at', 'updated_at']
 
     def validate_image(self, value):
-        """Validate image file size and format"""
         if value:
-            # CRITICAL FIX: Max file size 5MB
-            max_size = 5 * 1024 * 1024  # 5MB in bytes
+            max_size = 5 * 1024 * 1024
             if value.size > max_size:
                 raise serializers.ValidationError(
                     f"Image file too large. Maximum size is 5MB. Your file is {value.size / (1024 * 1024):.2f}MB."
                 )
-
-            # CRITICAL FIX: Check file format
             allowed_formats = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
             content_type = getattr(value, 'content_type', '')
             if content_type and content_type not in allowed_formats:
                 raise serializers.ValidationError(
                     f"Invalid image format '{content_type}'. Only JPG, PNG, and WebP are allowed."
                 )
-
-            # Additional check: validate file extension
             import os
             ext = os.path.splitext(value.name)[1].lower() if value.name else ''
             allowed_extensions = ['.jpg', '.jpeg', '.png', '.webp']
@@ -58,26 +61,19 @@ class ListingSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     f"Invalid file extension '{ext}'. Only .jpg, .jpeg, .png, and .webp are allowed."
                 )
-
         return value
 
     def validate(self, data):
-        user = self.context['request'].user
-
-        # Only vendors can create listings
-        if user.user_type != 'vendor':
-            raise serializers.ValidationError("Only vendors can create listings.")
-
-        # Only verified vendors can create listings
+        request = self.context.get('request')
+        if not request:
+            return data  # nested/read-only usage — skip write validation
+        user = request.user
         if not user.is_verified_vendor:
             raise serializers.ValidationError("You must be a verified vendor to post listings.")
-
         return data
 
 
-# NEW: Transaction Serializer for payouts
 class TransactionSerializer(serializers.ModelSerializer):
-    """Serializer for vendor payout transactions"""
     buyer_name = serializers.CharField(source='order.buyer.username', read_only=True)
     service_name = serializers.CharField(source='order.listing.title', read_only=True)
     order_reference = serializers.CharField(source='order.reference', read_only=True)
@@ -85,14 +81,8 @@ class TransactionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Transaction
         fields = [
-            'id',
-            'order_reference',
-            'amount',
-            'status',
-            'created_at',
-            'released_at',
-            'withdrawn_at',
-            'buyer_name',
-            'service_name'
+            'id', 'order_reference', 'amount', 'status',
+            'created_at', 'released_at', 'withdrawn_at',
+            'buyer_name', 'service_name'
         ]
         read_only_fields = ['id', 'created_at', 'released_at', 'withdrawn_at']

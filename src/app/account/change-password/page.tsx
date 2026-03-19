@@ -40,31 +40,58 @@ export default function ChangePasswordPage() {
     return { minLength, hasNumber, hasSpecial, isValid: minLength && hasNumber && hasSpecial };
   };
 
-  const handleSave = () => {
-    if (!passwords.oldPassword || !passwords.newPassword || !passwords.confirmPassword) {
-      setError("All fields are required");
-      return;
+const handleSave = async () => {
+  setError("");
+
+  if (!passwords.oldPassword || !passwords.newPassword || !passwords.confirmPassword) {
+    setError("All fields are required");
+    return;
+  }
+
+  if (passwords.newPassword !== passwords.confirmPassword) {
+    setError("New passwords do not match");
+    return;
+  }
+
+  const { isValid } = validatePassword(passwords.newPassword);
+  if (!isValid) {
+    setError("Password must be 8+ chars with number & symbol");
+    return;
+  }
+
+  try {
+    const token = localStorage.getItem("accessToken");
+
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/auth/change-password/`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          old_password: passwords.oldPassword,
+          new_password: passwords.newPassword,
+        }),
+      }
+    );
+
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      throw new Error(data.error || "Password change failed");
     }
 
-    if (passwords.newPassword !== passwords.confirmPassword) {
-      setError("New passwords do not match");
-      return;
-    }
+    setSuccess(true);
 
-    const { isValid } = validatePassword(passwords.newPassword);
-    if (!isValid) {
-      setError("Password must be 8+ chars with number & symbol");
-      return;
-    }
-
-    // Simulate API call
     setTimeout(() => {
-      setSuccess(true);
-      setTimeout(() => {
-        router.push("/account/profile");
-      }, 1500);
-    }, 800);
-  };
+      router.push("/account/profile");
+    }, 1500);
+  } catch (err: any) {
+    setError(err.message || "Failed to update password");
+  }
+};
 
   const { minLength, hasNumber, hasSpecial } = validatePassword(passwords.newPassword);
 

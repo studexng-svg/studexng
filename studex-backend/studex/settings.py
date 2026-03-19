@@ -2,18 +2,20 @@
 Django settings for StudEx project.
 """
 
-from pathlib import Path
-from datetime import timedelta
-import os
-from decouple import config
 
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
+from datetime import timedelta
+from dotenv import load_dotenv
+from pathlib import Path
+from decouple import config
+import os
+
 BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(os.path.join(BASE_DIR, ".env"))
+
 
 # =======================================
 # Firebase Admin Initialization
 # =======================================
-# This runs at import time and initializes Firebase Admin SDK
 try:
     import firebase_admin
     from firebase_admin import credentials
@@ -24,7 +26,6 @@ try:
         cred = credentials.Certificate(service_account_path)
         firebase_admin.initialize_app(cred)
     else:
-        # Silent fallback in case file is missing (e.g. CI environment)
         print("Warning: firebase_service_account.json not found. Firebase auth will not work.")
 except ImportError:
     print("firebase-admin not installed. Run: pip install firebase-admin")
@@ -32,15 +33,14 @@ except Exception as e:
     print(f"Failed to initialize Firebase Admin: {e}")
 
 # SECURITY WARNING: keep the secret key used in production secret!
-# SECRET_KEY is now REQUIRED - no default value for security
 try:
-    SECRET_KEY = config('SECRET_KEY')
+    SECRET_KEY = os.getenv("SECRET_KEY")
+    DEBUG = os.getenv("DEBUG") == "True"
+    
 except:
     raise ValueError("SECRET_KEY environment variable must be set. Add it to your .env file.")
 
-# SECURITY WARNING: don't run with debug turned on in production!
-# DEBUG defaults to False for security
-DEBUG = config('DEBUG', default=False, cast=bool)
+DEBUG = os.getenv("DEBUG", "False") == "True"
 
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1,.vercel.app,.railway.app').split(',')
 
@@ -56,7 +56,7 @@ INSTALLED_APPS = [
     # Third party apps
     'rest_framework',
     'rest_framework_simplejwt',
-    'rest_framework_simplejwt.token_blacklist',  # For proper logout
+    'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
     'django_filters',
     
@@ -64,22 +64,25 @@ INSTALLED_APPS = [
     'accounts',
     'services',
     'orders',
-    'wallet',
+    'payments',
     'chat',
+    'reviews',
+    'loyalty',
+    'notifications'
 ]
 
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',  # Must be first
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',  # Add this for static files on Railway
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'studex.middleware.RateLimitMiddleware',  # Rate limiting
-    'studex.middleware.SecurityHeadersMiddleware',  # Additional security headers
+    'studex.middleware.RateLimitMiddleware',
+    'studex.middleware.SecurityHeadersMiddleware',
 ]
 
 ROOT_URLCONF = 'studex.urls'
@@ -115,7 +118,6 @@ if DB_ENGINE == 'django.db.backends.sqlite3':
         }
     }
 else:
-    # PostgreSQL or other database
     DATABASES = {
         'default': {
             'ENGINE': DB_ENGINE,
@@ -169,7 +171,7 @@ AUTH_USER_MODEL = 'accounts.User'
 # =======================================
 CORS_ALLOWED_ORIGINS = config(
     'CORS_ALLOWED_ORIGINS',
-    default='http://localhost:3000,http://127.0.0.1:3000'
+    default='http://localhost:3000,http://127.0.0.1:8000'
 ).split(',')
 
 CORS_ALLOW_CREDENTIALS = True
@@ -199,12 +201,11 @@ CORS_ALLOW_METHODS = [
 CORS_PREFLIGHT_MAX_AGE = 86400
 
 # =======================================
-# REST Framework & JWT + Firebase Settings
+# REST Framework & JWT Settings
 # =======================================
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'studex.authentication.FirebaseAuthentication',  # ← Our new Firebase auth
-        'rest_framework_simplejwt.authentication.JWTAuthentication',  # ← Keep old JWT working
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
@@ -235,19 +236,16 @@ SIMPLE_JWT = {
 # Paystack Payment Gateway Settings
 # =======================================
 PAYSTACK_PUBLIC_KEY = config('PAYSTACK_PUBLIC_KEY', default='')
-PAYSTACK_SECRET_KEY = config('PAYSTACK_SECRET_KEY', default='')
+PAYSTACK_SECRET_KEY = config('PAYSTACK_SECRET_KEY')
 
 # =======================================
 # University Email Domain Validation
 # =======================================
-# Set to None to allow any email domain (development mode)
-# Set to list of domains to restrict to university emails only (production mode)
 ALLOWED_UNIVERSITY_DOMAINS = config(
     'ALLOWED_UNIVERSITY_DOMAINS',
-    default=None,  # None = allow all domains (development)
-    cast=lambda v: v.split(',') if v else None  # Comma-separated in .env
+    default=None,
+    cast=lambda v: v.split(',') if v else None
 )
-# Example: ALLOWED_UNIVERSITY_DOMAINS=pau.edu.ng,student.pau.edu.ng
 
 # =======================================
 # Blockchain Settings (Polygon)
@@ -255,16 +253,6 @@ ALLOWED_UNIVERSITY_DOMAINS = config(
 BLOCKCHAIN_RPC_URL = config('BLOCKCHAIN_RPC_URL', default='https://polygon-rpc.com')
 BLOCKCHAIN_PRIVATE_KEY = config('BLOCKCHAIN_PRIVATE_KEY', default='')
 BLOCKCHAIN_CONTRACT_ADDRESS = config('BLOCKCHAIN_CONTRACT_ADDRESS', default='')
-
-# =======================================
-# Email Configuration
-# =======================================
-EMAIL_BACKEND = config('EMAIL_BACKEND', default='django.core.mail.backends.console.EmailBackend')
-EMAIL_HOST = config('EMAIL_HOST', default='smtp.gmail.com')
-EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
-EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)
-EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
-EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
 
 # =======================================
 # API & Frontend URLs
@@ -275,7 +263,6 @@ FRONTEND_BASE_URL = config('FRONTEND_BASE_URL', default='http://localhost:3000')
 # =======================================
 # Security Settings (Production)
 # =======================================
-# Cookie security (enable in production with HTTPS)
 SESSION_COOKIE_SECURE = config('SESSION_COOKIE_SECURE', default=not DEBUG, cast=bool)
 SESSION_COOKIE_HTTPONLY = config('SESSION_COOKIE_HTTPONLY', default=True, cast=bool)
 SESSION_COOKIE_SAMESITE = config('SESSION_COOKIE_SAMESITE', default='Lax')
@@ -284,7 +271,6 @@ CSRF_COOKIE_SECURE = config('CSRF_COOKIE_SECURE', default=not DEBUG, cast=bool)
 CSRF_COOKIE_HTTPONLY = config('CSRF_COOKIE_HTTPONLY', default=True, cast=bool)
 CSRF_COOKIE_SAMESITE = config('CSRF_COOKIE_SAMESITE', default='Lax')
 
-# Additional security headers (enable in production)
 if not DEBUG:
     SECURE_SSL_REDIRECT = True
     SECURE_BROWSER_XSS_FILTER = True
@@ -313,11 +299,18 @@ LOGGING = {
 # =======================================
 # Rate Limiting Configuration
 # =======================================
-# Requests per minute for different endpoints
-RATE_LIMIT_LOGIN = config('RATE_LIMIT_LOGIN', default=10, cast=int)
-RATE_LIMIT_REGISTER = config('RATE_LIMIT_REGISTER', default=5, cast=int)
-RATE_LIMIT_API = config('RATE_LIMIT_API', default=60, cast=int)
-RATE_LIMIT_FILE_UPLOAD = config('RATE_LIMIT_FILE_UPLOAD', default=20, cast=int)
+# In DEBUG mode, limits are very high so local development is never throttled.
+# In production, tighter limits apply.
+if DEBUG:
+    RATE_LIMIT_LOGIN = 1000
+    RATE_LIMIT_REGISTER = 1000
+    RATE_LIMIT_API = 1000
+    RATE_LIMIT_FILE_UPLOAD = 1000
+else:
+    RATE_LIMIT_LOGIN = config('RATE_LIMIT_LOGIN', default=10, cast=int)
+    RATE_LIMIT_REGISTER = config('RATE_LIMIT_REGISTER', default=5, cast=int)
+    RATE_LIMIT_API = config('RATE_LIMIT_API', default=60, cast=int)
+    RATE_LIMIT_FILE_UPLOAD = config('RATE_LIMIT_FILE_UPLOAD', default=20, cast=int)
 
 # Cache backend for rate limiting
 CACHES = {
@@ -330,21 +323,24 @@ CACHES = {
 # =======================================
 # File Upload Security Configuration
 # =======================================
-# Maximum upload size in MB
 MAX_UPLOAD_SIZE_MB = config('MAX_UPLOAD_SIZE_MB', default=10, cast=int)
 
-# Allowed image file extensions
 ALLOWED_IMAGE_EXTENSIONS = config(
     'ALLOWED_IMAGE_EXTENSIONS',
     default='jpg,jpeg,png,gif,webp'
 )
 
-# Allowed document file extensions
 ALLOWED_DOCUMENT_EXTENSIONS = config(
     'ALLOWED_DOCUMENT_EXTENSIONS',
     default='pdf,doc,docx'
 )
 
-# Django's built-in upload handlers
-DATA_UPLOAD_MAX_MEMORY_SIZE = MAX_UPLOAD_SIZE_MB * 1024 * 1024  # Convert to bytes
-FILE_UPLOAD_MAX_MEMORY_SIZE = MAX_UPLOAD_SIZE_MB * 1024 * 1024
+# =======================================
+# Email Configuration
+# =======================================
+EMAIL_BACKEND = config('EMAIL_BACKEND', default='django.core.mail.backends.console.EmailBackend')
+EMAIL_HOST = config('EMAIL_HOST', default='smtp.gmail.com')
+EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
+EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)
+EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
+EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')

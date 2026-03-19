@@ -1,17 +1,16 @@
 // src/components/ChatWindow.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { X, Send, User, Loader } from "lucide-react";
-import { toast } from "@/components/ui/sonner";
-import { isMessageAllowed, extractPrice } from "@/utils/chatRules";
+import { fetchWithAuth, useAuth } from "@/lib/authStore";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
 
 interface ChatWindowProps {
-  sellerId: string;
+  sellerId: number;
   sellerName: string;
-  productId: string;
+  listingId: number;
   productName: string;
   originalPrice: number;
   onClose: () => void;
@@ -24,104 +23,117 @@ interface Message {
   amount?: number;
   sender?: string;
   created_at?: string;
+  is_mine?: boolean;
 }
+
+const isMessageAllowed = (msg: string): "allow" | "offer" | "block" => {
+  const lower = msg.toLowerCase();
+  const blocked = [
+    /\b(\+?234|0)[789]\d{9}\b/,
+    /whatsapp/i,
+    /pay.*outside/i,
+    /transfer.*direct/i,
+    /cashapp/i,
+    /opay.*number/i,
+    /palmpay.*number/i,
+  ];
+  for (const pattern of blocked) {
+    if (pattern.test(msg)) return "block";
+  }
+  if (/\b\d[\d,]*k?\b/.test(lower) && /(last|offer|take|give|do|accept|how about)/i.test(lower)) {
+    return "offer";
+  }
+  return "allow";
+};
+
+const extractPrice = (msg: string): number => {
+  const match = msg.match(/\b(\d[\d,]*)k?\b/i);
+  if (!match) return 0;
+  const raw = match[1].replace(/,/g, '');
+  const num = parseInt(raw);
+  return msg.toLowerCase().includes('k') ? num * 1000 : num;
+};
 
 export default function ChatWindow({
   sellerId,
   sellerName,
-  productId,
+  listingId,
   productName,
   originalPrice,
   onClose,
 }: ChatWindowProps) {
+  const { user } = useAuth(); // ← get logged-in user
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [conversationId, setConversationId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [error, setError] = useState("");
+  const bottomRef = useRef<HTMLDivElement>(null);
 
-  // Load or create conversation on mount
   useEffect(() => {
-    const loadConversation = async () => {
-      try {
-        const token = localStorage.getItem('access_token');
-        if (!token) {
-          setLoading(false);
-          return;
-        }
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
-        // Try to find existing conversation with this seller about this product
-        const res = await fetch(`${API_URL}/api/chat/conversations/?participant=${sellerId}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
+  // Create or load conversation on mount
+  useEffect(() => {
+    // ← FIX: if the logged-in user IS the seller, don't init — close immediately
+    if (!sellerId || (user?.id && user.id === sellerId)) {
+      onClose();
+      return;
+    }
+
+    const init = async () => {
+      try {
+        const res = await fetchWithAuth(`${API_URL}/api/chat/conversations/`, {
+          method: 'POST',
+          body: JSON.stringify({ listing_id: listingId, seller_id: sellerId }),
         });
 
-        if (res.ok) {
-          const conversations = await res.json();
-          const existingConv = conversations.results?.find((c: any) =>
-            c.participants.some((p: any) => p.id === sellerId)
-          );
+        if (!res.ok) throw new Error('Could not start conversation');
+        const conv = await res.json();
+        setConversationId(conv.id);
 
-          if (existingConv) {
-            setConversationId(existingConv.id);
-            await loadMessages(existingConv.id, token);
-          } else {
-            // Create new conversation
-            await createConversation(token);
-          }
-        }
+        const msgRes = await fetchWithAuth(`${API_URL}/api/chat/conversations/${conv.id}/messages/`);
+        const data = await msgRes.json();
+        const currentUsername = user?.username;
+        const msgs = (Array.isArray(data) ? data : data.results || []).map((m: any) => ({
+          id: m.id.toString(),
+          text: m.content,
+          sender: m.sender_username,
+          is_mine: currentUsername ? m.sender_username === currentUsername : !!m.is_mine,
+          created_at: m.created_at,
+        }));
+        setMessages(msgs);
       } catch (err) {
-        console.error("Failed to load conversation:", err);
+        setError("Could not load chat. Please try again.");
       } finally {
         setLoading(false);
       }
     };
+    init();
+  }, [listingId, sellerId, user?.id, onClose]);
 
-    loadConversation();
-  }, [sellerId]);
-
-  const createConversation = async (token: string) => {
-    try {
-      const res = await fetch(`${API_URL}/api/chat/conversations/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          participants: [sellerId],
-          listing_id: productId
-        })
-      });
-
-      if (res.ok) {
-        const conv = await res.json();
-        setConversationId(conv.id);
-      }
-    } catch (err) {
-      console.error("Failed to create conversation:", err);
-    }
-  };
-
-  const loadMessages = async (convId: number, token: string) => {
-    try {
-      const res = await fetch(`${API_URL}/api/chat/conversations/${convId}/messages/`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-
-      if (res.ok) {
+  // Poll for new messages every 5s
+  useEffect(() => {
+    if (!conversationId) return;
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetchWithAuth(`${API_URL}/api/chat/conversations/${conversationId}/messages/`);
         const data = await res.json();
-        const msgs = (data.results || data).map((m: any) => ({
+        const currentUsername = user?.username;
+        const msgs = (Array.isArray(data) ? data : data.results || []).map((m: any) => ({
           id: m.id.toString(),
           text: m.content,
-          sender: m.sender?.username,
-          created_at: m.created_at
+          sender: m.sender_username,
+          is_mine: currentUsername ? m.sender_username === currentUsername : !!m.is_mine,
+          created_at: m.created_at,
         }));
         setMessages(msgs);
-      }
-    } catch (err) {
-      console.error("Failed to load messages:", err);
-    }
-  };
+      } catch {}
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [conversationId]);
 
   const handleSend = async () => {
     if (!message.trim() || !conversationId || sending) return;
@@ -129,43 +141,31 @@ export default function ChatWindow({
     const result = isMessageAllowed(message);
 
     if (result === "block") {
-      toast.error("Outside payment not allowed. Only bargaining in chat.");
+      setError("Outside payment details are not allowed. Violators get banned.");
+      setTimeout(() => setError(""), 3000);
       return;
     }
 
     setSending(true);
 
     try {
-      const token = localStorage.getItem('access_token');
-
-      // Send message via API
-      const res = await fetch(`${API_URL}/api/chat/messages/send/`, {
+      const res = await fetchWithAuth(`${API_URL}/api/chat/conversations/${conversationId}/send/`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          conversation_id: conversationId,
-          content: message,
-          message_type: 'text'
-        })
+        body: JSON.stringify({ content: message, message_type: 'text' }),
       });
 
-      if (!res.ok) {
-        throw new Error('Failed to send message');
-      }
-
+      if (!res.ok) throw new Error('Send failed');
       const sentMessage = await res.json();
 
-      // Add message to local state
-      setMessages(prev => [...prev, {
+      const newMsg: Message = {
         id: sentMessage.id.toString(),
         text: message,
-        sender: 'me'
-      }]);
+        sender: 'me',
+        is_mine: true,
+      };
 
-      // Auto-detect offer
+      setMessages(prev => [...prev, newMsg]);
+
       if (result === "offer") {
         const amount = extractPrice(message);
         if (amount > 0 && amount < originalPrice * 2) {
@@ -175,16 +175,13 @@ export default function ChatWindow({
             isSystem: true,
             amount,
           }]);
-          toast.success(`Offer ₦${amount.toLocaleString()} sent!`, {
-            description: "Waiting for seller response",
-          });
         }
       }
 
       setMessage("");
-    } catch (err) {
-      console.error("Failed to send message:", err);
-      toast.error("Failed to send message. Please try again.");
+    } catch {
+      setError("Failed to send. Try again.");
+      setTimeout(() => setError(""), 3000);
     } finally {
       setSending(false);
     }
@@ -196,7 +193,7 @@ export default function ChatWindow({
       <div className="fixed inset-0 bg-black/70 z-50" onClick={onClose} />
 
       {/* Chat Panel */}
-      <div className="fixed bottom-0 left-0 right-0 h-[90vh] bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 rounded-t-3xl z-50 
+      <div className="fixed bottom-0 left-0 right-0 h-[90vh] bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 rounded-t-3xl z-50
                       md:right-4 md:bottom-4 md:top-20 md:w-96 md:h-[calc(100vh-6rem)] md:rounded-3xl overflow-hidden flex flex-col">
 
         {/* Header */}
@@ -207,21 +204,28 @@ export default function ChatWindow({
             </div>
             <div>
               <p className="font-bold text-white">{sellerName}</p>
-              <p className="text-white/70 text-xs">Active now</p>
+              <p className="text-white/70 text-xs">{productName}</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-1">
+          <button onClick={onClose} className="p-1 hover:bg-white/10 rounded-full transition">
             <X className="w-6 h-6 text-white" />
           </button>
         </div>
 
         {/* Warning Banner */}
-        <div className="bg-red-600 text-white text-xs p-3 text-center font-bold flex-shrink-0">
+        <div className="bg-red-600 text-white text-xs p-2 text-center font-bold flex-shrink-0">
           Bargain only • No outside payments • Violators banned instantly
         </div>
 
-        {/* Messages Area - This is the scrollable part */}
-        <div className="flex-1 overflow-y-auto px-4 py-6 space-y-4">
+        {/* Error banner */}
+        {error && (
+          <div className="bg-red-500/90 text-white text-xs p-2 text-center font-bold flex-shrink-0">
+            {error}
+          </div>
+        )}
+
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
           {loading ? (
             <div className="flex items-center justify-center h-full">
               <Loader className="w-8 h-8 text-white animate-spin" />
@@ -232,63 +236,61 @@ export default function ChatWindow({
             </p>
           ) : (
             messages.map(msg => (
-              <div key={msg.id} className={msg.isSystem ? "mx-auto max-w-xs" : msg.sender === 'me' ? "ml-auto max-w-[80%]" : "mr-auto max-w-[80%]"}>
+              <div key={msg.id}
+                className={msg.isSystem ? "mx-auto max-w-xs" : msg.is_mine ? "ml-auto max-w-[80%]" : "mr-auto max-w-[80%]"}>
                 {msg.isSystem ? (
                   <div className="bg-gradient-to-r from-teal-600/20 to-purple-600/20 border border-teal-500/50 rounded-2xl p-4 text-center shadow-lg">
                     <p className="text-white font-black text-lg">₦{msg.amount?.toLocaleString()}</p>
                     <p className="text-white/80 text-sm">Offer for {productName}</p>
-                    <div className="flex gap-2 mt-4 justify-center">
-                      <button className="px-5 py-2 bg-teal-600 hover:bg-teal-700 rounded-xl text-white font-bold text-sm transition">
-                        Accept
-                      </button>
-                      <button className="px-5 py-2 bg-amber-600 hover:bg-amber-700 rounded-xl text-white font-bold text-sm transition">
-                        Counter
-                      </button>
-                      <button className="px-5 py-2 bg-red-600 hover:bg-red-700 rounded-xl text-white font-bold text-sm transition">
-                        Decline
-                      </button>
+                    <div className="flex gap-2 mt-3 justify-center">
+                      <button className="px-4 py-1.5 bg-teal-600 rounded-xl text-white font-bold text-sm">Accept</button>
+                      <button className="px-4 py-1.5 bg-amber-600 rounded-xl text-white font-bold text-sm">Counter</button>
+                      <button className="px-4 py-1.5 bg-red-600 rounded-xl text-white font-bold text-sm">Decline</button>
                     </div>
                   </div>
                 ) : (
-                  <div className={`backdrop-blur-md rounded-2xl p-3 shadow-md ${msg.sender === 'me' ? 'bg-purple-600/80 text-white' : 'bg-white/10 text-white'}`}>
-                    {msg.sender !== 'me' && (
-                      <p className="text-xs text-white/70 mb-1">{msg.sender || sellerName}</p>
+                  <div className={`rounded-2xl px-4 py-2.5 ${
+                    msg.is_mine
+                      ? 'bg-purple-600 text-white rounded-br-sm'
+                      : 'bg-white/10 text-white rounded-bl-sm'
+                  }`}>
+                    {!msg.is_mine && (
+                      <p className="text-xs text-white/60 mb-1">{msg.sender || sellerName}</p>
                     )}
-                    {msg.text}
+                    <p className="text-sm leading-relaxed">{msg.text}</p>
+                    {msg.created_at && (
+                      <p className="text-xs opacity-50 mt-1 text-right">
+                        {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    )}
                   </div>
                 )}
               </div>
             ))
           )}
+          <div ref={bottomRef} />
         </div>
 
-        {/* Input Bar */}
-        <div className="bg-slate-900/90 backdrop-blur-xl border-t border-white/10 p-4 flex-shrink-0">
-          <div className="flex gap-3">
-            <input
-              type="text"
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && (e.preventDefault(), handleSend())}
-              placeholder="Type your offer... e.g. 4k last"
-              className="flex-1 bg-white/10 border border-white/20 rounded-2xl px-5 py-3 text-white placeholder-white/50 focus:outline-none focus:border-purple-500 transition"
-            />
-            <button
-              onClick={handleSend}
-              disabled={sending || loading || !conversationId}
-              className={`p-3 rounded-xl transition shadow-lg ${
-                sending || loading || !conversationId
-                  ? 'bg-gray-600 cursor-not-allowed'
-                  : 'bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700'
-              }`}
-            >
-              {sending ? (
-                <Loader className="w-6 h-6 text-white animate-spin" />
-              ) : (
-                <Send className="w-6 h-6 text-white" />
-              )}
-            </button>
-          </div>
+        {/* Input */}
+        <div className="bg-slate-900/90 border-t border-white/10 p-4 flex gap-3 flex-shrink-0">
+          <input
+            type="text"
+            value={message}
+            onChange={e => setMessage(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && !e.shiftKey && (e.preventDefault(), handleSend())}
+            placeholder='Type your offer... e.g. "4k last"'
+            className="flex-1 bg-white/10 border border-white/20 rounded-2xl px-4 py-3 text-white placeholder-white/40 text-sm focus:outline-none focus:border-purple-500 transition"
+          />
+          <button onClick={handleSend} disabled={sending || !conversationId || !message.trim()}
+            className={`p-3 rounded-xl transition ${
+              sending || !conversationId || !message.trim()
+                ? 'bg-gray-600 cursor-not-allowed'
+                : 'bg-gradient-to-r from-teal-600 to-cyan-600'
+            }`}>
+            {sending
+              ? <Loader className="w-5 h-5 text-white animate-spin" />
+              : <Send className="w-5 h-5 text-white" />}
+          </button>
         </div>
       </div>
     </>

@@ -1,10 +1,8 @@
 // src/lib/authStore.ts
-// CRITICAL FIX: Added Firebase onAuthStateChanged integration and checkAuth method
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { auth } from "./firebase";
-import { onAuthStateChanged, signOut as firebaseSignOut } from "firebase/auth";
-import { api } from "./api";
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 interface UserProfile {
   id: number;
@@ -25,19 +23,20 @@ interface AuthState {
   accessToken: string | null;
   refreshToken: string | null;
   isHydrated: boolean;
-  isAuthReady: boolean; // NEW: Track if auth check is complete
+  isAuthReady: boolean;
 
   login: (userData: UserProfile, accessToken: string, refreshToken: string) => void;
   logout: () => void;
   setUser: (userData: UserProfile) => void;
+  updateUser: (freshUser: Partial<UserProfile>) => void;
   setHydrated: (hydrated: boolean) => void;
-  checkAuth: () => Promise<void>; // NEW: Check and restore auth state
-  setAuthReady: (ready: boolean) => void; // NEW: Mark auth as ready
+  setAuthReady: (ready: boolean) => void;
+  updateTokens: (accessToken: string, refreshToken: string) => void;
 }
 
 export const useAuth = create<AuthState>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       user: null,
       isLoggedIn: false,
       accessToken: null,
@@ -46,96 +45,41 @@ export const useAuth = create<AuthState>()(
       isAuthReady: false,
 
       login: (userData, accessToken, refreshToken) => {
-        localStorage.setItem("access_token", accessToken);
-        localStorage.setItem("refresh_token", refreshToken);
-
-        set({
-          user: userData,
-          isLoggedIn: true,
-          accessToken,
-          refreshToken,
-          isAuthReady: true,
-        });
-      },
-
-      logout: async () => {
+        set({ user: userData, isLoggedIn: true, accessToken, refreshToken, isAuthReady: true });
+        // Load this user's cart from localStorage
         try {
-          // Sign out from Firebase
-          await firebaseSignOut(auth);
-
-          // Call backend logout
-          await api.logout();
-        } catch (error) {
-          console.error("Logout error:", error);
-        }
-
-        // Clear localStorage
-        localStorage.removeItem("access_token");
-        localStorage.removeItem("refresh_token");
-
-        set({
-          user: null,
-          isLoggedIn: false,
-          accessToken: null,
-          refreshToken: null,
-          isAuthReady: true,
-        });
+          const { useCart } = require("@/lib/cartStore");
+          useCart.getState().loadCartForUser(userData.id);
+        } catch {}
       },
 
-      setUser: (userData) => {
-        set({ user: userData });
-      },
-
-      setHydrated: (hydrated: boolean) => {
-        set({ isHydrated: hydrated });
-      },
-
-      setAuthReady: (ready: boolean) => {
-        set({ isAuthReady: ready });
-      },
-
-      // CRITICAL FIX: Check auth state from localStorage and Firebase
-      checkAuth: async () => {
+      logout: () => {
         try {
-          const accessToken = localStorage.getItem("access_token");
-          const refreshToken = localStorage.getItem("refresh_token");
-
-          if (!accessToken || !refreshToken) {
-            // No tokens found - user is not logged in
-            set({ isLoggedIn: false, user: null, isAuthReady: true });
-            return;
+          const userId = useAuth.getState().user?.id;
+          if (userId) {
+            localStorage.removeItem(`studex-wishlist-${userId}`);
           }
-
-          // Verify tokens are still valid by fetching user profile
+          localStorage.removeItem("auth-storage");
+          // Clear cart state on logout
           try {
-            const userProfile = await api.getProfile();
-
-            // Tokens are valid - restore auth state
-            set({
-              user: userProfile,
-              isLoggedIn: true,
-              accessToken,
-              refreshToken,
-              isAuthReady: true,
-            });
-          } catch (error) {
-            // Tokens invalid or expired - clear auth state
-            console.error("Auth check failed:", error);
-            localStorage.removeItem("access_token");
-            localStorage.removeItem("refresh_token");
-            set({
-              user: null,
-              isLoggedIn: false,
-              accessToken: null,
-              refreshToken: null,
-              isAuthReady: true,
-            });
-          }
-        } catch (error) {
-          console.error("Check auth error:", error);
-          set({ isAuthReady: true });
-        }
+            const { useCart } = require("@/lib/cartStore");
+            useCart.getState().loadCartForUser(null);
+          } catch {}
+        } catch {}
+        set({ user: null, isLoggedIn: false, accessToken: null, refreshToken: null, isAuthReady: true });
       },
+
+      setUser: (userData) => set({ user: userData }),
+
+      // Merges fresh fields into existing user — used after /api/auth/me/ call
+      // This is how vendor approval by admin gets reflected without re-login
+      updateUser: (freshUser) => set((state) => ({
+        user: state.user ? { ...state.user, ...freshUser } : state.user,
+      })),
+
+      setHydrated: (hydrated) => set({ isHydrated: hydrated }),
+      setAuthReady: (ready) => set({ isAuthReady: ready }),
+      updateTokens: (accessToken, refreshToken) => set({ accessToken, refreshToken }),
     }),
     {
       name: "auth-storage",
@@ -146,28 +90,107 @@ export const useAuth = create<AuthState>()(
         refreshToken: state.refreshToken,
       }),
       onRehydrateStorage: () => (state) => {
-        if (state) {
-          state.setHydrated(true);
-        }
+        if (state) state.setHydrated(true);
       },
     }
   )
 );
 
-// CRITICAL FIX: Set up Firebase onAuthStateChanged listener
-if (typeof window !== "undefined") {
-  onAuthStateChanged(auth, async (firebaseUser) => {
-    console.log("Firebase auth state changed:", firebaseUser ? "logged in" : "logged out");
+// ─────────────────────────────────────────
+// getToken — reads from Zustand store (in-memory first, then localStorage)
+// ─────────────────────────────────────────
+export const getToken = (): string | null => {
+  try {
+    const storeToken = useAuth.getState().accessToken;
+    if (storeToken) return storeToken;
+    const stored = localStorage.getItem("auth-storage");
+    return stored ? JSON.parse(stored)?.state?.accessToken ?? null : null;
+  } catch {
+    return null;
+  }
+};
 
-    // If Firebase user exists but Zustand says not logged in, sync state
-    const { isLoggedIn, checkAuth } = useAuth.getState();
+const getRefreshToken = (): string | null => {
+  try {
+    const storeToken = useAuth.getState().refreshToken;
+    if (storeToken) return storeToken;
+    const stored = localStorage.getItem("auth-storage");
+    return stored ? JSON.parse(stored)?.state?.refreshToken ?? null : null;
+  } catch {
+    return null;
+  }
+};
 
-    if (firebaseUser && !isLoggedIn) {
-      console.log("Firebase user detected, checking auth state...");
-      await checkAuth();
-    } else if (!firebaseUser && isLoggedIn) {
-      console.log("Firebase user logged out, clearing auth state...");
-      useAuth.getState().logout();
+// ─────────────────────────────────────────
+// refreshAccessToken — calls Django /api/auth/token/refresh/
+// ─────────────────────────────────────────
+let isRefreshing = false;
+let refreshPromise: Promise<string | null> | null = null;
+
+const refreshAccessToken = async (): Promise<string | null> => {
+  if (isRefreshing && refreshPromise) return refreshPromise;
+
+  isRefreshing = true;
+  refreshPromise = (async () => {
+    try {
+      const refresh = getRefreshToken();
+      if (!refresh) return null;
+
+      const res = await fetch(`${API_BASE_URL}/api/auth/token/refresh/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refresh }),
+      });
+
+      if (!res.ok) {
+        useAuth.getState().logout();
+        return null;
+      }
+
+      const data = await res.json();
+      const newAccessToken = data.access;
+      const newRefreshToken = data.refresh || refresh;
+
+      useAuth.getState().updateTokens(newAccessToken, newRefreshToken);
+      return newAccessToken;
+    } catch {
+      return null;
+    } finally {
+      isRefreshing = false;
+      refreshPromise = null;
     }
-  });
-}
+  })();
+
+  return refreshPromise;
+};
+
+// ─────────────────────────────────────────
+// fetchWithAuth — use instead of fetch() for all authenticated API calls.
+// Automatically refreshes expired tokens and retries once.
+// ─────────────────────────────────────────
+export const fetchWithAuth = async (
+  url: string,
+  options: RequestInit = {}
+): Promise<Response> => {
+  const token = getToken();
+
+  const makeRequest = (t: string | null) => {
+    const headers = new Headers(options.headers || {});
+    if (t) headers.set("Authorization", `Bearer ${t}`);
+    if (!headers.has("Content-Type") && !(options.body instanceof FormData)) {
+      headers.set("Content-Type", "application/json");
+    }
+    return fetch(url, { ...options, headers });
+  };
+
+  let response = await makeRequest(token);
+
+  if (response.status === 401) {
+    const newToken = await refreshAccessToken();
+    if (newToken) {
+      response = await makeRequest(newToken);
+    }
+  }
+
+  return response;
+};

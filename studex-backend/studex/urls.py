@@ -12,8 +12,11 @@ urlpatterns = [
     path('api/admin/', include('accounts.admin_urls')),  # Admin-only endpoints (dashboard, user management)
     path('api/services/', include('services.urls')),  # Services endpoints (categories, listings)
     path('api/orders/', include('orders.urls')),      # Orders endpoints
-    path('api/wallet/', include('wallet.urls')),      # Wallet endpoints
-    path('api/chat/', include('chat.urls')),          # Chat/messaging endpoints
+    path('api/payments/', include('payments.urls')),   # payment endpoints
+    path('api/chat/', include('chat.urls')),         # Chat/messaging endpoints
+    path('api/reviews/', include('reviews.urls')),
+    path('api/loyalty/', include('loyalty.urls')),
+    path('api/notifications/', include('notifications.urls')),
 ]
 
 # ← NEW: Serve media files during development (DEBUG = True)

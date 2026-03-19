@@ -3,188 +3,100 @@ from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.utils import timezone
-from django.db.models import Q, Count, Max
+from django.db.models import Q
 from .models import Conversation, Message
-from .serializers import (
-    ConversationSerializer,
-    ConversationDetailSerializer,
-    MessageSerializer,
-    SendMessageSerializer
-)
+from .serializers import ConversationSerializer, MessageSerializer
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class ConversationViewSet(viewsets.ModelViewSet):
-    queryset = Conversation.objects.all()
     serializer_class = ConversationSerializer
     permission_classes = [permissions.IsAuthenticated]
+    http_method_names = ['get', 'post', 'head', 'options']
 
     def get_queryset(self):
-        """Return conversations where user is either buyer or seller"""
         user = self.request.user
-        return self.queryset.filter(
+        return Conversation.objects.filter(
             Q(buyer=user) | Q(seller=user)
-        ).distinct()
+        ).select_related('buyer', 'seller', 'listing').order_by('-updated_at')
 
-    def get_serializer_class(self):
-        """Use detailed serializer for retrieve action"""
-        if self.action == 'retrieve':
-            return ConversationDetailSerializer
-        return ConversationSerializer
+    def create(self, request, *args, **kwargs):
+        print("REQUEST DATA:", request.data)
+        """Start or retrieve a conversation about a listing"""
+        listing_id = request.data.get('listing_id')
+        seller_id = request.data.get('seller_id')
 
-    def retrieve(self, request, *args, **kwargs):
-        """Get conversation details with messages"""
-        conversation = self.get_object()
+        if not listing_id or not seller_id:
+            return Response({'error': 'listing_id and seller_id are required'}, status=400)
 
-        # Mark messages as read for the current user
-        Message.objects.filter(
-            conversation=conversation,
-            is_read=False
-        ).exclude(sender=request.user).update(
-            is_read=True,
-            read_at=timezone.now()
+        from services.models import Listing
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+
+        try:
+            listing = Listing.objects.get(id=listing_id)
+            seller = User.objects.get(id=seller_id)
+        except (Listing.DoesNotExist, User.DoesNotExist):
+            return Response({'error': 'Listing or seller not found'}, status=404)
+
+        if request.user == seller:
+            return Response({'error': 'You cannot message yourself'}, status=400)
+
+        conversation, created = Conversation.objects.get_or_create(
+            buyer=request.user,
+            seller=seller,
+            listing=listing,
         )
 
         serializer = self.get_serializer(conversation)
+        return Response(serializer.data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+
+    @action(detail=True, methods=['get'])
+    def messages(self, request, pk=None):
+        """GET /api/chat/conversations/{id}/messages/"""
+        conversation = self.get_object()
+        msgs = conversation.messages.select_related('sender').order_by('created_at')
+
+        # Mark all unread messages from other user as read
+        msgs.filter(is_read=False).exclude(sender=request.user).update(
+            is_read=True, read_at=timezone.now()
+        )
+
+        serializer = MessageSerializer(msgs, many=True, context={'request': request})
         return Response(serializer.data)
 
-    @action(detail=False, methods=['get'])
-    def unread_count(self, request):
-        """Get total unread message count for current user"""
-        user = request.user
+    @action(detail=True, methods=['post'])
+    def send(self, request, pk=None):
+        """POST /api/chat/conversations/{id}/send/"""
+        conversation = self.get_object()
 
-        # Count all unread messages in user's conversations
-        total_unread = Message.objects.filter(
-            Q(conversation__buyer=user) | Q(conversation__seller=user),
-            is_read=False
-        ).exclude(sender=user).count()
+        # Verify user belongs to this conversation
+        if request.user not in [conversation.buyer, conversation.seller]:
+            return Response({'error': 'Not a participant'}, status=403)
 
-        return Response({'unread_count': total_unread})
+        content = request.data.get('content', '').strip()
+        if not content:
+            return Response({'error': 'Message content is required'}, status=400)
+
+        message = Message.objects.create(
+            conversation=conversation,
+            sender=request.user,
+            content=content,
+            message_type=request.data.get('message_type', 'text'),
+        )
+
+        serializer = MessageSerializer(message, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
-class MessageViewSet(viewsets.ModelViewSet):
-    queryset = Message.objects.all()
+class MessageViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = MessageSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        """Return messages from user's conversations"""
         user = self.request.user
-        return self.queryset.filter(
+        return Message.objects.filter(
             Q(conversation__buyer=user) | Q(conversation__seller=user)
-        ).distinct()
-
-    @action(detail=False, methods=['post'])
-    def send(self, request):
-        """Send a message (creates conversation if needed)"""
-        serializer = SendMessageSerializer(data=request.data, context={'request': request})
-
-        if serializer.is_valid():
-            try:
-                message = serializer.save()
-
-                return Response({
-                    'message': 'Message sent successfully',
-                    'data': MessageSerializer(message).data
-                }, status=status.HTTP_201_CREATED)
-
-            except Exception as e:
-                return Response({
-                    'error': str(e)
-                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    @action(detail=True, methods=['patch'])
-    def mark_read(self, request, pk=None):
-        """Mark a message as read"""
-        message = self.get_object()
-
-        # Only recipient can mark as read
-        if message.sender == request.user:
-            return Response(
-                {'error': 'Cannot mark your own message as read'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        message.is_read = True
-        message.read_at = timezone.now()
-        message.save()
-
-        return Response({
-            'message': 'Message marked as read',
-            'data': MessageSerializer(message).data
-        })
-
-    @action(detail=True, methods=['patch'])
-    def accept_offer(self, request, pk=None):
-        """Accept a price offer"""
-        message = self.get_object()
-
-        # Only seller can accept offers
-        conversation = message.conversation
-        if request.user != conversation.seller:
-            return Response(
-                {'error': 'Only the seller can accept offers'},
-                status=status.HTTP_403_FORBIDDEN
-            )
-
-        # Must be an offer message
-        if message.message_type != 'offer':
-            return Response(
-                {'error': 'This is not an offer message'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        # Update offer status
-        message.offer_status = 'accepted'
-        message.save()
-
-        # Create system message
-        Message.objects.create(
-            conversation=conversation,
-            sender=request.user,
-            message_type='system',
-            content=f'Offer of ₦{message.offer_amount} has been accepted!'
-        )
-
-        return Response({
-            'message': 'Offer accepted',
-            'data': MessageSerializer(message).data
-        })
-
-    @action(detail=True, methods=['patch'])
-    def reject_offer(self, request, pk=None):
-        """Reject a price offer"""
-        message = self.get_object()
-
-        # Only seller can reject offers
-        conversation = message.conversation
-        if request.user != conversation.seller:
-            return Response(
-                {'error': 'Only the seller can reject offers'},
-                status=status.HTTP_403_FORBIDDEN
-            )
-
-        # Must be an offer message
-        if message.message_type != 'offer':
-            return Response(
-                {'error': 'This is not an offer message'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        # Update offer status
-        message.offer_status = 'rejected'
-        message.save()
-
-        # Create system message
-        Message.objects.create(
-            conversation=conversation,
-            sender=request.user,
-            message_type='system',
-            content=f'Offer of ₦{message.offer_amount} has been rejected.'
-        )
-
-        return Response({
-            'message': 'Offer rejected',
-            'data': MessageSerializer(message).data
-        })
+        ).select_related('sender', 'conversation')

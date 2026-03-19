@@ -1,5 +1,4 @@
 // src/app/categories/page.tsx — OFFICIAL STUDEx 3.0 CATEGORIES PAGE (Database-Driven)
-
 "use client";
 
 import { motion } from "framer-motion";
@@ -32,49 +31,58 @@ export default function CategoriesPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Fetch real categories from backend
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'}/api/categories/`);
-        if (!res.ok) throw new Error("Failed to fetch");
+        const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+        const res = await fetch(`${API_URL}/api/services/categories/`, {
+          headers: { "Content-Type": "application/json" },
+        });
+
+        if (!res.ok) {
+          throw new Error(`Failed to fetch categories. Status: ${res.status}`);
+        }
+
         const data = await res.json();
+        console.log("Fetched categories:", data.results || data);
+
         setCategories(data.results || data || []);
-      } catch (err) {
+      } catch (err: any) {
         console.error("Categories fetch error:", err);
-        // Fallback to your beautiful hardcoded ones if backend not ready
+
+        // Fallback hardcoded categories if API fails
         setCategories([
-          { 
+          {
             id: 1,
-            title: "Lashes", 
-            slug: "lashes", 
+            title: "Lashes",
+            slug: "lashes",
             image: "/images/lashes-1.jpg",
             icon: "sparkles",
-            color: "from-purple-500 to-pink-500"
+            color: "from-purple-500 to-pink-500",
           },
-          { 
+          {
             id: 2,
-            title: "Nails", 
-            slug: "nails", 
+            title: "Nails",
+            slug: "nails",
             image: "/images/nails-1.jpg",
             icon: "zap",
-            color: "from-teal-500 to-cyan-500"
+            color: "from-teal-500 to-cyan-500",
           },
-          { 
+          {
             id: 3,
-            title: "Laundry", 
-            slug: "laundry", 
+            title: "Laundry",
+            slug: "laundry",
             image: "/images/laundry-1.jpg",
             icon: "shirt",
-            color: "from-blue-500 to-indigo-500"
+            color: "from-blue-500 to-indigo-500",
           },
-          { 
+          {
             id: 4,
-            title: "Food", 
-            slug: "food", 
+            title: "Food",
+            slug: "food",
             image: "/images/food-1.jpg",
             icon: "package",
-            color: "from-orange-500 to-red-500"
+            color: "from-orange-500 to-red-500",
           },
         ]);
       } finally {
@@ -87,11 +95,11 @@ export default function CategoriesPage() {
 
   return (
     <>
-      {/* LUXURY HEADER */}
+      {/* HEADER */}
       <div className="sticky top-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-3xl z-50 border-b border-purple-100 dark:border-gray-800">
         <div className="flex items-center justify-between p-5">
           <button
-            onClick={() => router.back()}
+            onClick={() => router.push("/home")}
             className="p-4 rounded-2xl bg-gradient-to-br from-purple-100 to-teal-100 dark:from-purple-900/30 dark:to-teal-900/30 hover:from-purple-200 hover:to-teal-200 dark:hover:from-purple-900/50 dark:hover:to-teal-900/50 active:scale-95 transition-all shadow-lg"
           >
             <ChevronLeft className="w-7 h-7 text-purple-700 dark:text-purple-400" />
@@ -101,15 +109,18 @@ export default function CategoriesPage() {
             <h1 className="text-3xl font-black bg-gradient-to-r from-purple-600 via-pink-600 to-teal-600 bg-clip-text text-transparent tracking-tight">
               Choose Your Vibe
             </h1>
-            <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mt-1">Campus luxury, one tap away</p>
+            <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mt-1">
+              Campus luxury, one tap away
+            </p>
           </div>
 
           <ThemeToggle />
         </div>
       </div>
 
+      {/* CATEGORIES GRID */}
       <div className="px-6 pt-8 pb-40 bg-[#FFF8F0] dark:bg-gray-950 min-h-screen">
-        {/* HERO STATEMENT */}
+        {/* HERO */}
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
@@ -144,7 +155,6 @@ export default function CategoriesPage() {
             <p className="text-xl text-gray-500 dark:text-gray-400">No categories yet. Coming soon!</p>
           </div>
         ) : (
-          /* EPIC GRID — Real Categories from Database */
           <div className="grid grid-cols-2 gap-8">
             {categories.map((cat, i) => {
               const Icon = iconMap[cat.icon] || Package;
@@ -161,8 +171,9 @@ export default function CategoriesPage() {
                       whileTap={{ scale: 0.95 }}
                       className="group relative overflow-hidden rounded-3xl shadow-2xl border-2 border-white/20 dark:border-gray-700/20"
                     >
-                      <div className={`absolute inset-0 bg-gradient-to-br ${cat.color} opacity-0 group-hover:opacity-90 transition-all duration-700`} />
-                      
+                      <div
+                        className={`absolute inset-0 bg-gradient-to-br ${cat.color} opacity-0 group-hover:opacity-90 transition-all duration-700`}
+                      />
                       <div className="absolute inset-0 blur-3xl opacity-0 group-hover:opacity-60 transition-opacity duration-1000">
                         <div className={`absolute inset-0 bg-gradient-to-br ${cat.color}`} />
                       </div>
@@ -172,6 +183,7 @@ export default function CategoriesPage() {
                           src={cat.image}
                           alt={cat.title}
                           fill
+                          sizes="(max-width: 768px) 50vw, 25vw"
                           className="object-cover group-hover:scale-125 transition-transform duration-1000"
                           priority={i < 2}
                         />
@@ -181,9 +193,7 @@ export default function CategoriesPage() {
                       <div className="absolute inset-0 flex flex-col justify-end p-8">
                         <div className="text-white">
                           <Icon className="w-12 h-12 mb-3 drop-shadow-2xl" />
-                          <h3 className="text-4xl font-black drop-shadow-2xl tracking-tight">
-                            {cat.title}
-                          </h3>
+                          <h3 className="text-4xl font-black drop-shadow-2xl tracking-tight">{cat.title}</h3>
                         </div>
 
                         <motion.div
@@ -214,18 +224,9 @@ export default function CategoriesPage() {
         )}
 
         {/* FINAL CTA */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1 }}
-          className="text-center mt-16"
-        >
-          <p className="text-lg font-medium text-gray-600 dark:text-gray-400">
-            Everything you need. Nothing you don't.
-          </p>
-          <p className="text-3xl font-black bg-gradient-to-r from-purple-600 to-teal-600 bg-clip-text text-transparent mt-3">
-            Just StudEx.
-          </p>
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1 }} className="text-center mt-16">
+          <p className="text-lg font-medium text-gray-600 dark:text-gray-400">Everything you need. Nothing you don't.</p>
+          <p className="text-3xl font-black bg-gradient-to-r from-purple-600 to-teal-600 bg-clip-text text-transparent mt-3">Just StudEx.</p>
         </motion.div>
       </div>
     </>

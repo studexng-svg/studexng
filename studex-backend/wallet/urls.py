@@ -5,12 +5,12 @@ from .views import WalletViewSet, BankAccountViewSet, EscrowViewSet, get_banks
 from .webhooks import paystack_webhook
 
 router = DefaultRouter()
-router.register(r'wallet', WalletViewSet, basename='wallet')
+router.register(r'', WalletViewSet, basename='wallet')        # was r'wallet' → now r''
 router.register(r'escrow', EscrowViewSet, basename='escrow')
 
 urlpatterns = [
     path('', include(router.urls)),
-    path('wallet/bank-account/', BankAccountViewSet.as_view({
+    path('bank-account/', BankAccountViewSet.as_view({         # was wallet/bank-account/ → now bank-account/
         'get': 'detail',
         'post': 'detail',
         'put': 'detail'

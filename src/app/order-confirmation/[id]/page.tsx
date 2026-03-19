@@ -6,11 +6,19 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import {
-  CheckCircle, Package, Calendar, MapPin, Clock,
-  ArrowRight, Home, MessageCircle, Loader
+  CheckCircle,
+  Package,
+  Calendar,
+  Clock,
+  ArrowRight,
+  Home,
+  MessageCircle,
+  Loader,
 } from "lucide-react";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+import { auth } from "@/lib/firebase"; // ✅ IMPORTANT (Firebase auth)
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 interface Order {
   id: number;
@@ -40,68 +48,72 @@ export default function OrderConfirmationPage() {
   useEffect(() => {
     const fetchOrder = async () => {
       try {
-        const token = localStorage.getItem('access_token');
-        const res = await fetch(`${API_URL}/api/orders/orders/${orderId}/`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
+        setLoading(true);
+
+        /* =====================================
+           ✅ GET FIREBASE TOKEN (NOT JWT)
+        ===================================== */
+        const user = auth.currentUser;
+
+        if (!user) {
+          router.push("/login");
+          return;
+        }
+
+        const token = await user.getIdToken();
+
+        /* =====================================
+           FETCH ORDER
+        ===================================== */
+        const res = await fetch(
+          `${API_URL}/api/orders/orders/${orderId}/`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`, // ✅ Firebase token only
+              "Content-Type": "application/json",
+            },
+          }
+        );
 
         if (!res.ok) {
-          throw new Error('Failed to fetch order');
+          const text = await res.text();
+          console.error("Backend error:", text);
+          throw new Error("Failed to fetch order");
         }
 
         const data = await res.json();
         setOrder(data);
-      } catch (err) {
-        console.error('Failed to load order:', err);
-        setError('Could not load order details');
+      } catch (err: any) {
+        console.error("Failed to load order:", err);
+        setError(err.message || "Could not load order details");
       } finally {
         setLoading(false);
       }
     };
 
-    if (orderId) {
-      fetchOrder();
-    }
-  }, [orderId]);
+    if (orderId) fetchOrder();
+  }, [orderId, router]);
+
+  /* =====================================
+     UI (unchanged)
+  ===================================== */
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-teal-50 flex items-center justify-center">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.8 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="text-center"
-        >
-          <Loader className="w-16 h-16 text-purple-600 animate-spin mx-auto mb-4" />
-          <p className="text-xl font-bold text-gray-700">Loading your order...</p>
-        </motion.div>
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader className="w-12 h-12 animate-spin" />
       </div>
     );
   }
 
   if (error || !order) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-teal-50 flex items-center justify-center p-6">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-3xl p-8 shadow-2xl text-center max-w-md"
-        >
-          <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Package className="w-10 h-10 text-red-600" />
-          </div>
-          <h2 className="text-2xl font-black text-gray-900 mb-2">Order Not Found</h2>
-          <p className="text-gray-600 mb-6">{error || "We couldn't find this order"}</p>
-          <Link href="/home">
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="px-8 py-3 bg-gradient-to-r from-purple-600 to-teal-600 text-white font-bold rounded-full"
-            >
-              Go to Home
-            </motion.button>
-          </Link>
-        </motion.div>
+      <div className="min-h-screen flex items-center justify-center text-center">
+        <div>
+          <h2 className="text-xl font-bold mb-4">Order Not Found</h2>
+          <p>{error}</p>
+          <Link href="/home">Go Home</Link>
+        </div>
       </div>
     );
   }
