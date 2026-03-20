@@ -3,7 +3,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   reactStrictMode: false,
-  
+
   typescript: {
     ignoreBuildErrors: true,
   },
@@ -24,6 +24,17 @@ const nextConfig: NextConfig = {
         protocol: "http",
         hostname: "localhost",
         port: "8000",
+        pathname: "/media/**",
+      },
+      // Production backend — update hostname when you deploy Django
+      {
+        protocol: "https",
+        hostname: "**",
+        pathname: "/media/**",
+      },
+      {
+        protocol: "http",
+        hostname: "**",
         pathname: "/media/**",
       },
     ],

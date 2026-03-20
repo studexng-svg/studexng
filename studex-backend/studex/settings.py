@@ -2,49 +2,39 @@
 Django settings for StudEx project.
 """
 
-
 from datetime import timedelta
-from dotenv import load_dotenv
 from pathlib import Path
 from decouple import config
 import os
+import dj_database_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-load_dotenv(os.path.join(BASE_DIR, ".env"))
-
 
 # =======================================
-# Firebase Admin Initialization
+# SECURITY
 # =======================================
+SECRET_KEY = config('SECRET_KEY', default='django-insecure-change-me-in-production')
+DEBUG = config('DEBUG', default='False') == 'True'
+
+ALLOWED_HOSTS = config(
+    'ALLOWED_HOSTS',
+    default='localhost,127.0.0.1,.onrender.com,.vercel.app,.railway.app'
+).split(',')
+
+import socket
 try:
-    import firebase_admin
-    from firebase_admin import credentials
+    local_ip = socket.gethostbyname(socket.gethostname())
+    if local_ip not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(local_ip)
+except Exception:
+    pass
 
-    service_account_path = os.path.join(BASE_DIR.parent, 'firebase_service_account.json')
-    
-    if os.path.exists(service_account_path):
-        cred = credentials.Certificate(service_account_path)
-        firebase_admin.initialize_app(cred)
-    else:
-        print("Warning: firebase_service_account.json not found. Firebase auth will not work.")
-except ImportError:
-    print("firebase-admin not installed. Run: pip install firebase-admin")
-except Exception as e:
-    print(f"Failed to initialize Firebase Admin: {e}")
+if DEBUG:
+    ALLOWED_HOSTS.append('*')
 
-# SECURITY WARNING: keep the secret key used in production secret!
-try:
-    SECRET_KEY = os.getenv("SECRET_KEY")
-    DEBUG = os.getenv("DEBUG") == "True"
-    
-except:
-    raise ValueError("SECRET_KEY environment variable must be set. Add it to your .env file.")
-
-DEBUG = os.getenv("DEBUG", "False") == "True"
-
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1,.vercel.app,.railway.app').split(',')
-
-# Application definition
+# =======================================
+# APPLICATIONS
+# =======================================
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -52,15 +42,15 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    
-    # Third party apps
+
+    # Third party
     'rest_framework',
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
     'django_filters',
-    
-    # Your apps
+
+    # StudEx apps
     'accounts',
     'services',
     'orders',
@@ -68,7 +58,7 @@ INSTALLED_APPS = [
     'chat',
     'reviews',
     'loyalty',
-    'notifications'
+    'notifications',
 ]
 
 MIDDLEWARE = [
@@ -106,102 +96,75 @@ TEMPLATES = [
 WSGI_APPLICATION = 'studex.wsgi.application'
 
 # =======================================
-# Database Configuration
+# DATABASE
 # =======================================
-DB_ENGINE = config('DB_ENGINE', default='django.db.backends.sqlite3')
+DATABASE_URL = config('DATABASE_URL', default='')
 
-if DB_ENGINE == 'django.db.backends.sqlite3':
+if DATABASE_URL:
+    # Production — Render PostgreSQL
+    DATABASES = {
+        'default': dj_database_url.parse(DATABASE_URL, conn_max_age=600)
+    }
+else:
+    # Local — SQLite
     DATABASES = {
         'default': {
-            'ENGINE': DB_ENGINE,
+            'ENGINE': 'django.db.backends.sqlite3',
             'NAME': BASE_DIR / 'db.sqlite3',
         }
     }
-else:
-    DATABASES = {
-        'default': {
-            'ENGINE': DB_ENGINE,
-            'NAME': config('DB_NAME', default='studex_db'),
-            'USER': config('DB_USER', default='postgres'),
-            'PASSWORD': config('DB_PASSWORD', default=''),
-            'HOST': config('DB_HOST', default='localhost'),
-            'PORT': config('DB_PORT', default='5432'),
-        }
-    }
 
-# Password validation
+# =======================================
+# PASSWORD VALIDATION
+# =======================================
 AUTH_PASSWORD_VALIDATORS = [
-    {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-    },
+    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
-# Internationalization
+# =======================================
+# INTERNATIONALISATION
+# =======================================
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'Africa/Lagos'
 USE_I18N = True
 USE_TZ = True
 
-# Static files
+# =======================================
+# STATIC & MEDIA FILES
+# =======================================
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
-# Media files
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
-# Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-
-# Custom User Model
 AUTH_USER_MODEL = 'accounts.User'
 
 # =======================================
-# CORS Settings
+# CORS
 # =======================================
-CORS_ALLOWED_ORIGINS = config(
-    'CORS_ALLOWED_ORIGINS',
-    default='http://localhost:3000,http://127.0.0.1:8000'
-).split(',')
+if DEBUG:
+    CORS_ALLOW_ALL_ORIGINS = True
+else:
+    CORS_ALLOW_ALL_ORIGINS = False
+    CORS_ALLOWED_ORIGINS = config(
+        'CORS_ALLOWED_ORIGINS',
+        default='http://localhost:3000,https://studexng.vercel.app',
+    ).split(',')
 
 CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOW_ALL_ORIGINS = False
-
 CORS_ALLOW_HEADERS = [
-    'accept',
-    'accept-encoding',
-    'authorization',
-    'content-type',
-    'dnt',
-    'origin',
-    'user-agent',
-    'x-csrftoken',
-    'x-requested-with',
+    'accept', 'accept-encoding', 'authorization', 'content-type',
+    'dnt', 'origin', 'user-agent', 'x-csrftoken', 'x-requested-with',
 ]
-
-CORS_ALLOW_METHODS = [
-    'DELETE',
-    'GET',
-    'OPTIONS',
-    'PATCH',
-    'POST',
-    'PUT',
-]
-
-CORS_PREFLIGHT_MAX_AGE = 86400
 
 # =======================================
-# REST Framework & JWT Settings
+# REST FRAMEWORK
 # =======================================
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
@@ -210,137 +173,50 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
     ),
-    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 20,
     'DEFAULT_FILTER_BACKENDS': [
         'django_filters.rest_framework.DjangoFilterBackend',
         'rest_framework.filters.SearchFilter',
         'rest_framework.filters.OrderingFilter',
     ],
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 20,
 }
 
+# =======================================
+# JWT
+# =======================================
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(days=int(config('JWT_ACCESS_TOKEN_LIFETIME', default=1))),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=int(config('JWT_REFRESH_TOKEN_LIFETIME', default=7))),
-    'ROTATE_REFRESH_TOKENS': False,
-    'BLACKLIST_AFTER_ROTATION': False,
-    'UPDATE_LAST_LOGIN': True,
-    'ALGORITHM': 'HS256',
-    'SIGNING_KEY': SECRET_KEY,
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=7),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=30),
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
     'AUTH_HEADER_TYPES': ('Bearer',),
-    'USER_ID_FIELD': 'id',
-    'USER_ID_CLAIM': 'user_id',
 }
 
 # =======================================
-# Paystack Payment Gateway Settings
+# PAYSTACK
 # =======================================
+PAYSTACK_SECRET_KEY = config('PAYSTACK_SECRET_KEY', default='')
 PAYSTACK_PUBLIC_KEY = config('PAYSTACK_PUBLIC_KEY', default='')
-PAYSTACK_SECRET_KEY = config('PAYSTACK_SECRET_KEY')
 
 # =======================================
-# University Email Domain Validation
+# CACHE (for login attempt tracking)
 # =======================================
-ALLOWED_UNIVERSITY_DOMAINS = config(
-    'ALLOWED_UNIVERSITY_DOMAINS',
-    default=None,
-    cast=lambda v: v.split(',') if v else None
-)
-
-# =======================================
-# Blockchain Settings (Polygon)
-# =======================================
-BLOCKCHAIN_RPC_URL = config('BLOCKCHAIN_RPC_URL', default='https://polygon-rpc.com')
-BLOCKCHAIN_PRIVATE_KEY = config('BLOCKCHAIN_PRIVATE_KEY', default='')
-BLOCKCHAIN_CONTRACT_ADDRESS = config('BLOCKCHAIN_CONTRACT_ADDRESS', default='')
-
-# =======================================
-# API & Frontend URLs
-# =======================================
-API_BASE_URL = config('API_BASE_URL', default='http://localhost:8000')
-FRONTEND_BASE_URL = config('FRONTEND_BASE_URL', default='http://localhost:3000')
-
-# =======================================
-# Security Settings (Production)
-# =======================================
-SESSION_COOKIE_SECURE = config('SESSION_COOKIE_SECURE', default=not DEBUG, cast=bool)
-SESSION_COOKIE_HTTPONLY = config('SESSION_COOKIE_HTTPONLY', default=True, cast=bool)
-SESSION_COOKIE_SAMESITE = config('SESSION_COOKIE_SAMESITE', default='Lax')
-
-CSRF_COOKIE_SECURE = config('CSRF_COOKIE_SECURE', default=not DEBUG, cast=bool)
-CSRF_COOKIE_HTTPONLY = config('CSRF_COOKIE_HTTPONLY', default=True, cast=bool)
-CSRF_COOKIE_SAMESITE = config('CSRF_COOKIE_SAMESITE', default='Lax')
-
-if not DEBUG:
-    SECURE_SSL_REDIRECT = True
-    SECURE_BROWSER_XSS_FILTER = True
-    SECURE_CONTENT_TYPE_NOSNIFF = True
-    X_FRAME_OPTIONS = 'DENY'
-
-# =======================================
-# Logging Configuration
-# =======================================
-LOG_LEVEL = config('LOG_LEVEL', default='INFO')
-
-LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'handlers': {
-        'console': {
-            'class': 'logging.StreamHandler',
-        },
-    },
-    'root': {
-        'handlers': ['console'],
-        'level': LOG_LEVEL,
-    },
-}
-
-# =======================================
-# Rate Limiting Configuration
-# =======================================
-# In DEBUG mode, limits are very high so local development is never throttled.
-# In production, tighter limits apply.
-if DEBUG:
-    RATE_LIMIT_LOGIN = 1000
-    RATE_LIMIT_REGISTER = 1000
-    RATE_LIMIT_API = 1000
-    RATE_LIMIT_FILE_UPLOAD = 1000
-else:
-    RATE_LIMIT_LOGIN = config('RATE_LIMIT_LOGIN', default=10, cast=int)
-    RATE_LIMIT_REGISTER = config('RATE_LIMIT_REGISTER', default=5, cast=int)
-    RATE_LIMIT_API = config('RATE_LIMIT_API', default=60, cast=int)
-    RATE_LIMIT_FILE_UPLOAD = config('RATE_LIMIT_FILE_UPLOAD', default=20, cast=int)
-
-# Cache backend for rate limiting
 CACHES = {
     'default': {
         'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-        'LOCATION': 'studex-rate-limit',
     }
 }
 
 # =======================================
-# File Upload Security Configuration
+# EMAIL (optional)
 # =======================================
-MAX_UPLOAD_SIZE_MB = config('MAX_UPLOAD_SIZE_MB', default=10, cast=int)
-
-ALLOWED_IMAGE_EXTENSIONS = config(
-    'ALLOWED_IMAGE_EXTENSIONS',
-    default='jpg,jpeg,png,gif,webp'
-)
-
-ALLOWED_DOCUMENT_EXTENSIONS = config(
-    'ALLOWED_DOCUMENT_EXTENSIONS',
-    default='pdf,doc,docx'
-)
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
 # =======================================
-# Email Configuration
+# SECURITY HEADERS (production only)
 # =======================================
-EMAIL_BACKEND = config('EMAIL_BACKEND', default='django.core.mail.backends.console.EmailBackend')
-EMAIL_HOST = config('EMAIL_HOST', default='smtp.gmail.com')
-EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)
-EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool)
-EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
-EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
+if not DEBUG:
+    SECURE_BROWSER_XSS_FILTER = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    X_FRAME_OPTIONS = 'DENY'
