@@ -35,7 +35,7 @@ class ListingSerializer(serializers.ModelSerializer):
     class Meta:
         model = Listing
         fields = [
-            'id', 'title', 'description', 'price', 'image',
+            'id', 'title', 'description', 'price', 'image', 'image_upload',
             'is_available', 'listing_type', 'track_inventory', 'stock_quantity',
             'category', 'vendor', 'vendor_is_verified',
             'created_at', 'updated_at'
