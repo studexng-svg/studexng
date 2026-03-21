@@ -9,6 +9,8 @@ urlpatterns = [
     path("verify/", views.verify_payment, name="verify-payment"),
     path("refund/", views.refund_payment, name="refund-payment"),
     path("seller/earnings/", views.seller_earnings, name="seller-earnings"),
+    path("preview/", views.preview_price, name="preview-price"),   # ← NEW
+
 
     # Paystack webhook — register this URL in Paystack Dashboard → Settings → Webhooks
     # Full URL to enter: https://yourdomain.com/api/payments/webhook/

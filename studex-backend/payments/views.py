@@ -122,16 +122,9 @@ def verify_bank_account(request):
 # ─────────────────────────────────────────
 # VERIFY PAYMENT + CREATE ORDER
 # ─────────────────────────────────────────
-
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def verify_payment(request):
-    """
-    Called after Paystack payment succeeds on the frontend.
-    1. Verifies payment with Paystack
-    2. Logs the transaction (with split amounts)
-    3. Creates the order(s)
-    """
     reference = request.data.get("reference")
     order_type = request.data.get("order_type", "product")
     listing_id = request.data.get("listing_id")
@@ -141,12 +134,10 @@ def verify_payment(request):
     if not reference:
         return Response({"error": "Payment reference is required."}, status=400)
 
-    # Prevent duplicate processing
     if PaymentTransaction.objects.filter(reference=reference, status="success").exists():
         existing = PaymentTransaction.objects.get(reference=reference, status="success")
         return Response({"order_id": existing.order_id, "message": "Already processed."})
 
-    # Verify with Paystack
     verify_res = requests.get(
         f"https://api.paystack.co/transaction/verify/{reference}",
         headers=PAYSTACK_HEADERS,
@@ -165,6 +156,22 @@ def verify_payment(request):
     paystack_data = verify_data["data"]
     amount_paid = Decimal(str(paystack_data["amount"])) / 100
     buyer_email = paystack_data.get("customer", {}).get("email", request.user.email)
+
+    # ── PROFILE DISCOUNT: check if the verified amount matches a discounted price ──
+    # The frontend already sent the discounted amount to Paystack.
+    # We just need to mark the bonus as used here.
+    discount_applied = False
+    discount_amount = Decimal("0")
+    try:
+        profile = request.user.profile
+        if profile.profile_bonus_eligible and not profile.profile_bonus_used:
+            discount_applied = True
+            profile.profile_bonus_used = True
+            profile.profile_bonus_eligible = False
+            profile.save(update_fields=["profile_bonus_used", "profile_bonus_eligible"])
+            logger.info(f"Profile discount applied and marked used for user {request.user.username}")
+    except Exception as e:
+        logger.warning(f"Profile discount check failed: {e}")
 
     seller_rate, platform_rate = get_commission_split(amount_paid)
     seller_amount = (amount_paid * seller_rate).quantize(Decimal("0.01"))
@@ -197,21 +204,22 @@ def verify_payment(request):
                 if listing.stock_quantity <= 0:
                     return Response({"error": f'"{listing.title}" is out of stock.'}, status=400)
                 if listing.stock_quantity < qty:
-                    return Response({"error": f'Only {listing.stock_quantity} of "{listing.title}" available. Stock limit exceeded.'}, status=400)
+                    return Response({"error": f'Only {listing.stock_quantity} of "{listing.title}" available.'}, status=400)
+
             order = Order.objects.create(
                 buyer=request.user,
                 listing=listing,
-                amount=amount_paid,
+                amount=amount_paid,   # already discounted — Paystack charged this amount
                 reference=reference,
                 status="paid",
             )
             order_id = order.id
-            # Reduce inventory stock if tracked
+
             try:
                 listing.reduce_stock(1)
             except Exception as e:
                 logger.warning(f"reduce_stock failed: {e}")
-            # Mark the booking as paid so Pay Now button disappears
+
             try:
                 from orders.models import Booking
                 Booking.objects.filter(
@@ -222,19 +230,17 @@ def verify_payment(request):
             except Exception as e:
                 logger.warning(f"Could not update booking status to paid: {e}")
 
-            # Notify vendor that payment has been received — always fire this
-            # Notify vendor of payment
             try:
                 from notifications.models import Notification
                 Notification.objects.create(
                     recipient=listing.vendor,
-                    notification_type='vendor_approved',
-                    title=f'💰 Payment Received — {listing.title}',
+                    notification_type="vendor_approved",
+                    title=f"💰 Payment Received — {listing.title}",
                     message=(
-                        f'{request.user.username} has paid ₦{listing.price:,.0f} for '
+                        f"{request.user.username} has paid ₦{amount_paid:,.0f} for "
                         f'"{listing.title}". Funds are held in escrow.'
                     ),
-                    action_url='/vendor/dashboard',
+                    action_url="/vendor/dashboard",
                 )
             except Exception as ne:
                 logger.warning(f"Payment notification failed: {ne}")
@@ -243,48 +249,47 @@ def verify_payment(request):
             for i, item_data in enumerate(items):
                 listing = Listing.objects.get(id=item_data["listing_id"])
                 qty = item_data.get("quantity", 1)
-                # Block if quantity exceeds stock
                 if listing.track_inventory:
                     if listing.stock_quantity <= 0:
                         return Response({"error": f'"{listing.title}" is out of stock.'}, status=400)
                     if listing.stock_quantity < qty:
-                        return Response({"error": f'Only {listing.stock_quantity} of "{listing.title}" available. You requested {qty}. Stock limit exceeded.'}, status=400)
+                        return Response({"error": f'Only {listing.stock_quantity} of "{listing.title}" available. You requested {qty}.'}, status=400)
+
                 order = Order.objects.create(
                     buyer=request.user,
                     listing=listing,
-                    amount=listing.price * item_data.get("quantity", 1),
+                    amount=listing.price * qty,
                     reference=f"{reference}-{item_data['listing_id']}-{i}",
                     status="paid",
                 )
-                # Reduce inventory stock if tracked
+
                 try:
-                    listing.reduce_stock(item_data.get("quantity", 1))
+                    listing.reduce_stock(qty)
                 except Exception as e:
                     logger.warning(f"reduce_stock failed: {e}")
-                # Notify vendor of payment
+
                 try:
                     from notifications.models import Notification
-                    item_amount = listing.price * item_data.get("quantity", 1)
+                    item_amount = listing.price * qty
                     Notification.objects.create(
                         recipient=listing.vendor,
-                        notification_type='vendor_approved',
-                        title=f'💰 Payment Received — {listing.title}',
+                        notification_type="vendor_approved",
+                        title=f"💰 Payment Received — {listing.title}",
                         message=(
-                            f'{request.user.username} has paid ₦{item_amount:,.0f} for '
-                            f'"{listing.title}" (qty: {item_data.get("quantity", 1)}). '
-                            f'Funds are held in escrow until the order is completed.'
+                            f"{request.user.username} has paid ₦{item_amount:,.0f} for "
+                            f'"{listing.title}" (qty: {qty}). Funds are held in escrow.'
                         ),
-                        action_url='/vendor/dashboard',
+                        action_url="/vendor/dashboard",
                     )
                 except Exception as ne:
                     logger.warning(f"Product payment notification failed: {ne}")
+
                 if order_id is None:
                     order_id = order.id
 
         txn.order_id = order_id
         txn.save()
 
-        # Deduct loyalty credits if buyer opted in
         credits_used = Decimal("0")
         if use_credits:
             try:
@@ -309,6 +314,7 @@ def verify_payment(request):
             "order_id": order_id,
             "message": "Payment verified. Order created.",
             "credits_used": float(credits_used),
+            "discount_applied": discount_applied,
         })
 
     except Exception as e:
@@ -608,3 +614,41 @@ def paystack_webhook(request):
             pass
 
     return HttpResponse(status=200)
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def preview_price(request):
+    """
+    Called by the checkout page before initialising Paystack.
+    Returns the final price the user should actually be charged,
+    including any profile completion discount.
+    """
+    amount = request.data.get("amount")
+    if not amount:
+        return Response({"error": "amount is required."}, status=400)
+
+    original = Decimal(str(amount))
+    discount_amount = Decimal("0")
+    has_discount = False
+
+    try:
+        profile = request.user.profile
+        if profile.profile_bonus_eligible and not profile.profile_bonus_used:
+            has_discount = True
+            discount_amount = (original * Decimal("0.05")).quantize(Decimal("0.01"))
+    except Exception:
+        pass
+
+    final_amount = original - discount_amount
+
+    return Response({
+        "original_amount": str(original),
+        "discount_eligible": has_discount,
+        "discount_percent": 5 if has_discount else 0,
+        "discount_amount": str(discount_amount),
+        "final_amount": str(final_amount),
+        "discount_message": (
+            f"🎉 5% profile completion discount applied — you save ₦{discount_amount:,.2f}!"
+            if has_discount else None
+        ),
+    })
