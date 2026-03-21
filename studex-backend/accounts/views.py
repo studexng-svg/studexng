@@ -16,9 +16,9 @@ from .serializers import (
     UserRegistrationSerializer,
     UserLoginSerializer,
     UserProfileSerializer,
-    SellerApplicationSerializer
+    SellerApplicationSerializer,
 )
-from .models import User, SellerApplication
+from .models import User, SellerApplication, Profile
 
 
 @api_view(['POST'])
@@ -46,31 +46,16 @@ def login_user(request):
     if not serializer.is_valid():
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    email = serializer.validated_data['email'].lower()
-    password = serializer.validated_data['password']
-
-    try:
-        user = User.objects.get(email__iexact=email)
-    except User.DoesNotExist:
-        return Response({'error': 'No account found with that email address.'}, status=status.HTTP_401_UNAUTHORIZED)
-
-    if not user.is_active:
-        return Response({'error': 'This account has been disabled.'}, status=status.HTTP_401_UNAUTHORIZED)
-
-    authenticated_user = authenticate(request, username=user.username, password=password)
-
-    if authenticated_user is not None:
-        refresh = RefreshToken.for_user(authenticated_user)
-        return Response({
-            'message': 'Login successful',
-            'user': UserProfileSerializer(authenticated_user).data,
-            'tokens': {
-                'refresh': str(refresh),
-                'access': str(refresh.access_token),
-            }
-        }, status=status.HTTP_200_OK)
-
-    return Response({'error': 'Incorrect password. Please try again.'}, status=status.HTTP_401_UNAUTHORIZED)
+    user = serializer.validated_data['user']
+    refresh = RefreshToken.for_user(user)
+    return Response({
+        'message': 'Login successful',
+        'user': UserProfileSerializer(user).data,
+        'tokens': {
+            'refresh': str(refresh),
+            'access': str(refresh.access_token),
+        }
+    }, status=status.HTTP_200_OK)
 
 
 @api_view(['GET'])
@@ -83,14 +68,55 @@ def get_user_profile(request):
 @api_view(['PUT', 'PATCH'])
 @permission_classes([IsAuthenticated])
 def update_user_profile(request):
-    serializer = UserProfileSerializer(request.user, data=request.data, partial=True)
+    serializer = UserProfileSerializer(
+        request.user, data=request.data, partial=True
+    )
     if serializer.is_valid():
         serializer.save()
+        # Re-serialize to return fresh nested profile data
         return Response({
             'message': 'Profile updated successfully',
-            'user': serializer.data
+            'user': UserProfileSerializer(request.user).data,
         }, status=status.HTTP_200_OK)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def check_profile_completion(request):
+    user = request.user
+
+    # Ensure Profile exists (safety net)
+    profile, _ = Profile.objects.get_or_create(user=user)
+
+    # Fields and where they live
+    completion_map = {
+        'username':  user.username,
+        'email':     user.email,
+        'phone':     user.phone,       # on User
+        'bio':       user.bio,         # on User
+        'whatsapp':  profile.whatsapp, # on Profile
+    }
+
+    missing = [field for field, val in completion_map.items() if not val]
+    is_complete = len(missing) == 0
+
+    if is_complete and not profile.profile_bonus_eligible:
+        profile.profile_bonus_eligible = True
+        profile.save(update_fields=['profile_bonus_eligible'])
+        return Response({
+            'message': 'Profile complete! You earned 5% off your first order 🎉',
+            'bonus': True,
+            'missing': [],
+            'is_complete': True,
+        })
+
+    return Response({
+        'message': 'Profile not complete yet' if not is_complete else 'Profile already complete',
+        'bonus': False,
+        'missing': missing,
+        'is_complete': is_complete,
+    })
 
 
 @api_view(['POST'])
@@ -103,16 +129,18 @@ def logout_user(request):
             token.blacklist()
         return Response({'message': 'Logged out successfully'}, status=status.HTTP_200_OK)
     except Exception as e:
-        return Response({'error': f'Logout failed: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            {'error': f'Logout failed: {str(e)}'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
 
-@api_view(["GET"])
+@api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def me(request):
-    """Returns fresh user data — called on account page load to detect vendor approval."""
+    """Returns fresh user data — called on account page load."""
     user = request.user
-    
-    # Fetch unread notification count for the bell badge
+
     unread_notifications = 0
     try:
         from notifications.models import Notification
@@ -122,16 +150,34 @@ def me(request):
     except Exception:
         pass
 
+    profile_data = {}
+    try:
+        p = user.profile
+        profile_data = {
+            'whatsapp': p.whatsapp or '',
+            'instagram': p.instagram or '',
+            'profile_bonus_eligible': p.profile_bonus_eligible,
+            'profile_bonus_used': p.profile_bonus_used,
+            'vendor_badge': p.vendor_badge,
+            'rating': str(p.rating),
+            'total_reviews': p.total_reviews,
+        }
+    except Profile.DoesNotExist:
+        pass
+
     return Response({
-        "id": user.id,
-        "username": user.username,
-        "email": user.email,
-        "phone": getattr(user, "phone", ""),
-        "user_type": user.user_type,
-        "is_verified_vendor": getattr(user, "is_verified_vendor", False),
-        "business_name": getattr(user, "business_name", ""),
-        "hostel": getattr(user, "hostel", ""),
-        "unread_notifications": unread_notifications,
+        'id': user.id,
+        'username': user.username,
+        'email': user.email,
+        'phone': user.phone or '',
+        'bio': user.bio or '',
+        'user_type': user.user_type,
+        'is_verified_vendor': user.is_verified_vendor,
+        'business_name': user.business_name or '',
+        'hostel': user.hostel or '',
+        'matric_number': user.matric_number or '',
+        'unread_notifications': unread_notifications,
+        **profile_data,
     })
 
 
@@ -148,13 +194,12 @@ class SellerApplicationViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
         return Response({
-            "message": "Application submitted successfully! We'll review it within 48 hours.",
-            "status": "pending"
+            'message': "Application submitted successfully! We'll review it within 48 hours.",
+            'status': 'pending',
         }, status=status.HTTP_201_CREATED)
 
     def perform_create(self, serializer):
         application = serializer.save(user=self.request.user)
-        # Notify admin that a new vendor application needs review
         try:
             from studex.notifications import notify_admin_new_application
             notify_admin_new_application(application)
@@ -166,28 +211,32 @@ class ForgotPasswordView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
-        email = request.data.get("email")
+        email = request.data.get('email')
         if not email:
-            return Response({"detail": "Email is required"}, status=400)
+            return Response({'detail': 'Email is required'}, status=400)
         try:
             user = User.objects.get(email=email)
         except User.DoesNotExist:
-            return Response({"detail": "If this email exists, a reset link has been sent."})
+            return Response({'detail': 'If this email exists, a reset link has been sent.'})
 
         uid = urlsafe_base64_encode(force_bytes(user.pk))
         token = default_token_generator.make_token(user)
         reset_url = f"{settings.FRONTEND_BASE_URL}/reset-password?uid={uid}&token={token}"
 
         send_mail(
-            subject="StudEx — Reset Your Password",
-            message=f"Hi {user.username},\n\nClick the link below to reset your password:\n\n{reset_url}\n\nThis link expires in 24 hours.",
+            subject='StudEx — Reset Your Password',
+            message=(
+                f'Hi {user.username},\n\n'
+                f'Click the link below to reset your password:\n\n{reset_url}\n\n'
+                f'This link expires in 24 hours.'
+            ),
             from_email=settings.DEFAULT_FROM_EMAIL,
             recipient_list=[email],
             fail_silently=False,
         )
         return Response({
-            "detail": "Reset link generated successfully.",
-            "reset_url": reset_url
+            'detail': 'Reset link generated successfully.',
+            'reset_url': reset_url,
         })
 
 
@@ -195,22 +244,22 @@ class ResetPasswordView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
-        uid = request.data.get("uid")
-        token = request.data.get("token")
-        password = request.data.get("password")
+        uid = request.data.get('uid')
+        token = request.data.get('token')
+        password = request.data.get('password')
 
         if not uid or not token or not password:
-            return Response({"detail": "Missing fields"}, status=400)
+            return Response({'detail': 'Missing fields'}, status=400)
 
         try:
             user_id = urlsafe_base64_decode(uid).decode()
             user = User.objects.get(pk=user_id)
         except Exception:
-            return Response({"detail": "Invalid link"}, status=400)
+            return Response({'detail': 'Invalid link'}, status=400)
 
         if not default_token_generator.check_token(user, token):
-            return Response({"detail": "Token expired or invalid"}, status=400)
+            return Response({'detail': 'Token expired or invalid'}, status=400)
 
         user.set_password(password)
         user.save()
-        return Response({"detail": "Password reset successful"})
+        return Response({'detail': 'Password reset successful'})

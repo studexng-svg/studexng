@@ -128,17 +128,31 @@ class UserLoginSerializer(serializers.Serializer):
         data['user'] = user
         return data
 
-
 class UserProfileSerializer(serializers.ModelSerializer):
     profile = serializers.SerializerMethodField()
 
+    # Write-only fields that map to the Profile model
+    whatsapp = serializers.CharField(
+        write_only=True, required=False, allow_blank=True, allow_null=True
+    )
+    instagram = serializers.CharField(
+        write_only=True, required=False, allow_blank=True, allow_null=True
+    )
+
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'phone', 'user_type',
-                  'matric_number', 'hostel', 'business_name', 'is_verified_vendor',
-                  'bio', 'profile_image', 'wallet_balance', 'created_at', 'profile',
-                  'is_staff', 'is_superuser']
-        read_only_fields = ['wallet_balance', 'is_verified_vendor', 'created_at', 'is_staff', 'is_superuser']
+        fields = [
+            'id', 'username', 'email', 'phone', 'user_type',
+            'matric_number', 'hostel', 'business_name', 'is_verified_vendor',
+            'bio', 'profile_image', 'wallet_balance', 'created_at', 'profile',
+            'is_staff', 'is_superuser',
+            # write-only profile fields
+            'whatsapp', 'instagram',
+        ]
+        read_only_fields = [
+            'wallet_balance', 'is_verified_vendor', 'created_at',
+            'is_staff', 'is_superuser'
+        ]
 
     def get_profile(self, obj):
         try:
@@ -150,9 +164,39 @@ class UserProfileSerializer(serializers.ModelSerializer):
                 'total_sales': profile.total_sales,
                 'rating': str(profile.rating),
                 'total_reviews': profile.total_reviews,
+                'profile_bonus_eligible': profile.profile_bonus_eligible,
+                'profile_bonus_used': profile.profile_bonus_used,
+                'vendor_badge': profile.vendor_badge,
             }
         except Profile.DoesNotExist:
             return None
+
+    def update(self, instance, validated_data):
+        # Pop Profile-specific fields before updating User
+        whatsapp = validated_data.pop('whatsapp', None)
+        instagram = validated_data.pop('instagram', None)
+
+        # Update User fields
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+
+        # Update Profile fields
+        try:
+            profile = instance.profile
+            if whatsapp is not None:
+                profile.whatsapp = whatsapp
+            if instagram is not None:
+                profile.instagram = instagram
+            profile.save()
+        except Profile.DoesNotExist:
+            Profile.objects.create(
+                user=instance,
+                whatsapp=whatsapp or '',
+                instagram=instagram or '',
+            )
+
+        return instance
 
 
 class ProfileSerializer(serializers.ModelSerializer):

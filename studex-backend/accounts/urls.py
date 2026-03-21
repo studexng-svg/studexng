@@ -4,7 +4,9 @@ from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenRefreshView
 from . import views
 from .views import SellerApplicationViewSet  # ← Import the ViewSet
-from .views import SellerApplicationViewSet, ForgotPasswordView, ResetPasswordView
+from .views import SellerApplicationViewSet, ForgotPasswordView, ResetPasswordView 
+from .views import check_profile_completion
+
 
 # Router for Seller Application endpoints
 router = DefaultRouter()
@@ -23,6 +25,8 @@ urlpatterns = [
     path('forgot-password/', ForgotPasswordView.as_view(), name='forgot-password'), 
     path('reset-password/', ResetPasswordView.as_view(), name='reset-password'), # ← ADD THIS
     path("me/", views.me, name="me"),
+    path('profile/check-completion/', check_profile_completion),
+
 
     # Seller verification endpoints (via router)
     path('', include(router.urls)),
