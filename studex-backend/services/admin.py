@@ -116,6 +116,18 @@ class ListingAdmin(admin.ModelAdmin):
     get_total_revenue.short_description = 'Total Revenue'
 
     def save_model(self, request, obj, form, change):
+        # Upload category image to Cloudinary if a new file was uploaded
+        if 'image' in request.FILES:
+            try:
+                import cloudinary.uploader
+                result = cloudinary.uploader.upload(
+                    request.FILES['image'],
+                    folder='studex/categories',
+                    transformation=[{'quality': 'auto', 'fetch_format': 'auto'}]
+                )
+                obj.image = result.get('secure_url', '')
+            except Exception as e:
+                pass  # Fall through to normal save
         """
         Override save_model so that when admin saves a listing,
         we detect is_available changes and notify the vendor.

@@ -31,6 +31,22 @@ class WalletFundView(APIView):
         return Response({"new_balance": user.wallet_balance})
 
 
+def upload_to_cloudinary(image_file, folder='studex/listings'):
+    """Upload image directly to Cloudinary, bypassing django-cloudinary-storage."""
+    try:
+        import cloudinary.uploader
+        result = cloudinary.uploader.upload(
+            image_file,
+            folder=folder,
+            transformation=[{'quality': 'auto', 'fetch_format': 'auto'}]
+        )
+        return result.get('secure_url', '')
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"Cloudinary upload failed: {e}")
+        return None
+
+
 class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
@@ -71,6 +87,14 @@ class ListingViewSet(viewsets.ModelViewSet):
         return queryset.filter(is_available=True)
 
     def update(self, request, *args, **kwargs):
+        image_file = request.FILES.get('image')
+        if image_file:
+            image_url = upload_to_cloudinary(image_file, folder='studex/listings')
+            if image_url:
+                # Inject the Cloudinary URL into the request data
+                data = request.data.copy() if hasattr(request.data, 'copy') else dict(request.data)
+                data['image'] = image_url
+                request._full_data = data
         # Vendors cannot change is_available — only admin can via Django Admin
         if 'is_available' in request.data and not request.user.is_staff:
             request.data._mutable = True if hasattr(request.data, '_mutable') else None
@@ -81,7 +105,15 @@ class ListingViewSet(viewsets.ModelViewSet):
         return super().update(request, *args, **kwargs)
 
     def perform_create(self, serializer):
-        listing = serializer.save(vendor=self.request.user, is_available=False)
+        image_url = None
+        image_file = self.request.FILES.get('image')
+        if image_file:
+            image_url = upload_to_cloudinary(image_file, folder='studex/listings')
+        listing = serializer.save(
+            vendor=self.request.user,
+            is_available=False,
+            image=image_url or ''
+        )
         # Notify admin that a new listing needs review and approval
         try:
             from studex.notifications import notify_admin_new_listing

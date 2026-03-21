@@ -29,7 +29,7 @@ class ListingSerializer(serializers.ModelSerializer):
         queryset=Category.objects.all(),
         help_text="Category slug (e.g., 'food', 'nails')"
     )
-    image = serializers.ImageField(required=False, allow_null=True)
+    image = serializers.CharField(required=False, allow_null=True, allow_blank=True)
 
     class Meta:
         model = Listing
@@ -42,25 +42,9 @@ class ListingSerializer(serializers.ModelSerializer):
         read_only_fields = ['vendor', 'vendor_is_verified', 'created_at', 'updated_at']
 
     def validate_image(self, value):
-        if value:
-            max_size = 5 * 1024 * 1024
-            if value.size > max_size:
-                raise serializers.ValidationError(
-                    f"Image file too large. Maximum size is 5MB. Your file is {value.size / (1024 * 1024):.2f}MB."
-                )
-            allowed_formats = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
-            content_type = getattr(value, 'content_type', '')
-            if content_type and content_type not in allowed_formats:
-                raise serializers.ValidationError(
-                    f"Invalid image format '{content_type}'. Only JPG, PNG, and WebP are allowed."
-                )
-            import os
-            ext = os.path.splitext(value.name)[1].lower() if value.name else ''
-            allowed_extensions = ['.jpg', '.jpeg', '.png', '.webp']
-            if ext and ext not in allowed_extensions:
-                raise serializers.ValidationError(
-                    f"Invalid file extension '{ext}'. Only .jpg, .jpeg, .png, and .webp are allowed."
-                )
+        # If it's already a URL string, just return it
+        if isinstance(value, str):
+            return value
         return value
 
     def validate(self, data):
