@@ -29,7 +29,8 @@ class ListingSerializer(serializers.ModelSerializer):
         queryset=Category.objects.all(),
         help_text="Category slug (e.g., 'food', 'nails')"
     )
-    image = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    image = serializers.SerializerMethodField()
+    image_upload = serializers.CharField(required=False, allow_null=True, allow_blank=True, write_only=True, source='image')
 
     class Meta:
         model = Listing
@@ -40,6 +41,19 @@ class ListingSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at'
         ]
         read_only_fields = ['vendor', 'vendor_is_verified', 'created_at', 'updated_at']
+
+    def get_image(self, obj):
+        """Return image URL as-is — could be Cloudinary URL or local path."""
+        if not obj.image:
+            return None
+        img = str(obj.image)
+        if img.startswith('http'):
+            return img
+        # Local file — prepend media URL
+        request = self.context.get('request')
+        if request:
+            return request.build_absolute_uri(f'/media/{img}')
+        return f'/media/{img}'
 
     def validate_image(self, value):
         # If it's already a URL string, just return it
