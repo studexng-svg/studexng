@@ -92,7 +92,7 @@ class API {
 
     if (!response.ok) {
       // Use the exact error message from backend — never override with generic message
-      const msg = data.error || data.detail || data.message || "Request failed";
+      const msg = data.error || data.detail || data.message || (data.non_field_errors && data.non_field_errors[0]) || "Request failed";
       const err: any = new Error(msg);
       err.disabled = data.disabled || false;
       err.status = response.status;
