@@ -1,7 +1,6 @@
 # services/models.py
 from django.db import models
 from django.contrib.auth import get_user_model
-from studex.validators import validate_image
 
 User = get_user_model()
 
@@ -9,11 +8,7 @@ User = get_user_model()
 class Category(models.Model):
     title = models.CharField(max_length=100, unique=True)
     slug = models.SlugField(max_length=100, unique=True)
-    image = models.ImageField(
-        upload_to='categories/',
-        blank=True, null=True,
-        validators=[validate_image]
-    )
+    image = models.URLField(max_length=500, blank=True, null=True)
 
     def __str__(self):
         return self.title
@@ -43,11 +38,7 @@ class Listing(models.Model):
         default='service',
         help_text="Type of listing — affects inventory tracking"
     )
-    image = models.ImageField(
-        upload_to='listings/',
-        blank=True, null=True,
-        validators=[validate_image]
-    )
+    image = models.URLField(max_length=500, blank=True, null=True)
     is_available = models.BooleanField(
         default=False,
         help_text="Admin must tick this to make listing visible in shop"
