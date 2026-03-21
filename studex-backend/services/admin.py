@@ -3,18 +3,51 @@ from django.contrib import admin
 from django.utils import timezone
 from django.utils.html import format_html
 from django.http import HttpResponse
-from django.db.models import Count
+from django import forms
 import csv
 from .models import Category, Listing, Transaction
 
 
+class CategoryImageForm(forms.ModelForm):
+    image_file = forms.ImageField(required=False, label='Upload Image')
+
+    class Meta:
+        model = Category
+        fields = ['title', 'slug', 'image_file']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance and self.instance.image:
+            self.fields['image_file'].help_text = f'Current: <a href="{self.instance.image}" target="_blank">View image</a>'
+
+
+class ListingImageForm(forms.ModelForm):
+    image_file = forms.ImageField(required=False, label='Upload Image')
+
+    class Meta:
+        model = Listing
+        exclude = []
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance and self.instance.image:
+            self.fields['image_file'].help_text = f'Current: <a href="{self.instance.image}" target="_blank">View image</a>'
+
+
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):
-    list_display = ('title', 'slug', 'listing_count', 'active_listing_count')
+    form = CategoryImageForm
+    list_display = ('title', 'slug', 'image_preview', 'listing_count', 'active_listing_count')
     search_fields = ('title',)
     prepopulated_fields = {"slug": ("title",)}
     ordering = ('title',)
     actions = ['export_to_csv']
+
+    def image_preview(self, obj):
+        if obj.image:
+            return format_html('<img src="{}" style="height:40px;border-radius:4px;"/>', obj.image)
+        return 'No image'
+    image_preview.short_description = 'Image'
 
     def listing_count(self, obj):
         count = obj.listings.count()
@@ -28,11 +61,12 @@ class CategoryAdmin(admin.ModelAdmin):
 
     def save_model(self, request, obj, form, change):
         """Upload category image directly to Cloudinary."""
-        if 'image' in request.FILES:
+        image_file = form.cleaned_data.get('image_file')
+        if image_file:
             try:
                 import cloudinary.uploader
                 result = cloudinary.uploader.upload(
-                    request.FILES['image'],
+                    image_file,
                     folder='studex/categories',
                     transformation=[{'quality': 'auto', 'fetch_format': 'auto'}]
                 )
@@ -133,11 +167,12 @@ class ListingAdmin(admin.ModelAdmin):
 
     def save_model(self, request, obj, form, change):
         # Upload listing image directly to Cloudinary if a new file was uploaded
-        if 'image' in request.FILES:
+        image_file = request.FILES.get('image_file') or request.FILES.get('image')
+        if image_file:
             try:
                 import cloudinary.uploader
                 result = cloudinary.uploader.upload(
-                    request.FILES['image'],
+                    image_file,
                     folder='studex/listings',
                     transformation=[{'quality': 'auto', 'fetch_format': 'auto'}]
                 )
