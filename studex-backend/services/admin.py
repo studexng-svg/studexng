@@ -26,6 +26,22 @@ class CategoryAdmin(admin.ModelAdmin):
         return format_html('<span style="color: green; font-weight: bold;">{}</span>', count)
     active_listing_count.short_description = 'Active Listings'
 
+    def save_model(self, request, obj, form, change):
+        """Upload category image directly to Cloudinary."""
+        if 'image' in request.FILES:
+            try:
+                import cloudinary.uploader
+                result = cloudinary.uploader.upload(
+                    request.FILES['image'],
+                    folder='studex/categories',
+                    transformation=[{'quality': 'auto', 'fetch_format': 'auto'}]
+                )
+                obj.image = result.get('secure_url', '')
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).warning(f"Cloudinary category upload failed: {e}")
+        super().save_model(request, obj, form, change)
+
     def export_to_csv(self, request, queryset):
         response = HttpResponse(content_type='text/csv')
         response['Content-Disposition'] = 'attachment; filename="categories.csv"'
@@ -116,18 +132,19 @@ class ListingAdmin(admin.ModelAdmin):
     get_total_revenue.short_description = 'Total Revenue'
 
     def save_model(self, request, obj, form, change):
-        # Upload category image to Cloudinary if a new file was uploaded
+        # Upload listing image directly to Cloudinary if a new file was uploaded
         if 'image' in request.FILES:
             try:
                 import cloudinary.uploader
                 result = cloudinary.uploader.upload(
                     request.FILES['image'],
-                    folder='studex/categories',
+                    folder='studex/listings',
                     transformation=[{'quality': 'auto', 'fetch_format': 'auto'}]
                 )
                 obj.image = result.get('secure_url', '')
             except Exception as e:
-                pass  # Fall through to normal save
+                import logging
+                logging.getLogger(__name__).warning(f"Cloudinary listing upload failed: {e}")
         """
         Override save_model so that when admin saves a listing,
         we detect is_available changes and notify the vendor.
