@@ -4,6 +4,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from decimal import Decimal
 from .models import LoyaltyAccount, LoyaltyTransaction
+from rest_framework import status
 
 CREDITS_PER_MILESTONE = Decimal("100")
 MILESTONE_INTERVAL = 5
@@ -103,3 +104,15 @@ def repeat_booking_check(request):
         'orders_until_next_reward': orders_until_next,
         'credit_balance': float(account.credit_balance),
     })
+
+@api_view(['POST'])
+def earn_points(request):
+    user = request.user
+
+    # Example logic (customize later)
+    points = 10
+
+    return Response({
+        "message": "Points earned successfully",
+        "points_added": points
+    }, status=status.HTTP_200_OK)
