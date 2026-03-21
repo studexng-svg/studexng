@@ -23,8 +23,6 @@ class ConversationViewSet(viewsets.ModelViewSet):
         ).select_related('buyer', 'seller', 'listing').order_by('-updated_at')
 
     def create(self, request, *args, **kwargs):
-        print("REQUEST DATA:", request.data)
-        """Start or retrieve a conversation about a listing"""
         listing_id = request.data.get('listing_id')
         seller_id = request.data.get('seller_id')
 
@@ -55,11 +53,9 @@ class ConversationViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['get'])
     def messages(self, request, pk=None):
-        """GET /api/chat/conversations/{id}/messages/"""
         conversation = self.get_object()
         msgs = conversation.messages.select_related('sender').order_by('created_at')
 
-        # Mark all unread messages from other user as read
         msgs.filter(is_read=False).exclude(sender=request.user).update(
             is_read=True, read_at=timezone.now()
         )
@@ -69,23 +65,60 @@ class ConversationViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def send(self, request, pk=None):
-        """POST /api/chat/conversations/{id}/send/"""
         conversation = self.get_object()
 
-        # Verify user belongs to this conversation
         if request.user not in [conversation.buyer, conversation.seller]:
             return Response({'error': 'Not a participant'}, status=403)
 
         content = request.data.get('content', '').strip()
-        if not content:
-            return Response({'error': 'Message content is required'}, status=400)
+        image = request.FILES.get('image')
+
+        if not content and not image:
+            return Response({'error': 'Message content or image is required'}, status=400)
+
+        message_type = 'image' if image else request.data.get('message_type', 'text')
+        image_url = ''
+
+        # Upload image to Cloudinary if available
+        if image:
+            try:
+                import cloudinary.uploader
+                result = cloudinary.uploader.upload(
+                    image,
+                    folder='studex/chat_images',
+                    transformation=[{'quality': 'auto', 'fetch_format': 'auto'}]
+                )
+                image_url = result.get('secure_url', '')
+                if not content:
+                    content = '📷 Image'
+            except Exception as e:
+                logger.warning(f"Cloudinary upload failed, saving locally: {e}")
+                # Fall back to local storage
+                message = Message.objects.create(
+                    conversation=conversation,
+                    sender=request.user,
+                    content=content or '📷 Image',
+                    message_type='image',
+                    image=image,
+                )
+                conversation.last_message = '📷 Image'
+                conversation.last_message_at = timezone.now()
+                conversation.save()
+                serializer = MessageSerializer(message, context={'request': request})
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
 
         message = Message.objects.create(
             conversation=conversation,
             sender=request.user,
             content=content,
-            message_type=request.data.get('message_type', 'text'),
+            message_type=message_type,
+            image_url=image_url,
         )
+
+        # Update conversation last message
+        conversation.last_message = '📷 Image' if image else content[:100]
+        conversation.last_message_at = timezone.now()
+        conversation.save()
 
         serializer = MessageSerializer(message, context={'request': request})
         return Response(serializer.data, status=status.HTTP_201_CREATED)

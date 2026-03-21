@@ -50,6 +50,10 @@ INSTALLED_APPS = [
     'corsheaders',
     'django_filters',
 
+    # Cloud storage
+    'cloudinary',
+    'cloudinary_storage',
+
     # StudEx apps
     'accounts',
     'services',
@@ -143,6 +147,19 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# =======================================
+# CLOUDINARY MEDIA STORAGE
+# =======================================
+CLOUDINARY_STORAGE = {
+    'CLOUD_NAME': config('CLOUDINARY_CLOUD_NAME', default=''),
+    'API_KEY': config('CLOUDINARY_API_KEY', default=''),
+    'API_SECRET': config('CLOUDINARY_API_SECRET', default=''),
+}
+
+# Use Cloudinary in production, local filesystem in development
+if not DEBUG and config('CLOUDINARY_CLOUD_NAME', default=''):
+    DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 AUTH_USER_MODEL = 'accounts.User'
 
 # =======================================
