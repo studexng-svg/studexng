@@ -1,4 +1,3 @@
-// next.config.ts
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
@@ -26,15 +25,19 @@ const nextConfig: NextConfig = {
         port: "8000",
         pathname: "/media/**",
       },
-      // Production backend — update hostname when you deploy Django
       {
         protocol: "https",
-        hostname: "**",
+        hostname: "res.cloudinary.com",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "studex-backend-v2.onrender.com",
         pathname: "/media/**",
       },
       {
-        protocol: "http",
-        hostname: "**",
+        protocol: "https",
+        hostname: "**.onrender.com",
         pathname: "/media/**",
       },
     ],
