@@ -1,5 +1,4 @@
 // src/context/AuthContext.tsx
-// CRITICAL FIX: Complete AuthContext with Firebase integration and auth state management
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from "react";
@@ -23,27 +22,22 @@ const AuthContext = createContext<AuthContextType>({
 export const useAuthContext = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const { user, isLoggedIn, checkAuth, isAuthReady, isHydrated } = useAuth();
+  // ── Removed checkAuth — it does not exist on the Zustand authStore.
+  // isHydrated becomes true once Zustand rehydrates from localStorage,
+  // which is the correct signal that auth state is ready.
+  const { user, isLoggedIn, isAuthReady, isHydrated } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
   const pathname = usePathname();
 
   useEffect(() => {
-    const initAuth = async () => {
-      // Wait for Zustand to hydrate from localStorage
-      if (!isHydrated) {
-        return;
-      }
-
-      // Check auth state from tokens
-      await checkAuth();
+    // Once Zustand has rehydrated from localStorage, auth is ready
+    if (isHydrated) {
       setIsLoading(false);
-    };
+    }
+  }, [isHydrated]);
 
-    initAuth();
-  }, [checkAuth, isHydrated]);
-
-  // Redirect logic for protected routes
+  // Redirect unauthenticated users away from protected routes
   useEffect(() => {
     if (!isAuthReady || isLoading) return;
 
@@ -51,18 +45,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const isPublicRoute = publicRoutes.includes(pathname);
 
     if (!isLoggedIn && !isPublicRoute) {
-      // User not logged in but trying to access protected route
-      console.log("Redirecting to /auth - user not logged in");
       router.push("/auth");
     }
   }, [isLoggedIn, isAuthReady, isLoading, pathname, router]);
 
-  const value = {
-    isLoggedIn,
-    user,
-    isLoading,
-    isAuthReady,
-  };
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={{ isLoggedIn, user, isLoading, isAuthReady }}>
+      {children}
+    </AuthContext.Provider>
+  );
 };

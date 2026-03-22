@@ -1,9 +1,8 @@
-// src/components/ChatWindow.tsx
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { X, Send, User, Loader } from "lucide-react";
-import { fetchWithAuth, useAuth } from "@/lib/authStore";
+import { X, Send, User, Loader, ImageIcon } from "lucide-react";
+import { fetchWithAuth, getToken, useAuth } from "@/lib/authStore";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
 
@@ -24,6 +23,8 @@ interface Message {
   sender?: string;
   created_at?: string;
   is_mine?: boolean;
+  image_url?: string | null;
+  message_type?: string;
 }
 
 const isMessageAllowed = (msg: string): "allow" | "offer" | "block" => {
@@ -62,22 +63,41 @@ export default function ChatWindow({
   originalPrice,
   onClose,
 }: ChatWindowProps) {
-  const { user } = useAuth(); // ← get logged-in user
+  const { user } = useAuth();
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [conversationId, setConversationId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
+
+  // ── Image state ──────────────────────────────────────────────────────────
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  // ─────────────────────────────────────────────────────────────────────────
+
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  const mapMessages = (data: any[]): Message[] => {
+    const currentUsername = user?.username;
+    return data.map((m: any) => ({
+      id: m.id.toString(),
+      text: m.content,
+      sender: m.sender_username,
+      is_mine: currentUsername ? m.sender_username === currentUsername : !!m.is_mine,
+      created_at: m.created_at,
+      image_url: m.image_url || null,
+      message_type: m.message_type || 'text',
+    }));
+  };
+
   // Create or load conversation on mount
   useEffect(() => {
-    // ← FIX: if the logged-in user IS the seller, don't init — close immediately
     if (!sellerId || (user?.id && user.id === sellerId)) {
       onClose();
       return;
@@ -89,22 +109,13 @@ export default function ChatWindow({
           method: 'POST',
           body: JSON.stringify({ listing_id: listingId, seller_id: sellerId }),
         });
-
         if (!res.ok) throw new Error('Could not start conversation');
         const conv = await res.json();
         setConversationId(conv.id);
 
         const msgRes = await fetchWithAuth(`${API_URL}/api/chat/conversations/${conv.id}/messages/`);
         const data = await msgRes.json();
-        const currentUsername = user?.username;
-        const msgs = (Array.isArray(data) ? data : data.results || []).map((m: any) => ({
-          id: m.id.toString(),
-          text: m.content,
-          sender: m.sender_username,
-          is_mine: currentUsername ? m.sender_username === currentUsername : !!m.is_mine,
-          created_at: m.created_at,
-        }));
-        setMessages(msgs);
+        setMessages(mapMessages(Array.isArray(data) ? data : data.results || []));
       } catch (err) {
         setError("Could not load chat. Please try again.");
       } finally {
@@ -121,64 +132,120 @@ export default function ChatWindow({
       try {
         const res = await fetchWithAuth(`${API_URL}/api/chat/conversations/${conversationId}/messages/`);
         const data = await res.json();
-        const currentUsername = user?.username;
-        const msgs = (Array.isArray(data) ? data : data.results || []).map((m: any) => ({
-          id: m.id.toString(),
-          text: m.content,
-          sender: m.sender_username,
-          is_mine: currentUsername ? m.sender_username === currentUsername : !!m.is_mine,
-          created_at: m.created_at,
-        }));
-        setMessages(msgs);
+        setMessages(mapMessages(Array.isArray(data) ? data : data.results || []));
       } catch {}
     }, 5000);
     return () => clearInterval(interval);
-  }, [conversationId]);
+  }, [conversationId, user?.username]);
 
-  const handleSend = async () => {
-    if (!message.trim() || !conversationId || sending) return;
-
-    const result = isMessageAllowed(message);
-
-    if (result === "block") {
-      setError("Outside payment details are not allowed. Violators get banned.");
+  // ── Image handlers ────────────────────────────────────────────────────────
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setError("Image must be under 5MB");
       setTimeout(() => setError(""), 3000);
       return;
+    }
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
+  };
+
+  const cancelImage = () => {
+    setImageFile(null);
+    setImagePreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const handleSend = async () => {
+    if ((!message.trim() && !imageFile) || !conversationId || sending) return;
+
+    // Block check only for text messages
+    if (message.trim() && !imageFile) {
+      const result = isMessageAllowed(message);
+      if (result === "block") {
+        setError("Outside payment details are not allowed. Violators get banned.");
+        setTimeout(() => setError(""), 3000);
+        return;
+      }
     }
 
     setSending(true);
 
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/chat/conversations/${conversationId}/send/`, {
-        method: 'POST',
-        body: JSON.stringify({ content: message, message_type: 'text' }),
-      });
+      const token = getToken();
+      let sentMessage: any;
 
-      if (!res.ok) throw new Error('Send failed');
-      const sentMessage = await res.json();
+      if (imageFile) {
+        // ── Send image via FormData ──────────────────────────────────────
+        const fd = new FormData();
+        fd.append("image", imageFile);
+        fd.append("message_type", "image");
+        if (message.trim()) fd.append("content", message.trim());
 
-      const newMsg: Message = {
-        id: sentMessage.id.toString(),
-        text: message,
-        sender: 'me',
-        is_mine: true,
-      };
+        const res = await fetch(
+          `${API_URL}/api/chat/conversations/${conversationId}/send/`,
+          {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}` },
+            body: fd,
+          }
+        );
+        if (!res.ok) throw new Error("Send failed");
+        sentMessage = await res.json();
 
-      setMessages(prev => [...prev, newMsg]);
+        setMessages(prev => [...prev, {
+          id: sentMessage.id.toString(),
+          text: sentMessage.content || "",
+          sender: user?.username || "me",
+          is_mine: true,
+          created_at: sentMessage.created_at,
+          image_url: sentMessage.image_url || null,
+          message_type: "image",
+        }]);
 
-      if (result === "offer") {
-        const amount = extractPrice(message);
-        if (amount > 0 && amount < originalPrice * 2) {
-          setMessages(prev => [...prev, {
-            id: (Date.now() + 1).toString(),
-            text: `Offer: ₦${amount.toLocaleString()} for ${productName}`,
-            isSystem: true,
-            amount,
-          }]);
+        cancelImage();
+        setMessage("");
+
+      } else {
+        // ── Send plain text ──────────────────────────────────────────────
+        const res = await fetchWithAuth(
+          `${API_URL}/api/chat/conversations/${conversationId}/send/`,
+          {
+            method: "POST",
+            body: JSON.stringify({ content: message, message_type: "text" }),
+          }
+        );
+        if (!res.ok) throw new Error("Send failed");
+        sentMessage = await res.json();
+
+        const newMsg: Message = {
+          id: sentMessage.id.toString(),
+          text: message,
+          sender: user?.username || "me",
+          is_mine: true,
+          created_at: sentMessage.created_at,
+          message_type: "text",
+        };
+        setMessages(prev => [...prev, newMsg]);
+
+        // Offer detection
+        const result = isMessageAllowed(message);
+        if (result === "offer") {
+          const amount = extractPrice(message);
+          if (amount > 0 && amount < originalPrice * 2) {
+            setMessages(prev => [...prev, {
+              id: (Date.now() + 1).toString(),
+              text: `Offer: ₦${amount.toLocaleString()} for ${productName}`,
+              isSystem: true,
+              amount,
+            }]);
+          }
         }
-      }
 
-      setMessage("");
+        setMessage("");
+      }
     } catch {
       setError("Failed to send. Try again.");
       setTimeout(() => setError(""), 3000);
@@ -237,7 +304,13 @@ export default function ChatWindow({
           ) : (
             messages.map(msg => (
               <div key={msg.id}
-                className={msg.isSystem ? "mx-auto max-w-xs" : msg.is_mine ? "ml-auto max-w-[80%]" : "mr-auto max-w-[80%]"}>
+                className={
+                  msg.isSystem
+                    ? "mx-auto max-w-xs"
+                    : msg.is_mine
+                    ? "ml-auto max-w-[80%]"
+                    : "mr-auto max-w-[80%]"
+                }>
                 {msg.isSystem ? (
                   <div className="bg-gradient-to-r from-teal-600/20 to-purple-600/20 border border-teal-500/50 rounded-2xl p-4 text-center shadow-lg">
                     <p className="text-white font-black text-lg">₦{msg.amount?.toLocaleString()}</p>
@@ -257,7 +330,25 @@ export default function ChatWindow({
                     {!msg.is_mine && (
                       <p className="text-xs text-white/60 mb-1">{msg.sender || sellerName}</p>
                     )}
-                    <p className="text-sm leading-relaxed">{msg.text}</p>
+
+                    {/* ── Image bubble ── */}
+                    {msg.image_url ? (
+                      <div>
+                        <a href={msg.image_url} target="_blank" rel="noopener noreferrer">
+                          <img
+                            src={msg.image_url}
+                            alt="shared image"
+                            className="rounded-xl max-w-[200px] max-h-[200px] object-cover mb-1 cursor-pointer hover:opacity-90 transition"
+                          />
+                        </a>
+                        {msg.text && msg.text !== "📷 Image" && (
+                          <p className="text-sm mt-1 leading-relaxed">{msg.text}</p>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-sm leading-relaxed">{msg.text}</p>
+                    )}
+
                     {msg.created_at && (
                       <p className="text-xs opacity-50 mt-1 text-right">
                         {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -271,22 +362,67 @@ export default function ChatWindow({
           <div ref={bottomRef} />
         </div>
 
-        {/* Input */}
-        <div className="bg-slate-900/90 border-t border-white/10 p-4 flex gap-3 flex-shrink-0">
+        {/* Image preview strip */}
+        {imagePreview && (
+          <div className="bg-slate-800/90 border-t border-white/10 px-4 py-2 flex items-center gap-3 flex-shrink-0">
+            <div className="relative flex-shrink-0">
+              <img
+                src={imagePreview}
+                alt="preview"
+                className="h-14 w-14 object-cover rounded-xl border-2 border-purple-400"
+              />
+              <button
+                onClick={cancelImage}
+                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-black"
+              >
+                ×
+              </button>
+            </div>
+            <p className="text-white/60 text-xs">Add a caption below (optional)</p>
+          </div>
+        )}
+
+        {/* Input bar */}
+        <div className="bg-slate-900/90 border-t border-white/10 p-4 flex gap-2 flex-shrink-0">
+
+          {/* Hidden file input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleImageSelect}
+          />
+
+          {/* Image button */}
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="p-3 bg-white/10 hover:bg-white/20 rounded-xl transition flex-shrink-0"
+            title="Attach image"
+          >
+            <ImageIcon className="w-5 h-5 text-white" />
+          </button>
+
+          {/* Text input */}
           <input
             type="text"
             value={message}
             onChange={e => setMessage(e.target.value)}
             onKeyDown={e => e.key === "Enter" && !e.shiftKey && (e.preventDefault(), handleSend())}
-            placeholder='Type your offer... e.g. "4k last"'
+            placeholder={imageFile ? 'Add a caption (optional)...' : 'Type your offer... e.g. "4k last"'}
             className="flex-1 bg-white/10 border border-white/20 rounded-2xl px-4 py-3 text-white placeholder-white/40 text-sm focus:outline-none focus:border-purple-500 transition"
           />
-          <button onClick={handleSend} disabled={sending || !conversationId || !message.trim()}
-            className={`p-3 rounded-xl transition ${
-              sending || !conversationId || !message.trim()
+
+          {/* Send button */}
+          <button
+            onClick={handleSend}
+            disabled={sending || !conversationId || (!message.trim() && !imageFile)}
+            className={`p-3 rounded-xl transition flex-shrink-0 ${
+              sending || !conversationId || (!message.trim() && !imageFile)
                 ? 'bg-gray-600 cursor-not-allowed'
                 : 'bg-gradient-to-r from-teal-600 to-cyan-600'
-            }`}>
+            }`}
+          >
             {sending
               ? <Loader className="w-5 h-5 text-white animate-spin" />
               : <Send className="w-5 h-5 text-white" />}
