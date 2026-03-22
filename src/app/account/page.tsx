@@ -159,7 +159,7 @@ export default function AccountPage() {
         className="sticky top-0 bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl z-40 border-b border-purple-100 dark:border-gray-800 shadow-sm">
         <div className="flex items-center justify-between p-4 max-w-4xl mx-auto">
           <Link href="/home" className="flex items-center">
-            <Image src="/images/logo-1.jpg" alt="StudEx Logo" width={140} height={40} className="h-10 w-auto object-contain" priority />
+            <Image src="/images/logo-1.jpg" alt="StudEx Logo" width={140} height={40} className="h-10 w-10 rounded-full object-cover" priority />
           </Link>
           <h1 className="text-xl font-black bg-gradient-to-r from-purple-600 to-teal-500 bg-clip-text text-transparent">My Account</h1>
           <div className="flex items-center gap-2">
