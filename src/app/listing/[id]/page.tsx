@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import {
   ArrowLeft, Star, MessageCircle, ShoppingCart, Calendar,
-  Clock, FileText, CheckCircle, Loader, AlertCircle, MapPin,
+  Clock, FileText, CheckCircle, Loader, AlertCircle,
   Shield, ChevronDown, ChevronUp, Send
 } from "lucide-react";
 import { useAuth, fetchWithAuth } from "@/lib/authStore";
@@ -65,19 +65,13 @@ export default function ListingDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [stockWarning, setStockWarning] = useState("");
-
-  // Chat
   const [showChat, setShowChat] = useState(false);
-
-  // Booking
   const [showBooking, setShowBooking] = useState(false);
   const [bookingDate, setBookingDate] = useState("");
   const [bookingTime, setBookingTime] = useState("");
   const [bookingNote, setBookingNote] = useState("");
   const [bookingStep, setBookingStep] = useState<"form" | "confirming" | "done">("form");
   const [bookingError, setBookingError] = useState("");
-
-  // Toast
   const [toast, setToast] = useState("");
 
   const showToast = (msg: string) => {
@@ -92,13 +86,11 @@ export default function ListingDetailPage() {
         if (!res.ok) throw new Error("Listing not found");
         const data = await res.json();
         setListing(data);
-        // Warn if low stock
         if (data.track_inventory && data.stock_quantity <= 3 && data.stock_quantity > 0) {
           setStockWarning(`Only ${data.stock_quantity} left in stock!`);
         } else if (data.track_inventory && data.stock_quantity === 0) {
           setStockWarning("Out of stock");
         }
-        // Fetch reviews for this listing
         try {
           const rv = await fetch(`${API_URL}/api/reviews/reviews/?listing=${id}`);
           if (rv.ok) {
@@ -117,28 +109,16 @@ export default function ListingDetailPage() {
 
   const handleAddToCart = async () => {
     if (!listing) return;
-    // Re-fetch listing to check current availability/stock
     try {
       const res = await fetch(`${API_URL}/api/services/listings/${listing.id}/`);
       if (res.ok) {
         const fresh = await res.json();
-        if (!fresh.is_available) {
-          showToast("Sorry, this item is no longer available!");
-          setListing(fresh);
-          return;
-        }
-        if (fresh.track_inventory && fresh.stock_quantity === 0) {
-          showToast("Sorry, this item is out of stock!");
-          setListing(fresh);
-          return;
-        }
-        if (fresh.track_inventory && fresh.stock_quantity <= 3) {
-          setStockWarning(`Only ${fresh.stock_quantity} left in stock!`);
-        }
+        if (!fresh.is_available) { showToast("Sorry, this item is no longer available!"); setListing(fresh); return; }
+        if (fresh.track_inventory && fresh.stock_quantity === 0) { showToast("Sorry, this item is out of stock!"); setListing(fresh); return; }
+        if (fresh.track_inventory && fresh.stock_quantity <= 3) setStockWarning(`Only ${fresh.stock_quantity} left in stock!`);
       }
     } catch {}
     addToCart({ id: listing.id, title: listing.title, price: listing.price, img: listing.image });
-    // Store this page so cart back button returns here
     try { sessionStorage.setItem("cart-referrer", window.location.pathname); } catch {}
     showToast("Added to cart!");
   };
@@ -149,20 +129,18 @@ export default function ListingDetailPage() {
     if (!bookingTime) { setBookingError("Please pick a time slot."); return; }
     setBookingError("");
     setBookingStep("confirming");
-    // Re-check availability before booking
     try {
       const freshRes = await fetch(`${API_URL}/api/services/listings/${listing!.id}/`);
       if (freshRes.ok) {
         const fresh = await freshRes.json();
         if (!fresh.is_available || (fresh.track_inventory && fresh.stock_quantity === 0)) {
-          setBookingError("Sorry, this item is no longer available. Someone may have just booked the last one.");
+          setBookingError("Sorry, this item is no longer available.");
           setBookingStep("form");
           setListing(fresh);
           return;
         }
       }
     } catch {}
-
     try {
       const res = await fetchWithAuth(`${API_URL}/api/orders/bookings/`, {
         method: "POST",
@@ -173,20 +151,13 @@ export default function ListingDetailPage() {
           note: bookingNote,
         }),
       });
-
       if (!res.ok) {
         const data = await res.json();
-        // Django returns field-level errors as { field: ["message"] }
-        const msg = data.detail
-          || data.scheduled_date?.[0]
-          || data.listing?.[0]
-          || data.scheduled_time?.[0]
-          || data.non_field_errors?.[0]
-          || Object.values(data).flat().join(" ")
-          || "Booking failed";
+        const msg = data.detail || data.scheduled_date?.[0] || data.listing?.[0]
+          || data.scheduled_time?.[0] || data.non_field_errors?.[0]
+          || Object.values(data).flat().join(" ") || "Booking failed";
         throw new Error(msg);
       }
-
       setBookingStep("done");
     } catch (err: any) {
       setBookingError(err.message || "Could not place booking. Try again.");
@@ -194,8 +165,18 @@ export default function ListingDetailPage() {
     }
   };
 
-  // Min date = today
+  // Opens the booking form and scrolls to it
+  const openBooking = () => {
+    if (!isLoggedIn) { router.push("/auth"); return; }
+    setShowBooking(true);
+    setTimeout(() => {
+      document.getElementById("booking-section")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 150);
+  };
+
   const today = new Date().toISOString().split("T")[0];
+  const isService = listing?.listing_type === "service" || !listing?.listing_type;
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950">
@@ -208,10 +189,7 @@ export default function ListingDetailPage() {
       <div className="text-center">
         <AlertCircle className="w-14 h-14 text-red-400 mx-auto mb-3" />
         <p className="text-gray-600 dark:text-gray-400">{error || "Listing not found"}</p>
-        <button onClick={() => router.back()}
-          className="mt-4 px-6 py-2.5 bg-purple-600 text-white rounded-full font-bold text-sm">
-          Go Back
-        </button>
+        <button onClick={() => router.back()} className="mt-4 px-6 py-2.5 bg-purple-600 text-white rounded-full font-bold text-sm">Go Back</button>
       </div>
     </div>
   );
@@ -254,9 +232,16 @@ export default function ListingDetailPage() {
         </div>
       </div>
 
-      <div className="pb-24 bg-gray-50 dark:bg-gray-950 min-h-screen">
-        
-        {/* Image */}
+      {/*
+        pb-28 — gives 112px of space at the bottom.
+        The bottom nav is ~70px tall. This means the last element on the page
+        always has ~42px of breathing room above the nav. Nothing gets hidden.
+        There is NO fixed bottom bar on this page anymore — that was the cause
+        of the overlap. Book Now and Add to Cart are inline in the page content.
+      */}
+      <div className="pb-28 bg-gray-50 dark:bg-gray-950 min-h-screen">
+
+        {/* Hero image */}
         <div className="relative h-64 w-full bg-gray-200 dark:bg-gray-800">
           {listing.image ? (
             <Image
@@ -274,15 +259,15 @@ export default function ListingDetailPage() {
 
         <div className="p-4 space-y-4">
 
-          {/* Stock warning banner */}
-        {stockWarning && (
-          <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-2xl p-3 flex items-center gap-2">
-            <AlertCircle className="w-5 h-5 text-orange-500 flex-shrink-0" />
-            <p className="text-orange-700 dark:text-orange-400 text-sm font-bold">{stockWarning}</p>
-          </div>
-        )}
+          {/* Stock warning */}
+          {stockWarning && (
+            <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-2xl p-3 flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-orange-500 flex-shrink-0" />
+              <p className="text-orange-700 dark:text-orange-400 text-sm font-bold">{stockWarning}</p>
+            </div>
+          )}
 
-        {/* Title + Price */}
+          {/* Title + Price */}
           <div className="bg-white dark:bg-gray-900 rounded-2xl p-4 shadow-sm border border-gray-100 dark:border-gray-800">
             <div className="flex items-start justify-between gap-3">
               <div className="flex-1">
@@ -295,8 +280,6 @@ export default function ListingDetailPage() {
                 ₦{Number(listing.price).toLocaleString()}
               </p>
             </div>
-
-            {/* Rating */}
             {totalReviews > 0 && (
               <div className="flex items-center gap-1.5 mt-2">
                 <div className="flex">
@@ -307,7 +290,6 @@ export default function ListingDetailPage() {
                 <span className="text-sm text-gray-500">{rating} ({totalReviews} reviews)</span>
               </div>
             )}
-
             <p className="text-gray-600 dark:text-gray-400 text-sm mt-3 leading-relaxed">{listing.description}</p>
           </div>
 
@@ -325,13 +307,10 @@ export default function ListingDetailPage() {
                     {badge && badge !== "none" && <VendorBadge badge={badge} size="sm" />}
                   </div>
                   {completionRate > 0 && (
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      {completionRate}% completion rate
-                    </p>
+                    <p className="text-xs text-gray-500 mt-0.5">{completionRate}% completion rate</p>
                   )}
                 </div>
               </div>
-              {/* Message button right on vendor card */}
               <button
                 onClick={() => { if (!isLoggedIn) { router.push("/auth"); return; } setShowChat(true); }}
                 className="flex items-center gap-1.5 px-3 py-2 bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded-xl font-bold text-sm border border-purple-100 dark:border-purple-800">
@@ -339,6 +318,19 @@ export default function ListingDetailPage() {
               </button>
             </div>
           </div>
+
+          {/*
+            ── ADD TO CART (food / physical product only) ──
+            Lives inline in the page — scrolls naturally, bottom nav never covers it.
+          */}
+          {!isService && listing.is_available && (
+            <button
+              onClick={handleAddToCart}
+              className="w-full py-4 bg-gradient-to-r from-purple-600 to-teal-500 text-white font-black rounded-2xl flex items-center justify-center gap-2 text-base shadow-lg active:scale-95 transition-transform"
+            >
+              <ShoppingCart className="w-5 h-5" /> Add to Cart
+            </button>
+          )}
 
           {/* Trust badges */}
           <div className={`grid gap-2 ${totalReviews > 0 ? "grid-cols-3" : "grid-cols-2"}`}>
@@ -354,118 +346,148 @@ export default function ListingDetailPage() {
             {totalReviews > 0 && (
               <div className="bg-white dark:bg-gray-900 rounded-xl p-3 text-center shadow-sm border border-gray-100 dark:border-gray-800">
                 <Star className="w-5 h-5 text-amber-500 fill-amber-500 mx-auto mb-1" />
-                <p className="text-[10px] text-gray-500 font-medium leading-tight">
-                  {rating.toFixed(1)} ({totalReviews})
-                </p>
+                <p className="text-[10px] text-gray-500 font-medium leading-tight">{rating.toFixed(1)} ({totalReviews})</p>
               </div>
             )}
           </div>
 
-          {/* BOOKING SECTION — only for services */}
-          {(listing.listing_type === "service" || !listing.listing_type) && <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden">
-            <button
-              onClick={() => setShowBooking(v => !v)}
-              className="w-full flex items-center justify-between p-4 text-left">
-              <div className="flex items-center gap-2">
-                <Calendar className="w-5 h-5 text-purple-600" />
-                <span className="font-black text-gray-900 dark:text-white">Book a Date & Time</span>
-              </div>
-              {showBooking ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
-            </button>
+          {/*
+            ── BOOKING SECTION (services only) ──
+            id="booking-section" lets openBooking() scroll here smoothly.
+            Book Now button is INSIDE this card, inline — user scrolls to it
+            naturally. Bottom nav sits below at all times, never overlaps.
+          */}
+          {isService && (
+            <div id="booking-section" className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden">
 
-            <AnimatePresence>
-              {showBooking && (
-                <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.25 }}
-                  className="overflow-hidden">
-                  <div className="px-4 pb-4 space-y-4 border-t border-gray-100 dark:border-gray-800 pt-4">
+              {/* Accordion toggle */}
+              <button
+                onClick={() => setShowBooking(v => !v)}
+                className="w-full flex items-center justify-between p-4 text-left"
+              >
+                <div className="flex items-center gap-2">
+                  <Calendar className="w-5 h-5 text-purple-600" />
+                  <span className="font-black text-gray-900 dark:text-white">Book a Date & Time</span>
+                </div>
+                {showBooking ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
+              </button>
 
-                    {bookingStep === "done" ? (
-                      <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
-                        className="text-center py-4 space-y-2">
-                        <CheckCircle className="w-14 h-14 text-green-500 mx-auto" />
-                        <p className="font-black text-gray-900 dark:text-white text-lg">Booking Request Sent!</p>
-                        <p className="text-gray-500 text-sm">The vendor will confirm your booking. You'll see it in your orders.</p>
-                        <button onClick={() => router.push("/account/bookings")}
-                          className="mt-2 px-6 py-2.5 bg-purple-600 text-white rounded-full font-bold text-sm">
-                          View My Orders
-                        </button>
-                      </motion.div>
-                    ) : (
-                      <>
-                        {/* Date picker */}
-                        <div>
-                          <label className="flex items-center gap-1.5 text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
-                            <Calendar className="w-4 h-4 text-purple-500" /> Pick a Date
-                          </label>
-                          <input type="date" min={today} value={bookingDate}
-                            onChange={e => setBookingDate(e.target.value)}
-                            className="w-full p-3 rounded-xl border-2 border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white focus:outline-none focus:border-purple-500 text-sm font-medium" />
-                        </div>
-
-                        {/* Time slots */}
-                        <div>
-                          <label className="flex items-center gap-1.5 text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
-                            <Clock className="w-4 h-4 text-purple-500" /> Pick a Time Slot
-                          </label>
-                          <div className="grid grid-cols-3 gap-2">
-                            {TIME_SLOTS.map(slot => (
-                              <button key={slot} onClick={() => setBookingTime(slot)}
-                                className={`py-2 rounded-xl text-xs font-bold border-2 transition ${
-                                  bookingTime === slot
-                                    ? "bg-purple-600 text-white border-purple-600"
-                                    : "bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:border-purple-300"
-                                }`}>
-                                {slot}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Note */}
-                        <div>
-                          <label className="flex items-center gap-1.5 text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
-                            <FileText className="w-4 h-4 text-purple-500" /> Add a Note (optional)
-                          </label>
-                          <textarea value={bookingNote} onChange={e => setBookingNote(e.target.value)}
-                            placeholder="Any special requests or details for the vendor..."
-                            rows={3}
-                            className="w-full p-3 rounded-xl border-2 border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white focus:outline-none focus:border-purple-500 text-sm resize-none" />
-                        </div>
-
-                        {bookingError && (
-                          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-3">
-                            <p className="text-red-600 dark:text-red-400 text-sm font-bold text-center">{bookingError}</p>
-                          </div>
-                        )}
-
-                        <button
-                          onClick={handleBooking}
-                          disabled={bookingStep === "confirming" || !bookingDate || !bookingTime}
-                          className={`w-full py-3.5 rounded-xl font-black text-white text-base flex items-center justify-center gap-2 transition ${
-                            bookingStep === "confirming" || !bookingDate || !bookingTime
-                              ? "bg-gray-300 dark:bg-gray-700 cursor-not-allowed opacity-60"
-                              : "bg-gradient-to-r from-purple-600 to-teal-500 hover:opacity-90"
-                          }`}>
-                          {bookingStep === "confirming"
-                            ? <><Loader className="w-5 h-5 animate-spin" /> Sending...</>
-                            : <><Send className="w-5 h-5" /> Send Booking Request</>}
-                        </button>
-
-                        <p className="text-xs text-gray-400 text-center">
-                          Vendor must confirm before it's finalised. Payment is only charged after confirmation.
-                        </p>
-                      </>
-                    )}
-                  </div>
-                </motion.div>
+              {/*
+                ── BOOK NOW button ──
+                Shown when the form is collapsed. Inline in the page, scrolls
+                with content. No fixed positioning. No conflict with bottom nav.
+              */}
+              {!showBooking && listing.is_available && (
+                <div className="px-4 pb-4">
+                  <button
+                    onClick={openBooking}
+                    className="w-full py-4 bg-gradient-to-r from-purple-600 to-teal-500 text-white font-black rounded-xl flex items-center justify-center gap-2 text-base shadow-lg active:scale-95 transition-transform"
+                  >
+                    <Calendar className="w-5 h-5" /> Book Now
+                  </button>
+                </div>
               )}
-            </AnimatePresence>
-          </div>}
 
-        {/* REVIEWS SECTION */}
+              {/* Expanded booking form */}
+              <AnimatePresence>
+                {showBooking && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.25 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="px-4 pb-6 space-y-4 border-t border-gray-100 dark:border-gray-800 pt-4">
+
+                      {bookingStep === "done" ? (
+                        <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+                          className="text-center py-4 space-y-2">
+                          <CheckCircle className="w-14 h-14 text-green-500 mx-auto" />
+                          <p className="font-black text-gray-900 dark:text-white text-lg">Booking Request Sent!</p>
+                          <p className="text-gray-500 text-sm">The vendor will confirm your booking. You'll see it in your bookings.</p>
+                          <button onClick={() => router.push("/book")}
+                            className="mt-2 px-6 py-2.5 bg-purple-600 text-white rounded-full font-bold text-sm">
+                            View My Bookings
+                          </button>
+                        </motion.div>
+                      ) : (
+                        <>
+                          {/* Date */}
+                          <div>
+                            <label className="flex items-center gap-1.5 text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
+                              <Calendar className="w-4 h-4 text-purple-500" /> Pick a Date
+                            </label>
+                            <input type="date" min={today} value={bookingDate}
+                              onChange={e => setBookingDate(e.target.value)}
+                              className="w-full p-3 rounded-xl border-2 border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white focus:outline-none focus:border-purple-500 text-sm font-medium" />
+                          </div>
+
+                          {/* Time slots */}
+                          <div>
+                            <label className="flex items-center gap-1.5 text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
+                              <Clock className="w-4 h-4 text-purple-500" /> Pick a Time Slot
+                            </label>
+                            <div className="grid grid-cols-3 gap-2">
+                              {TIME_SLOTS.map(slot => (
+                                <button key={slot} onClick={() => setBookingTime(slot)}
+                                  className={`py-2 rounded-xl text-xs font-bold border-2 transition ${
+                                    bookingTime === slot
+                                      ? "bg-purple-600 text-white border-purple-600"
+                                      : "bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:border-purple-300"
+                                  }`}>
+                                  {slot}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Note */}
+                          <div>
+                            <label className="flex items-center gap-1.5 text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
+                              <FileText className="w-4 h-4 text-purple-500" /> Add a Note (optional)
+                            </label>
+                            <textarea value={bookingNote} onChange={e => setBookingNote(e.target.value)}
+                              placeholder="Any special requests or details for the vendor..."
+                              rows={3}
+                              className="w-full p-3 rounded-xl border-2 border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white focus:outline-none focus:border-purple-500 text-sm resize-none" />
+                          </div>
+
+                          {bookingError && (
+                            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-3">
+                              <p className="text-red-600 dark:text-red-400 text-sm font-bold text-center">{bookingError}</p>
+                            </div>
+                          )}
+
+                          {/* Send Booking Request */}
+                          <button
+                            onClick={handleBooking}
+                            disabled={bookingStep === "confirming" || !bookingDate || !bookingTime}
+                            className={`w-full py-4 rounded-xl font-black text-white text-base flex items-center justify-center gap-2 transition ${
+                              bookingStep === "confirming" || !bookingDate || !bookingTime
+                                ? "bg-gray-300 dark:bg-gray-700 cursor-not-allowed opacity-60"
+                                : "bg-gradient-to-r from-purple-600 to-teal-500 hover:opacity-90 active:scale-95"
+                            }`}>
+                            {bookingStep === "confirming"
+                              ? <><Loader className="w-5 h-5 animate-spin" /> Sending...</>
+                              : <><Send className="w-5 h-5" /> Send Booking Request</>}
+                          </button>
+
+                          <p className="text-xs text-gray-400 text-center">
+                            Vendor must confirm before it's finalised. Payment is only charged after confirmation.
+                          </p>
+                        </>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
+
+          {/* Reviews */}
           {reviews.length > 0 && (
-            <div className="bg-white dark:bg-gray-900 rounded-2xl p-4 shadow-sm border border-gray-100 dark:border-gray-800 mx-4 mb-4">
+            <div className="bg-white dark:bg-gray-900 rounded-2xl p-4 shadow-sm border border-gray-100 dark:border-gray-800">
               <div className="flex items-center gap-2 mb-4">
                 <Star className="w-5 h-5 text-amber-400 fill-amber-400" />
                 <h3 className="font-black text-gray-900 dark:text-white">Reviews ({reviews.length})</h3>
@@ -481,9 +503,7 @@ export default function ListingDetailPage() {
                         ))}
                       </div>
                     </div>
-                    {review.comment && (
-                      <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{review.comment}</p>
-                    )}
+                    {review.comment && <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{review.comment}</p>}
                     <p className="text-xs text-gray-400 mt-1">
                       {new Date(review.created_at).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}
                     </p>
@@ -495,25 +515,7 @@ export default function ListingDetailPage() {
 
         </div>
       </div>
-
-      {/* Bottom Action Bar — service=Book only, food/product=Cart only */}
-      {listing.is_available && (
-        <div className="fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 p-4 flex gap-3">
-          {listing.listing_type === "service" ? (
-            // SERVICE: Book Now only
-            <button onClick={() => { if (!isLoggedIn) { router.push("/auth"); return; } setShowBooking(true); window.scrollTo({ top: 9999, behavior: "smooth" }); }}
-              className="flex-1 py-3.5 bg-gradient-to-r from-purple-600 to-teal-500 text-white font-black rounded-xl flex items-center justify-center gap-2 text-sm shadow-lg">
-              <Calendar className="w-5 h-5" /> Book Now
-            </button>
-          ) : (
-            // FOOD / PHYSICAL PRODUCT: Add to Cart only
-            <button onClick={handleAddToCart}
-              className="flex-1 py-3.5 bg-gradient-to-r from-purple-600 to-teal-500 text-white font-black rounded-xl flex items-center justify-center gap-2 text-sm shadow-lg">
-              <ShoppingCart className="w-5 h-5" /> Add to Cart
-            </button>
-          )}
-        </div>
-      )}
+      {/* ── NO fixed bottom bar here. That was the entire problem. ── */}
     </>
   );
 }

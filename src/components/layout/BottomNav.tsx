@@ -9,7 +9,6 @@ import Image from "next/image";
 import { useState, useEffect } from "react";
 import { useAuth, fetchWithAuth } from "@/lib/authStore";
 
-
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 const navItems = [
@@ -23,8 +22,6 @@ const navItems = [
 export default function BottomNav() {
   const pathname = usePathname();
   const { isLoggedIn } = useAuth();
-  const [isVisible, setIsVisible] = useState(true);
-  const [lastScrollY, setLastScrollY] = useState(0);
   const [unreadCount, setUnreadCount] = useState(0);
 
   if (pathname === "/" || pathname === "/auth" || pathname.startsWith("/admin")) {
@@ -49,25 +46,8 @@ export default function BottomNav() {
     return () => clearInterval(interval);
   }, [isLoggedIn]);
 
-  useEffect(() => {
-    const handleScroll = () => {
-      const currentScrollY = window.scrollY;
-      if (currentScrollY < 50) setIsVisible(true);
-      else if (currentScrollY > lastScrollY) setIsVisible(false);
-      else setIsVisible(true);
-      setLastScrollY(currentScrollY);
-    };
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, [lastScrollY]);
-
   return (
-    <motion.div
-      initial={{ y: 0 }}
-      animate={{ y: isVisible ? 0 : 100 }}
-      transition={{ duration: 0.3, ease: "easeInOut" }}
-      className="fixed bottom-0 left-0 right-0 w-full bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 shadow-2xl z-50"
-    >
+    <div className="fixed bottom-0 left-0 right-0 w-full bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 shadow-2xl z-50">
       <div className="flex justify-around items-center px-2 py-3 max-w-full">
         {navItems.map((item) => {
           const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
@@ -95,7 +75,6 @@ export default function BottomNav() {
                     stroke={isActive ? "#7C3AED" : "currentColor"}
                     fill={isActive ? "#7C3AED" : "none"}
                   />
-                  {/* Unread badge */}
                   {isChat && unreadCount > 0 && (
                     <div className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 bg-red-500 rounded-full flex items-center justify-center px-1">
                       <span className="text-white text-[9px] font-black leading-none">
@@ -120,6 +99,6 @@ export default function BottomNav() {
       >
         <Image src="/images/logo-1.jpg" alt="StudEx" width={48} height={48} className="w-12 h-12 rounded-full object-cover" />
       </Link>
-    </motion.div>
+    </div>
   );
 }
