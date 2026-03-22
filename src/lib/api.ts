@@ -91,11 +91,31 @@ class API {
     const data = await response.json().catch(() => ({}));
 
     if (!response.ok) {
-      // Use the exact error message from backend — never override with generic message
-      const msg = data.error || data.detail || data.message || (data.non_field_errors && data.non_field_errors[0]) || "Request failed";
+      // 1. Try the simple top-level error fields first
+      let msg = data.error || data.detail || data.message ||
+        (data.non_field_errors && data.non_field_errors[0]);
+
+      // 2. If none of those exist, Django returned field-level validation errors
+      //    e.g. { "username": ["A user with that username already exists."],
+      //           "email": ["user with this email already exists."] }
+      //    Extract them all and join into a readable message.
+      if (!msg) {
+        const reserved = ["error", "detail", "message", "non_field_errors", "status_code"];
+        const fieldErrors = Object.entries(data)
+          .filter(([key]) => !reserved.includes(key))
+          .map(([field, errs]) => {
+            const errText = Array.isArray(errs) ? errs[0] : String(errs);
+            // Capitalise field name for readability
+            const label = field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, " ");
+            return `${label}: ${errText}`;
+          });
+        msg = fieldErrors.length > 0 ? fieldErrors.join(" • ") : "Request failed";
+      }
+
       const err: any = new Error(msg);
       err.disabled = data.disabled || false;
       err.status = response.status;
+      err.fieldErrors = data; // attach raw errors in case caller wants them
       throw err;
     }
 

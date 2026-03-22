@@ -160,7 +160,7 @@ export default function AuthPage() {
           setMessage("Welcome to StudEx!");
           setTimeout(() => router.push("/home"), 1500);
         } catch (err: any) {
-          setMessage(err.message || "Registration failed");
+          setMessage(err.message || "Registration failed, Please check your details.");
         } finally {
           setIsLoading(false);
         }
