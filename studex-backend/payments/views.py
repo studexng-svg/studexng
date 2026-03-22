@@ -131,6 +131,11 @@ def verify_payment(request):
     items = request.data.get("items", [])
     use_credits = request.data.get("use_credits", False)
 
+    # ── The frontend must send the booking_id when paying for a service booking.
+    # This ensures we mark ONLY that exact booking as paid, not all bookings
+    # the user has for the same listing.
+    booking_id = request.data.get("booking_id")
+
     if not reference:
         return Response({"error": "Payment reference is required."}, status=400)
 
@@ -157,11 +162,8 @@ def verify_payment(request):
     amount_paid = Decimal(str(paystack_data["amount"])) / 100
     buyer_email = paystack_data.get("customer", {}).get("email", request.user.email)
 
-    # ── PROFILE DISCOUNT: check if the verified amount matches a discounted price ──
-    # The frontend already sent the discounted amount to Paystack.
-    # We just need to mark the bonus as used here.
+    # ── PROFILE DISCOUNT: mark bonus as used now that payment is confirmed ──
     discount_applied = False
-    discount_amount = Decimal("0")
     try:
         profile = request.user.profile
         if profile.profile_bonus_eligible and not profile.profile_bonus_used:
@@ -169,7 +171,7 @@ def verify_payment(request):
             profile.profile_bonus_used = True
             profile.profile_bonus_eligible = False
             profile.save(update_fields=["profile_bonus_used", "profile_bonus_eligible"])
-            logger.info(f"Profile discount applied and marked used for user {request.user.username}")
+            logger.info(f"Profile discount marked used for user {request.user.username}")
     except Exception as e:
         logger.warning(f"Profile discount check failed: {e}")
 
@@ -209,7 +211,7 @@ def verify_payment(request):
             order = Order.objects.create(
                 buyer=request.user,
                 listing=listing,
-                amount=amount_paid,   # already discounted — Paystack charged this amount
+                amount=amount_paid,
                 reference=reference,
                 status="paid",
             )
@@ -220,21 +222,50 @@ def verify_payment(request):
             except Exception as e:
                 logger.warning(f"reduce_stock failed: {e}")
 
+            # ── BOOKING STATUS UPDATE ──────────────────────────────────────────
+            # Only mark the SPECIFIC booking being paid for as paid.
+            # If booking_id was sent from the frontend, use it directly (most precise).
+            # If not, fall back to the single most-recently-created confirmed booking
+            # for this listing — never bulk-update all bookings.
             try:
                 from orders.models import Booking
-                Booking.objects.filter(
-                    buyer=request.user,
-                    listing=listing,
-                    status="confirmed"
-                ).update(status="paid")
+                if booking_id:
+                    # Most precise: the frontend told us exactly which booking was paid
+                    paid_booking = Booking.objects.filter(
+                        id=booking_id,
+                        buyer=request.user,
+                        listing=listing,
+                        status="confirmed",
+                    ).first()
+                else:
+                    # Fallback: pick the single most recent confirmed booking
+                    paid_booking = Booking.objects.filter(
+                        buyer=request.user,
+                        listing=listing,
+                        status="confirmed",
+                    ).order_by("-created_at").first()
+
+                if paid_booking:
+                    paid_booking.status = "paid"
+                    paid_booking.save(update_fields=["status"])
+                    logger.info(
+                        f"Booking {paid_booking.id} marked as paid for user "
+                        f"{request.user.username}"
+                    )
+                else:
+                    logger.warning(
+                        f"No confirmed booking found to mark as paid for user "
+                        f"{request.user.username}, listing {listing.id}"
+                    )
             except Exception as e:
                 logger.warning(f"Could not update booking status to paid: {e}")
+            # ── END BOOKING STATUS UPDATE ──────────────────────────────────────
 
             try:
                 from notifications.models import Notification
                 Notification.objects.create(
                     recipient=listing.vendor,
-                    notification_type="vendor_approved",
+                    notification_type="booking_paid",
                     title=f"💰 Payment Received — {listing.title}",
                     message=(
                         f"{request.user.username} has paid ₦{amount_paid:,.0f} for "
@@ -416,14 +447,12 @@ def seller_earnings(request):
 
     total_orders = Order.objects.filter(listing__vendor=user).count()
 
-    # Try escrow model if it exists, else fall back to payment transactions
     try:
         from wallet.models import EscrowTransaction
         escrows = EscrowTransaction.objects.filter(seller=user)
         total_earned = escrows.filter(status="released").aggregate(Sum("seller_amount"))["seller_amount__sum"] or 0
         pending = escrows.filter(status="held").aggregate(Sum("seller_amount"))["seller_amount__sum"] or 0
     except Exception:
-        # Fallback: calculate from PaymentTransactions
         txns = PaymentTransaction.objects.filter(seller=user, status="success")
         total_earned = txns.aggregate(Sum("seller_amount"))["seller_amount__sum"] or 0
         pending = 0
@@ -449,7 +478,6 @@ def seller_earnings(request):
 # ─────────────────────────────────────────
 
 def _create_or_update_paystack_subaccount(user, bank_code, account_number, account_name):
-    """Creates or updates a Paystack subaccount for the seller."""
     try:
         existing = SellerBankAccount.objects.filter(user=user).first()
 
@@ -520,15 +548,9 @@ from django.http import HttpResponse
 
 @csrf_exempt
 def paystack_webhook(request):
-    """
-    Paystack sends POST requests here for payment events.
-    Verify signature, then handle charge.success to mark orders/bookings paid.
-    Set this URL in your Paystack Dashboard → Settings → Webhooks.
-    """
     if request.method != "POST":
         return HttpResponse(status=405)
 
-    # Verify Paystack signature
     paystack_signature = request.headers.get("x-paystack-signature", "")
     computed = hmac.new(
         PAYSTACK_SECRET.encode("utf-8"),
@@ -555,12 +577,10 @@ def paystack_webhook(request):
         amount_kobo = data.get("amount", 0)
         amount = Decimal(str(amount_kobo)) / 100
 
-        # Already processed via verify endpoint? Skip duplicate
         if PaymentTransaction.objects.filter(reference=reference, status="success").exists():
             logger.info(f"Webhook: reference {reference} already processed, skipping.")
             return HttpResponse(status=200)
 
-        # Find buyer from metadata or email
         customer_email = data.get("customer", {}).get("email")
         try:
             from django.contrib.auth import get_user_model
@@ -569,7 +589,6 @@ def paystack_webhook(request):
         except Exception:
             buyer = None
 
-        # Log the transaction if not already logged
         if buyer and not PaymentTransaction.objects.filter(reference=reference).exists():
             metadata = data.get("metadata", {})
             custom_fields = {cf["variable_name"]: cf["value"] for cf in metadata.get("custom_fields", [])}
@@ -595,7 +614,6 @@ def paystack_webhook(request):
             logger.info(f"Webhook: logged transaction {reference} for {customer_email}")
 
     elif event == "transfer.success":
-        # A payout to a vendor completed
         reference = data.get("reference")
         logger.info(f"Webhook: transfer succeeded for {reference}")
 
@@ -614,6 +632,11 @@ def paystack_webhook(request):
             pass
 
     return HttpResponse(status=200)
+
+
+# ─────────────────────────────────────────
+# PRICE PREVIEW (discount check before Paystack init)
+# ─────────────────────────────────────────
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])

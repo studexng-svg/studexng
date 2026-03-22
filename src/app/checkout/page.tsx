@@ -27,22 +27,12 @@ interface PricePreview {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PaystackButton — MUST live outside CheckoutPage.
-//
-// Why: usePaystackPayment is a hook that captures config.amount at mount time.
-// If it lives inside CheckoutPage, it mounts with rawTotal (before the discount
-// preview fetch completes) and never updates.
-//
-// By keeping it here and only rendering it after paystackReady=true, the hook
-// always receives the final discounted chargeAmountInKobo.
+// usePaystackPayment captures config.amount at mount time. By only mounting
+// this component after paystackReady=true (i.e. after the preview fetch),
+// Paystack always receives the final discounted amount.
 // ─────────────────────────────────────────────────────────────────────────────
 function PaystackButton({
-  config,
-  isProcessing,
-  setIsProcessing,
-  isLoggedIn,
-  onSuccess,
-  onClose,
-  label,
+  config, isProcessing, setIsProcessing, isLoggedIn, onSuccess, onClose, label,
 }: {
   config: Parameters<typeof usePaystackPayment>[0];
   isProcessing: boolean;
@@ -53,7 +43,6 @@ function PaystackButton({
   label: string;
 }) {
   const initializePayment = usePaystackPayment(config);
-
   return (
     <motion.button
       whileHover={{ scale: isProcessing ? 1 : 1.02 }}
@@ -70,15 +59,9 @@ function PaystackButton({
         ${isProcessing ? "opacity-70 cursor-not-allowed" : "hover:shadow-purple-500/50"}`}
     >
       {isProcessing ? (
-        <>
-          <Loader className="w-8 h-8 animate-spin" />
-          Processing...
-        </>
+        <><Loader className="w-8 h-8 animate-spin" /> Processing...</>
       ) : (
-        <>
-          <CreditCard className="w-10 h-10" />
-          {label}
-        </>
+        <><CreditCard className="w-10 h-10" /> {label}</>
       )}
     </motion.button>
   );
@@ -100,23 +83,16 @@ export default function CheckoutPage() {
     ? (booking?.total || 0)
     : cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
-  // ── Discount / price preview state ───────────────────────────────────────
   const [pricePreview, setPricePreview] = useState<PricePreview | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
-
-  // paystackReady gates PaystackButton so it only mounts AFTER chargeAmount
-  // is finalised — this is what makes the discount actually reach Paystack.
   const [paystackReady, setPaystackReady] = useState(false);
-
-  // The amount we actually charge Paystack — updated after preview resolves
   const [chargeAmount, setChargeAmount] = useState(rawTotal);
 
   useEffect(() => {
     if (!user || rawTotal <= 0) return;
-
     const fetchPreview = async () => {
       setPreviewLoading(true);
-      setPaystackReady(false); // unmount PaystackButton while fetching
+      setPaystackReady(false);
       try {
         const res = await fetchWithAuth(`${API_URL}/api/payments/preview/`, {
           method: "POST",
@@ -133,15 +109,13 @@ export default function CheckoutPage() {
         setChargeAmount(rawTotal);
       } finally {
         setPreviewLoading(false);
-        setPaystackReady(true); // now remount PaystackButton with correct amount
+        setPaystackReady(true);
       }
     };
-
     fetchPreview();
   }, [user, rawTotal]);
 
   const chargeAmountInKobo = Math.round(chargeAmount * 100);
-
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<"card" | "transfer">("card");
 
@@ -149,17 +123,14 @@ export default function CheckoutPage() {
     `STUDEX-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`
   );
 
-  // This config is passed into PaystackButton which only mounts after
-  // chargeAmountInKobo is final — so Paystack always gets the right amount.
   const config: Parameters<typeof usePaystackPayment>[0] = {
     reference: referenceRef.current,
     email: user?.email || "user@studex.com",
     amount: chargeAmountInKobo,
     publicKey: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY!,
-    channels:
-      paymentMethod === "transfer"
-        ? (["bank_transfer"] as any)
-        : (["card", "bank", "ussd", "bank_transfer"] as any),
+    channels: paymentMethod === "transfer"
+      ? (["bank_transfer"] as any)
+      : (["card", "bank", "ussd", "bank_transfer"] as any),
     metadata: {
       custom_fields: [
         { display_name: "Customer", variable_name: "customer", value: user?.username || "" },
@@ -172,6 +143,11 @@ export default function CheckoutPage() {
     },
   };
 
+  // ── createOrder ────────────────────────────────────────────────────────────
+  // SERVICE: sends booking_id so the backend marks ONLY this specific booking
+  //          as paid — not every confirmed booking for the same listing.
+  // PRODUCT: sends cart items as normal — booking_id is not relevant here.
+  // ──────────────────────────────────────────────────────────────────────────
   const createOrder = async (paymentRef: string) => {
     if (isServiceBooking && booking) {
       const res = await fetchWithAuth(`${API_URL}/api/payments/verify/`, {
@@ -181,6 +157,7 @@ export default function CheckoutPage() {
           reference: paymentRef,
           listing_id: booking.providerId,
           order_type: "service",
+          booking_id: booking.bookingId ?? null,
         }),
       });
       const data = await res.json();
@@ -188,6 +165,7 @@ export default function CheckoutPage() {
       return data;
     }
 
+    // Product / food order
     const res = await fetchWithAuth(`${API_URL}/api/payments/verify/`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -206,10 +184,7 @@ export default function CheckoutPage() {
   };
 
   const handlePaystackSuccess = useCallback(async (ref: any) => {
-    if (!isLoggedIn) {
-      router.push("/auth");
-      return;
-    }
+    if (!isLoggedIn) { router.push("/auth"); return; }
     try {
       const result = await createOrder(ref.reference);
       if (isFoodOrder) clearCart();
@@ -217,9 +192,7 @@ export default function CheckoutPage() {
       router.push(`/order-confirmation/${result.order_id}`);
     } catch (error: any) {
       console.error("Order creation failed:", error.message);
-      alert(
-        `Payment received but order failed. Contact support with ref: ${ref.reference}`
-      );
+      alert(`Payment received but order failed. Contact support with ref: ${ref.reference}`);
       setIsProcessing(false);
     }
   }, [isLoggedIn, isFoodOrder, isServiceBooking]);
@@ -232,22 +205,15 @@ export default function CheckoutPage() {
   if (!isFoodOrder && !isServiceBooking) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-teal-50 flex items-center justify-center p-6">
-        <motion.div
-          initial={{ scale: 0.9, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          className="text-center"
-        >
+        <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="text-center">
           <Package className="w-32 h-32 text-purple-300 mx-auto mb-8" />
           <h2 className="text-4xl font-black bg-gradient-to-r from-purple-600 to-teal-600 bg-clip-text text-transparent mb-4">
             Nothing to checkout
           </h2>
           <p className="text-gray-600 mb-8">Go book a service or add items to cart!</p>
           <Link href="/home">
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="px-12 py-5 bg-gradient-to-r from-purple-600 to-teal-600 text-white font-black text-xl rounded-full shadow-2xl"
-            >
+            <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+              className="px-12 py-5 bg-gradient-to-r from-purple-600 to-teal-600 text-white font-black text-xl rounded-full shadow-2xl">
               Explore StudEx
             </motion.button>
           </Link>
@@ -259,18 +225,12 @@ export default function CheckoutPage() {
   return (
     <>
       {/* TOP BAR */}
-      <motion.div
-        initial={{ y: -20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        className="sticky top-0 bg-white/95 backdrop-blur-xl z-50 border-b border-purple-100 shadow-lg"
-      >
+      <motion.div initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
+        className="sticky top-0 bg-white/95 backdrop-blur-xl z-50 border-b border-purple-100 shadow-lg">
         <div className="flex items-center justify-between px-6 py-5 max-w-4xl mx-auto">
           <Link href={isServiceBooking ? `/lashes/${booking?.providerId}` : "/cart"}>
-            <motion.div
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
-              className="p-2 hover:bg-purple-100 rounded-full transition"
-            >
+            <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
+              className="p-2 hover:bg-purple-100 rounded-full transition">
               <ArrowLeft className="w-7 h-7 text-purple-600" />
             </motion.div>
           </Link>
@@ -289,18 +249,13 @@ export default function CheckoutPage() {
       <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-teal-50 px-6 pt-8 pb-32 max-w-4xl mx-auto">
 
         {/* ORDER SUMMARY */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-white/90 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-white mb-6"
-        >
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+          className="bg-white/90 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-white mb-6">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-black text-gray-900 flex items-center gap-3">
-              {isServiceBooking ? (
-                <Calendar className="w-7 h-7 text-purple-600" />
-              ) : (
-                <Package className="w-7 h-7 text-purple-600" />
-              )}
+              {isServiceBooking
+                ? <Calendar className="w-7 h-7 text-purple-600" />
+                : <Package className="w-7 h-7 text-purple-600" />}
               {isServiceBooking ? "Your Appointment" : "Your Order"}
             </h2>
             <Sparkles className="w-6 h-6 text-teal-500" />
@@ -309,19 +264,11 @@ export default function CheckoutPage() {
           <div className="space-y-5">
             {/* SERVICE BOOKING */}
             {isServiceBooking && booking && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="bg-gradient-to-r from-purple-100 to-teal-100 rounded-3xl p-8"
-              >
+              <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+                className="bg-gradient-to-r from-purple-100 to-teal-100 rounded-3xl p-8">
                 <div className="flex items-center gap-5 mb-6">
                   <div className="relative w-24 h-24 rounded-3xl overflow-hidden ring-4 ring-purple-200">
-                    <Image
-                      src={`/images/${booking.providerImg}`}
-                      alt={booking.providerName}
-                      fill
-                      className="object-cover"
-                    />
+                    <Image src={`/images/${booking.providerImg}`} alt={booking.providerName} fill className="object-cover" />
                   </div>
                   <div>
                     <h3 className="text-2xl font-black">{booking.providerName}</h3>
@@ -329,63 +276,44 @@ export default function CheckoutPage() {
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4 text-lg">
-                  <div className="flex items-center gap-3">
-                    <Calendar className="w-5 h-5" />
-                    <span className="font-medium">{booking.date}</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Clock className="w-5 h-5" />
-                    <span className="font-medium">{booking.time}</span>
-                  </div>
-                  <div className="flex items-center gap-3 col-span-2">
-                    <MapPin className="w-5 h-5" />
-                    <span className="font-medium">{booking.location}</span>
-                  </div>
+                  <div className="flex items-center gap-3"><Calendar className="w-5 h-5" /><span className="font-medium">{booking.date}</span></div>
+                  <div className="flex items-center gap-3"><Clock className="w-5 h-5" /><span className="font-medium">{booking.time}</span></div>
+                  <div className="flex items-center gap-3 col-span-2"><MapPin className="w-5 h-5" /><span className="font-medium">{booking.location}</span></div>
                 </div>
               </motion.div>
             )}
 
-            {/* PRODUCT/FOOD CART */}
-            {isFoodOrder &&
-              cart.map((item, i) => (
-                <motion.div
-                  key={item.id}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: i * 0.1 }}
-                  className="flex justify-between items-center p-4 bg-gradient-to-r from-purple-50 to-teal-50 rounded-2xl"
-                >
-                  <div className="flex-1">
-                    <p className="font-bold text-gray-900 text-lg">{item.title}</p>
-                    <p className="text-sm text-purple-600 font-medium">×{item.quantity}</p>
-                  </div>
-                  <p className="font-black text-xl text-purple-600">
-                    ₦{(item.price * item.quantity).toLocaleString()}
-                  </p>
-                </motion.div>
-              ))}
+            {/* PRODUCT / FOOD CART */}
+            {isFoodOrder && cart.map((item, i) => (
+              <motion.div key={item.id} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: i * 0.1 }}
+                className="flex justify-between items-center p-4 bg-gradient-to-r from-purple-50 to-teal-50 rounded-2xl">
+                <div className="flex-1">
+                  <p className="font-bold text-gray-900 text-lg">{item.title}</p>
+                  <p className="text-sm text-purple-600 font-medium">×{item.quantity}</p>
+                </div>
+                <p className="font-black text-xl text-purple-600">
+                  ₦{(item.price * item.quantity).toLocaleString()}
+                </p>
+              </motion.div>
+            ))}
 
-            {/* ── PRICE BREAKDOWN ── */}
+            {/* PRICE BREAKDOWN */}
             <div className="border-t-2 border-purple-200 pt-6 mt-6 space-y-3">
               {previewLoading ? (
                 <div className="animate-pulse h-20 bg-purple-50 rounded-2xl" />
               ) : (
                 <>
-                  {/* Original price */}
                   <div className="flex justify-between items-center text-base">
-                    <span className="text-gray-500 font-medium">Service Price</span>
-                    <span className="font-bold text-gray-700">
-                      ₦{rawTotal.toLocaleString()}
+                    <span className="text-gray-500 font-medium">
+                      {isServiceBooking ? "Service Price" : "Order Total"}
                     </span>
+                    <span className="font-bold text-gray-700">₦{rawTotal.toLocaleString()}</span>
                   </div>
 
-                  {/* Discount line — only shown if eligible */}
                   {pricePreview?.discount_eligible && (
-                    <motion.div
-                      initial={{ opacity: 0, y: -6 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="flex justify-between items-center text-base"
-                    >
+                    <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
+                      className="flex justify-between items-center text-base">
                       <span className="text-green-600 font-bold flex items-center gap-2">
                         <Tag className="w-4 h-4" />
                         Profile Discount ({pricePreview.discount_percent}% off)
@@ -396,46 +324,29 @@ export default function CheckoutPage() {
                     </motion.div>
                   )}
 
-                  {/* Platform fee */}
                   <div className="flex justify-between items-center text-base">
                     <span className="text-gray-500 font-medium">Platform Fee</span>
                     <span className="text-green-600 font-bold">Included</span>
                   </div>
 
-                  {/* Total */}
-                  <motion.div
-                    initial={{ scale: 0.97 }}
-                    animate={{ scale: 1 }}
-                    className="bg-gradient-to-r from-purple-600 to-teal-600 rounded-2xl p-6 text-white mt-2"
-                  >
+                  <motion.div initial={{ scale: 0.97 }} animate={{ scale: 1 }}
+                    className="bg-gradient-to-r from-purple-600 to-teal-600 rounded-2xl p-6 text-white mt-2">
                     <div className="flex justify-between items-center">
                       <span className="text-xl font-bold">Total Amount</span>
                       <div className="text-right">
                         {pricePreview?.discount_eligible && (
-                          <p className="text-sm line-through opacity-60">
-                            ₦{rawTotal.toLocaleString()}
-                          </p>
+                          <p className="text-sm line-through opacity-60">₦{rawTotal.toLocaleString()}</p>
                         )}
-                        <span className="text-4xl font-black">
-                          ₦{chargeAmount.toLocaleString()}
-                        </span>
+                        <span className="text-4xl font-black">₦{chargeAmount.toLocaleString()}</span>
                       </div>
                     </div>
                   </motion.div>
 
-                  {/* Discount banner */}
                   {pricePreview?.discount_eligible && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="bg-green-50 border-2 border-green-200 rounded-2xl p-4 text-center"
-                    >
-                      <p className="text-green-700 font-black text-sm">
-                        {pricePreview.discount_message}
-                      </p>
-                      <p className="text-green-600 text-xs mt-1">
-                        One-time reward for completing your profile ✓
-                      </p>
+                    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                      className="bg-green-50 border-2 border-green-200 rounded-2xl p-4 text-center">
+                      <p className="text-green-700 font-black text-sm">{pricePreview.discount_message}</p>
+                      <p className="text-green-600 text-xs mt-1">One-time reward for completing your profile ✓</p>
                     </motion.div>
                   )}
                 </>
@@ -444,25 +355,17 @@ export default function CheckoutPage() {
           </div>
         </motion.div>
 
-        {/* PAYMENT METHOD SELECTION */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="space-y-4 mb-6"
-        >
+        {/* PAYMENT METHOD */}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }} className="space-y-4 mb-6">
           <h2 className="text-xl font-black text-gray-900">Choose Payment Method</h2>
 
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
+          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
             onClick={() => setPaymentMethod("card")}
             className={`w-full rounded-2xl p-6 transition-all text-left ${
               paymentMethod === "card"
                 ? "bg-gradient-to-r from-purple-600 to-teal-600 text-white shadow-xl"
-                : "bg-white text-gray-800 shadow-md"
-            }`}
-          >
+                : "bg-white text-gray-800 shadow-md"}`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <CreditCard className="w-8 h-8" />
@@ -477,16 +380,12 @@ export default function CheckoutPage() {
             </div>
           </motion.button>
 
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
+          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
             onClick={() => setPaymentMethod("transfer")}
             className={`w-full rounded-2xl p-6 transition-all text-left ${
               paymentMethod === "transfer"
                 ? "bg-gradient-to-r from-purple-600 to-teal-600 text-white shadow-xl"
-                : "bg-white text-gray-800 shadow-md"
-            }`}
-          >
+                : "bg-white text-gray-800 shadow-md"}`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <Building2 className="w-8 h-8" />
@@ -504,11 +403,8 @@ export default function CheckoutPage() {
 
         {/* BANK TRANSFER NOTE */}
         {paymentMethod === "transfer" && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-blue-50 border border-blue-200 rounded-2xl p-4 mb-6"
-          >
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+            className="bg-blue-50 border border-blue-200 rounded-2xl p-4 mb-6">
             <p className="text-blue-800 font-bold text-sm">How bank transfer works:</p>
             <p className="text-blue-700 text-sm mt-1">
               After clicking Pay, Paystack will generate a unique account number for this
@@ -519,12 +415,9 @@ export default function CheckoutPage() {
         )}
 
         {/* SECURITY BADGES */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
-          className="bg-white/90 backdrop-blur-xl rounded-3xl p-6 shadow-xl border border-white mb-6"
-        >
+          className="bg-white/90 backdrop-blur-xl rounded-3xl p-6 shadow-xl border border-white mb-6">
           <div className="flex items-center justify-center gap-8 text-center">
             {[
               { icon: Shield, label: "Secure",    color: "text-green-600"  },
@@ -540,12 +433,9 @@ export default function CheckoutPage() {
         </motion.div>
 
         {/* SPLIT PAYMENT INFO */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
-          className="bg-purple-50 border-2 border-purple-200 rounded-2xl p-6 mb-8 text-center"
-        >
+          className="bg-purple-50 border-2 border-purple-200 rounded-2xl p-6 mb-8 text-center">
           <Shield className="w-12 h-12 text-purple-600 mx-auto mb-3" />
           <p className="font-black text-lg text-gray-900">Automatic Split Payment</p>
           <p className="text-sm text-gray-700 mt-2">
@@ -555,11 +445,7 @@ export default function CheckoutPage() {
           </p>
         </motion.div>
 
-        {/* ── PAY BUTTON ──
-            paystackReady ensures PaystackButton only mounts AFTER chargeAmount
-            is finalised from the preview fetch. This is what makes the discount
-            actually reach Paystack instead of the stale rawTotal.
-        */}
+        {/* PAY BUTTON */}
         {paystackReady && chargeAmountInKobo > 0 ? (
           <PaystackButton
             config={config}
@@ -571,12 +457,10 @@ export default function CheckoutPage() {
             onClose={handlePaystackClose}
           />
         ) : (
-          <motion.button
-            disabled
+          <motion.button disabled
             className="w-full py-8 rounded-3xl font-black text-3xl shadow-2xl
               bg-gradient-to-r from-purple-600 to-teal-600 text-white
-              flex items-center justify-center gap-4 opacity-70 cursor-not-allowed"
-          >
+              flex items-center justify-center gap-4 opacity-70 cursor-not-allowed">
             <Loader className="w-8 h-8 animate-spin" />
             {previewLoading ? "Calculating price..." : "Loading..."}
           </motion.button>
@@ -584,9 +468,7 @@ export default function CheckoutPage() {
 
         <p className="text-center text-xs text-gray-600 mt-6">
           By completing this purchase you agree to StudEx{" "}
-          <Link href="/terms" className="text-purple-600 underline font-bold">
-            Terms & Conditions
-          </Link>
+          <Link href="/terms" className="text-purple-600 underline font-bold">Terms & Conditions</Link>
         </p>
       </div>
     </>

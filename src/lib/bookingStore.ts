@@ -1,4 +1,4 @@
-// src/lib/bookingStore.ts  ← FINAL & CORRECT (WORKS 100%)
+// src/lib/bookingStore.ts
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
@@ -13,6 +13,7 @@ type BookingItem = {
   addons: Record<string, number>;
   note: string;
   total: number;
+  bookingId?: number; // ← the Django Booking.id — used to mark ONLY this booking as paid
 };
 
 type BookingStore = {
@@ -21,7 +22,6 @@ type BookingStore = {
   clearBooking: () => void;
 };
 
-// THIS IS THE ONLY LINE THAT WAS WRONG BEFORE
 export const useBookingStore = create<BookingStore>()(
   persist(
     (set) => ({
@@ -30,7 +30,7 @@ export const useBookingStore = create<BookingStore>()(
       clearBooking: () => set({ booking: null }),
     }),
     {
-      name: "studex-booking", // This saves it to localStorage
+      name: "studex-booking",
     }
   )
 );
