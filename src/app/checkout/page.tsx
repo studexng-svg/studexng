@@ -25,6 +25,68 @@ interface PricePreview {
   discount_message: string | null;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// PaystackButton — MUST live outside CheckoutPage.
+//
+// Why: usePaystackPayment is a hook that captures config.amount at mount time.
+// If it lives inside CheckoutPage, it mounts with rawTotal (before the discount
+// preview fetch completes) and never updates.
+//
+// By keeping it here and only rendering it after paystackReady=true, the hook
+// always receives the final discounted chargeAmountInKobo.
+// ─────────────────────────────────────────────────────────────────────────────
+function PaystackButton({
+  config,
+  isProcessing,
+  setIsProcessing,
+  isLoggedIn,
+  onSuccess,
+  onClose,
+  label,
+}: {
+  config: Parameters<typeof usePaystackPayment>[0];
+  isProcessing: boolean;
+  setIsProcessing: (v: boolean) => void;
+  isLoggedIn: boolean;
+  onSuccess: (ref: any) => void;
+  onClose: () => void;
+  label: string;
+}) {
+  const initializePayment = usePaystackPayment(config);
+
+  return (
+    <motion.button
+      whileHover={{ scale: isProcessing ? 1 : 1.02 }}
+      whileTap={{ scale: isProcessing ? 1 : 0.98 }}
+      onClick={() => {
+        if (!isLoggedIn || isProcessing) return;
+        setIsProcessing(true);
+        initializePayment({ onSuccess, onClose });
+      }}
+      disabled={isProcessing || !isLoggedIn}
+      className={`w-full py-8 rounded-3xl font-black text-3xl shadow-2xl
+        bg-gradient-to-r from-purple-600 to-teal-600 text-white
+        flex items-center justify-center gap-4
+        ${isProcessing ? "opacity-70 cursor-not-allowed" : "hover:shadow-purple-500/50"}`}
+    >
+      {isProcessing ? (
+        <>
+          <Loader className="w-8 h-8 animate-spin" />
+          Processing...
+        </>
+      ) : (
+        <>
+          <CreditCard className="w-10 h-10" />
+          {label}
+        </>
+      )}
+    </motion.button>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CheckoutPage
+// ─────────────────────────────────────────────────────────────────────────────
 export default function CheckoutPage() {
   const router = useRouter();
   const { user, isAuthReady, isLoggedIn, isHydrated } = useAuth();
@@ -38,11 +100,15 @@ export default function CheckoutPage() {
     ? (booking?.total || 0)
     : cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
-  // ── Discount state ────────────────────────────────────────────────────────
+  // ── Discount / price preview state ───────────────────────────────────────
   const [pricePreview, setPricePreview] = useState<PricePreview | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
 
-  // The amount we actually charge Paystack — starts as raw total, updated after preview
+  // paystackReady gates PaystackButton so it only mounts AFTER chargeAmount
+  // is finalised — this is what makes the discount actually reach Paystack.
+  const [paystackReady, setPaystackReady] = useState(false);
+
+  // The amount we actually charge Paystack — updated after preview resolves
   const [chargeAmount, setChargeAmount] = useState(rawTotal);
 
   useEffect(() => {
@@ -50,6 +116,7 @@ export default function CheckoutPage() {
 
     const fetchPreview = async () => {
       setPreviewLoading(true);
+      setPaystackReady(false); // unmount PaystackButton while fetching
       try {
         const res = await fetchWithAuth(`${API_URL}/api/payments/preview/`, {
           method: "POST",
@@ -66,6 +133,7 @@ export default function CheckoutPage() {
         setChargeAmount(rawTotal);
       } finally {
         setPreviewLoading(false);
+        setPaystackReady(true); // now remount PaystackButton with correct amount
       }
     };
 
@@ -81,15 +149,17 @@ export default function CheckoutPage() {
     `STUDEX-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`
   );
 
-  const config = {
+  // This config is passed into PaystackButton which only mounts after
+  // chargeAmountInKobo is final — so Paystack always gets the right amount.
+  const config: Parameters<typeof usePaystackPayment>[0] = {
     reference: referenceRef.current,
     email: user?.email || "user@studex.com",
-    amount: chargeAmountInKobo,  // ← discounted amount sent to Paystack
+    amount: chargeAmountInKobo,
     publicKey: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY!,
     channels:
       paymentMethod === "transfer"
-        ? ["bank_transfer"]
-        : ["card", "bank", "ussd", "bank_transfer"],
+        ? (["bank_transfer"] as any)
+        : (["card", "bank", "ussd", "bank_transfer"] as any),
     metadata: {
       custom_fields: [
         { display_name: "Customer", variable_name: "customer", value: user?.username || "" },
@@ -101,8 +171,6 @@ export default function CheckoutPage() {
       ],
     },
   };
-
-  const initializePayment = usePaystackPayment(config);
 
   const createOrder = async (paymentRef: string) => {
     if (isServiceBooking && booking) {
@@ -137,42 +205,28 @@ export default function CheckoutPage() {
     return data;
   };
 
-  const handlePayment = useCallback(() => {
-    if (!config.publicKey) {
-      alert("Paystack key missing. Check your .env file.");
+  const handlePaystackSuccess = useCallback(async (ref: any) => {
+    if (!isLoggedIn) {
+      router.push("/auth");
       return;
     }
-    if (chargeAmountInKobo <= 0) {
-      alert("Cannot process zero payment.");
-      return;
+    try {
+      const result = await createOrder(ref.reference);
+      if (isFoodOrder) clearCart();
+      if (isServiceBooking) clearBooking();
+      router.push(`/order-confirmation/${result.order_id}`);
+    } catch (error: any) {
+      console.error("Order creation failed:", error.message);
+      alert(
+        `Payment received but order failed. Contact support with ref: ${ref.reference}`
+      );
+      setIsProcessing(false);
     }
+  }, [isLoggedIn, isFoodOrder, isServiceBooking]);
 
-    setIsProcessing(true);
-
-    initializePayment({
-      onSuccess: async (ref: any) => {
-        if (!isLoggedIn) {
-          router.push("/auth");
-          return;
-        }
-        try {
-          const result = await createOrder(ref.reference);
-          if (isFoodOrder) clearCart();
-          if (isServiceBooking) clearBooking();
-          router.push(`/order-confirmation/${result.order_id}`);
-        } catch (error: any) {
-          console.error("Order creation failed:", error.message);
-          alert(
-            `Payment received but order failed. Contact support with ref: ${ref.reference}`
-          );
-          setIsProcessing(false);
-        }
-      },
-      onClose: () => {
-        setIsProcessing(false);
-      },
-    });
-  }, [initializePayment, chargeAmountInKobo, isLoggedIn, isFoodOrder, isServiceBooking]);
+  const handlePaystackClose = useCallback(() => {
+    setIsProcessing(false);
+  }, []);
 
   // ── Empty state ───────────────────────────────────────────────────────────
   if (!isFoodOrder && !isServiceBooking) {
@@ -311,14 +365,13 @@ export default function CheckoutPage() {
                 </motion.div>
               ))}
 
-            {/* ── PRICE BREAKDOWN (with discount) ── */}
+            {/* ── PRICE BREAKDOWN ── */}
             <div className="border-t-2 border-purple-200 pt-6 mt-6 space-y-3">
-
               {previewLoading ? (
                 <div className="animate-pulse h-20 bg-purple-50 rounded-2xl" />
               ) : (
                 <>
-                  {/* Original price line */}
+                  {/* Original price */}
                   <div className="flex justify-between items-center text-base">
                     <span className="text-gray-500 font-medium">Service Price</span>
                     <span className="font-bold text-gray-700">
@@ -326,7 +379,7 @@ export default function CheckoutPage() {
                     </span>
                   </div>
 
-                  {/* Discount line — only if eligible */}
+                  {/* Discount line — only shown if eligible */}
                   {pricePreview?.discount_eligible && (
                     <motion.div
                       initial={{ opacity: 0, y: -6 }}
@@ -359,7 +412,7 @@ export default function CheckoutPage() {
                       <span className="text-xl font-bold">Total Amount</span>
                       <div className="text-right">
                         {pricePreview?.discount_eligible && (
-                          <p className="text-sm line-through opacity-60 text-right">
+                          <p className="text-sm line-through opacity-60">
                             ₦{rawTotal.toLocaleString()}
                           </p>
                         )}
@@ -502,36 +555,32 @@ export default function CheckoutPage() {
           </p>
         </motion.div>
 
-        {/* PAY BUTTON */}
-        <motion.button
-          whileHover={{ scale: isProcessing ? 1 : 1.02 }}
-          whileTap={{ scale: isProcessing ? 1 : 0.98 }}
-          onClick={handlePayment}
-          disabled={isProcessing || !isLoggedIn || previewLoading}
-          className={`w-full py-8 rounded-3xl font-black text-3xl shadow-2xl
-            bg-gradient-to-r from-purple-600 to-teal-600 text-white
-            flex items-center justify-center gap-4
-            ${(isProcessing || !isAuthReady || !isHydrated || previewLoading)
-              ? "opacity-70 cursor-not-allowed"
-              : "hover:shadow-purple-500/50"}`}
-        >
-          {isProcessing ? (
-            <>
-              <Loader className="w-8 h-8 animate-spin" />
-              Processing...
-            </>
-          ) : previewLoading ? (
-            <>
-              <Loader className="w-8 h-8 animate-spin" />
-              Loading price...
-            </>
-          ) : (
-            <>
-              <CreditCard className="w-10 h-10" />
-              Pay ₦{chargeAmount.toLocaleString()} Now
-            </>
-          )}
-        </motion.button>
+        {/* ── PAY BUTTON ──
+            paystackReady ensures PaystackButton only mounts AFTER chargeAmount
+            is finalised from the preview fetch. This is what makes the discount
+            actually reach Paystack instead of the stale rawTotal.
+        */}
+        {paystackReady && chargeAmountInKobo > 0 ? (
+          <PaystackButton
+            config={config}
+            isProcessing={isProcessing}
+            setIsProcessing={setIsProcessing}
+            isLoggedIn={!!isLoggedIn}
+            label={`Pay ₦${chargeAmount.toLocaleString()} Now`}
+            onSuccess={handlePaystackSuccess}
+            onClose={handlePaystackClose}
+          />
+        ) : (
+          <motion.button
+            disabled
+            className="w-full py-8 rounded-3xl font-black text-3xl shadow-2xl
+              bg-gradient-to-r from-purple-600 to-teal-600 text-white
+              flex items-center justify-center gap-4 opacity-70 cursor-not-allowed"
+          >
+            <Loader className="w-8 h-8 animate-spin" />
+            {previewLoading ? "Calculating price..." : "Loading..."}
+          </motion.button>
+        )}
 
         <p className="text-center text-xs text-gray-600 mt-6">
           By completing this purchase you agree to StudEx{" "}

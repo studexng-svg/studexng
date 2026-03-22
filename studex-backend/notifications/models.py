@@ -5,10 +5,20 @@ from django.conf import settings
 
 class Notification(models.Model):
     TYPE_CHOICES = (
+        # Admin notifications
         ('vendor_application', 'New Vendor Application'),
         ('new_listing', 'New Listing Needs Approval'),
+        # Vendor notifications
         ('vendor_approved', 'Vendor Account Approved'),
         ('vendor_revoked', 'Vendor Account Deactivated'),
+        ('new_booking_request', 'New Booking Request'),       # vendor gets this
+        ('booking_paid', 'Booking Paid'),                     # vendor gets this
+        ('order_confirmed', 'Order Confirmed by Buyer'),      # vendor gets this
+        # Buyer notifications
+        ('booking_confirmed', 'Booking Confirmed by Vendor'), # buyer gets this
+        ('booking_cancelled', 'Booking Cancelled'),           # buyer gets this
+        ('payment_received', 'Payment Received'),             # buyer gets this
+        ('order_completed', 'Order Completed'),               # buyer gets this
     )
 
     recipient = models.ForeignKey(
