@@ -254,8 +254,8 @@ export default function ListingDetailPage() {
         </div>
       </div>
 
-      <div className="pb-36 bg-gray-50 dark:bg-gray-950 min-h-screen">
-
+      <div className="pb-52 bg-gray-50 dark:bg-gray-950 min-h-screen">
+        
         {/* Image */}
         <div className="relative h-64 w-full bg-gray-200 dark:bg-gray-800">
           {listing.image ? (

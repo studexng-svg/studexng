@@ -66,8 +66,8 @@ export default function BottomNav() {
       initial={{ y: 0 }}
       animate={{ y: isVisible ? 0 : 100 }}
       transition={{ duration: 0.3, ease: "easeInOut" }}
-      className="fixed bottom-0 left-0 right-0 w-full bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 shadow-2xl z-50"
-    >
+      className="fixed bottom-[70px] left-0 right-0 z-40 bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 p-4 flex gap-3">
+
       <div className="flex justify-around items-center px-2 py-3 max-w-full">
         {navItems.map((item) => {
           const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
