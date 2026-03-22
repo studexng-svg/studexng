@@ -6,14 +6,14 @@ from decimal import Decimal
 from .models import LoyaltyAccount, LoyaltyTransaction
 from rest_framework import status
 
-CREDITS_PER_MILESTONE = Decimal("100")
-MILESTONE_INTERVAL = 5
+CREDITS_PER_MILESTONE = Decimal("200")   # ← changed from 100
+MILESTONE_INTERVAL = 10                  # ← changed from 5
 
 
 def award_loyalty_credits(user, order):
     """
     Called after an order is confirmed complete.
-    Awards ₦100 credits every 5 completed orders.
+    Awards ₦200 credits every 10 completed orders.
     """
     account, _ = LoyaltyAccount.objects.get_or_create(user=user)
     account.total_completed_orders += 1
@@ -36,15 +36,12 @@ def award_loyalty_credits(user, order):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def loyalty_status(request):
-    """Returns loyalty balance and progress toward next reward.
-    Syncs total_completed_orders from real DB orders so historical
-    orders completed before loyalty was set up are counted correctly.
-    """
+    """Returns loyalty balance and progress toward next reward."""
     from orders.models import Order
 
     account, created = LoyaltyAccount.objects.get_or_create(user=request.user)
 
-    # Always sync count from real completed orders so nothing is missed
+    # Sync count from real completed orders
     real_count = Order.objects.filter(
         buyer=request.user,
         status='completed'
@@ -56,8 +53,8 @@ def loyalty_status(request):
 
     completed = account.total_completed_orders
     orders_until_next = MILESTONE_INTERVAL - (completed % MILESTONE_INTERVAL)
-    if orders_until_next == MILESTONE_INTERVAL:
-        orders_until_next = MILESTONE_INTERVAL  # full interval away from next milestone
+    if orders_until_next == MILESTONE_INTERVAL and completed == 0:
+        orders_until_next = MILESTONE_INTERVAL
 
     history = [
         {
@@ -105,13 +102,10 @@ def repeat_booking_check(request):
         'credit_balance': float(account.credit_balance),
     })
 
+
 @api_view(['POST'])
 def earn_points(request):
-    user = request.user
-
-    # Example logic (customize later)
     points = 10
-
     return Response({
         "message": "Points earned successfully",
         "points_added": points

@@ -178,7 +178,6 @@ class OrderViewSet(viewsets.ModelViewSet):
             }
         )
 
-        # Notify vendor
         _notify(
             recipient=order.listing.vendor,
             notification_type='booking_paid',
@@ -222,7 +221,6 @@ class OrderViewSet(viewsets.ModelViewSet):
         order.buyer_confirmed_at = timezone.now()
         order.save()
 
-        # Notify vendor that buyer confirmed and funds will be released
         _notify(
             recipient=order.listing.vendor,
             notification_type='order_confirmed',
@@ -239,21 +237,26 @@ class OrderViewSet(viewsets.ModelViewSet):
         try:
             from loyalty.models import LoyaltyAccount, LoyaltyTransaction
             from decimal import Decimal as D
+
+            MILESTONE = 10      # ← changed from 5
+            REWARD = D('200')   # ← changed from 100
+
             account, _ = LoyaltyAccount.objects.get_or_create(user=request.user)
             account.total_completed_orders += 1
             account.save(update_fields=['total_completed_orders'])
-            if account.total_completed_orders % 5 == 0:
-                account.credit_balance = (account.credit_balance or D('0')) + D('100')
+
+            if account.total_completed_orders % MILESTONE == 0:
+                account.credit_balance = (account.credit_balance or D('0')) + REWARD
                 account.save(update_fields=['credit_balance'])
                 LoyaltyTransaction.objects.create(
                     account=account,
                     type='earned',
-                    amount=D('100'),
+                    amount=REWARD,
                     description=f"Loyalty reward: {account.total_completed_orders} orders completed!",
                     order=order,
                 )
                 credits_awarded = True
-                credits_amount = 100
+                credits_amount = 200
         except Exception as e:
             logger.warning(f"Loyalty award skipped for order {order.id}: {e}")
 
@@ -317,7 +320,6 @@ class BookingViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         booking = serializer.save(buyer=self.request.user)
 
-        # Notify vendor of new booking request
         _notify(
             recipient=booking.listing.vendor,
             notification_type='new_booking_request',
@@ -342,7 +344,6 @@ class BookingViewSet(viewsets.ModelViewSet):
         booking.status = 'confirmed'
         booking.save()
 
-        # Notify buyer that vendor confirmed
         _notify(
             recipient=booking.buyer,
             notification_type='booking_confirmed',
@@ -377,9 +378,7 @@ class BookingViewSet(viewsets.ModelViewSet):
         booking.status = 'cancelled'
         booking.save()
 
-        # Notify the other party about cancellation
         if is_buyer:
-            # Buyer cancelled → notify vendor
             _notify(
                 recipient=booking.listing.vendor,
                 notification_type='booking_cancelled',
@@ -391,7 +390,6 @@ class BookingViewSet(viewsets.ModelViewSet):
                 action_url='/vendor/dashboard',
             )
         else:
-            # Vendor cancelled → notify buyer
             _notify(
                 recipient=booking.buyer,
                 notification_type='booking_cancelled',

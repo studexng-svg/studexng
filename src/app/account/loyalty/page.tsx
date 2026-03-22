@@ -8,6 +8,9 @@ import { useAuth, fetchWithAuth } from "@/lib/authStore";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
+const MILESTONE = 10;   // orders needed per reward
+const REWARD    = 200;  // naira awarded
+
 interface LoyaltyData {
   credit_balance: number;
   total_completed_orders: number;
@@ -31,8 +34,13 @@ export default function LoyaltyPage() {
       .finally(() => setLoading(false));
   }, [isHydrated, isLoggedIn]);
 
+  // How many orders the user has completed within the current 10-order cycle
+  const completedInCycle = data
+    ? MILESTONE - data.orders_until_next_reward
+    : 0;
+
   const progress = data
-    ? Math.round(((5 - data.orders_until_next_reward) / 5) * 100)
+    ? Math.round((completedInCycle / MILESTONE) * 100)
     : 0;
 
   return (
@@ -81,7 +89,7 @@ export default function LoyaltyPage() {
               </div>
               <div className="flex justify-between mt-2">
                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                  {5 - data.orders_until_next_reward} / 5 orders
+                  {completedInCycle} / {MILESTONE} orders
                 </p>
                 <p className="text-xs font-bold text-purple-600 dark:text-purple-400">
                   {data.orders_until_next_reward} more to go!
@@ -132,7 +140,7 @@ export default function LoyaltyPage() {
               <p className="font-black text-purple-900 dark:text-purple-300 mb-3">How it works</p>
               {[
                 "Complete an order on StudEx",
-                "Every 5 completed orders = ₦100 credit",
+                `Every ${MILESTONE} completed orders = ₦${REWARD} credit`,
                 "Credits apply automatically at your next checkout",
                 "Only on-platform orders count",
               ].map((step, i) => (

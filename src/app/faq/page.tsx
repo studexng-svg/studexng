@@ -86,7 +86,7 @@ const faqs = [
       },
       {
         q: "What are loyalty credits?",
-        a: "Every time you complete an order on StudEx, your loyalty count goes up. Every 5 completed orders, you earn ₦100 in credits. Credits are applied automatically at your next checkout.",
+        a: "Every time you complete an order on StudEx, your loyalty count goes up. Every 10 completed orders, you earn ₦200 in credits. Credits are applied automatically at your next checkout.",
       },
       {
         q: "Where do I see my loyalty balance?",
