@@ -109,26 +109,19 @@ export default function BuyerBookingsPage() {
     if (!confirm("Are you sure you want to cancel this booking?")) return;
     try {
       const res = await fetchWithAuth(`${API_URL}/api/orders/bookings/${id}/cancel/`, { method: "POST" });
-      if (res.ok) {
-        showToast("Booking cancelled.");
-        loadBookings();
-      } else {
-        showToast("Could not cancel. Try again.", false);
-      }
+      if (res.ok) { showToast("Booking cancelled."); loadBookings(); }
+      else showToast("Could not cancel. Try again.", false);
     } catch {
       showToast("Error cancelling booking.", false);
     }
   };
 
-  // ── PAY NOW — routes through checkout so the discount preview runs ──────
-  // This is the key fix. Previously this page had its own Paystack init
-  // which bypassed preview_price entirely. Now it sets the booking in the
-  // store and sends the user to /checkout, exactly like /book/page.tsx does.
+  // ── Routes through /checkout so preview_price runs and discount is applied ──
   const handlePay = (booking: Booking) => {
     setBooking({
       providerId: String(booking.listing),
       providerName: booking.listing_title,
-      providerImg: "placeholder.jpg",
+      providerImg: "",          // no placeholder — checkout handles empty string
       service: booking.listing_title,
       date: booking.scheduled_date,
       time: booking.scheduled_time,
@@ -136,11 +129,10 @@ export default function BuyerBookingsPage() {
       addons: {},
       note: booking.note,
       total: parseFloat(booking.listing_price),
-      bookingId: booking.id,
+      bookingId: booking.id,   // marks exactly this booking as paid
     });
     router.push("/checkout");
   };
-  // ────────────────────────────────────────────────────────────────────────
 
   const filtered = filter === "all" ? bookings : bookings.filter(b => b.status === filter);
 
@@ -162,7 +154,6 @@ export default function BuyerBookingsPage() {
 
   return (
     <>
-      {/* TOAST */}
       <AnimatePresence>
         {toast && (
           <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
@@ -205,7 +196,6 @@ export default function BuyerBookingsPage() {
           ))}
         </div>
 
-        {/* ERROR */}
         {error && (
           <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-2xl p-4 flex items-center gap-3">
             <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
@@ -213,7 +203,6 @@ export default function BuyerBookingsPage() {
           </div>
         )}
 
-        {/* EMPTY */}
         {filtered.length === 0 && !error && (
           <div className="text-center py-20">
             <Calendar className="w-14 h-14 text-gray-300 dark:text-gray-700 mx-auto mb-4" />
@@ -224,7 +213,6 @@ export default function BuyerBookingsPage() {
           </div>
         )}
 
-        {/* BOOKING CARDS */}
         <div className="space-y-4">
           {filtered.map(booking => {
             const cfg = STATUS[booking.status as keyof typeof STATUS];
@@ -236,23 +224,16 @@ export default function BuyerBookingsPage() {
               <motion.div key={booking.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
                 className={`rounded-2xl border p-4 ${cfg.bg}`}>
 
-                {/* Top row */}
                 <div className="flex items-start justify-between gap-2 mb-3">
                   <div className="flex-1">
-                    <p className="font-black text-gray-900 dark:text-white text-base leading-tight">
-                      {booking.listing_title}
-                    </p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-                      by <span className="font-semibold">{booking.vendor_name}</span>
-                    </p>
+                    <p className="font-black text-gray-900 dark:text-white text-base leading-tight">{booking.listing_title}</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">by <span className="font-semibold">{booking.vendor_name}</span></p>
                   </div>
                   <span className={`flex-shrink-0 flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold ${cfg.badge}`}>
-                    <Icon className="w-3.5 h-3.5" />
-                    {cfg.label}
+                    <Icon className="w-3.5 h-3.5" />{cfg.label}
                   </span>
                 </div>
 
-                {/* Date / Time / Price */}
                 <div className="grid grid-cols-3 gap-2 mb-3">
                   <div className="bg-white/60 dark:bg-gray-800/60 rounded-xl p-2.5 text-center">
                     <Calendar className="w-4 h-4 mx-auto mb-1 text-gray-400" />
@@ -268,34 +249,27 @@ export default function BuyerBookingsPage() {
                   </div>
                 </div>
 
-                {/* Status message */}
                 <p className={`text-xs font-medium mb-3 ${cfg.color}`}>{cfg.message}</p>
 
-                {/* Note */}
                 {booking.note && (
                   <div className="bg-white/50 dark:bg-gray-800/40 rounded-xl p-2.5 mb-3">
                     <p className="text-xs text-gray-500 dark:text-gray-400 italic">Note: {booking.note}</p>
                   </div>
                 )}
 
-                {/* Action buttons */}
                 <div className="flex gap-2">
                   {isConfirmed && (
-                    <button
-                      onClick={() => handlePay(booking)}
-                      className="flex-1 py-3 bg-gradient-to-r from-teal-500 to-emerald-500 text-white rounded-xl font-black text-sm flex items-center justify-center gap-2 shadow-md"
-                    >
+                    <button onClick={() => handlePay(booking)}
+                      className="flex-1 py-3 bg-gradient-to-r from-teal-500 to-emerald-500 text-white rounded-xl font-black text-sm flex items-center justify-center gap-2 shadow-md">
                       <CreditCard className="w-4 h-4" /> Pay Now
                     </button>
                   )}
-
                   {isPending && (
                     <button onClick={() => cancelBooking(booking.id)}
                       className="flex-shrink-0 py-3 px-4 bg-white dark:bg-gray-800 border border-red-200 dark:border-red-800 text-red-500 rounded-xl font-bold text-sm flex items-center gap-1.5">
                       <Ban className="w-4 h-4" /> Cancel
                     </button>
                   )}
-
                   {booking.status === "cancelled" && (
                     <button onClick={() => router.push("/home")}
                       className="flex-1 py-3 bg-white dark:bg-gray-800 border border-purple-200 dark:border-purple-800 text-purple-600 rounded-xl font-bold text-sm flex items-center justify-center gap-2">

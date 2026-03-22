@@ -13,7 +13,7 @@ type BookingItem = {
   addons: Record<string, number>;
   note: string;
   total: number;
-  bookingId?: number; // ← the Django Booking.id — used to mark ONLY this booking as paid
+  bookingId?: number;
 };
 
 type BookingStore = {
@@ -29,8 +29,6 @@ export const useBookingStore = create<BookingStore>()(
       setBooking: (booking) => set({ booking }),
       clearBooking: () => set({ booking: null }),
     }),
-    {
-      name: "studex-booking",
-    }
+    { name: "studex-booking" }
   )
 );
