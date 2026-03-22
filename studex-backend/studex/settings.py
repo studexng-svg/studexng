@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
     'django_filters',
+    'django_apscheduler',  # ← booking reminder scheduler
 
     # Cloud storage
     'cloudinary',
@@ -229,6 +230,12 @@ CACHES = {
 # EMAIL (optional)
 # =======================================
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+
+# =======================================
+# APSCHEDULER — booking reminder settings
+# =======================================
+APSCHEDULER_DATETIME_FORMAT = "N j, Y, f:s a"  # human-readable log format
+APSCHEDULER_RUN_NOW_TIMEOUT = 25               # seconds before a missed job is skipped
 
 # =======================================
 # SECURITY HEADERS (production only)

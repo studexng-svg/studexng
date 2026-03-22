@@ -14,6 +14,8 @@ class Notification(models.Model):
         ('new_booking_request', 'New Booking Request'),       # vendor gets this
         ('booking_paid', 'Booking Paid'),                     # vendor gets this
         ('order_confirmed', 'Order Confirmed by Buyer'),      # vendor gets this
+        ('booking_reminder_5min', 'Booking Starting in 5 Minutes'),  # ← NEW
+        ('booking_time_now',      'Booking Time Now'),
         # Buyer notifications
         ('booking_confirmed', 'Booking Confirmed by Vendor'), # buyer gets this
         ('booking_cancelled', 'Booking Cancelled'),           # buyer gets this

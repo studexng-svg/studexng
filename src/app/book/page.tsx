@@ -78,7 +78,6 @@ export default function MyBookingsPage() {
       if (!res.ok) throw new Error("Failed to load bookings");
       const data = await res.json();
       const list: ApiBooking[] = Array.isArray(data) ? data : (data.results || []);
-      // Only show the buyer's own bookings (not ones where they're the vendor)
       setBookings(list.filter((b) => b.listing?.vendor !== undefined));
     } catch (e: any) {
       setError("Could not load bookings. Please try again.");
@@ -96,7 +95,6 @@ export default function MyBookingsPage() {
   }, [isLoggedIn]);
 
   const handlePayNow = (b: ApiBooking) => {
-    // Reconstruct bookingStore item so checkout page works
     setBooking({
       providerId: String(b.listing.id),
       providerName: b.listing.title,
@@ -108,6 +106,7 @@ export default function MyBookingsPage() {
       addons: {},
       note: b.note,
       total: b.listing.price,
+      bookingId: b.id, // ← tells checkout exactly which booking to mark paid
     });
     router.push("/checkout");
   };
