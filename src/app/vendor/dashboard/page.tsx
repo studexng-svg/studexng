@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth, fetchWithAuth } from "@/lib/authStore";
+import { useAuth, fetchWithAuth, getToken } from "@/lib/authStore";
 import {
   MessageCircle, Calendar, DollarSign, Package, ShoppingBag,
   Send, Check, X, Plus, Edit2, Trash2,
@@ -24,7 +24,6 @@ export default function VendorDashboard() {
 
   useEffect(() => {
     if (!user) return;
-    // Fetch unread message count
     fetchWithAuth(`${API_URL}/api/chat/conversations/`)
       .then(r => r.ok ? r.json() : null)
       .then(d => {
@@ -32,7 +31,6 @@ export default function VendorDashboard() {
         const list = Array.isArray(d) ? d : (d.results || []);
         setMsgBadge(list.reduce((s: number, c: any) => s + (c.unread_count || 0), 0));
       }).catch(() => {});
-    // Fetch pending bookings count — only where this user is the vendor
     fetchWithAuth(`${API_URL}/api/orders/bookings/`)
       .then(r => r.ok ? r.json() : null)
       .then(d => {
@@ -57,10 +55,7 @@ export default function VendorDashboard() {
   ];
 
   return (
-    // ← pb-20 gives space for the BottomNav (which is now shown again)
-    // ← We do NOT use h-screen here so BottomNav isn't hidden
     <div className="min-h-screen bg-gray-950 text-white flex flex-col">
-
       {/* Header */}
       <div className="bg-gray-900 border-b border-gray-800 px-4 py-4 flex-shrink-0">
         <div className="max-w-5xl mx-auto flex items-center justify-between">
@@ -80,7 +75,7 @@ export default function VendorDashboard() {
         </div>
       </div>
 
-      {/* Tab Bar — horizontally scrollable so all 5 tabs are reachable */}
+      {/* Tab Bar */}
       <div className="bg-gray-900 border-b border-gray-800 overflow-x-auto flex-shrink-0">
         <div className="max-w-5xl mx-auto flex">
           {tabs.map(tab => {
@@ -108,7 +103,6 @@ export default function VendorDashboard() {
       </div>
 
       {/* Tab Content */}
-      {/* Messages gets its own full-height panel; other tabs scroll normally */}
       <div className="flex-1 max-w-5xl w-full mx-auto px-4 py-4 overflow-hidden">
         {activeTab === "messages" && <MessagesTab />}
         {activeTab === "bookings" && <BookingsTab />}
@@ -118,7 +112,6 @@ export default function VendorDashboard() {
         {activeTab === "reviews" && <ReviewsTab />}
       </div>
 
-      {/* Spacer so content isn't hidden behind BottomNav (BottomNav is ~70px tall) */}
       <div className="h-20 flex-shrink-0" />
     </div>
   );
@@ -133,6 +126,13 @@ function MessagesTab() {
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+
+  // ── Image state ──────────────────────────────────────────────
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  // ─────────────────────────────────────────────────────────────
+
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -173,22 +173,60 @@ function MessagesTab() {
     } catch {}
   };
 
+  // ── Image handlers ────────────────────────────────────────────
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      alert("Image must be under 5MB");
+      return;
+    }
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
+  };
+
+  const cancelImage = () => {
+    setImageFile(null);
+    setImagePreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+  // ─────────────────────────────────────────────────────────────
+
   const sendMessage = async () => {
-    if (!text.trim() || !activeConv || sending) return;
+    if ((!text.trim() && !imageFile) || !activeConv || sending) return;
     setSending(true);
     try {
-      await fetchWithAuth(`${API_URL}/api/chat/conversations/${activeConv.id}/send/`, {
-        method: "POST",
-        body: JSON.stringify({ content: text, message_type: "text" }),
-      });
-      setText("");
+      const token = getToken();
+
+      if (imageFile) {
+        // Send image via FormData
+        const fd = new FormData();
+        fd.append("image", imageFile);
+        fd.append("message_type", "image");
+        if (text.trim()) fd.append("content", text.trim());
+
+        await fetch(`${API_URL}/api/chat/conversations/${activeConv.id}/send/`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+          body: fd,
+        });
+        cancelImage();
+        setText("");
+      } else {
+        // Send plain text
+        await fetchWithAuth(`${API_URL}/api/chat/conversations/${activeConv.id}/send/`, {
+          method: "POST",
+          body: JSON.stringify({ content: text, message_type: "text" }),
+        });
+        setText("");
+      }
+
       loadMessages(activeConv.id);
     } catch {} finally { setSending(false); }
   };
 
   if (loading) return <LoadingSpinner />;
 
-  // ← Key fix: use calc(100vh - header - tabbar - bottomnav) so input is always visible
   return (
     <div className="flex gap-4" style={{ height: "calc(100vh - 200px)" }}>
 
@@ -252,7 +290,7 @@ function MessagesTab() {
               </div>
             </div>
 
-            {/* Messages — scrollable */}
+            {/* Messages */}
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
               {messages.length === 0 && (
                 <p className="text-center text-gray-600 text-sm mt-8">No messages yet</p>
@@ -267,7 +305,25 @@ function MessagesTab() {
                     <p className={`text-xs font-semibold mb-1 ${msg.is_mine ? "text-teal-200 text-right" : "text-gray-400"}`}>
                       {msg.sender_username || (msg.is_mine ? user?.username : activeConv.buyer_username)}
                     </p>
-                    <p className="text-sm">{msg.content}</p>
+
+                    {/* ── Image bubble ── */}
+                    {msg.image_url ? (
+                      <div>
+                        <a href={msg.image_url} target="_blank" rel="noopener noreferrer">
+                          <img
+                            src={msg.image_url}
+                            alt="shared image"
+                            className="rounded-xl max-w-[200px] max-h-[200px] object-cover mb-1 cursor-pointer hover:opacity-90 transition"
+                          />
+                        </a>
+                        {msg.content && msg.content !== "📷 Image" && (
+                          <p className="text-sm mt-1">{msg.content}</p>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-sm">{msg.content}</p>
+                    )}
+
                     <p className="text-xs opacity-50 mt-1 text-right">
                       {new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                     </p>
@@ -277,14 +333,62 @@ function MessagesTab() {
               <div ref={bottomRef} />
             </div>
 
-            {/* ← Input always pinned at the bottom of the chat panel, above BottomNav */}
-            <div className="p-4 border-t border-gray-800 flex gap-3 flex-shrink-0 bg-gray-900">
-              <input value={text} onChange={e => setText(e.target.value)}
+            {/* Image preview strip */}
+            {imagePreview && (
+              <div className="px-4 py-2 border-t border-gray-800 flex items-center gap-3 flex-shrink-0 bg-gray-900">
+                <div className="relative flex-shrink-0">
+                  <img
+                    src={imagePreview}
+                    alt="preview"
+                    className="h-14 w-14 object-cover rounded-xl border-2 border-teal-500"
+                  />
+                  <button
+                    onClick={cancelImage}
+                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-black"
+                  >
+                    ×
+                  </button>
+                </div>
+                <p className="text-gray-400 text-xs">Add a caption below (optional)</p>
+              </div>
+            )}
+
+            {/* Input bar */}
+            <div className="p-4 border-t border-gray-800 flex gap-2 flex-shrink-0 bg-gray-900">
+
+              {/* Hidden file input */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleImageSelect}
+              />
+
+              {/* Image button */}
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="p-3 bg-gray-800 hover:bg-gray-700 rounded-xl transition flex-shrink-0"
+                title="Attach image"
+              >
+                <ImageIcon className="w-5 h-5 text-gray-400" />
+              </button>
+
+              {/* Text input */}
+              <input
+                value={text}
+                onChange={e => setText(e.target.value)}
                 onKeyDown={e => e.key === "Enter" && !e.shiftKey && (e.preventDefault(), sendMessage())}
-                placeholder="Type a reply..."
-                className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white text-sm placeholder-gray-500 focus:outline-none focus:border-teal-500 transition" />
-              <button onClick={sendMessage} disabled={sending || !text.trim()}
-                className="p-3 bg-teal-600 hover:bg-teal-500 disabled:opacity-40 rounded-xl transition">
+                placeholder={imageFile ? "Add a caption (optional)..." : "Type a reply..."}
+                className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white text-sm placeholder-gray-500 focus:outline-none focus:border-teal-500 transition"
+              />
+
+              {/* Send button */}
+              <button
+                onClick={sendMessage}
+                disabled={sending || (!text.trim() && !imageFile)}
+                className="p-3 bg-teal-600 hover:bg-teal-500 disabled:opacity-40 rounded-xl transition flex-shrink-0"
+              >
                 {sending ? <Loader className="w-5 h-5 text-white animate-spin" /> : <Send className="w-5 h-5 text-white" />}
               </button>
             </div>
@@ -310,7 +414,6 @@ function BookingsTab() {
       const res = await fetchWithAuth(`${API_URL}/api/orders/bookings/`);
       const data = await res.json();
       const list = Array.isArray(data) ? data : (data.results || []);
-      // Only show bookings made TO this vendor — not bookings they made as a buyer
       const vendorOnly = list.filter((b: any) => b.vendor_username === user?.username);
       setBookings(vendorOnly);
     } catch {} finally { setLoading(false); }
@@ -567,8 +670,6 @@ function ListingsTab() {
     showToast("Deleted."); loadListings();
   };
 
-
-
   if (loading) return <LoadingSpinner />;
 
   return (
@@ -617,7 +718,6 @@ function ListingsTab() {
               <span className="text-sm text-gray-400">{form.image ? form.image.name : "Upload image (optional)"}</span>
               <input type="file" accept="image/*" className="hidden" onChange={e => setForm(f => ({ ...f, image: e.target.files?.[0] || null }))} />
             </label>
-            {/* Listing type */}
             <select value={form.listing_type} onChange={e => setForm(f => ({ ...f, listing_type: e.target.value }))}
               className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-teal-500 transition">
               <option value="service">Service (e.g. nails, lashes)</option>
@@ -625,7 +725,6 @@ function ListingsTab() {
               <option value="product">Physical Product (stock tracked)</option>
             </select>
 
-            {/* Inventory tracking — only for food/product */}
             {(form.listing_type === 'food' || form.listing_type === 'product') && (
               <div className="flex items-center gap-4 bg-gray-800 rounded-xl px-4 py-3">
                 <div className="flex-1">
@@ -669,8 +768,8 @@ function ListingsTab() {
                 )}
                 <div className="flex items-center justify-between">
                   <span className={`flex items-center gap-2 text-xs font-bold px-3 py-1.5 rounded-lg ${
-                      listing.is_available ? "bg-green-900/30 text-green-400" : "bg-yellow-900/30 text-yellow-400"
-                    }`}>
+                    listing.is_available ? "bg-green-900/30 text-green-400" : "bg-yellow-900/30 text-yellow-400"
+                  }`}>
                     {listing.is_available ? <ToggleRight className="w-4 h-4" /> : <ToggleLeft className="w-4 h-4" />}
                     {listing.is_available ? "Active" : "Pending Approval"}
                   </span>
@@ -751,24 +850,7 @@ function OrdersTab() {
   );
 }
 
-/* ─── SHARED COMPONENTS ──────────────────────────────────────── */
-function StatusBadge({ status, small }: { status: string; small?: boolean }) {
-  const map: Record<string, string> = {
-    pending: "bg-amber-900/40 text-amber-400",
-    confirmed: "bg-teal-900/40 text-teal-400",
-    completed: "bg-green-900/40 text-green-400",
-    cancelled: "bg-red-900/40 text-red-400",
-    held: "bg-amber-900/40 text-amber-400",
-    released: "bg-green-900/40 text-green-400",
-  };
-  return (
-    <span className={`${map[status] || "bg-gray-800 text-gray-400"} ${small ? "text-xs px-2 py-0.5" : "text-xs px-3 py-1"} rounded-full font-bold capitalize`}>
-      {status}
-    </span>
-  );
-}
-
-
+/* ─── REVIEWS TAB ────────────────────────────────────────────── */
 function ReviewsTab() {
   const { user } = useAuth();
   const [reviews, setReviews] = useState<any[]>([]);
@@ -792,7 +874,6 @@ function ReviewsTab() {
 
   return (
     <div className="p-4 space-y-4 pb-24">
-      {/* Summary */}
       {reviews.length > 0 && (
         <div className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 border border-amber-200 dark:border-amber-800 rounded-2xl p-4 flex items-center gap-4">
           <div className="text-center">
@@ -838,6 +919,23 @@ function ReviewsTab() {
         </div>
       )}
     </div>
+  );
+}
+
+/* ─── SHARED COMPONENTS ──────────────────────────────────────── */
+function StatusBadge({ status, small }: { status: string; small?: boolean }) {
+  const map: Record<string, string> = {
+    pending: "bg-amber-900/40 text-amber-400",
+    confirmed: "bg-teal-900/40 text-teal-400",
+    completed: "bg-green-900/40 text-green-400",
+    cancelled: "bg-red-900/40 text-red-400",
+    held: "bg-amber-900/40 text-amber-400",
+    released: "bg-green-900/40 text-green-400",
+  };
+  return (
+    <span className={`${map[status] || "bg-gray-800 text-gray-400"} ${small ? "text-xs px-2 py-0.5" : "text-xs px-3 py-1"} rounded-full font-bold capitalize`}>
+      {status}
+    </span>
   );
 }
 
