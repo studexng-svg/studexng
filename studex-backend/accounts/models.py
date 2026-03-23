@@ -1,8 +1,9 @@
+# accounts/models.py
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
-from studex.validators import validate_image, validate_document
+from studex.validators import validate_image
 
 
 class User(AbstractUser):
@@ -77,12 +78,11 @@ class Profile(models.Model):
     loyalty_credits = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     completed_order_count = models.IntegerField(default=0)
 
-    # ✅ NEW: PROFILE COMPLETION DISCOUNT
+    # PROFILE COMPLETION DISCOUNT
     profile_bonus_eligible = models.BooleanField(
         default=False,
         help_text="User gets 5% off first order after completing profile"
     )
-
     profile_bonus_used = models.BooleanField(
         default=False,
         help_text="Whether the 5% discount has been used"
@@ -115,19 +115,48 @@ class SellerApplication(models.Model):
     )
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='seller_application')
-    id_document = models.FileField(upload_to='seller_verification/id/', validators=[validate_image])
-    admission_letter = models.FileField(upload_to='seller_verification/admission/', validators=[validate_document])
+
+    # ✅ UPDATED: Front and back of ID card only (removed admission_letter)
+    id_front = models.ImageField(
+        upload_to='seller_verification/id_front/',
+        validators=[validate_image],
+        help_text="Front of student ID card"
+    )
+    id_back = models.ImageField(
+        upload_to='seller_verification/id_back/',
+        validators=[validate_image],
+        help_text="Back of student ID card"
+    )
+
     business_age_confirmed = models.BooleanField(default=False)
 
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
 
     submitted_at = models.DateTimeField(auto_now_add=True)
     reviewed_at = models.DateTimeField(null=True, blank=True)
-    reviewed_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL)
+    reviewed_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='reviewed_applications'
+    )
     notes = models.TextField(blank=True, null=True)
 
     def __str__(self):
         return f"{self.user.username} - {self.get_status_display()}"
+
+    def id_front_url(self):
+        """Return full URL for id_front image"""
+        if self.id_front:
+            return self.id_front.url
+        return None
+
+    def id_back_url(self):
+        """Return full URL for id_back image"""
+        if self.id_back:
+            return self.id_back.url
+        return None
 
 
 # SIGNALS

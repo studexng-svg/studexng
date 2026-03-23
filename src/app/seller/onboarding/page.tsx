@@ -1,7 +1,6 @@
-// src/app/seller/onboarding/page.tsx
 "use client";
 
-import { Store, ChevronLeft, CheckCircle, FileText, X, Shield, ArrowRight } from "lucide-react";
+import { Store, ChevronLeft, CheckCircle, X, Shield, ArrowRight, CreditCard, FlipHorizontal } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -12,8 +11,12 @@ import { useAuth, getToken } from "@/lib/authStore";
 export default function SellerOnboarding() {
   const [step, setStep] = useState(1);
   const [files, setFiles] = useState({
-    id: null as File | null,
-    admission: null as File | null,
+    idFront: null as File | null,
+    idBack: null as File | null,
+  });
+  const [previews, setPreviews] = useState({
+    idFront: null as string | null,
+    idBack: null as string | null,
   });
   const [businessAge, setBusinessAge] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -22,21 +25,31 @@ export default function SellerOnboarding() {
   const router = useRouter();
   const { user, isLoggedIn } = useAuth();
 
-  const handleFile = (type: "id" | "admission", file: File | null) => {
-    setFiles(prev => ({ ...prev, [type]: file }));
+  const handleFile = (type: "idFront" | "idBack", file: File | null) => {
+    setFiles((prev) => ({ ...prev, [type]: file }));
+
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPreviews((prev) => ({ ...prev, [type]: reader.result as string }));
+      };
+      reader.readAsDataURL(file);
+    } else {
+      setPreviews((prev) => ({ ...prev, [type]: null }));
+    }
   };
 
-  const removeFile = (type: "id" | "admission") => {
-    setFiles(prev => ({ ...prev, [type]: null }));
+  const removeFile = (type: "idFront" | "idBack") => {
+    setFiles((prev) => ({ ...prev, [type]: null }));
+    setPreviews((prev) => ({ ...prev, [type]: null }));
   };
 
   const handleSubmit = async () => {
-    if (!files.id || !files.admission || !businessAge) {
-      setError("Please complete all fields");
+    if (!files.idFront || !files.idBack || !businessAge) {
+      setError("Please upload both sides of your ID card and check the declaration");
       return;
     }
 
-    // Check Django JWT login
     if (!isLoggedIn) {
       setError("Please log in first");
       router.push("/auth");
@@ -47,43 +60,66 @@ export default function SellerOnboarding() {
     setError("");
 
     const formData = new FormData();
-    formData.append("id_document", files.id!);
-    formData.append("admission_letter", files.admission!);
+    formData.append("id_front", files.idFront!);
+    formData.append("id_back", files.idBack!);
     formData.append("business_age_confirmed", "true");
 
     try {
       const token = getToken();
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/api/auth/seller/applications/`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        body: formData,
-      });
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/api/auth/seller/applications/`,
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+          body: formData,
+        }
+      );
 
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(data.detail || data.error || "Submission failed");
+        throw new Error(
+          data.detail ||
+            (Object.values(data)[0] as string[])?.[0] ||
+            "Submission failed"
+        );
       }
 
       setSuccess(true);
-      setTimeout(() => {
-        router.push("/account");
-      }, 3000);
+      setTimeout(() => router.push("/account"), 3000);
     } catch (err: any) {
       setError(err.message || "Failed to submit. Please try again.");
       setLoading(false);
     }
   };
 
-  const isStep2Complete = files.id && files.admission && businessAge;
+  const isStep2Complete = files.idFront && files.idBack && businessAge;
 
   const fadeInUp = {
     initial: { opacity: 0, y: 20 },
     animate: { opacity: 1, y: 0 },
     transition: { duration: 0.5 },
   };
+
+  const idFields: {
+    key: "idFront" | "idBack";
+    label: string;
+    hint: string;
+    Icon: React.ElementType;
+  }[] = [
+    {
+      key: "idFront",
+      label: "ID Card — Front",
+      hint: "Shows your name, photo & matric number",
+      Icon: CreditCard,
+    },
+    {
+      key: "idBack",
+      label: "ID Card — Back",
+      hint: "Shows expiry date, barcode or institution seal",
+      Icon: FlipHorizontal,
+    },
+  ];
 
   return (
     <>
@@ -120,13 +156,18 @@ export default function SellerOnboarding() {
 
       <div className="p-6 pb-32">
         {/* PROGRESS STEPS */}
-        <motion.div {...fadeInUp} className="flex justify-center items-center mb-10 gap-4">
+        <motion.div
+          {...fadeInUp}
+          className="flex justify-center items-center mb-10 gap-4"
+        >
           {[1, 2, 3].map((i) => (
             <div key={i} className="flex items-center">
               <motion.div
                 animate={{ scale: i <= step ? 1 : 0.9 }}
                 className={`w-14 h-14 rounded-full flex items-center justify-center font-bold text-lg shadow-lg ${
-                  i <= step ? "bg-gradient-to-r from-teal-500 to-emerald-500 text-white" : "bg-gray-100 text-gray-400"
+                  i <= step
+                    ? "bg-gradient-to-r from-teal-500 to-emerald-500 text-white"
+                    : "bg-gray-100 text-gray-400"
                 }`}
               >
                 {i < step ? <CheckCircle className="w-7 h-7" /> : i}
@@ -134,7 +175,11 @@ export default function SellerOnboarding() {
               {i < 3 && (
                 <motion.div
                   animate={{ scaleX: i < step ? 1 : 0 }}
-                  className={`w-20 h-1.5 origin-left ${i < step ? "bg-gradient-to-r from-teal-500 to-emerald-500" : "bg-gray-200"}`}
+                  className={`w-20 h-1.5 origin-left ${
+                    i < step
+                      ? "bg-gradient-to-r from-teal-500 to-emerald-500"
+                      : "bg-gray-200"
+                  }`}
                 />
               )}
             </div>
@@ -155,7 +200,8 @@ export default function SellerOnboarding() {
               Sell on StudEx
             </h2>
             <p className="text-sm text-gray-600 max-w-xs mx-auto leading-relaxed">
-              Join thousands of campus sellers. Earn real money. Get verified in 24–48 hours.
+              Join thousands of campus sellers. Earn real money. Get verified in
+              24–48 hours.
             </p>
             <motion.button
               whileHover={{ scale: 1.02 }}
@@ -172,85 +218,83 @@ export default function SellerOnboarding() {
         {/* STEP 2: DOCUMENTS */}
         {step === 2 && (
           <motion.div {...fadeInUp} className="space-y-8">
-            <h2 className="text-xl font-black text-gray-800">Verify Your Identity</h2>
+            <div>
+              <h2 className="text-xl font-black text-gray-800">
+                Verify Your Identity
+              </h2>
+              <p className="text-sm text-gray-500 mt-1">
+                Upload both sides of your student ID card
+              </p>
+            </div>
 
             {error && (
-              <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-red-600 text-center font-medium">
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="text-red-600 text-center font-medium text-sm"
+              >
                 {error}
               </motion.p>
             )}
 
-            <div className="space-y-6">
-              {/* STUDENT ID */}
-              <motion.div whileHover={{ y: -2 }}>
-                <label className="block">
-                  <div className={`border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all ${
-                    files.id ? "border-emerald-500 bg-emerald-50" : "border-purple-300 hover:border-purple-500"
-                  }`}>
-                    <FileText className="w-10 h-10 mx-auto mb-3 text-purple-600" />
-                    <p className="text-sm font-bold text-gray-800">Student ID</p>
-                    <p className="text-xs text-gray-500 mt-1">JPG, PNG, or PDF</p>
-                    <input
-                      type="file"
-                      className="hidden"
-                      accept=".pdf,.jpg,.jpeg,.png"
-                      onChange={(e) => handleFile("id", e.target.files?.[0] || null)}
-                    />
-                  </div>
-                  {files.id && (
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      className="mt-3 p-3 bg-emerald-100 rounded-xl flex items-center justify-between shadow-sm"
-                    >
-                      <p className="text-xs font-bold text-emerald-800 flex items-center gap-2">
-                        <CheckCircle className="w-4 h-4" />
-                        {files.id.name}
-                      </p>
-                      <button onClick={() => removeFile("id")} className="p-1.5 hover:bg-red-200 rounded-full transition">
-                        <X className="w-4 h-4 text-red-600" />
-                      </button>
-                    </motion.div>
-                  )}
-                </label>
-              </motion.div>
-
-              {/* ADMISSION LETTER */}
-              <motion.div whileHover={{ y: -2 }}>
-                <label className="block">
-                  <div className={`border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all ${
-                    files.admission ? "border-emerald-500 bg-emerald-50" : "border-purple-300 hover:border-purple-500"
-                  }`}>
-                    <FileText className="w-10 h-10 mx-auto mb-3 text-purple-600" />
-                    <p className="text-sm font-bold text-gray-800">Admission Letter</p>
-                    <p className="text-xs text-gray-500 mt-1">Proof of enrollment</p>
-                    <input
-                      type="file"
-                      className="hidden"
-                      accept=".pdf,.jpg,.jpeg,.png"
-                      onChange={(e) => handleFile("admission", e.target.files?.[0] || null)}
-                    />
-                  </div>
-                  {files.admission && (
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      className="mt-3 p-3 bg-emerald-100 rounded-xl flex items-center justify-between shadow-sm"
-                    >
-                      <p className="text-xs font-bold text-emerald-800 flex items-center gap-2">
-                        <CheckCircle className="w-4 h-4" />
-                        {files.admission.name}
-                      </p>
-                      <button onClick={() => removeFile("admission")} className="p-1.5 hover:bg-red-200 rounded-full transition">
-                        <X className="w-4 h-4 text-red-600" />
-                      </button>
-                    </motion.div>
-                  )}
-                </label>
-              </motion.div>
+            <div className="space-y-5">
+              {idFields.map(({ key, label, hint, Icon }) => (
+                <motion.div key={key} whileHover={{ y: -2 }}>
+                  <label className="block">
+                    {/* Upload area or image preview */}
+                    {previews[key] ? (
+                      <div className="relative rounded-2xl overflow-hidden border-2 border-emerald-500">
+                        <img
+                          src={previews[key]!}
+                          alt={label}
+                          className="w-full h-44 object-cover"
+                        />
+                        {/* overlay with label */}
+                        <div className="absolute bottom-0 left-0 right-0 bg-black/50 backdrop-blur-sm px-4 py-2 flex items-center justify-between">
+                          <p className="text-white text-sm font-bold flex items-center gap-2">
+                            <CheckCircle className="w-4 h-4 text-emerald-400" />
+                            {label}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => removeFile(key)}
+                            className="p-1.5 bg-red-500/80 hover:bg-red-600 rounded-full transition"
+                          >
+                            <X className="w-4 h-4 text-white" />
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all border-purple-300 hover:border-purple-500 hover:bg-purple-50">
+                        <div className="w-14 h-14 mx-auto mb-3 bg-gradient-to-br from-purple-100 to-teal-100 rounded-2xl flex items-center justify-center">
+                          <Icon className="w-8 h-8 text-purple-600" />
+                        </div>
+                        <p className="text-sm font-bold text-gray-800">
+                          {label}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">{hint}</p>
+                        <p className="text-xs text-purple-500 mt-2 font-medium">
+                          Tap to upload · JPG, PNG or PDF
+                        </p>
+                        <input
+                          type="file"
+                          className="hidden"
+                          accept=".pdf,.jpg,.jpeg,.png"
+                          onChange={(e) =>
+                            handleFile(key, e.target.files?.[0] || null)
+                          }
+                        />
+                      </div>
+                    )}
+                  </label>
+                </motion.div>
+              ))}
 
               {/* HONESTY CHECKBOX */}
-              <motion.div whileHover={{ scale: 1.01 }} className="bg-gradient-to-r from-purple-50 to-teal-50 rounded-2xl p-5 border-2 border-purple-200">
+              <motion.div
+                whileHover={{ scale: 1.01 }}
+                className="bg-gradient-to-r from-purple-50 to-teal-50 rounded-2xl p-5 border-2 border-purple-200"
+              >
                 <label className="flex items-start gap-4 cursor-pointer">
                   <input
                     type="checkbox"
@@ -264,7 +308,8 @@ export default function SellerOnboarding() {
                       Business Age Declaration
                     </p>
                     <p className="text-xs text-gray-600 mt-1 leading-relaxed">
-                      I confirm that I have been selling on campus for <strong>6 months or more</strong>.
+                      I confirm that I have been selling on campus for{" "}
+                      <strong>6 months or more</strong>.
                     </p>
                   </div>
                 </label>
@@ -278,7 +323,9 @@ export default function SellerOnboarding() {
               disabled={!isStep2Complete}
               className="w-full py-5 rounded-2xl font-black text-white shadow-2xl flex items-center justify-center gap-3 transition-all disabled:opacity-50"
               style={{
-                background: isStep2Complete ? "linear-gradient(to right, #14B8A6, #10B981)" : "#9CA3AF"
+                background: isStep2Complete
+                  ? "linear-gradient(to right, #14B8A6, #10B981)"
+                  : "#9CA3AF",
               }}
             >
               Continue to Review
@@ -297,17 +344,46 @@ export default function SellerOnboarding() {
             >
               <CheckCircle className="w-16 h-16 text-emerald-600" />
             </motion.div>
+
             <h2 className="text-2xl font-black bg-gradient-to-r from-purple-600 to-teal-500 bg-clip-text text-transparent">
               {success ? "Application Submitted!" : "Ready to Submit?"}
             </h2>
+
+            {/* Preview thumbnails at review step */}
+            {!success && (
+              <div className="grid grid-cols-2 gap-3 text-left">
+                {idFields.map(({ key, label }) =>
+                  previews[key] ? (
+                    <div
+                      key={key}
+                      className="rounded-2xl overflow-hidden border border-gray-200"
+                    >
+                      <img
+                        src={previews[key]!}
+                        alt={label}
+                        className="w-full h-28 object-cover"
+                      />
+                      <p className="text-xs font-bold text-gray-600 p-2 bg-gray-50">
+                        {label}
+                      </p>
+                    </div>
+                  ) : null
+                )}
+              </div>
+            )}
+
             <p className="text-sm text-gray-600 max-w-xs mx-auto leading-relaxed">
               {success
-                ? "We'll review your documents and notify you via app within 48 hours."
-                : "Double-check your files and declaration before submitting."}
+                ? "We'll review your ID and notify you within 48 hours."
+                : "Double-check your ID photos before submitting."}
             </p>
 
             {error && (
-              <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-red-600 text-center font-medium">
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="text-red-600 text-center font-medium text-sm"
+              >
                 {error}
               </motion.p>
             )}
@@ -321,15 +397,25 @@ export default function SellerOnboarding() {
                 Redirecting to Account...
               </motion.p>
             ) : (
-              <motion.button
-                whileHover={{ scale: !loading ? 1.02 : 1 }}
-                whileTap={{ scale: !loading ? 0.98 : 1 }}
-                onClick={handleSubmit}
-                disabled={loading}
-                className="w-full py-5 rounded-2xl font-black text-white bg-gradient-to-r from-teal-500 to-emerald-500 shadow-2xl disabled:opacity-50 transition-all"
-              >
-                {loading ? "Submitting Application..." : "Submit Application"}
-              </motion.button>
+              <div className="space-y-3">
+                <motion.button
+                  whileHover={{ scale: !loading ? 1.02 : 1 }}
+                  whileTap={{ scale: !loading ? 0.98 : 1 }}
+                  onClick={handleSubmit}
+                  disabled={loading}
+                  className="w-full py-5 rounded-2xl font-black text-white bg-gradient-to-r from-teal-500 to-emerald-500 shadow-2xl disabled:opacity-50 transition-all"
+                >
+                  {loading ? "Submitting Application..." : "Submit Application"}
+                </motion.button>
+
+                {/* Go back and re-upload */}
+                <button
+                  onClick={() => setStep(2)}
+                  className="w-full py-3 rounded-2xl font-bold text-gray-500 hover:text-gray-700 transition text-sm"
+                >
+                  ← Re-upload ID photos
+                </button>
+              </div>
             )}
           </motion.div>
         )}

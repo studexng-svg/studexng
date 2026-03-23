@@ -124,7 +124,7 @@ export default function AddService() {
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.detail || Object.values(data)[0]?.[0] || "Failed to publish service");
+        throw new Error(data.detail || (Object.values(data)[0] as string[])?.[0] || "Failed to publish service");
       }
 
       router.push("/seller");

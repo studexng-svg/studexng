@@ -76,11 +76,9 @@ class UserAdmin(BaseUserAdmin):
 
     ordering = ['-created_at']
 
-    # Custom actions for easy vendor management
     actions = ['approve_vendors', 'unverify_vendors', 'export_to_csv']
 
     def approve_vendors(self, request, queryset):
-        # Only approve actual vendors
         updated = queryset.filter(user_type='vendor').update(is_verified_vendor=True)
         self.message_user(request, f"{updated} vendor(s) have been approved and can now sell on StudEx.")
     approve_vendors.short_description = "Approve selected vendors (set verified = True)"
@@ -91,7 +89,6 @@ class UserAdmin(BaseUserAdmin):
     unverify_vendors.short_description = "Unverify selected vendors"
 
     def export_to_csv(self, request, queryset):
-        """Export selected users to CSV"""
         response = HttpResponse(content_type='text/csv')
         response['Content-Disposition'] = 'attachment; filename="users.csv"'
 
@@ -104,14 +101,9 @@ class UserAdmin(BaseUserAdmin):
 
         for user in queryset:
             writer.writerow([
-                user.id,
-                user.username,
-                user.email,
-                user.user_type,
-                user.business_name or 'N/A',
-                user.phone or 'N/A',
-                user.matric_number or 'N/A',
-                user.hostel or 'N/A',
+                user.id, user.username, user.email, user.user_type,
+                user.business_name or 'N/A', user.phone or 'N/A',
+                user.matric_number or 'N/A', user.hostel or 'N/A',
                 float(user.wallet_balance),
                 'Yes' if user.is_verified_vendor else 'No',
                 'Yes' if user.is_active else 'No',
@@ -123,7 +115,6 @@ class UserAdmin(BaseUserAdmin):
     export_to_csv.short_description = "Export selected to CSV"
 
 
-# Optional: Separate Profile list view
 @admin.register(Profile)
 class ProfileAdmin(admin.ModelAdmin):
     list_display = ['user', 'total_orders', 'total_sales', 'rating', 'total_reviews', 'notifications_enabled']
@@ -133,51 +124,56 @@ class ProfileAdmin(admin.ModelAdmin):
     ordering = ['-total_orders']
 
 
-# NEW: Seller Application Admin
 @admin.register(SellerApplication)
 class SellerApplicationAdmin(admin.ModelAdmin):
     list_display = ['user', 'status', 'submitted_at', 'business_age_confirmed']
     list_filter = ['status', 'submitted_at', 'business_age_confirmed']
-    search_fields = ['user__username', 'user__email', 'user__business_name']
-    readonly_fields = ['user', 'id_document', 'admission_letter', 'submitted_at', 'id']
-    
+    search_fields = ['user__username', 'user__email']
+
+    # ✅ UPDATED: id_front and id_back instead of id_document and admission_letter
+    readonly_fields = ['id', 'user', 'id_front', 'id_back', 'submitted_at']
+
     fieldsets = (
         ('Application Info', {
             'fields': ('id', 'user', 'status', 'submitted_at')
         }),
-        ('Documents', {
-            'fields': ('id_document', 'admission_letter')
+        ('ID Card Documents', {
+            'fields': ('id_front', 'id_back')  # ✅ updated
         }),
         ('Verification', {
             'fields': ('business_age_confirmed',)
         }),
-        ('Notes', {
+        ('Admin Notes', {
             'fields': ('notes',)
         }),
     )
 
-    # Custom actions to approve/reject applications
     actions = ['approve_applications', 'reject_applications']
 
     def approve_applications(self, request, queryset):
-        """Approve selected applications and mark user as verified vendor"""
+        approved_count = 0
         for app in queryset.filter(status='pending'):
             app.status = 'approved'
+            app.reviewed_at = timezone.now()
+            app.reviewed_by = request.user
             app.save()
-            # Also set the user as a verified vendor
             app.user.is_verified_vendor = True
+            app.user.user_type = 'vendor'
             app.user.save()
-        
-        count = queryset.filter(status='pending').count()
-        self.message_user(request, f"{count} application(s) approved! Users are now verified vendors.")
+            approved_count += 1
+        self.message_user(request, f"{approved_count} application(s) approved! Users are now verified vendors.")
     approve_applications.short_description = "Approve selected applications"
 
     def reject_applications(self, request, queryset):
-        """Reject selected applications"""
-        updated = queryset.filter(status='pending').update(status='rejected')
-        self.message_user(request, f"{updated} application(s) rejected.")
+        rejected_count = 0
+        for app in queryset.filter(status='pending'):
+            app.status = 'rejected'
+            app.reviewed_at = timezone.now()
+            app.reviewed_by = request.user
+            app.save()
+            rejected_count += 1
+        self.message_user(request, f"{rejected_count} application(s) rejected.")
     reject_applications.short_description = "Reject selected applications"
 
     def has_add_permission(self, request):
-        """Don't allow adding applications from admin"""
         return False

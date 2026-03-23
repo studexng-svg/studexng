@@ -1,8 +1,8 @@
 # accounts/views.py
 from rest_framework import status, viewsets
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, action
 from rest_framework.response import Response
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
@@ -12,6 +12,7 @@ from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.encoding import force_bytes
 from django.core.mail import send_mail
 from django.conf import settings
+from django.utils import timezone
 from .serializers import (
     UserRegistrationSerializer,
     UserLoginSerializer,
@@ -68,12 +69,9 @@ def get_user_profile(request):
 @api_view(['PUT', 'PATCH'])
 @permission_classes([IsAuthenticated])
 def update_user_profile(request):
-    serializer = UserProfileSerializer(
-        request.user, data=request.data, partial=True
-    )
+    serializer = UserProfileSerializer(request.user, data=request.data, partial=True)
     if serializer.is_valid():
         serializer.save()
-        # Re-serialize to return fresh nested profile data
         return Response({
             'message': 'Profile updated successfully',
             'user': UserProfileSerializer(request.user).data,
@@ -85,17 +83,14 @@ def update_user_profile(request):
 @permission_classes([IsAuthenticated])
 def check_profile_completion(request):
     user = request.user
-
-    # Ensure Profile exists (safety net)
     profile, _ = Profile.objects.get_or_create(user=user)
 
-    # Fields and where they live
     completion_map = {
-        'username':  user.username,
-        'email':     user.email,
-        'phone':     user.phone,       # on User
-        'bio':       user.bio,         # on User
-        'whatsapp':  profile.whatsapp, # on Profile
+        'username': user.username,
+        'email': user.email,
+        'phone': user.phone,
+        'bio': user.bio,
+        'whatsapp': profile.whatsapp,
     }
 
     missing = [field for field, val in completion_map.items() if not val]
@@ -129,10 +124,7 @@ def logout_user(request):
             token.blacklist()
         return Response({'message': 'Logged out successfully'}, status=status.HTTP_200_OK)
     except Exception as e:
-        return Response(
-            {'error': f'Logout failed: {str(e)}'},
-            status=status.HTTP_400_BAD_REQUEST
-        )
+        return Response({'error': f'Logout failed: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(['GET'])
@@ -182,11 +174,18 @@ def me(request):
 
 
 class SellerApplicationViewSet(viewsets.ModelViewSet):
-    queryset = SellerApplication.objects.all()
+    """
+    Vendor-facing: submit and view own application.
+    Admin-facing: list all, approve, reject.
+    """
+    queryset = SellerApplication.objects.select_related('user').all()
     serializer_class = SellerApplicationSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
+        # Admins see all applications, regular users see only their own
+        if self.request.user.is_staff:
+            return self.queryset.order_by('-submitted_at')
         return self.queryset.filter(user=self.request.user)
 
     def create(self, request, *args, **kwargs):
@@ -194,7 +193,7 @@ class SellerApplicationViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
         return Response({
-            'message': "Application submitted successfully! We'll review it within 48 hours.",
+            'message': "Application submitted! We'll review your ID within 48 hours.",
             'status': 'pending',
         }, status=status.HTTP_201_CREATED)
 
@@ -205,6 +204,62 @@ class SellerApplicationViewSet(viewsets.ModelViewSet):
             notify_admin_new_application(application)
         except Exception:
             pass
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAdminUser])
+    def approve(self, request, pk=None):
+        """
+        POST /api/auth/seller/applications/{id}/approve/
+        Admin approves a seller application.
+        """
+        application = self.get_object()
+
+        if application.status == 'approved':
+            return Response({'error': 'Application already approved'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Update application
+        application.status = 'approved'
+        application.reviewed_at = timezone.now()
+        application.reviewed_by = request.user
+        application.notes = request.data.get('notes', '')
+        application.save()
+
+        # Make the user a verified vendor
+        user = application.user
+        user.is_verified_vendor = True
+        user.user_type = 'vendor'
+        user.save()
+
+        return Response({
+            'message': f'{user.username} has been approved as a seller.',
+            'status': 'approved',
+        }, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAdminUser])
+    def reject(self, request, pk=None):
+        """
+        POST /api/auth/seller/applications/{id}/reject/
+        Admin rejects a seller application.
+        """
+        application = self.get_object()
+
+        if application.status == 'rejected':
+            return Response({'error': 'Application already rejected'}, status=status.HTTP_400_BAD_REQUEST)
+
+        application.status = 'rejected'
+        application.reviewed_at = timezone.now()
+        application.reviewed_by = request.user
+        application.notes = request.data.get('notes', 'Application rejected.')
+        application.save()
+
+        # Ensure vendor status is revoked
+        user = application.user
+        user.is_verified_vendor = False
+        user.save()
+
+        return Response({
+            'message': f"{user.username}'s application has been rejected.",
+            'status': 'rejected',
+        }, status=status.HTTP_200_OK)
 
 
 class ForgotPasswordView(APIView):

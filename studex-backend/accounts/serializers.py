@@ -1,63 +1,47 @@
 # accounts/serializers.py
 from rest_framework import serializers
 from django.contrib.auth import get_user_model, authenticate
-from .models import Profile, SellerApplication  # ← Added SellerApplication
+from .models import Profile, SellerApplication
 
 User = get_user_model()
+
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=8)
     password2 = serializers.CharField(write_only=True, min_length=8)
-    
+
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'phone', 'password', 'password2', 
+        fields = ['id', 'username', 'email', 'phone', 'password', 'password2',
                   'user_type', 'matric_number', 'hostel']
         extra_kwargs = {
             'email': {'required': True},
             'username': {'required': True},
         }
-    
+
     def validate(self, data):
-        """Validate passwords match"""
         if data['password'] != data['password2']:
             raise serializers.ValidationError("Passwords do not match")
         return data
-    
+
     def validate_email(self, value):
-        """Validate email is unique and must end with @pau.edu.ng"""
-        # Check uniqueness
         if User.objects.filter(email=value).exists():
             raise serializers.ValidationError("Email already exists")
-
-        # CRITICAL: Enforce @pau.edu.ng domain
         if not value.lower().endswith('@pau.edu.ng'):
             raise serializers.ValidationError("Only @pau.edu.ng email addresses are allowed")
-
         return value
 
     def validate_phone(self, value):
-        """Validate phone number is numeric and exactly 11 digits"""
-        import re
-
         if not value:
             raise serializers.ValidationError("Phone number is required")
-
-        # Remove any whitespace
         phone_cleaned = value.replace(' ', '').replace('-', '')
-
-        # Check if numeric
         if not phone_cleaned.isdigit():
             raise serializers.ValidationError("Phone number must be numeric")
-
-        # Check if exactly 11 digits
         if len(phone_cleaned) != 11:
             raise serializers.ValidationError("Phone number must be exactly 11 digits")
-
         return phone_cleaned
 
     def validate_password(self, value):
-        """Validate password strength."""
         if len(value) < 8:
             raise serializers.ValidationError("Password must be at least 8 characters.")
         if not any(c.isalpha() for c in value):
@@ -67,37 +51,18 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         return value
 
     def validate_matric_number(self, value):
-        """Validate matriculation number is unique and properly formatted"""
-        import re
-
-        # If matric number is provided, validate it
         if value:
-            # Check uniqueness
             if User.objects.filter(matric_number=value).exists():
                 raise serializers.ValidationError("This matriculation number is already registered")
-
-            # Optional: Add format validation (customize pattern for your university)
-            # Example pattern: PAU/2023/12345 or 2023/12345
-            # pattern = r'^[A-Z]{2,4}/\d{4}/\d{4,6}$|^\d{4}/\d{4,6}$'
-            # if not re.match(pattern, value.upper()):
-            #     raise serializers.ValidationError(
-            #         "Invalid matriculation number format. Expected format: PAU/2023/12345 or 2023/12345"
-            #     )
-
         return value
-    
+
     def create(self, validated_data):
-        """Create user with hashed password"""
         validated_data.pop('password2')
         password = validated_data.pop('password')
-        
         user = User.objects.create(**validated_data)
         user.set_password(password)
         user.save()
-        
-        # Create profile automatically (signals also handle this as backup)
         Profile.objects.get_or_create(user=user)
-        
         return user
 
 
@@ -114,30 +79,21 @@ class UserLoginSerializer(serializers.Serializer):
         except User.DoesNotExist:
             raise serializers.ValidationError("Invalid email or password.")
 
-        user = authenticate(
-            username=user.username,   # 🔥 FIX
-            password=password
-        )
+        user = authenticate(username=user.username, password=password)
 
         if not user:
             raise serializers.ValidationError("Invalid email or password.")
-
         if not user.is_active:
             raise serializers.ValidationError("User account is disabled.")
 
         data['user'] = user
         return data
 
+
 class UserProfileSerializer(serializers.ModelSerializer):
     profile = serializers.SerializerMethodField()
-
-    # Write-only fields that map to the Profile model
-    whatsapp = serializers.CharField(
-        write_only=True, required=False, allow_blank=True, allow_null=True
-    )
-    instagram = serializers.CharField(
-        write_only=True, required=False, allow_blank=True, allow_null=True
-    )
+    whatsapp = serializers.CharField(write_only=True, required=False, allow_blank=True, allow_null=True)
+    instagram = serializers.CharField(write_only=True, required=False, allow_blank=True, allow_null=True)
 
     class Meta:
         model = User
@@ -146,13 +102,9 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'matric_number', 'hostel', 'business_name', 'is_verified_vendor',
             'bio', 'profile_image', 'wallet_balance', 'created_at', 'profile',
             'is_staff', 'is_superuser',
-            # write-only profile fields
             'whatsapp', 'instagram',
         ]
-        read_only_fields = [
-            'wallet_balance', 'is_verified_vendor', 'created_at',
-            'is_staff', 'is_superuser'
-        ]
+        read_only_fields = ['wallet_balance', 'is_verified_vendor', 'created_at', 'is_staff', 'is_superuser']
 
     def get_profile(self, obj):
         try:
@@ -172,16 +124,13 @@ class UserProfileSerializer(serializers.ModelSerializer):
             return None
 
     def update(self, instance, validated_data):
-        # Pop Profile-specific fields before updating User
         whatsapp = validated_data.pop('whatsapp', None)
         instagram = validated_data.pop('instagram', None)
 
-        # Update User fields
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
 
-        # Update Profile fields
         try:
             profile = instance.profile
             if whatsapp is not None:
@@ -190,11 +139,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
                 profile.instagram = instagram
             profile.save()
         except Profile.DoesNotExist:
-            Profile.objects.create(
-                user=instance,
-                whatsapp=whatsapp or '',
-                instagram=instagram or '',
-            )
+            Profile.objects.create(user=instance, whatsapp=whatsapp or '', instagram=instagram or '')
 
         return instance
 
@@ -233,38 +178,65 @@ class UserSerializer(serializers.ModelSerializer):
             return None
 
 
-# FIXED: Seller Application Serializer — for real document upload
 class SellerApplicationSerializer(serializers.ModelSerializer):
-    id_document = serializers.FileField(required=True)
-    admission_letter = serializers.FileField(required=True)
+    # ✅ UPDATED: id_front and id_back only
+    id_front = serializers.ImageField(required=True)
+    id_back = serializers.ImageField(required=True)
+
+    # ✅ Read-only URL fields so admin frontend can display the images
+    id_front_url = serializers.SerializerMethodField()
+    id_back_url = serializers.SerializerMethodField()
+
+    # ✅ Applicant info for admin panel display
+    applicant_name = serializers.SerializerMethodField()
+    applicant_email = serializers.SerializerMethodField()
+    applicant_matric = serializers.SerializerMethodField()
 
     class Meta:
         model = SellerApplication
         fields = [
             'id',
-            'id_document',
-            'admission_letter',
+            'id_front',
+            'id_back',
+            'id_front_url',
+            'id_back_url',
             'business_age_confirmed',
             'status',
             'submitted_at',
-            'notes'
+            'notes',
+            'applicant_name',
+            'applicant_email',
+            'applicant_matric',
         ]
         read_only_fields = ['status', 'submitted_at', 'notes']
 
+    def get_id_front_url(self, obj):
+        request = self.context.get('request')
+        if obj.id_front and request:
+            return request.build_absolute_uri(obj.id_front.url)
+        return None
+
+    def get_id_back_url(self, obj):
+        request = self.context.get('request')
+        if obj.id_back and request:
+            return request.build_absolute_uri(obj.id_back.url)
+        return None
+
+    def get_applicant_name(self, obj):
+        return obj.user.get_full_name() or obj.user.username
+
+    def get_applicant_email(self, obj):
+        return obj.user.email
+
+    def get_applicant_matric(self, obj):
+        return obj.user.matric_number or ''
+
     def create(self, validated_data):
         user = self.context['request'].user
-        
         # Delete any previous application (one per user)
         SellerApplication.objects.filter(user=user).delete()
-        
-        # Don't pass user here - it's handled by perform_create in the view
-        application = SellerApplication.objects.create(
-            **validated_data
-        )
+        application = SellerApplication.objects.create(**validated_data)
         return application
 
     def validate(self, data):
-        # FIXED: Remove the vendor type check
-        # Anyone (buyer or vendor user_type) can submit a seller application
-        # The application process will determine if they get approved
         return data
