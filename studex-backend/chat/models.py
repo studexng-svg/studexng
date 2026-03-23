@@ -32,12 +32,33 @@ class Message(models.Model):
     message_type = models.CharField(max_length=20, choices=MESSAGE_TYPES, default='text')
     content = models.TextField(blank=True, default='')
     image = models.ImageField(upload_to='chat_images/', null=True, blank=True)
-    image_url = models.URLField(blank=True, default='')  # For Cloudinary URL
+    image_url = models.URLField(blank=True, default='')
     offer_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     offer_status = models.CharField(max_length=20, default='pending', blank=True)
     is_read = models.BooleanField(default=False)
     read_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    # ✅ Edit & Pin
+    is_edited = models.BooleanField(default=False)
+    edited_at = models.DateTimeField(null=True, blank=True)
+    is_pinned = models.BooleanField(default=False)
+    pinned_at = models.DateTimeField(null=True, blank=True)
+    pinned_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='pinned_messages'
+    )
+
+    # ✅ "Delete for me" tracking
+    # Stores which users have deleted this message for themselves.
+    # When ALL participants have deleted for themselves → row is hard-deleted.
+    deleted_for = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        blank=True,
+        related_name='messages_deleted_for_me',
+    )
 
     class Meta:
         ordering = ['created_at']
@@ -46,7 +67,6 @@ class Message(models.Model):
         return f"Message from {self.sender.username} in conversation {self.conversation.id}"
 
     def get_image_url(self):
-        """Returns Cloudinary URL if available, otherwise Django media URL"""
         if self.image_url:
             return self.image_url
         if self.image:
