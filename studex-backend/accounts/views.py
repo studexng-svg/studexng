@@ -20,6 +20,8 @@ from .serializers import (
     SellerApplicationSerializer,
 )
 from .models import User, SellerApplication, Profile
+# Replace the local send_notification function in views.py with this:
+from .utils import send_notification
 
 
 def send_notification(recipient, notification_type, title, message, action_url=None):

@@ -5,19 +5,15 @@ from django.utils import timezone
 from django.http import HttpResponse
 import csv
 from .models import User, Profile, SellerApplication
+from .utils import send_notification
 
 
-# Inline for Profile — shows Profile fields inside the User edit page
 class ProfileInline(admin.StackedInline):
     model = Profile
     can_delete = False
     extra = 0
     verbose_name_plural = "Profile"
-    fields = (
-        'whatsapp', 'instagram',
-        'total_orders', 'total_sales', 'rating', 'total_reviews',
-        'notifications_enabled', 'email_notifications',
-    )
+    fields = ('whatsapp', 'instagram', 'total_orders', 'total_sales', 'rating', 'total_reviews', 'notifications_enabled', 'email_notifications')
     readonly_fields = ('total_orders', 'total_sales', 'rating', 'total_reviews')
 
 
@@ -30,87 +26,72 @@ class UserAdmin(BaseUserAdmin):
             return []
         return [ProfileInline]
 
-    list_display = [
-        'username', 'email', 'user_type', 'business_name', 'hostel',
-        'wallet_balance', 'is_verified_vendor', 'is_staff', 'is_active', 'created_at'
-    ]
-    list_filter = [
-        'user_type', 'is_verified_vendor', 'is_staff', 'is_active', 'hostel'
-    ]
+    list_display = ['username', 'email', 'user_type', 'business_name', 'hostel', 'wallet_balance', 'is_verified_vendor', 'is_staff', 'is_active', 'created_at']
+    list_filter = ['user_type', 'is_verified_vendor', 'is_staff', 'is_active', 'hostel']
     search_fields = ['username', 'email', 'phone', 'business_name', 'matric_number']
     readonly_fields = ['wallet_balance', 'created_at', 'updated_at']
 
     fieldsets = (
-        (None, {
-            'fields': ('username', 'password')
-        }),
-        ('Personal Info', {
-            'fields': ('first_name', 'last_name', 'email', 'phone', 'bio', 'profile_image')
-        }),
-        ('StudEx Role', {
-            'fields': ('user_type',)
-        }),
-        ('Student Info', {
-            'fields': ('matric_number', 'hostel')
-        }),
-        ('Vendor Info', {
-            'fields': ('business_name', 'is_verified_vendor')
-        }),
-        ('Wallet', {
-            'fields': ('wallet_balance',)
-        }),
-        ('Permissions', {
-            'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions')
-        }),
-        ('Important Dates', {
-            'fields': ('last_login', 'date_joined', 'created_at', 'updated_at')
-        }),
+        (None, {'fields': ('username', 'password')}),
+        ('Personal Info', {'fields': ('first_name', 'last_name', 'email', 'phone', 'bio', 'profile_image')}),
+        ('StudEx Role', {'fields': ('user_type',)}),
+        ('Student Info', {'fields': ('matric_number', 'hostel')}),
+        ('Vendor Info', {'fields': ('business_name', 'is_verified_vendor')}),
+        ('Wallet', {'fields': ('wallet_balance',)}),
+        ('Permissions', {'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions')}),
+        ('Important Dates', {'fields': ('last_login', 'date_joined', 'created_at', 'updated_at')}),
     )
 
     add_fieldsets = (
-        (None, {
-            'classes': ('wide',),
-            'fields': ('username', 'email', 'password1', 'password2', 'user_type'),
-        }),
+        (None, {'classes': ('wide',), 'fields': ('username', 'email', 'password1', 'password2', 'user_type')}),
     )
 
     ordering = ['-created_at']
-
     actions = ['approve_vendors', 'unverify_vendors', 'export_to_csv']
 
     def approve_vendors(self, request, queryset):
-        updated = queryset.filter(user_type='vendor').update(is_verified_vendor=True)
-        self.message_user(request, f"{updated} vendor(s) have been approved and can now sell on StudEx.")
+        approved_count = 0
+        for user in queryset:
+            if not user.is_verified_vendor:
+                user.is_verified_vendor = True
+                user.user_type = 'vendor'
+                user.save()
+                send_notification(
+                    recipient=user,
+                    notification_type='seller_approved',
+                    title='🎉 Application Accepted!',
+                    message='Your seller application has been approved. You are now a verified vendor on StudEx. Start listing your services!',
+                    action_url='/seller',
+                )
+                approved_count += 1
+        self.message_user(request, f"{approved_count} vendor(s) approved and notified.")
     approve_vendors.short_description = "Approve selected vendors (set verified = True)"
 
     def unverify_vendors(self, request, queryset):
-        updated = queryset.filter(user_type='vendor').update(is_verified_vendor=False)
-        self.message_user(request, f"{updated} vendor(s) have been unverified.")
+        unverified_count = 0
+        for user in queryset.filter(is_verified_vendor=True):
+            user.is_verified_vendor = False
+            user.user_type = 'student'
+            user.save()
+            SellerApplication.objects.filter(user=user).delete()
+            send_notification(
+                recipient=user,
+                notification_type='seller_revoked',
+                title='⚠️ Vendor Status Removed',
+                message='You have been unverified. Please re-apply if you would like to be a vendor again.',
+                action_url='/seller/onboarding',
+            )
+            unverified_count += 1
+        self.message_user(request, f"{unverified_count} vendor(s) unverified and notified.")
     unverify_vendors.short_description = "Unverify selected vendors"
 
     def export_to_csv(self, request, queryset):
         response = HttpResponse(content_type='text/csv')
         response['Content-Disposition'] = 'attachment; filename="users.csv"'
-
         writer = csv.writer(response)
-        writer.writerow([
-            'ID', 'Username', 'Email', 'User Type', 'Business Name',
-            'Phone', 'Matric Number', 'Hostel', 'Wallet Balance',
-            'Is Verified Vendor', 'Is Active', 'Is Staff', 'Created At'
-        ])
-
+        writer.writerow(['ID', 'Username', 'Email', 'User Type', 'Business Name', 'Phone', 'Matric Number', 'Hostel', 'Wallet Balance', 'Is Verified Vendor', 'Is Active', 'Is Staff', 'Created At'])
         for user in queryset:
-            writer.writerow([
-                user.id, user.username, user.email, user.user_type,
-                user.business_name or 'N/A', user.phone or 'N/A',
-                user.matric_number or 'N/A', user.hostel or 'N/A',
-                float(user.wallet_balance),
-                'Yes' if user.is_verified_vendor else 'No',
-                'Yes' if user.is_active else 'No',
-                'Yes' if user.is_staff else 'No',
-                user.created_at.strftime('%Y-%m-%d %H:%M:%S')
-            ])
-
+            writer.writerow([user.id, user.username, user.email, user.user_type, user.business_name or 'N/A', user.phone or 'N/A', user.matric_number or 'N/A', user.hostel or 'N/A', float(user.wallet_balance), 'Yes' if user.is_verified_vendor else 'No', 'Yes' if user.is_active else 'No', 'Yes' if user.is_staff else 'No', user.created_at.strftime('%Y-%m-%d %H:%M:%S')])
         return response
     export_to_csv.short_description = "Export selected to CSV"
 
@@ -129,23 +110,13 @@ class SellerApplicationAdmin(admin.ModelAdmin):
     list_display = ['user', 'status', 'submitted_at', 'business_age_confirmed']
     list_filter = ['status', 'submitted_at', 'business_age_confirmed']
     search_fields = ['user__username', 'user__email']
-
-    # ✅ UPDATED: id_front and id_back instead of id_document and admission_letter
     readonly_fields = ['id', 'user', 'id_front', 'id_back', 'submitted_at']
 
     fieldsets = (
-        ('Application Info', {
-            'fields': ('id', 'user', 'status', 'submitted_at')
-        }),
-        ('ID Card Documents', {
-            'fields': ('id_front', 'id_back')  # ✅ updated
-        }),
-        ('Verification', {
-            'fields': ('business_age_confirmed',)
-        }),
-        ('Admin Notes', {
-            'fields': ('notes',)
-        }),
+        ('Application Info', {'fields': ('id', 'user', 'status', 'submitted_at')}),
+        ('ID Card Documents', {'fields': ('id_front', 'id_back')}),
+        ('Verification', {'fields': ('business_age_confirmed',)}),
+        ('Admin Notes', {'fields': ('notes',)}),
     )
 
     actions = ['approve_applications', 'reject_applications']
@@ -160,19 +131,34 @@ class SellerApplicationAdmin(admin.ModelAdmin):
             app.user.is_verified_vendor = True
             app.user.user_type = 'vendor'
             app.user.save()
+            send_notification(
+                recipient=app.user,
+                notification_type='seller_approved',
+                title='🎉 Application Accepted!',
+                message='Your seller application has been approved. You are now a verified vendor on StudEx. Start listing your services!',
+                action_url='/seller',
+            )
             approved_count += 1
-        self.message_user(request, f"{approved_count} application(s) approved! Users are now verified vendors.")
+        self.message_user(request, f"{approved_count} application(s) approved and vendors notified.")
     approve_applications.short_description = "Approve selected applications"
 
     def reject_applications(self, request, queryset):
         rejected_count = 0
         for app in queryset.filter(status='pending'):
-            app.status = 'rejected'
-            app.reviewed_at = timezone.now()
-            app.reviewed_by = request.user
-            app.save()
+            user = app.user
+            user.is_verified_vendor = False
+            user.user_type = 'student'
+            user.save()
+            send_notification(
+                recipient=user,
+                notification_type='seller_rejected',
+                title='❌ Application Rejected',
+                message='Your seller application was rejected. Please upload your ID card details correctly and try again.',
+                action_url='/seller/onboarding',
+            )
+            app.delete()
             rejected_count += 1
-        self.message_user(request, f"{rejected_count} application(s) rejected.")
+        self.message_user(request, f"{rejected_count} application(s) rejected and applicants notified.")
     reject_applications.short_description = "Reject selected applications"
 
     def has_add_permission(self, request):
