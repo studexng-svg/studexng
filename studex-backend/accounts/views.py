@@ -22,6 +22,20 @@ from .serializers import (
 from .models import User, SellerApplication, Profile
 
 
+def send_notification(recipient, notification_type, title, message, action_url=None):
+    try:
+        from notifications.models import Notification
+        Notification.objects.create(
+            recipient=recipient,
+            notification_type=notification_type,
+            title=title,
+            message=message,
+            action_url=action_url or '',
+        )
+    except Exception:
+        pass
+
+
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def register_user(request):
@@ -32,10 +46,7 @@ def register_user(request):
         return Response({
             'message': 'User registered successfully',
             'user': UserProfileSerializer(user).data,
-            'tokens': {
-                'refresh': str(refresh),
-                'access': str(refresh.access_token),
-            }
+            'tokens': {'refresh': str(refresh), 'access': str(refresh.access_token),}
         }, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -46,24 +57,19 @@ def login_user(request):
     serializer = UserLoginSerializer(data=request.data)
     if not serializer.is_valid():
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
     user = serializer.validated_data['user']
     refresh = RefreshToken.for_user(user)
     return Response({
         'message': 'Login successful',
         'user': UserProfileSerializer(user).data,
-        'tokens': {
-            'refresh': str(refresh),
-            'access': str(refresh.access_token),
-        }
+        'tokens': {'refresh': str(refresh), 'access': str(refresh.access_token),}
     }, status=status.HTTP_200_OK)
 
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_user_profile(request):
-    serializer = UserProfileSerializer(request.user)
-    return Response(serializer.data)
+    return Response(UserProfileSerializer(request.user).data)
 
 
 @api_view(['PUT', 'PATCH'])
@@ -72,10 +78,7 @@ def update_user_profile(request):
     serializer = UserProfileSerializer(request.user, data=request.data, partial=True)
     if serializer.is_valid():
         serializer.save()
-        return Response({
-            'message': 'Profile updated successfully',
-            'user': UserProfileSerializer(request.user).data,
-        }, status=status.HTTP_200_OK)
+        return Response({'message': 'Profile updated successfully', 'user': UserProfileSerializer(request.user).data}, status=status.HTTP_200_OK)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -84,34 +87,14 @@ def update_user_profile(request):
 def check_profile_completion(request):
     user = request.user
     profile, _ = Profile.objects.get_or_create(user=user)
-
-    completion_map = {
-        'username': user.username,
-        'email': user.email,
-        'phone': user.phone,
-        'bio': user.bio,
-        'whatsapp': profile.whatsapp,
-    }
-
+    completion_map = {'username': user.username, 'email': user.email, 'phone': user.phone, 'bio': user.bio, 'whatsapp': profile.whatsapp}
     missing = [field for field, val in completion_map.items() if not val]
     is_complete = len(missing) == 0
-
     if is_complete and not profile.profile_bonus_eligible:
         profile.profile_bonus_eligible = True
         profile.save(update_fields=['profile_bonus_eligible'])
-        return Response({
-            'message': 'Profile complete! You earned 5% off your first order 🎉',
-            'bonus': True,
-            'missing': [],
-            'is_complete': True,
-        })
-
-    return Response({
-        'message': 'Profile not complete yet' if not is_complete else 'Profile already complete',
-        'bonus': False,
-        'missing': missing,
-        'is_complete': is_complete,
-    })
+        return Response({'message': 'Profile complete! You earned 5% off your first order 🎉', 'bonus': True, 'missing': [], 'is_complete': True})
+    return Response({'message': 'Profile not complete yet' if not is_complete else 'Profile already complete', 'bonus': False, 'missing': missing, 'is_complete': is_complete})
 
 
 @api_view(['POST'])
@@ -130,60 +113,28 @@ def logout_user(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def me(request):
-    """Returns fresh user data — called on account page load."""
     user = request.user
-
     unread_notifications = 0
     try:
         from notifications.models import Notification
-        unread_notifications = Notification.objects.filter(
-            recipient=user, is_read=False
-        ).count()
+        unread_notifications = Notification.objects.filter(recipient=user, is_read=False).count()
     except Exception:
         pass
-
     profile_data = {}
     try:
         p = user.profile
-        profile_data = {
-            'whatsapp': p.whatsapp or '',
-            'instagram': p.instagram or '',
-            'profile_bonus_eligible': p.profile_bonus_eligible,
-            'profile_bonus_used': p.profile_bonus_used,
-            'vendor_badge': p.vendor_badge,
-            'rating': str(p.rating),
-            'total_reviews': p.total_reviews,
-        }
+        profile_data = {'whatsapp': p.whatsapp or '', 'instagram': p.instagram or '', 'profile_bonus_eligible': p.profile_bonus_eligible, 'profile_bonus_used': p.profile_bonus_used, 'vendor_badge': p.vendor_badge, 'rating': str(p.rating), 'total_reviews': p.total_reviews}
     except Profile.DoesNotExist:
         pass
-
-    return Response({
-        'id': user.id,
-        'username': user.username,
-        'email': user.email,
-        'phone': user.phone or '',
-        'bio': user.bio or '',
-        'user_type': user.user_type,
-        'is_verified_vendor': user.is_verified_vendor,
-        'business_name': user.business_name or '',
-        'hostel': user.hostel or '',
-        'matric_number': user.matric_number or '',
-        'unread_notifications': unread_notifications,
-        **profile_data,
-    })
+    return Response({'id': user.id, 'username': user.username, 'email': user.email, 'phone': user.phone or '', 'bio': user.bio or '', 'user_type': user.user_type, 'is_verified_vendor': user.is_verified_vendor, 'business_name': user.business_name or '', 'hostel': user.hostel or '', 'matric_number': user.matric_number or '', 'unread_notifications': unread_notifications, **profile_data})
 
 
 class SellerApplicationViewSet(viewsets.ModelViewSet):
-    """
-    Vendor-facing: submit and view own application.
-    Admin-facing: list all, approve, reject.
-    """
     queryset = SellerApplication.objects.select_related('user').all()
     serializer_class = SellerApplicationSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        # Admins see all applications, regular users see only their own
         if self.request.user.is_staff:
             return self.queryset.order_by('-submitted_at')
         return self.queryset.filter(user=self.request.user)
@@ -192,10 +143,7 @@ class SellerApplicationViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
-        return Response({
-            'message': "Application submitted! We'll review your ID within 48 hours.",
-            'status': 'pending',
-        }, status=status.HTTP_201_CREATED)
+        return Response({'message': "Application submitted! We'll review your ID within 48 hours.", 'status': 'pending'}, status=status.HTTP_201_CREATED)
 
     def perform_create(self, serializer):
         application = serializer.save(user=self.request.user)
@@ -207,59 +155,66 @@ class SellerApplicationViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'], permission_classes=[IsAdminUser])
     def approve(self, request, pk=None):
-        """
-        POST /api/auth/seller/applications/{id}/approve/
-        Admin approves a seller application.
-        """
         application = self.get_object()
-
         if application.status == 'approved':
             return Response({'error': 'Application already approved'}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Update application
         application.status = 'approved'
         application.reviewed_at = timezone.now()
         application.reviewed_by = request.user
         application.notes = request.data.get('notes', '')
         application.save()
-
-        # Make the user a verified vendor
         user = application.user
         user.is_verified_vendor = True
         user.user_type = 'vendor'
         user.save()
-
-        return Response({
-            'message': f'{user.username} has been approved as a seller.',
-            'status': 'approved',
-        }, status=status.HTTP_200_OK)
+        send_notification(
+            recipient=user,
+            notification_type='seller_approved',
+            title='🎉 Application Accepted!',
+            message='Your seller application has been approved. You are now a verified vendor on StudEx. Start listing your services!',
+            action_url='/seller',
+        )
+        return Response({'message': f'{user.username} has been approved as a seller.', 'status': 'approved'}, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=['post'], permission_classes=[IsAdminUser])
     def reject(self, request, pk=None):
-        """
-        POST /api/auth/seller/applications/{id}/reject/
-        Admin rejects a seller application.
-        """
         application = self.get_object()
-
         if application.status == 'rejected':
             return Response({'error': 'Application already rejected'}, status=status.HTTP_400_BAD_REQUEST)
-
-        application.status = 'rejected'
-        application.reviewed_at = timezone.now()
-        application.reviewed_by = request.user
-        application.notes = request.data.get('notes', 'Application rejected.')
-        application.save()
-
-        # Ensure vendor status is revoked
         user = application.user
         user.is_verified_vendor = False
+        user.user_type = 'student'
         user.save()
+        send_notification(
+            recipient=user,
+            notification_type='seller_rejected',
+            title='❌ Application Rejected',
+            message='Your seller application was rejected. Please upload your ID card details correctly and try again.',
+            action_url='/seller/onboarding',
+        )
+        application.delete()
+        return Response({'message': f"{user.username}'s application has been rejected.", 'status': 'rejected'}, status=status.HTTP_200_OK)
 
-        return Response({
-            'message': f"{user.username}'s application has been rejected.",
-            'status': 'rejected',
-        }, status=status.HTTP_200_OK)
+    @action(detail=False, methods=['post'], permission_classes=[IsAdminUser], url_path='revoke/(?P<user_id>[^/.]+)')
+    def revoke(self, request, user_id=None):
+        try:
+            user = User.objects.get(pk=user_id)
+        except User.DoesNotExist:
+            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+        if not user.is_verified_vendor:
+            return Response({'error': 'User is not a verified vendor'}, status=status.HTTP_400_BAD_REQUEST)
+        user.is_verified_vendor = False
+        user.user_type = 'student'
+        user.save()
+        SellerApplication.objects.filter(user=user).delete()
+        send_notification(
+            recipient=user,
+            notification_type='seller_revoked',
+            title='⚠️ Vendor Status Removed',
+            message='Your vendor status has been removed by admin. Your account has been reset to a student account. If you wish to become a vendor again, please reapply.',
+            action_url='/seller/onboarding',
+        )
+        return Response({'message': f"{user.username}'s vendor status has been revoked. They are now a student.", 'user_type': 'student'}, status=status.HTTP_200_OK)
 
 
 class ForgotPasswordView(APIView):
@@ -273,26 +228,11 @@ class ForgotPasswordView(APIView):
             user = User.objects.get(email=email)
         except User.DoesNotExist:
             return Response({'detail': 'If this email exists, a reset link has been sent.'})
-
         uid = urlsafe_base64_encode(force_bytes(user.pk))
         token = default_token_generator.make_token(user)
         reset_url = f"{settings.FRONTEND_BASE_URL}/reset-password?uid={uid}&token={token}"
-
-        send_mail(
-            subject='StudEx — Reset Your Password',
-            message=(
-                f'Hi {user.username},\n\n'
-                f'Click the link below to reset your password:\n\n{reset_url}\n\n'
-                f'This link expires in 24 hours.'
-            ),
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[email],
-            fail_silently=False,
-        )
-        return Response({
-            'detail': 'Reset link generated successfully.',
-            'reset_url': reset_url,
-        })
+        send_mail(subject='StudEx — Reset Your Password', message=(f'Hi {user.username},\n\nClick the link below to reset your password:\n\n{reset_url}\n\nThis link expires in 24 hours.'), from_email=settings.DEFAULT_FROM_EMAIL, recipient_list=[email], fail_silently=False)
+        return Response({'detail': 'Reset link generated successfully.', 'reset_url': reset_url})
 
 
 class ResetPasswordView(APIView):
@@ -302,19 +242,15 @@ class ResetPasswordView(APIView):
         uid = request.data.get('uid')
         token = request.data.get('token')
         password = request.data.get('password')
-
         if not uid or not token or not password:
             return Response({'detail': 'Missing fields'}, status=400)
-
         try:
             user_id = urlsafe_base64_decode(uid).decode()
             user = User.objects.get(pk=user_id)
         except Exception:
             return Response({'detail': 'Invalid link'}, status=400)
-
         if not default_token_generator.check_token(user, token):
             return Response({'detail': 'Token expired or invalid'}, status=400)
-
         user.set_password(password)
         user.save()
         return Response({'detail': 'Password reset successful'})

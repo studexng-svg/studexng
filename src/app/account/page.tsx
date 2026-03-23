@@ -1,23 +1,20 @@
 "use client";
 
-import { Package, Heart, Settings, HelpCircle, LogOut, ChevronRight, Store, Clock, ArrowRight, Loader, Banknote, LayoutDashboard, Calendar, Gift, Bell, X, CheckCheck } from "lucide-react";
+import { Package, Heart, Settings, HelpCircle, LogOut, ChevronRight, Store, Clock, ArrowRight, Loader, Banknote, LayoutDashboard, Calendar, Gift, Bell, X, CheckCheck, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { motion } from "framer-motion";
 import Image from "next/image";
 import ThemeToggle from "@/components/ThemeToggle";
 import { useAuth, fetchWithAuth } from "@/lib/authStore";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+const POLL_INTERVAL = 15000; // poll every 15 seconds
 
-// A user is a vendor if admin has verified them (is_verified_vendor=true)
-// OR if they have user_type="vendor" AND is_verified_vendor=true.
-// is_verified_vendor is the single source of truth set by admin.
 const isApprovedVendor = (u: { user_type?: string; is_verified_vendor?: boolean } | null) =>
   !!u?.is_verified_vendor;
 
-// Pending = user applied (user_type=vendor) but admin hasn't verified yet
 const isPendingVendor = (u: { user_type?: string; is_verified_vendor?: boolean } | null) =>
   u?.user_type === "vendor" && !u?.is_verified_vendor;
 
@@ -34,29 +31,64 @@ export default function AccountPage() {
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [showNotifications, setShowNotifications] = useState(false);
 
+  // Track previous vendor status to detect changes
+  const prevVendorStatus = useRef<boolean | null>(null);
+  const pollTimer = useRef<NodeJS.Timeout | null>(null);
+
   useEffect(() => {
     if (isHydrated && !isLoggedIn) router.push("/auth");
   }, [isHydrated, isLoggedIn, router]);
+
+  // ── Poll user status + notifications every 15s ──────────────────────────
+  const pollStatus = async () => {
+    try {
+      const meRes = await fetchWithAuth(`${API_URL}/api/auth/me/`);
+      if (!meRes.ok) return;
+      const freshUser = await meRes.json();
+      useAuth.getState().updateUser(freshUser);
+
+      const wasVendor = prevVendorStatus.current;
+      const isNowVendor = !!freshUser.is_verified_vendor;
+
+      // ✅ Just got approved — redirect to vendor page immediately
+      if (wasVendor === false && isNowVendor) {
+        router.push("/seller");
+        return;
+      }
+
+      // ✅ Just got revoked — stay on account page, it will re-render as student
+      prevVendorStatus.current = isNowVendor;
+    } catch {}
+
+    // Also refresh notifications
+    try {
+      const notifRes = await fetchWithAuth(`${API_URL}/api/notifications/`);
+      if (notifRes.ok) {
+        const notifData = await notifRes.json();
+        setNotifications(notifData.notifications || []);
+        setUnreadNotifications(notifData.unread_count || 0);
+      }
+    } catch {}
+  };
 
   useEffect(() => {
     if (!isHydrated || !isLoggedIn) return;
 
     const fetchData = async () => {
       try {
-        // Always fetch fresh user data — catches admin approve/revoke instantly
+        // Fetch fresh user on mount
         try {
           const meRes = await fetchWithAuth(`${API_URL}/api/auth/me/`);
           if (meRes.ok) {
             const freshUser = await meRes.json();
             useAuth.getState().updateUser(freshUser);
+            prevVendorStatus.current = !!freshUser.is_verified_vendor;
           }
         } catch {}
 
-        // Get the freshest user from store (just updated above)
         const freshUser = useAuth.getState().user;
         const isVendor = isApprovedVendor(freshUser);
 
-        // Bank account (only relevant for vendors)
         if (isVendor) {
           try {
             const bankRes = await fetchWithAuth(`${API_URL}/api/payments/seller/bank-account/`);
@@ -67,14 +99,12 @@ export default function AccountPage() {
           } catch {}
         }
 
-        // Badge counts
         try {
           const bkRes = await fetchWithAuth(`${API_URL}/api/orders/bookings/`);
           if (bkRes.ok) {
             const bkData = await bkRes.json();
             const bkList = Array.isArray(bkData) ? bkData : (bkData.results || []);
             if (isVendor) {
-              // Only count bookings made TO this vendor (not bookings they made as a buyer)
               const vendorBookings = bkList.filter((b: any) => b.vendor_username === freshUser?.username);
               setPendingBookings(vendorBookings.filter((b: any) => b.status === "pending").length);
             } else {
@@ -101,7 +131,6 @@ export default function AccountPage() {
           }
         } catch {}
 
-        // Fetch notifications
         try {
           const notifRes = await fetchWithAuth(`${API_URL}/api/notifications/`);
           if (notifRes.ok) {
@@ -119,9 +148,17 @@ export default function AccountPage() {
     };
 
     fetchData();
+
+    // ✅ Start polling every 15 seconds
+    pollTimer.current = setInterval(pollStatus, POLL_INTERVAL);
+
+    return () => {
+      if (pollTimer.current) clearInterval(pollTimer.current);
+    };
   }, [isHydrated, isLoggedIn]);
 
   const handleLogout = () => {
+    if (pollTimer.current) clearInterval(pollTimer.current);
     logout();
     router.push("/auth");
   };
@@ -132,6 +169,36 @@ export default function AccountPage() {
       setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
       setUnreadNotifications(0);
     } catch {}
+  };
+
+  // ✅ Mark single notification as read and navigate to action_url
+  const handleNotificationClick = async (n: any) => {
+    if (!n.is_read) {
+      try {
+        await fetchWithAuth(`${API_URL}/api/notifications/${n.id}/read/`, { method: 'POST' });
+        setNotifications(prev => prev.map(notif => notif.id === n.id ? { ...notif, is_read: true } : notif));
+        setUnreadNotifications(prev => Math.max(0, prev - 1));
+      } catch {}
+    }
+    if (n.action_url) {
+      setShowNotifications(false);
+      router.push(n.action_url);
+    }
+  };
+
+  // ✅ Notification icon based on type
+  const getNotifIcon = (type: string) => {
+    switch (type) {
+      case 'seller_approved': return '🎉';
+      case 'seller_rejected': return '❌';
+      case 'seller_revoked': return '⚠️';
+      case 'new_booking_request': return '📅';
+      case 'booking_confirmed': return '✅';
+      case 'booking_cancelled': return '🚫';
+      case 'payment_received': return '💰';
+      case 'order_completed': return '📦';
+      default: return '🔔';
+    }
   };
 
   const fadeInUp = { initial: { opacity: 0, y: 20 }, whileInView: { opacity: 1, y: 0 }, viewport: { once: true }, transition: { duration: 0.5 } };
@@ -148,7 +215,6 @@ export default function AccountPage() {
     );
   }
 
-  // Derive vendor status from freshest store value
   const currentUser = useAuth.getState().user ?? user;
   const vendorApproved = isApprovedVendor(currentUser);
   const vendorPending = isPendingVendor(currentUser);
@@ -174,9 +240,13 @@ export default function AccountPage() {
                 )}
               </button>
 
-              {/* Notifications Dropdown */}
+              {/* ✅ Notifications Dropdown — now with click-to-navigate */}
               {showNotifications && (
-                <div className="absolute right-0 top-12 w-80 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-700 z-50 overflow-hidden">
+                <motion.div
+                  initial={{ opacity: 0, y: -8, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  className="absolute right-0 top-12 w-80 bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-700 z-50 overflow-hidden"
+                >
                   <div className="flex items-center justify-between p-4 border-b border-gray-100 dark:border-gray-700">
                     <h3 className="font-bold text-gray-900 dark:text-white">Notifications</h3>
                     <div className="flex items-center gap-2">
@@ -197,22 +267,51 @@ export default function AccountPage() {
                       </div>
                     ) : (
                       notifications.map((n: any) => (
-                        <div key={n.id} className={`p-4 border-b border-gray-50 dark:border-gray-700 last:border-0 ${!n.is_read ? 'bg-purple-50 dark:bg-purple-900/20' : ''}`}>
+                        <motion.div
+                          key={n.id}
+                          whileHover={{ backgroundColor: 'rgba(139, 92, 246, 0.05)' }}
+                          onClick={() => handleNotificationClick(n)}
+                          className={`p-4 border-b border-gray-50 dark:border-gray-700 last:border-0 cursor-pointer transition-colors ${
+                            !n.is_read ? 'bg-purple-50 dark:bg-purple-900/20' : ''
+                          }`}
+                        >
                           <div className="flex items-start gap-3">
-                            <div className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${!n.is_read ? 'bg-purple-500' : 'bg-gray-300 dark:bg-gray-600'}`} />
+                            {/* Emoji icon based on type */}
+                            <span className="text-lg flex-shrink-0 mt-0.5">
+                              {getNotifIcon(n.type)}
+                            </span>
                             <div className="flex-1 min-w-0">
-                              <p className="font-semibold text-sm text-gray-900 dark:text-white">{n.title}</p>
-                              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2">{n.message}</p>
-                              <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                                {new Date(n.created_at).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                              <div className="flex items-center justify-between gap-2">
+                                <p className="font-semibold text-sm text-gray-900 dark:text-white truncate">
+                                  {n.title}
+                                </p>
+                                {!n.is_read && (
+                                  <span className="w-2 h-2 bg-purple-500 rounded-full flex-shrink-0" />
+                                )}
+                              </div>
+                              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2">
+                                {n.message}
                               </p>
+                              <div className="flex items-center justify-between mt-1">
+                                <p className="text-xs text-gray-400 dark:text-gray-500">
+                                  {new Date(n.created_at).toLocaleDateString('en-NG', {
+                                    day: 'numeric', month: 'short',
+                                    hour: '2-digit', minute: '2-digit'
+                                  })}
+                                </p>
+                                {n.action_url && (
+                                  <span className="text-xs text-purple-500 flex items-center gap-0.5">
+                                    View <ExternalLink className="w-3 h-3" />
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </div>
-                        </div>
+                        </motion.div>
                       ))
                     )}
                   </div>
-                </div>
+                </motion.div>
               )}
             </div>
             <ThemeToggle />
@@ -250,7 +349,7 @@ export default function AccountPage() {
           </div>
         </motion.div>
 
-        {/* ─── VENDOR HUB BUTTON (approved vendors only) ─── */}
+        {/* Vendor Hub (approved vendors only) */}
         {vendorApproved && (
           <motion.div {...fadeInUp}>
             <Link href="/vendor/dashboard">
@@ -310,7 +409,7 @@ export default function AccountPage() {
         {/* Pending Approval Banner */}
         {vendorPending && (
           <motion.div {...fadeInUp} className="bg-gradient-to-br from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 border border-yellow-300 dark:border-yellow-800 rounded-2xl p-5 flex items-center gap-4">
-            <Clock className="w-8 h-8 text-yellow-600 dark:text-yellow-400 flex-shrink-0" />
+            <Clock className="w-8 h-8 text-yellow-600 dark:text-yellow-400 flex-shrink-0 animate-pulse" />
             <div className="flex-1">
               <p className="font-bold text-yellow-800 dark:text-yellow-300">Vendor Application Pending</p>
               <p className="text-sm text-yellow-700 dark:text-yellow-400 mt-1">We're reviewing your application. You'll be notified once approved!</p>
@@ -351,7 +450,7 @@ export default function AccountPage() {
           ))}
         </motion.div>
 
-        {/* Become a Vendor CTA — only for non-vendors (not pending, not approved) */}
+        {/* Become a Vendor CTA */}
         {!vendorApproved && !vendorPending && (
           <motion.div {...fadeInUp} className="bg-gradient-to-br from-purple-600 via-purple-500 to-teal-500 rounded-2xl p-5 text-white shadow-xl relative overflow-hidden">
             <div className="absolute inset-0 bg-black/10" />

@@ -11,16 +11,20 @@ class Notification(models.Model):
         # Vendor notifications
         ('vendor_approved', 'Vendor Account Approved'),
         ('vendor_revoked', 'Vendor Account Deactivated'),
-        ('new_booking_request', 'New Booking Request'),       # vendor gets this
-        ('booking_paid', 'Booking Paid'),                     # vendor gets this
-        ('order_confirmed', 'Order Confirmed by Buyer'),      # vendor gets this
-        ('booking_reminder_5min', 'Booking Starting in 5 Minutes'),  # ← NEW
-        ('booking_time_now',      'Booking Time Now'),
+        ('new_booking_request', 'New Booking Request'),
+        ('booking_paid', 'Booking Paid'),
+        ('order_confirmed', 'Order Confirmed by Buyer'),
+        ('booking_reminder_5min', 'Booking Starting in 5 Minutes'),
+        ('booking_time_now', 'Booking Time Now'),
         # Buyer notifications
-        ('booking_confirmed', 'Booking Confirmed by Vendor'), # buyer gets this
-        ('booking_cancelled', 'Booking Cancelled'),           # buyer gets this
-        ('payment_received', 'Payment Received'),             # buyer gets this
-        ('order_completed', 'Order Completed'),               # buyer gets this
+        ('booking_confirmed', 'Booking Confirmed by Vendor'),
+        ('booking_cancelled', 'Booking Cancelled'),
+        ('payment_received', 'Payment Received'),
+        ('order_completed', 'Order Completed'),
+        # ✅ NEW: Seller application notifications
+        ('seller_approved', 'Seller Application Approved'),
+        ('seller_rejected', 'Seller Application Rejected'),
+        ('seller_revoked', 'Seller Status Revoked'),
     )
 
     recipient = models.ForeignKey(
