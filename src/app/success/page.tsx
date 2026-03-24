@@ -12,10 +12,9 @@ import Image from "next/image";
 export default function SuccessPage() {
   const router = useRouter();
 
-  const bookings = useBookingStore((state) => state.bookings);
-  const latestBooking = bookings?.[bookings.length - 1];
+  const storedBooking = useBookingStore((state) => state.booking);
 
-  const booking = latestBooking || {
+  const booking = storedBooking  || {
     providerName: "Your Stylist",
     providerImg: "lashes-vendor-1.jpg",
     date: format(new Date(Date.now() + 2 * 24 * 60 * 60 * 1000), "EEE, MMM d"),

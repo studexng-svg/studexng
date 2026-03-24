@@ -1,10 +1,9 @@
-# accounts/urls.py
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenRefreshView
 from . import views
 from .views import SellerApplicationViewSet, ForgotPasswordView, ResetPasswordView
-from .views import check_profile_completion
+from .views import check_profile_completion, check_username
 
 # Router for Seller Application endpoints
 router = DefaultRouter()
@@ -17,6 +16,9 @@ urlpatterns = [
     path('logout/', views.logout_user, name='logout'),
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
 
+    # ✅ Username availability check — used by signup form
+    path('check-username/', check_username, name='check-username'),
+
     # Profile endpoints
     path('profile/', views.get_user_profile, name='profile'),
     path('profile/update/', views.update_user_profile, name='profile-update'),
@@ -26,8 +28,11 @@ urlpatterns = [
     path('me/', views.me, name='me'),
 
     # Seller verification endpoints (via router)
-    # Includes: /seller/applications/ (list/create)
-    # And:      /seller/applications/{id}/approve/
-    #           /seller/applications/{id}/reject/
+    # Generates:
+    #   GET/POST   /api/auth/seller/applications/
+    #   GET        /api/auth/seller/applications/{id}/
+    #   POST       /api/auth/seller/applications/{id}/approve/
+    #   POST       /api/auth/seller/applications/{id}/reject/
+    #   POST       /api/auth/seller/applications/revoke/{user_id}/
     path('', include(router.urls)),
 ]
