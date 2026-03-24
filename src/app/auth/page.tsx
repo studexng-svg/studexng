@@ -36,7 +36,7 @@ export default function AuthPage() {
   const router = useRouter();
   const { login: storeLogin, isLoggedIn, isHydrated } = useAuth();
 
-  const hostels = ["Cedar", "Trezadel", "Trinity", "Pearl", "Redwood", "Cooperative Queens", "Aster Hall", "Cooperative Kings", "Pod", "Faith", "Amethyst", "Emerald", "EDC"];
+  const hostels = ["Cedar", "Trezadel", "Trinity", "Pearl", "Redwood", "Cooperative Queens", "Queen Mary", "Aster Hall", "Cooperative Kings", "Pod", "Faith", "Amethyst", "Emerald", "EDC"];
 
   useEffect(() => {
     setMounted(true);

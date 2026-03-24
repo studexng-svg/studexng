@@ -218,11 +218,14 @@ export default function CheckoutPage() {
 
       <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-teal-50 px-6 pt-8 pb-32 max-w-4xl mx-auto">
 
+        {/* Order Summary */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-          className="bg-white/90 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-white mb-6">
+          className="bg-white rounded-3xl p-8 shadow-lg border border-purple-100 mb-6">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-black text-gray-900 flex items-center gap-3">
-              {isServiceBooking ? <Calendar className="w-7 h-7 text-purple-600" /> : <Package className="w-7 h-7 text-purple-600" />}
+              {isServiceBooking
+                ? <Calendar className="w-7 h-7 text-purple-600" />
+                : <Package className="w-7 h-7 text-purple-600" />}
               {isServiceBooking ? "Your Appointment" : "Your Order"}
             </h2>
             <Sparkles className="w-6 h-6 text-teal-500" />
@@ -232,9 +235,8 @@ export default function CheckoutPage() {
             {/* SERVICE BOOKING */}
             {isServiceBooking && booking && (
               <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
-                className="bg-gradient-to-r from-purple-100 to-teal-100 rounded-3xl p-8">
+                className="bg-gradient-to-r from-purple-50 to-teal-50 rounded-3xl p-6 border border-purple-100">
                 <div className="flex items-center gap-5 mb-6">
-                  {/* ── Image with fallback — fixes 400 error when providerImg is empty ── */}
                   {booking.providerImg ? (
                     <div className="relative w-24 h-24 rounded-3xl overflow-hidden ring-4 ring-purple-200">
                       <Image
@@ -242,21 +244,21 @@ export default function CheckoutPage() {
                         alt={booking.providerName} fill className="object-cover" />
                     </div>
                   ) : (
-                    <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-purple-300 to-teal-300 flex items-center justify-center ring-4 ring-purple-200 flex-shrink-0">
+                    <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-purple-400 to-teal-400 flex items-center justify-center ring-4 ring-purple-200 flex-shrink-0">
                       <span className="text-4xl font-black text-white">
                         {booking.providerName?.[0]?.toUpperCase() || "S"}
                       </span>
                     </div>
                   )}
                   <div>
-                    <h3 className="text-2xl font-black">{booking.providerName}</h3>
-                    <p className="text-purple-700 font-bold">Service Booking</p>
+                    <h3 className="text-2xl font-black text-gray-900">{booking.providerName}</h3>
+                    <p className="text-purple-600 font-bold">Service Booking</p>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4 text-lg">
-                  <div className="flex items-center gap-3"><Calendar className="w-5 h-5" /><span className="font-medium">{booking.date}</span></div>
-                  <div className="flex items-center gap-3"><Clock className="w-5 h-5" /><span className="font-medium">{booking.time}</span></div>
-                  <div className="flex items-center gap-3 col-span-2"><MapPin className="w-5 h-5" /><span className="font-medium">{booking.location}</span></div>
+                <div className="grid grid-cols-2 gap-4 text-base">
+                  <div className="flex items-center gap-3 text-gray-700"><Calendar className="w-5 h-5 text-purple-500" /><span className="font-medium">{booking.date}</span></div>
+                  <div className="flex items-center gap-3 text-gray-700"><Clock className="w-5 h-5 text-purple-500" /><span className="font-medium">{booking.time}</span></div>
+                  <div className="flex items-center gap-3 col-span-2 text-gray-700"><MapPin className="w-5 h-5 text-purple-500" /><span className="font-medium">{booking.location}</span></div>
                 </div>
               </motion.div>
             )}
@@ -265,7 +267,7 @@ export default function CheckoutPage() {
             {isFoodOrder && cart.map((item, i) => (
               <motion.div key={item.id} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: i * 0.1 }}
-                className="flex justify-between items-center p-4 bg-gradient-to-r from-purple-50 to-teal-50 rounded-2xl">
+                className="flex justify-between items-center p-4 bg-gradient-to-r from-purple-50 to-teal-50 rounded-2xl border border-purple-100">
                 <div className="flex-1">
                   <p className="font-bold text-gray-900 text-lg">{item.title}</p>
                   <p className="text-sm text-purple-600 font-medium">×{item.quantity}</p>
@@ -275,7 +277,7 @@ export default function CheckoutPage() {
             ))}
 
             {/* PRICE BREAKDOWN */}
-            <div className="border-t-2 border-purple-200 pt-6 mt-6 space-y-3">
+            <div className="border-t-2 border-purple-100 pt-6 mt-6 space-y-3">
               {previewLoading ? (
                 <div className="animate-pulse h-20 bg-purple-50 rounded-2xl" />
               ) : (
@@ -333,13 +335,19 @@ export default function CheckoutPage() {
 
           <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
             onClick={() => setPaymentMethod("card")}
-            className={`w-full rounded-2xl p-6 transition-all text-left ${paymentMethod === "card" ? "bg-gradient-to-r from-purple-600 to-teal-600 text-white shadow-xl" : "bg-white text-gray-800 shadow-md"}`}>
+            className={`w-full rounded-2xl p-6 transition-all text-left ${
+              paymentMethod === "card"
+                ? "bg-gradient-to-r from-purple-600 to-teal-600 text-white shadow-xl"
+                : "bg-white text-gray-800 shadow-md border border-purple-100"
+            }`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <CreditCard className="w-8 h-8" />
                 <div>
                   <p className="text-xl font-black">Card / USSD / Bank</p>
-                  <p className={`text-sm font-medium ${paymentMethod === "card" ? "opacity-90" : "text-gray-600"}`}>Visa, Mastercard, Verve, USSD</p>
+                  <p className={`text-sm font-medium ${paymentMethod === "card" ? "opacity-90" : "text-gray-500"}`}>
+                    Visa, Mastercard, Verve, USSD
+                  </p>
                 </div>
               </div>
               {paymentMethod === "card" && <Check className="w-8 h-8" />}
@@ -348,13 +356,19 @@ export default function CheckoutPage() {
 
           <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
             onClick={() => setPaymentMethod("transfer")}
-            className={`w-full rounded-2xl p-6 transition-all text-left ${paymentMethod === "transfer" ? "bg-gradient-to-r from-purple-600 to-teal-600 text-white shadow-xl" : "bg-white text-gray-800 shadow-md"}`}>
+            className={`w-full rounded-2xl p-6 transition-all text-left ${
+              paymentMethod === "transfer"
+                ? "bg-gradient-to-r from-purple-600 to-teal-600 text-white shadow-xl"
+                : "bg-white text-gray-800 shadow-md border border-purple-100"
+            }`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <Building2 className="w-8 h-8" />
                 <div>
                   <p className="text-xl font-black">Bank Transfer</p>
-                  <p className={`text-sm font-medium ${paymentMethod === "transfer" ? "opacity-90" : "text-gray-600"}`}>Opay, Palmpay, GTB, Access & all banks</p>
+                  <p className={`text-sm font-medium ${paymentMethod === "transfer" ? "opacity-90" : "text-gray-500"}`}>
+                    Opay, Palmpay, GTB, Access & all banks
+                  </p>
                 </div>
               </div>
               {paymentMethod === "transfer" && <Check className="w-8 h-8" />}
@@ -373,8 +387,9 @@ export default function CheckoutPage() {
           </motion.div>
         )}
 
+        {/* Security badges */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
-          className="bg-white/90 backdrop-blur-xl rounded-3xl p-6 shadow-xl border border-white mb-6">
+          className="bg-white rounded-3xl p-6 shadow-lg border border-purple-100 mb-6">
           <div className="flex items-center justify-center gap-8 text-center">
             {[
               { icon: Shield, label: "Secure", color: "text-green-600" },
@@ -389,14 +404,21 @@ export default function CheckoutPage() {
           </div>
         </motion.div>
 
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}
-          className="bg-purple-50 border-2 border-purple-200 rounded-2xl p-6 mb-8 text-center">
-          <Shield className="w-12 h-12 text-purple-600 mx-auto mb-3" />
-          <p className="font-black text-lg text-gray-900">Automatic Split Payment</p>
-          <p className="text-sm text-gray-700 mt-2">
-            Your payment is split automatically by Paystack — 70% goes directly to the seller, 30% to StudEx.
-            Refunds are processed back to your original payment method instantly.
-          </p>
+        {/* ✅ FIXED: Split payment info box — white background, dark readable text */}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}
+          className="bg-white rounded-2xl p-6 mb-8 border-2 border-purple-200 shadow-md">
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 bg-gradient-to-br from-purple-100 to-teal-100 rounded-2xl flex items-center justify-center flex-shrink-0">
+              <Shield className="w-6 h-6 text-purple-600" />
+            </div>
+            <div>
+              <p className="font-black text-lg text-gray-900">Automatic Split Payment</p>
+              <p className="text-sm text-gray-600 mt-1 leading-relaxed">
+                Your payment is split automatically by Paystack — 70% goes directly to the seller,
+                30% to StudEx. Refunds are processed back to your original payment method instantly.
+              </p>
+            </div>
+          </div>
         </motion.div>
 
         {paystackReady && chargeAmountInKobo > 0 ? (

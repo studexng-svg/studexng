@@ -154,7 +154,7 @@ export default function SellerOnboarding() {
         </div>
       </motion.div>
 
-      <div className="p-6 pb-32">
+      <div className="p-6 pb-48">
         {/* PROGRESS STEPS */}
         <motion.div
           {...fadeInUp}
