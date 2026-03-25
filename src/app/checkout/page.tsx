@@ -23,6 +23,8 @@ interface PricePreview {
   discount_amount: string;
   final_amount: string;
   discount_message: string | null;
+  subaccount_code: string | null;   // ✅ vendor's Paystack subaccount
+  vendor_share: number | null;       // ✅ vendor's percentage e.g. 75
 }
 
 function PaystackButton({
@@ -88,7 +90,11 @@ export default function CheckoutPage() {
         const res = await fetchWithAuth(`${API_URL}/api/payments/preview/`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ amount: rawTotal }),
+          body: JSON.stringify({
+            amount: rawTotal,
+            // ✅ Pass listing_id so backend can look up vendor's subaccount
+            listing_id: isServiceBooking ? booking?.providerId : (cart[0]?.id ?? null),
+          }),
         });
         if (res.ok) {
           const data: PricePreview = await res.json();
@@ -113,6 +119,10 @@ export default function CheckoutPage() {
     `STUDEX-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`
   );
 
+  // ✅ Build Paystack config with subaccount split if available
+  const paystackSubaccount = pricePreview?.subaccount_code ?? null;
+  const vendorShare = pricePreview?.vendor_share ?? 75; // default 75% to vendor
+
   const config: Parameters<typeof usePaystackPayment>[0] = {
     reference: referenceRef.current,
     email: user?.email || "user@studex.com",
@@ -121,12 +131,23 @@ export default function CheckoutPage() {
     channels: paymentMethod === "transfer"
       ? (["bank_transfer"] as any)
       : (["card", "bank", "ussd", "bank_transfer"] as any),
+    // ✅ Subaccount split — sends vendor their cut automatically
+    ...(paystackSubaccount ? {
+      subaccount: paystackSubaccount,
+      bearer: "account",           // platform bears Paystack's transaction fee
+      transaction_charge: 0,       // use percentage split, not fixed charge
+    } : {}),
     metadata: {
       custom_fields: [
         { display_name: "Customer", variable_name: "customer", value: user?.username || "" },
         {
           display_name: "Order Type", variable_name: "type",
           value: isServiceBooking ? "service_booking" : "product_order",
+        },
+        // ✅ Pass listing_id in metadata so webhook can link to correct listing
+        {
+          display_name: "Listing ID", variable_name: "listing_id",
+          value: String(isServiceBooking ? booking?.providerId ?? "" : cart[0]?.id ?? ""),
         },
       ],
     },
@@ -166,12 +187,23 @@ export default function CheckoutPage() {
     if (!isLoggedIn) { router.push("/auth"); return; }
     try {
       const result = await createOrder(ref.reference);
+      // ✅ Clear cart/booking on success
       if (isFoodOrder) clearCart();
       if (isServiceBooking) clearBooking();
-      router.push(`/order-confirmation/${result.order_id}`);
+      // ✅ Navigate using order_id — always defined on success
+      if (result.order_id) {
+        router.push(`/order-confirmation/${result.order_id}`);
+      } else {
+        // Already processed — look up via reference
+        router.push(`/order-confirmation/ref/${ref.reference}`);
+      }
     } catch (error: any) {
-      alert(`Payment received but order failed. Contact support with ref: ${ref.reference}`);
-      setIsProcessing(false);
+      // ✅ Payment went through even if our server had an issue
+      // Clear cart so user is not double-charged
+      if (isFoodOrder) clearCart();
+      if (isServiceBooking) clearBooking();
+      // Show friendly message with reference number
+      router.push(`/payment-received?ref=${ref.reference}`);
     }
   }, [isLoggedIn, isFoodOrder, isServiceBooking]);
 
@@ -414,8 +446,8 @@ export default function CheckoutPage() {
             <div>
               <p className="font-black text-lg text-gray-900">Automatic Split Payment</p>
               <p className="text-sm text-gray-600 mt-1 leading-relaxed">
-                Your payment is split automatically by Paystack — 70% goes directly to the seller,
-                30% to StudEx. Refunds are processed back to your original payment method instantly.
+                Your payment is split automatically by Paystack — 75% goes directly to the seller,
+                25% to StudEx. Refunds are processed back to your original payment method instantly.
               </p>
             </div>
           </div>

@@ -154,7 +154,7 @@ export default function SellerOnboarding() {
         </div>
       </motion.div>
 
-      <div className="p-6 pb-48">
+      <div className="p-6 min-h-screen" style={{ paddingBottom: "140px" }}>
         {/* PROGRESS STEPS */}
         <motion.div
           {...fadeInUp}
