@@ -4,7 +4,7 @@
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Package, CheckCircle, Clock, ChevronLeft, MapPin, AlertCircle } from "lucide-react";
+import { Package, CheckCircle, Clock, ChevronLeft, AlertCircle } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAuth, fetchWithAuth } from "@/lib/authStore";
 
@@ -19,7 +19,7 @@ interface Order {
   };
   amount: number;
   created_at: string;
-  status: "pending" | "paid" | "seller_completed" | "completed" | "disputed" | "cancelled";
+  status: "pending" | "paid" | "processing" | "completed" | "disputed" | "cancelled";
 }
 
 export default function OrdersPage() {
@@ -65,8 +65,8 @@ export default function OrdersPage() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "paid": return "bg-amber-100 text-amber-600";
-      case "seller_completed": return "bg-blue-100 text-blue-600";
+      case "paid":
+      case "processing": return "bg-amber-100 text-amber-600";
       case "completed": return "bg-emerald-100 text-emerald-600";
       case "disputed": return "bg-red-100 text-red-600";
       case "cancelled": return "bg-gray-100 text-gray-500";
@@ -86,8 +86,8 @@ export default function OrdersPage() {
   const getStatusLabel = (status: string) => {
     switch (status) {
       case "pending": return "Pending Payment";
-      case "paid": return "In Escrow";
-      case "seller_completed": return "Seller Completed";
+      case "paid":
+      case "processing": return "In Progress";
       case "completed": return "Completed";
       case "disputed": return "Disputed";
       case "cancelled": return "Cancelled";
@@ -184,18 +184,6 @@ export default function OrdersPage() {
                   </div>
                 </div>
               </Link>
-
-              {/* ESCROW BANNER */}
-              {(order.status === "paid" || order.status === "seller_completed") && (
-                <div className="px-4 py-2 bg-amber-50 border-t border-amber-200">
-                  <p className="text-xs text-amber-800">
-                    <span className="font-bold">⏳ In Escrow:</span>{" "}
-                    {order.status === "seller_completed"
-                      ? "Seller marked complete. Confirm receipt to release payment."
-                      : "Payment held safely. Waiting for seller to complete."}
-                  </p>
-                </div>
-              )}
             </motion.div>
           ))
         )}
