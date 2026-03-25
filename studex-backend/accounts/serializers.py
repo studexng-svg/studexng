@@ -2,9 +2,9 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model, authenticate
 from .models import Profile, SellerApplication
+import re
 
 User = get_user_model()
-
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=8)
@@ -12,57 +12,106 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'phone', 'password', 'password2',
-                  'user_type', 'matric_number', 'hostel']
+        fields = [
+            'id', 'username', 'email', 'phone', 'password', 'password2',
+            'user_type', 'matric_number', 'hostel'
+        ]
         extra_kwargs = {
             'email': {'required': True},
             'username': {'required': True},
         }
 
-    def validate(self, data):
-        if data['password'] != data['password2']:
-            raise serializers.ValidationError("Passwords do not match")
-        return data
+    # ✅ USERNAME VALIDATION (ADDED PROPERLY)
+    def validate_username(self, value):
+        value = value.strip()
 
-    def validate_email(self, value):
-        if User.objects.filter(email=value).exists():
-            raise serializers.ValidationError("Email already exists")
-        if not value.lower().endswith('@pau.edu.ng'):
-            raise serializers.ValidationError("Only @pau.edu.ng email addresses are allowed")
+        if " " in value:
+            raise serializers.ValidationError("Username cannot contain spaces")
+
+        if not re.match(r'^[a-zA-Z0-9_]+$', value):
+            raise serializers.ValidationError("Only letters, numbers, and underscores allowed")
+
+        if len(value) < 3:
+            raise serializers.ValidationError("Username must be at least 3 characters")
+
+        if len(value) > 30:
+            raise serializers.ValidationError("Username cannot exceed 30 characters")
+
+        if User.objects.filter(username__iexact=value).exists():
+            raise serializers.ValidationError("Username already taken")
+
         return value
 
+    # ✅ EMAIL VALIDATION (FIXED + CLEANED)
+    def validate_email(self, value):
+        value = value.lower().strip()
+
+        if not value.endswith('@pau.edu.ng'):
+            raise serializers.ValidationError("Only @pau.edu.ng email addresses are allowed")
+
+        if User.objects.filter(email__iexact=value).exists():
+            raise serializers.ValidationError("Email already exists")
+
+        return value
+
+    # ✅ PHONE VALIDATION (IMPROVED)
     def validate_phone(self, value):
         if not value:
             raise serializers.ValidationError("Phone number is required")
-        phone_cleaned = value.replace(' ', '').replace('-', '')
-        if not phone_cleaned.isdigit():
-            raise serializers.ValidationError("Phone number must be numeric")
-        if len(phone_cleaned) != 11:
-            raise serializers.ValidationError("Phone number must be exactly 11 digits")
-        return phone_cleaned
 
+        phone = value.replace(' ', '').replace('-', '')
+
+        if not phone.isdigit():
+            raise serializers.ValidationError("Phone number must be numeric")
+
+        if len(phone) != 11:
+            raise serializers.ValidationError("Phone number must be exactly 11 digits")
+
+        if not phone.startswith("0"):
+            raise serializers.ValidationError("Phone number must start with 0")
+
+        return phone
+
+    # ✅ PASSWORD VALIDATION (UPGRADED)
     def validate_password(self, value):
         if len(value) < 8:
-            raise serializers.ValidationError("Password must be at least 8 characters.")
-        if not any(c.isalpha() for c in value):
-            raise serializers.ValidationError("Password must contain at least one letter.")
-        if not any(c.isdigit() for c in value):
-            raise serializers.ValidationError("Password must contain at least one number.")
+            raise serializers.ValidationError("Password must be at least 8 characters")
+
+        if not re.search(r'[A-Z]', value):
+            raise serializers.ValidationError("Password must contain at least one uppercase letter")
+
+        if not re.search(r'[a-z]', value):
+            raise serializers.ValidationError("Password must contain at least one lowercase letter")
+
+        if not re.search(r'\d', value):
+            raise serializers.ValidationError("Password must contain at least one number")
+
         return value
 
+    # ✅ MATCH PASSWORDS
+    def validate(self, data):
+        if data['password'] != data['password2']:
+            raise serializers.ValidationError({"password": "Passwords do not match"})
+        return data
+
+    # ✅ MATRIC VALIDATION (UNCHANGED BUT CLEANED)
     def validate_matric_number(self, value):
         if value:
             if User.objects.filter(matric_number=value).exists():
                 raise serializers.ValidationError("This matriculation number is already registered")
         return value
 
+    # ✅ CREATE USER (SAFE + STANDARD)
     def create(self, validated_data):
         validated_data.pop('password2')
         password = validated_data.pop('password')
-        user = User.objects.create(**validated_data)
+
+        user = User.objects.create_user(**validated_data)
         user.set_password(password)
         user.save()
+
         Profile.objects.get_or_create(user=user)
+
         return user
 
 
