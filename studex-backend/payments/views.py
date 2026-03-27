@@ -4,7 +4,7 @@ import logging
 from decimal import Decimal
 from django.conf import settings
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from orders.models import Order
 from .models import SellerBankAccount, PaymentTransaction
@@ -25,6 +25,29 @@ def get_commission_split(amount: Decimal):
         platform_rate = Decimal("0.15")
     seller_rate = Decimal("1") - platform_rate
     return seller_rate, platform_rate
+
+
+# ─────────────────────────────────────────
+# GET BANKS — proxied through backend to avoid CORS
+# Frontend calls /api/payments/banks/ instead of Flutterwave directly
+# ─────────────────────────────────────────
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def get_banks(request):
+    try:
+        res = requests.get(
+            f"{FLW_BASE}/banks/NG",
+            headers=FLW_HEADERS,
+            timeout=10,
+        )
+        if res.status_code == 200:
+            return Response(res.json(), status=200)
+        logger.warning(f"FLW banks fetch failed: {res.status_code} {res.text[:200]}")
+        return Response({"data": []}, status=200)  # Fall back to empty — frontend uses FALLBACK_BANKS
+    except Exception as e:
+        logger.error(f"get_banks error: {e}", exc_info=True)
+        return Response({"data": []}, status=200)
 
 
 # ─────────────────────────────────────────
@@ -93,7 +116,6 @@ def verify_bank_account(request):
     if not account_number or not bank_code:
         return Response({"error": "account_number and bank_code required."}, status=400)
 
-    # ── Wrapped in try/except so ANY Flutterwave error returns 400, never 500 ──
     try:
         res = requests.post(
             f"{FLW_BASE}/accounts/resolve",
@@ -115,7 +137,6 @@ def verify_bank_account(request):
                     status=400
                 )
 
-        # Non-200 from Flutterwave → return their message as a 400
         try:
             flw_msg = res.json().get("message", "Verification unavailable.")
         except Exception:
@@ -160,7 +181,6 @@ def verify_payment(request):
         existing = PaymentTransaction.objects.get(reference=ref_key, status="success")
         return Response({"order_id": existing.order_id, "message": "Already processed."})
 
-    # Verify with Flutterwave
     try:
         if transaction_id:
             verify_res = requests.get(
@@ -413,11 +433,9 @@ def seller_earnings(request):
     user = request.user
 
     total_orders = Order.objects.filter(listing__vendor=user).count()
-
-    # Read directly from PaymentTransaction — no escrow dependency
     txns = PaymentTransaction.objects.filter(seller=user, status="success")
     total_earned = txns.aggregate(Sum("seller_amount"))["seller_amount__sum"] or 0
-    pending = 0  # Flutterwave handles payout timing
+    pending = 0
 
     commission_rate = 30 if total_orders < 10 else (20 if total_orders < 50 else 15)
 

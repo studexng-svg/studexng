@@ -6,12 +6,13 @@ from services.models import Listing
 
 User = get_user_model()
 
+
 class Order(models.Model):
     STATUS_CHOICES = (
         ('pending', 'Pending Payment'),
-        ('paid', 'Paid - In Escrow'),
+        ('paid', 'Paid'),                                    # ← was "Paid - In Escrow"
         ('seller_completed', 'Seller Marked Complete'),
-        ('completed', 'Buyer Confirmed - Released'),
+        ('completed', 'Buyer Confirmed - Complete'),         # ← was "Buyer Confirmed - Released"
         ('disputed', 'Disputed'),
         ('cancelled', 'Cancelled'),
     )
@@ -25,7 +26,6 @@ class Order(models.Model):
     paid_at = models.DateTimeField(null=True, blank=True)
     seller_completed_at = models.DateTimeField(null=True, blank=True)
     buyer_confirmed_at = models.DateTimeField(null=True, blank=True)
-
     auto_released = models.BooleanField(default=False)
 
     def __str__(self):
@@ -76,27 +76,27 @@ class Dispute(models.Model):
     complaint = models.TextField(help_text="Detailed description of the issue")
     evidence = models.TextField(blank=True, help_text="Evidence or screenshots description")
 
-    # Provider response
     provider_response = models.TextField(blank=True, null=True)
     provider_responded_at = models.DateTimeField(null=True, blank=True)
 
-    # Admin resolution
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='open')
     resolution = models.CharField(max_length=30, choices=RESOLUTION_CHOICES, default='pending')
-    assigned_to = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True,
-                                     related_name='assigned_disputes',
-                                     help_text="Support staff assigned to this dispute")
+    assigned_to = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='assigned_disputes',
+        help_text="Support staff assigned to this dispute"
+    )
     admin_decision = models.TextField(blank=True, help_text="Admin's reasoning for resolution")
     resolved_at = models.DateTimeField(null=True, blank=True)
-    resolved_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True,
-                                     related_name='disputes_resolved')
+    resolved_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='disputes_resolved'
+    )
 
-    # Appeal system
     appeal_text = models.TextField(blank=True, null=True)
     appealed_at = models.DateTimeField(null=True, blank=True)
     appeal_decision = models.TextField(blank=True, null=True)
 
-    # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -113,13 +113,14 @@ class Dispute(models.Model):
             models.Index(fields=['order']),
         ]
 
+
 class Booking(models.Model):
     STATUS_CHOICES = [
-        ('pending', 'Pending'),       # buyer sent request
-        ('confirmed', 'Confirmed'),   # vendor confirmed
-        ('paid', 'Paid'),               # buyer paid
-        ('cancelled', 'Cancelled'),   # either party cancelled
-        ('completed', 'Completed'),   # service done
+        ('pending', 'Pending'),
+        ('confirmed', 'Confirmed'),
+        ('paid', 'Paid'),
+        ('cancelled', 'Cancelled'),
+        ('completed', 'Completed'),
     ]
 
     buyer = models.ForeignKey(
@@ -133,7 +134,7 @@ class Booking(models.Model):
         related_name='bookings'
     )
     scheduled_date = models.DateField()
-    scheduled_time = models.CharField(max_length=20)  # e.g. "2:00 PM"
+    scheduled_time = models.CharField(max_length=20)
     note = models.TextField(blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     created_at = models.DateTimeField(auto_now_add=True)
@@ -144,4 +145,3 @@ class Booking(models.Model):
 
     def __str__(self):
         return f"Booking by {self.buyer.username} for {self.listing.title} on {self.scheduled_date}"
-    

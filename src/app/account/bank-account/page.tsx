@@ -36,27 +36,19 @@ export default function BankAccountPage() {
     if (isHydrated && !isLoggedIn) router.push("/auth");
   }, [isHydrated, isLoggedIn]);
 
-  // ── Load bank list from Flutterwave via our backend ──────────────────────
-  // We fetch from Flutterwave's public bank list endpoint.
-  // Falls back to FALLBACK_BANKS if unavailable.
+  // ── Fetch banks via our backend proxy (avoids CORS from browser → Flutterwave)
+  // Backend route: GET /api/payments/banks/
+  // No Authorization header needed — the endpoint is AllowAny
   useEffect(() => {
     const loadBanks = async () => {
       try {
-        const res = await fetch(
-          "https://api.flutterwave.com/v3/banks/NG",
-          {
-            headers: {
-              Authorization: `Bearer ${process.env.NEXT_PUBLIC_FLW_PUBLIC_KEY}`,
-            },
-          }
-        );
+        const res = await fetch(`${API_URL}/api/payments/banks/`);
         if (res.ok) {
           const data = await res.json();
           const raw: Bank[] = (data.data || []).map((b: any) => ({
             name: b.name,
             code: b.code,
           }));
-          // Deduplicate by code
           const seen = new Set<string>();
           const unique = raw.filter(b => {
             if (seen.has(b.code)) return false;
@@ -101,7 +93,6 @@ export default function BankAccountPage() {
     load();
   }, [isHydrated, isLoggedIn]);
 
-  // Auto-verify account name when 10 digits entered + bank selected
   const verifyAccount = useCallback(async (accNum: string, bankCode: string) => {
     if (accNum.length !== 10 || !bankCode) return;
     setVerifying(true);
@@ -217,7 +208,6 @@ export default function BankAccountPage() {
 
       <div className="max-w-lg mx-auto p-4 mt-4 space-y-5">
 
-        {/* Info Banner */}
         <div className="bg-teal-900/20 border border-teal-700/40 rounded-2xl p-4 flex items-start gap-3">
           <Banknote className="w-5 h-5 text-teal-400 flex-shrink-0 mt-0.5" />
           <div>
@@ -228,7 +218,6 @@ export default function BankAccountPage() {
           </div>
         </div>
 
-        {/* Form */}
         <div className="bg-gray-900 rounded-2xl p-5 border border-gray-800 space-y-5">
 
           {/* Bank Selector */}
@@ -311,7 +300,6 @@ export default function BankAccountPage() {
             />
           </div>
 
-          {/* Status Messages */}
           {status === "error" && (
             <div className="flex items-start gap-2 bg-red-900/30 border border-red-700/40 rounded-xl px-4 py-3">
               <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
@@ -325,7 +313,6 @@ export default function BankAccountPage() {
             </div>
           )}
 
-          {/* Save Button */}
           <button
             onClick={handleSave}
             disabled={saving || !isComplete}
@@ -346,7 +333,6 @@ export default function BankAccountPage() {
   );
 }
 
-// Fallback bank list (used if Flutterwave bank list API is unavailable)
 const FALLBACK_BANKS: Bank[] = [
   { name: "Access Bank", code: "044" },
   { name: "Citibank", code: "023" },
