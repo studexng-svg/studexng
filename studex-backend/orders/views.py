@@ -9,8 +9,7 @@ from django.contrib.auth import get_user_model
 from decimal import Decimal
 from .models import Order, Booking, Dispute
 from .serializers import (
-    OrderSerializer, DisputeSerializer, DisputeResponseSerializer,
-    DisputeResolutionSerializer, DisputeAppealSerializer, BookingSerializer
+    OrderSerializer, DisputeSerializer, BookingSerializer
 )
 import logging
 
@@ -19,7 +18,6 @@ User = get_user_model()
 
 
 def _notify(recipient, notification_type, title, message, action_url=""):
-    """Helper — creates a Notification silently, never crashes the caller."""
     try:
         from notifications.models import Notification
         Notification.objects.create(
@@ -40,182 +38,25 @@ class OrderViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
+        # Always return orders where user is the buyer
         return self.queryset.filter(buyer=user).order_by('-created_at')
 
     def perform_create(self, serializer):
-        user = self.request.user
-        order = serializer.save(buyer=user)
-
-        try:
-            profile = user.profile
-            if profile.profile_bonus_eligible and not profile.profile_bonus_used:
-                discount = order.amount * Decimal('0.05')
-                order.amount = order.amount - discount
-                order.save(update_fields=['amount'])
-                profile.profile_bonus_used = True
-                profile.profile_bonus_eligible = False
-                profile.save(update_fields=['profile_bonus_used', 'profile_bonus_eligible'])
-        except Exception as e:
-            logger.warning(f"Profile discount failed: {e}")
-
-        return order
-
-    def create(self, request, *args, **kwargs):
-        user = request.user
-        discount_eligible = False
-        try:
-            profile = user.profile
-            if profile.profile_bonus_eligible and not profile.profile_bonus_used:
-                discount_eligible = True
-        except Exception:
-            pass
-
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        order = self.perform_create(serializer)
-
-        discount_amount = Decimal('0')
-        if discount_eligible:
-            original = Decimal(str(request.data.get('amount', 0)))
-            discount_amount = original * Decimal('0.05')
-
-        response_data = self.get_serializer(order).data
-        response_data['discount_applied'] = discount_eligible
-        response_data['discount_amount'] = str(discount_amount)
-        if discount_eligible:
-            response_data['discount_message'] = (
-                f"5% profile completion discount applied! You saved ₦{discount_amount:.2f}"
-            )
-
-        return Response(response_data, status=status.HTTP_201_CREATED)
+        serializer.save(buyer=self.request.user)
 
     @action(detail=True, methods=['post'])
-    @transaction.atomic
-    def confirm_payment(self, request, pk=None):
-        from wallet.models import Wallet, WalletTransaction, EscrowTransaction
-        from django.db.models import F
-        import requests as http_requests
-        from django.conf import settings
-
-        order = self.get_object()
-
-        if order.buyer != request.user:
-            return Response(
-                {"detail": "You are not the buyer of this order"},
-                status=status.HTTP_403_FORBIDDEN
-            )
-
-        if order.status in ['paid', 'seller_completed', 'completed']:
-            return Response({
-                "message": "Payment already confirmed",
-                "order": self.get_serializer(order).data,
-                "status": order.status,
-            }, status=status.HTTP_200_OK)
-
-        if order.status != 'pending':
-            return Response(
-                {"detail": f"Order is already {order.status}"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        payment_method = request.data.get('payment_method')
-        paystack_reference = request.data.get('paystack_reference')
-        total_amount = Decimal(str(order.amount))
-
-        if payment_method == 'wallet':
-            buyer_wallet = Wallet.objects.select_for_update().get(user=request.user)
-            if buyer_wallet.balance < total_amount:
-                return Response(
-                    {'error': 'Insufficient wallet balance'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            buyer_wallet.balance = F('balance') - total_amount
-            buyer_wallet.save()
-            buyer_wallet.refresh_from_db()
-            WalletTransaction.objects.create(
-                wallet=buyer_wallet,
-                type='debit',
-                amount=total_amount,
-                status='success',
-                description=f'Payment for order {order.reference}',
-                order=order,
-            )
-
-        elif payment_method == 'card':
-            if not paystack_reference:
-                return Response(
-                    {"error": "Paystack reference required"},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            verify_url = f"https://api.paystack.co/transaction/verify/{paystack_reference}"
-            headers = {'Authorization': f'Bearer {settings.PAYSTACK_SECRET_KEY}'}
-            paystack_response = http_requests.get(verify_url, headers=headers)
-            if paystack_response.status_code != 200:
-                return Response({'error': 'Failed to verify payment'}, status=400)
-            data = paystack_response.json()
-            if data['data']['status'] != 'success':
-                return Response({'error': 'Payment not verified'}, status=400)
-            order.payment_reference = paystack_reference
-        else:
-            return Response(
-                {"error": "Invalid payment method"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        order.status = 'paid'
-        order.paid_at = timezone.now()
-        order.save()
-
-        EscrowTransaction.objects.get_or_create(
-            order=order,
-            defaults={
-                'buyer': order.buyer,
-                'seller': order.listing.vendor,
-                'total_amount': total_amount,
-                'seller_amount': total_amount * Decimal('0.95'),
-                'platform_fee': total_amount * Decimal('0.05'),
-                'status': 'held',
-            }
-        )
-
-        _notify(
-            recipient=order.listing.vendor,
-            notification_type='booking_paid',
-            title=f'💰 Payment Received — {order.listing.title}',
-            message=(
-                f'{request.user.username} has paid ₦{total_amount:,.0f} for '
-                f'"{order.listing.title}". Funds are held in escrow.'
-            ),
-            action_url='/vendor/dashboard',
-        )
-
-        return Response({
-            "message": "Payment confirmed! Order is now in escrow.",
-            "order": self.get_serializer(order).data,
-        })
-
-    @action(detail=True, methods=['post', 'patch'])
-    @transaction.atomic
     def confirm(self, request, pk=None):
+        """Buyer confirms order is complete."""
         order = self.get_object()
 
         if order.buyer != request.user:
-            return Response(
-                {"detail": "You are not the buyer of this order."},
-                status=status.HTTP_403_FORBIDDEN
-            )
+            return Response({"detail": "You are not the buyer of this order."}, status=403)
 
         if order.status == 'completed':
-            return Response(
-                {"message": "Order already confirmed.", "order": self.get_serializer(order).data},
-                status=status.HTTP_200_OK
-            )
+            return Response({"message": "Order already confirmed.", "order": self.get_serializer(order).data})
 
         if order.status not in ['paid', 'seller_completed']:
-            return Response(
-                {"detail": f"Cannot confirm an order with status: '{order.status}'."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"detail": f"Cannot confirm an order with status: '{order.status}'."}, status=400)
 
         order.status = 'completed'
         order.buyer_confirmed_at = timezone.now()
@@ -227,31 +68,26 @@ class OrderViewSet(viewsets.ModelViewSet):
             title=f'✅ Order Confirmed — {order.listing.title}',
             message=(
                 f'{request.user.username} has confirmed the order for '
-                f'"{order.listing.title}". Payment will be released to you shortly.'
+                f'"{order.listing.title}". Payment was split to your account via Flutterwave.'
             ),
             action_url='/vendor/dashboard',
         )
 
+        # Loyalty credits
         credits_awarded = False
         credits_amount = 0
         try:
             from loyalty.models import LoyaltyAccount, LoyaltyTransaction
-            from decimal import Decimal as D
-
-            MILESTONE = 10      # ← changed from 5
-            REWARD = D('200')   # ← changed from 100
-
+            MILESTONE = 10
+            REWARD = Decimal('200')
             account, _ = LoyaltyAccount.objects.get_or_create(user=request.user)
             account.total_completed_orders += 1
             account.save(update_fields=['total_completed_orders'])
-
             if account.total_completed_orders % MILESTONE == 0:
-                account.credit_balance = (account.credit_balance or D('0')) + REWARD
+                account.credit_balance = (account.credit_balance or Decimal('0')) + REWARD
                 account.save(update_fields=['credit_balance'])
                 LoyaltyTransaction.objects.create(
-                    account=account,
-                    type='earned',
-                    amount=REWARD,
+                    account=account, type='earned', amount=REWARD,
                     description=f"Loyalty reward: {account.total_completed_orders} orders completed!",
                     order=order,
                 )
@@ -260,34 +96,31 @@ class OrderViewSet(viewsets.ModelViewSet):
         except Exception as e:
             logger.warning(f"Loyalty award skipped for order {order.id}: {e}")
 
+        # Vendor badge
         try:
             vendor = order.listing.vendor
             vp = vendor.profile
             vp.on_platform_sales = (vp.on_platform_sales or 0) + 1
             sales = vp.on_platform_sales
-            if sales >= 50:
-                vp.vendor_badge = 'top'
-            elif sales >= 30:
-                vp.vendor_badge = 'trusted'
-            elif sales >= 10:
-                vp.vendor_badge = 'rising'
+            if sales >= 50: vp.vendor_badge = 'top'
+            elif sales >= 30: vp.vendor_badge = 'trusted'
+            elif sales >= 10: vp.vendor_badge = 'rising'
             vp.save(update_fields=['on_platform_sales', 'vendor_badge'])
         except Exception as e:
-            logger.warning(f"Vendor badge update skipped for order {order.id}: {e}")
+            logger.warning(f"Vendor badge update skipped: {e}")
 
         response_data = {
-            "message": "Order confirmed! Payment will be released to the vendor.",
+            "message": "Order confirmed! Payment was split to the vendor via Flutterwave.",
             "order": self.get_serializer(order).data,
             "can_review": True,
         }
         if credits_awarded:
             response_data["loyalty_reward"] = {
-                "awarded": True,
-                "amount": credits_amount,
+                "awarded": True, "amount": credits_amount,
                 "message": f"🎉 You earned ₦{credits_amount} loyalty credits!",
             }
 
-        return Response(response_data, status=status.HTTP_200_OK)
+        return Response(response_data)
 
 
 class DisputeViewSet(viewsets.ModelViewSet):
@@ -300,8 +133,7 @@ class DisputeViewSet(viewsets.ModelViewSet):
         if user.is_staff or user.is_superuser:
             return self.queryset.all()
         return self.queryset.filter(
-            models.Q(order__buyer=user) |
-            models.Q(order__listing__vendor=user)
+            models.Q(order__buyer=user) | models.Q(order__listing__vendor=user)
         ).distinct()
 
 
@@ -319,7 +151,6 @@ class BookingViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         booking = serializer.save(buyer=self.request.user)
-
         _notify(
             recipient=booking.listing.vendor,
             notification_type='new_booking_request',
@@ -335,7 +166,6 @@ class BookingViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], url_path='confirm')
     def confirm_booking(self, request, pk=None):
         booking = self.get_object()
-
         if booking.listing.vendor != request.user:
             return Response({'detail': 'Only the vendor can confirm.'}, status=403)
         if booking.status != 'pending':
@@ -347,19 +177,15 @@ class BookingViewSet(viewsets.ModelViewSet):
         _notify(
             recipient=booking.buyer,
             notification_type='booking_confirmed',
-            title=f'✅ Booking Confirmed — {booking.listing.title}',
+            title=f'✅ Booking Accepted — {booking.listing.title}',
             message=(
-                f'Great news! {request.user.username} has confirmed your booking for '
+                f'Great news! {request.user.username} has accepted your booking for '
                 f'"{booking.listing.title}" on {booking.scheduled_date} at '
-                f'{booking.scheduled_time}. Proceed to payment to lock it in.'
+                f'{booking.scheduled_time}. You can now proceed to pay.'
             ),
-            action_url='/book',
+            action_url='/account/bookings',
         )
-
-        return Response({
-            'detail': 'Booking confirmed.',
-            'status': 'confirmed',
-        })
+        return Response({'detail': 'Booking confirmed.', 'status': 'confirmed'})
 
     @action(detail=True, methods=['post'], url_path='cancel')
     def cancel(self, request, pk=None):
@@ -370,36 +196,33 @@ class BookingViewSet(viewsets.ModelViewSet):
         if not (is_buyer or is_vendor):
             return Response({'detail': 'Not allowed.'}, status=403)
         if booking.status in ['completed', 'cancelled']:
-            return Response(
-                {'detail': f'Cannot cancel a {booking.status} booking.'},
-                status=400
-            )
+            return Response({'detail': f'Cannot cancel a {booking.status} booking.'}, status=400)
 
         booking.status = 'cancelled'
         booking.save()
 
-        if is_buyer:
+        if is_vendor:
+            _notify(
+                recipient=booking.buyer,
+                notification_type='booking_cancelled',
+                title=f'❌ Booking Declined — {booking.listing.title}',
+                message=(
+                    f'Unfortunately, {request.user.username} has declined your booking for '
+                    f'"{booking.listing.title}" on {booking.scheduled_date}. '
+                    f'You can book again or choose another vendor.'
+                ),
+                action_url='/account/bookings',
+            )
+        elif is_buyer:
             _notify(
                 recipient=booking.listing.vendor,
                 notification_type='booking_cancelled',
-                title=f'❌ Booking Cancelled — {booking.listing.title}',
+                title=f'❌ Booking Cancelled by Buyer — {booking.listing.title}',
                 message=(
                     f'{request.user.username} has cancelled their booking for '
                     f'"{booking.listing.title}" on {booking.scheduled_date}.'
                 ),
                 action_url='/vendor/dashboard',
-            )
-        else:
-            _notify(
-                recipient=booking.buyer,
-                notification_type='booking_cancelled',
-                title=f'❌ Booking Cancelled — {booking.listing.title}',
-                message=(
-                    f'Unfortunately, {request.user.username} has cancelled your booking for '
-                    f'"{booking.listing.title}" on {booking.scheduled_date}. '
-                    f'You can book another vendor for the same service.'
-                ),
-                action_url='/book',
             )
 
         return Response({'detail': 'Booking cancelled.', 'status': 'cancelled'})
