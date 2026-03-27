@@ -10,7 +10,6 @@ import {
   ChevronRight, Hourglass, Ban,
 } from "lucide-react";
 import { useAuth, fetchWithAuth, getToken } from "@/lib/authStore";
-// Flutterwave loaded via script tag
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -65,6 +64,35 @@ const STATUS = {
   },
 };
 
+// ─── LOAD FLUTTERWAVE SCRIPT DYNAMICALLY ──────────────────────
+function loadFlutterwaveScript(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    // Already loaded
+    if (typeof (window as any).FlutterwaveCheckout === "function") {
+      resolve();
+      return;
+    }
+
+    // Script tag already injected, wait for it
+    const existing = document.querySelector(
+      'script[src="https://checkout.flutterwave.com/v3.js"]'
+    );
+    if (existing) {
+      existing.addEventListener("load", () => resolve());
+      existing.addEventListener("error", () => reject(new Error("Flutterwave failed to load")));
+      return;
+    }
+
+    // Inject fresh
+    const script = document.createElement("script");
+    script.src = "https://checkout.flutterwave.com/v3.js";
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("Flutterwave failed to load"));
+    document.head.appendChild(script);
+  });
+}
+
 export default function BuyerBookingsPage() {
   const router = useRouter();
   const { user, isLoggedIn, isHydrated } = useAuth();
@@ -74,6 +102,16 @@ export default function BuyerBookingsPage() {
   const [payingId, setPayingId] = useState<number | null>(null);
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
   const [filter, setFilter] = useState<"all" | "pending" | "confirmed" | "cancelled" | "paid">("all");
+  const [flwReady, setFlwReady] = useState(false);
+
+  // ─── PRE-LOAD FLUTTERWAVE SCRIPT ON MOUNT ─────────────────────
+  useEffect(() => {
+    loadFlutterwaveScript()
+      .then(() => setFlwReady(true))
+      .catch(() => {
+        // Will retry on pay click
+      });
+  }, []);
 
   useEffect(() => {
     if (isHydrated && !isLoggedIn) router.push("/auth");
@@ -92,7 +130,6 @@ export default function BuyerBookingsPage() {
       if (!res.ok) throw new Error("Failed to load bookings");
       const data = await res.json();
       const all: Booking[] = Array.isArray(data) ? data : (data.results || []);
-      // Only show bookings where current user is the buyer
       setBookings(all.filter(b => b.buyer_username === user?.username));
     } catch {
       setError("Could not load bookings. Pull to refresh.");
@@ -132,114 +169,95 @@ export default function BuyerBookingsPage() {
       .catch(() => {});
   }, [isLoggedIn]);
 
-  // ─── PAYSTACK PAYMENT FOR A CONFIRMED BOOKING ─────────────────
   const activeBooking = bookings.find(b => b.id === payingId);
   const listingPrice = activeBooking ? parseFloat(activeBooking.listing_price) : 0;
   const creditsToApply = useCredits ? Math.min(loyaltyBalance, listingPrice) : 0;
   const amountAfterCredits = Math.max(listingPrice - creditsToApply, 0);
-  const amountKobo = Math.round(amountAfterCredits * 100);
   const referenceRef = useRef(`STUDEX-BKG-${Date.now()}`);
 
-  // Reset reference each time a new booking is selected for payment
   useEffect(() => {
     if (payingId) {
       referenceRef.current = `STUDEX-BKG-${Date.now()}-${payingId}`;
     }
   }, [payingId]);
 
-  // Flutterwave config is passed directly to FlutterwaveCheckout
-  const flwConfig = {
-    reference: referenceRef.current,
-    email: user?.email || "",
-    amount: amountKobo,
-    publicKey: process.env.NEXT_PUBLIC_FLW_PUBLIC_KEY!,
-    // ✅ Pass vendor subaccount so Paystack splits automatically at charge time
-    ...(activeBooking?.vendor_subaccount_code && {
-      subaccount: activeBooking.vendor_subaccount_code,
-      bearer: "subaccount" as const, // platform fee deducted from subaccount (vendor pays Paystack fee)
-    }),
-    metadata: {
-      custom_fields: [
-        { display_name: "Booking ID", variable_name: "booking_id", value: String(payingId) },
-        { display_name: "Listing ID", variable_name: "listing_id", value: String(activeBooking?.listing || "") },
-        { display_name: "Customer", variable_name: "customer", value: user?.username || "" },
-        { display_name: "Order Type", variable_name: "type", value: "booking_payment" },
-      ],
-    },
-  };
-
-
-
   const handlePay = (bookingId: number) => {
     setPayingId(bookingId);
   };
 
-  // Called after payingId is set and user clicks "Proceed to Payment"
-  const proceedToFlutterwave = () => {
+  // ─── PROCEED TO FLUTTERWAVE ────────────────────────────────────
+  const proceedToFlutterwave = async () => {
     if (!activeBooking) return;
+
+    // Ensure script is loaded (retry if not ready yet)
+    if (!flwReady || typeof (window as any).FlutterwaveCheckout !== "function") {
+      showToast("Loading payment gateway...", true);
+      try {
+        await loadFlutterwaveScript();
+        setFlwReady(true);
+      } catch {
+        showToast("Payment system unavailable. Check your connection and retry.", false);
+        return;
+      }
+    }
 
     const FlutterwaveCheckout = (window as any).FlutterwaveCheckout;
 
-    if (!FlutterwaveCheckout) {
-      showToast("Payment system not loaded. Refresh page.", false);
-      return;
-    }
+    FlutterwaveCheckout({
+      public_key: process.env.NEXT_PUBLIC_FLW_PUBLIC_KEY,
+      tx_ref: referenceRef.current,
+      amount: amountAfterCredits,
+      currency: "NGN",
+      payment_options: "card,banktransfer,ussd",
+      customer: {
+        email: user?.email,
+        name: user?.username,
+      },
+      meta: {
+        booking_id: payingId,
+        listing_id: activeBooking.listing,
+        type: "booking_payment",
+      },
 
-  FlutterwaveCheckout({
-    public_key: process.env.NEXT_PUBLIC_FLW_PUBLIC_KEY,
-    tx_ref: referenceRef.current,
-    amount: amountAfterCredits, // ✅ Flutterwave uses Naira, NOT kobo
-    currency: "NGN",
-    payment_options: "card,banktransfer,ussd",
-    customer: {
-      email: user?.email,
-      name: user?.username,
-    },
-    meta: {
-      booking_id: payingId,
-      listing_id: activeBooking.listing,
-      type: "booking_payment",
-    },
+      callback: async (response: any) => {
+        try {
+          const token = getToken();
 
-    callback: async (response: any) => {
-      try {
-        const token = getToken();
+          const res = await fetch(`${API_URL}/api/payments/verify/`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              reference: response.tx_ref,
+              transaction_id: response.transaction_id,
+              listing_id: activeBooking.listing,
+              order_type: "service",
+              use_credits: useCredits,
+            }),
+          });
 
-        const res = await fetch(`${API_URL}/api/payments/verify/`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            reference: response.tx_ref,
-            transaction_id: response.transaction_id,
-            listing_id: activeBooking.listing,
-            order_type: "service",
-            use_credits: useCredits,
-          }),
-        });
+          const data = await res.json();
 
-        const data = await res.json();
-
-        if (res.ok) {
-          showToast("Payment successful! Booking confirmed ✓");
-          setPayingId(null);
-          loadBookings();
-        } else {
-          showToast(data.error || "Payment verification failed", false);
+          if (res.ok) {
+            showToast("Payment successful! Booking confirmed ✓");
+            setPayingId(null);
+            loadBookings();
+          } else {
+            showToast(data.error || "Payment verification failed", false);
+          }
+        } catch {
+          showToast("Payment received. Please check your bookings.", false);
         }
-      } catch {
-        showToast("Payment received. Please check your bookings.", false);
-      }
-    },
+      },
 
-    onclose: () => {
-      setPayingId(null);
-      showToast("Payment cancelled.", false);
-    },
-  });
-};
+      onclose: () => {
+        setPayingId(null);
+        showToast("Payment cancelled.", false);
+      },
+    });
+  };
 
   const filtered = filter === "all" ? bookings : bookings.filter(b => b.status === filter);
 
@@ -273,13 +291,24 @@ export default function BuyerBookingsPage() {
         )}
       </AnimatePresence>
 
-      {/* PAYMENT CONFIRMATION MODAL */}
+      {/* PAYMENT CONFIRMATION MODAL
+          FIX: Changed items-end to items-center on all screens so the bottom nav
+          never overlaps the modal. Also added bottom safe-area padding. */}
       <AnimatePresence>
         {payingId && activeBooking && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 z-50 flex items-end sm:items-center justify-center p-4">
-            <motion.div initial={{ y: 80, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 80, opacity: 0 }}
-              className="bg-white dark:bg-gray-900 rounded-3xl p-6 w-full max-w-md shadow-2xl">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
+            style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom, 0px))" }}
+          >
+            <motion.div
+              initial={{ y: 80, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 80, opacity: 0 }}
+              className="bg-white dark:bg-gray-900 rounded-3xl p-6 w-full max-w-md shadow-2xl overflow-y-auto max-h-[90dvh]"
+            >
               <h2 className="text-xl font-black text-gray-900 dark:text-white mb-1">Confirm Payment</h2>
               <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">You're about to pay for this confirmed booking.</p>
 
@@ -383,7 +412,9 @@ export default function BuyerBookingsPage() {
         </div>
       </div>
 
-      <div className="max-w-2xl mx-auto p-4 pb-28 space-y-4 bg-[#FFF8F0] dark:bg-gray-950 min-h-screen">
+      {/* FIX: pb-[calc(7rem+env(safe-area-inset-bottom,0px))] gives enough clearance
+          for the bottom nav on all devices including notched iPhones */}
+      <div className="max-w-2xl mx-auto p-4 pb-[calc(7rem+env(safe-area-inset-bottom,0px))] space-y-4 bg-[#FFF8F0] dark:bg-gray-950 min-h-screen">
 
         {/* FILTER TABS */}
         <div className="flex gap-2 overflow-x-auto pb-1">
@@ -474,7 +505,6 @@ export default function BuyerBookingsPage() {
 
                 {/* Action buttons */}
                 <div className="flex gap-2">
-                  {/* PAY NOW — only when confirmed */}
                   {isConfirmed && (
                     <button onClick={() => handlePay(booking.id)}
                       className="flex-1 py-3 bg-gradient-to-r from-teal-500 to-emerald-500 text-white rounded-xl font-black text-sm flex items-center justify-center gap-2 shadow-md">
@@ -482,7 +512,6 @@ export default function BuyerBookingsPage() {
                     </button>
                   )}
 
-                  {/* CANCEL — only when pending */}
                   {isPending && (
                     <button onClick={() => cancelBooking(booking.id)}
                       className="flex-shrink-0 py-3 px-4 bg-white dark:bg-gray-800 border border-red-200 dark:border-red-800 text-red-500 rounded-xl font-bold text-sm flex items-center gap-1.5">
@@ -490,7 +519,6 @@ export default function BuyerBookingsPage() {
                     </button>
                   )}
 
-                  {/* Rebooking suggestion for cancelled */}
                   {booking.status === "cancelled" && (
                     <button onClick={() => router.push("/home")}
                       className="flex-1 py-3 bg-white dark:bg-gray-800 border border-purple-200 dark:border-purple-800 text-purple-600 rounded-xl font-bold text-sm flex items-center justify-center gap-2">
