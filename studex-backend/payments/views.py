@@ -11,9 +11,16 @@ from .models import SellerBankAccount, PaymentTransaction
 
 logger = logging.getLogger(__name__)
 
-FLW_SECRET = settings.FLW_SECRET_KEY
+# .strip() prevents \n or trailing spaces in env var from crashing HTTP headers
+FLW_SECRET = (getattr(settings, "FLW_SECRET_KEY", "") or "").strip()
+if not FLW_SECRET:
+    logger.error("FLW_SECRET_KEY is not set in Django settings / environment variables!")
+
 FLW_BASE = "https://api.flutterwave.com/v3"
-FLW_HEADERS = {"Authorization": f"Bearer {FLW_SECRET}", "Content-Type": "application/json"}
+FLW_HEADERS = {
+    "Authorization": f"Bearer {FLW_SECRET}",
+    "Content-Type": "application/json",
+}
 
 
 def get_commission_split(amount: Decimal):
@@ -28,26 +35,80 @@ def get_commission_split(amount: Decimal):
 
 
 # ─────────────────────────────────────────
-# GET BANKS — proxied through backend to avoid CORS
-# Frontend calls /api/payments/banks/ instead of Flutterwave directly
+# GET BANKS — backend proxy to avoid CORS
 # ─────────────────────────────────────────
 
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def get_banks(request):
     try:
-        res = requests.get(
-            f"{FLW_BASE}/banks/NG",
-            headers=FLW_HEADERS,
-            timeout=10,
-        )
+        res = requests.get(f"{FLW_BASE}/banks/NG", headers=FLW_HEADERS, timeout=10)
         if res.status_code == 200:
             return Response(res.json(), status=200)
-        logger.warning(f"FLW banks fetch failed: {res.status_code} {res.text[:200]}")
-        return Response({"data": []}, status=200)  # Fall back to empty — frontend uses FALLBACK_BANKS
+        logger.warning(f"FLW banks fetch failed: {res.status_code} {res.text[:300]}")
+        return Response({"data": []}, status=200)
     except Exception as e:
         logger.error(f"get_banks error: {e}", exc_info=True)
         return Response({"data": []}, status=200)
+
+
+# ─────────────────────────────────────────
+# VERIFY BANK ACCOUNT
+# ─────────────────────────────────────────
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def verify_bank_account(request):
+    account_number = request.data.get("account_number")
+    bank_code = request.data.get("bank_code")
+
+    if not account_number or not bank_code:
+        return Response({"error": "account_number and bank_code required."}, status=400)
+
+    if not FLW_SECRET:
+        return Response(
+            {"error": "Verification unavailable. Please enter your account name manually."},
+            status=400
+        )
+
+    try:
+        payload = {"account_number": str(account_number), "account_bank": str(bank_code)}
+        logger.info(f"FLW resolve request: {payload}")
+
+        res = requests.post(
+            f"{FLW_BASE}/accounts/resolve",
+            headers=FLW_HEADERS,
+            json=payload,
+            timeout=15,
+        )
+
+        logger.info(f"FLW resolve response: status={res.status_code} body={res.text[:500]}")
+
+        try:
+            resp_json = res.json()
+        except Exception:
+            resp_json = {}
+
+        if res.status_code == 200 and resp_json.get("status") == "success":
+            account_name = resp_json.get("data", {}).get("account_name", "")
+            return Response({"account_name": account_name})
+
+        flw_message = resp_json.get("message", "Could not verify account.")
+        logger.warning(f"FLW resolve failed: {res.status_code} — {flw_message}")
+        return Response({"error": flw_message}, status=400)
+
+    except requests.exceptions.Timeout:
+        logger.warning("FLW account resolve timed out")
+        return Response(
+            {"error": "Verification timed out. Enter your account name manually."},
+            status=400
+        )
+    except Exception as e:
+        logger.error(f"verify_bank_account unexpected error: {e}", exc_info=True)
+        return Response(
+            {"error": "Verification unavailable. Please enter your account name manually."},
+            status=400
+        )
 
 
 # ─────────────────────────────────────────
@@ -104,62 +165,6 @@ def seller_bank_account(request):
 
 
 # ─────────────────────────────────────────
-# VERIFY BANK ACCOUNT — auto-fill account name
-# ─────────────────────────────────────────
-
-@api_view(["POST"])
-@permission_classes([IsAuthenticated])
-def verify_bank_account(request):
-    account_number = request.data.get("account_number")
-    bank_code = request.data.get("bank_code")
-
-    if not account_number or not bank_code:
-        return Response({"error": "account_number and bank_code required."}, status=400)
-
-    try:
-        res = requests.post(
-            f"{FLW_BASE}/accounts/resolve",
-            headers=FLW_HEADERS,
-            json={"account_number": account_number, "account_bank": bank_code},
-            timeout=10,
-        )
-
-        logger.info(f"FLW resolve: status={res.status_code} body={res.text[:300]}")
-
-        if res.status_code == 200:
-            data = res.json()
-            if data.get("status") == "success":
-                account_name = data.get("data", {}).get("account_name", "")
-                return Response({"account_name": account_name})
-            else:
-                return Response(
-                    {"error": data.get("message", "Could not verify account.")},
-                    status=400
-                )
-
-        try:
-            flw_msg = res.json().get("message", "Verification unavailable.")
-        except Exception:
-            flw_msg = "Verification unavailable."
-
-        logger.warning(f"FLW resolve non-200: {res.status_code} — {flw_msg}")
-        return Response({"error": flw_msg}, status=400)
-
-    except requests.exceptions.Timeout:
-        logger.warning("FLW account resolve timed out")
-        return Response(
-            {"error": "Verification timed out. Enter your account name manually."},
-            status=400
-        )
-    except Exception as e:
-        logger.error(f"verify_bank_account unexpected error: {e}", exc_info=True)
-        return Response(
-            {"error": "Verification unavailable. Please enter your account name manually."},
-            status=400
-        )
-
-
-# ─────────────────────────────────────────
 # VERIFY PAYMENT + CREATE ORDER
 # ─────────────────────────────────────────
 
@@ -167,7 +172,7 @@ def verify_bank_account(request):
 @permission_classes([IsAuthenticated])
 def verify_payment(request):
     reference = request.data.get("reference")
-    transaction_id = request.data.get("transaction_id")
+    transaction_id = request.data.get("transaction_id")  # numeric Flutterwave ID
     order_type = request.data.get("order_type", "product")
     listing_id = request.data.get("listing_id")
     items = request.data.get("items", [])
@@ -199,7 +204,7 @@ def verify_payment(request):
         return Response({"error": "Payment verification failed. Please contact support."}, status=400)
 
     if verify_res.status_code != 200:
-        logger.error(f"Flutterwave verification HTTP error: {verify_res.status_code}")
+        logger.error(f"Flutterwave verification HTTP error: {verify_res.status_code} {verify_res.text[:300]}")
         return Response({"error": "Payment verification failed."}, status=400)
 
     verify_data = verify_res.json()
@@ -213,6 +218,9 @@ def verify_payment(request):
     buyer_email = flw_data.get("customer", {}).get("email", request.user.email)
     ref_key = flw_data.get("tx_ref", ref_key)
 
+    # ── Store the numeric transaction ID — needed for refunds later ──
+    flw_transaction_id = flw_data.get("id")  # this is the numeric ID e.g. 12345678
+
     seller_rate, platform_rate = get_commission_split(amount_paid)
     seller_amount = (amount_paid * seller_rate).quantize(Decimal("0.01"))
     platform_amount = (amount_paid * platform_rate).quantize(Decimal("0.01"))
@@ -223,6 +231,7 @@ def verify_payment(request):
         buyer=request.user,
         seller=seller,
         reference=ref_key,
+        flw_transaction_id=flw_transaction_id,  # ← saved for refunds
         amount=amount_paid,
         seller_amount=seller_amount,
         platform_amount=platform_amount,
@@ -368,16 +377,24 @@ def seller_transactions(request):
     ).order_by("-created_at")[:50]
 
     return Response([{
-        "id": t.id, "reference": t.reference,
-        "amount": float(t.amount), "seller_amount": float(t.seller_amount),
-        "platform_amount": float(t.platform_amount), "order_type": t.order_type,
-        "buyer_name": t.buyer_name, "buyer_email": t.buyer_email,
-        "order_id": t.order_id, "created_at": t.created_at.isoformat(),
+        "id": t.id,
+        "reference": t.reference,
+        "flw_transaction_id": t.flw_transaction_id,
+        "amount": float(t.amount),
+        "seller_amount": float(t.seller_amount),
+        "platform_amount": float(t.platform_amount),
+        "order_type": t.order_type,
+        "buyer_name": t.buyer_name,
+        "buyer_email": t.buyer_email,
+        "order_id": t.order_id,
+        "created_at": t.created_at.isoformat(),
     } for t in txns])
 
 
 # ─────────────────────────────────────────
 # REFUND
+# Flutterwave refunds require the NUMERIC transaction ID (e.g. 12345678)
+# not the tx_ref string. We store flw_transaction_id at payment time for this.
 # ─────────────────────────────────────────
 
 @api_view(["POST"])
@@ -400,23 +417,55 @@ def refund_payment(request):
     if txn.status == "refunded":
         return Response({"error": "This transaction has already been refunded."}, status=400)
 
+    # Must use the numeric Flutterwave transaction ID for refunds
+    if not txn.flw_transaction_id:
+        logger.error(f"Refund attempted but flw_transaction_id missing for ref: {reference}")
+        return Response({
+            "error": "Cannot process refund automatically — missing transaction ID. Please contact support."
+        }, status=400)
+
     try:
         refund_res = requests.post(
-            f"{FLW_BASE}/transactions/{reference}/refund",
+            f"{FLW_BASE}/transactions/{txn.flw_transaction_id}/refund",
             headers=FLW_HEADERS,
             json={"amount": float(txn.amount), "comments": reason},
             timeout=15,
         )
+
+        logger.info(f"FLW refund response: status={refund_res.status_code} body={refund_res.text[:300]}")
+
         if refund_res.status_code in [200, 201]:
             txn.status = "refunded"
             txn.save()
+
+            # Notify buyer
+            try:
+                from notifications.models import Notification
+                Notification.objects.create(
+                    recipient=txn.buyer,
+                    notification_type='refund_processed',
+                    title='💸 Refund Initiated',
+                    message=(
+                        f'Your refund of ₦{txn.amount:,.0f} has been initiated. '
+                        f'It will return to your original payment method within 3-5 business days.'
+                    ),
+                    action_url='/account/orders',
+                )
+            except Exception as ne:
+                logger.warning(f"Refund notification failed: {ne}")
+
             return Response({
                 "message": "Refund initiated. Amount returns to original payment method within 3-5 business days.",
-                "reference": reference, "amount": float(txn.amount),
+                "reference": reference,
+                "amount": float(txn.amount),
             })
+
         error_data = refund_res.json()
         logger.error(f"Flutterwave refund failed: {error_data}")
-        return Response({"error": error_data.get("message", "Refund failed. Please contact support.")}, status=400)
+        return Response({
+            "error": error_data.get("message", "Refund failed. Please contact support.")
+        }, status=400)
+
     except Exception as e:
         logger.error(f"Refund request failed: {e}", exc_info=True)
         return Response({"error": "Refund request failed. Please contact support."}, status=400)
@@ -435,13 +484,12 @@ def seller_earnings(request):
     total_orders = Order.objects.filter(listing__vendor=user).count()
     txns = PaymentTransaction.objects.filter(seller=user, status="success")
     total_earned = txns.aggregate(Sum("seller_amount"))["seller_amount__sum"] or 0
-    pending = 0
 
     commission_rate = 30 if total_orders < 10 else (20 if total_orders < 50 else 15)
 
     return Response({
         "total_earned": float(total_earned),
-        "pending": float(pending),
+        "pending": 0,
         "available": float(total_earned),
         "total_orders": total_orders,
         "commission_rate": commission_rate,
@@ -517,7 +565,7 @@ def _create_or_update_flw_subaccount(user, bank_code, account_number, account_na
         if res.status_code in [200, 201]:
             return res.json()["data"]["id"]
 
-        logger.error(f"Flutterwave subaccount error: {res.text}")
+        logger.error(f"Flutterwave subaccount error: {res.status_code} {res.text[:300]}")
         return None
 
     except Exception as e:
@@ -579,6 +627,7 @@ def flutterwave_webhook(request):
 
     if event == "charge.completed" and data.get("status") == "successful":
         tx_ref = data.get("tx_ref")
+        flw_transaction_id = data.get("id")
         amount = Decimal(str(data.get("amount", 0)))
 
         if PaymentTransaction.objects.filter(reference=tx_ref, status="success").exists():
@@ -603,9 +652,14 @@ def flutterwave_webhook(request):
             PaymentTransaction.objects.get_or_create(
                 reference=tx_ref,
                 defaults={
-                    "buyer": buyer, "seller": seller, "amount": amount,
-                    "seller_amount": seller_amount, "platform_amount": platform_amount,
-                    "status": "success", "order_type": meta.get("type", "product"),
+                    "buyer": buyer,
+                    "seller": seller,
+                    "amount": amount,
+                    "flw_transaction_id": flw_transaction_id,
+                    "seller_amount": seller_amount,
+                    "platform_amount": platform_amount,
+                    "status": "success",
+                    "order_type": meta.get("type", "product"),
                     "buyer_email": customer_email,
                     "buyer_name": buyer.get_full_name() or buyer.username,
                     "flw_response": data,

@@ -12,7 +12,7 @@ class SellerBankAccount(models.Model):
     bank_name = models.CharField(max_length=100)
     account_number = models.CharField(max_length=20)
     account_name = models.CharField(max_length=200)
-    # Flutterwave subaccount ID for split payments
+    # Flutterwave subaccount ID for split payments (e.g. "RS_ABC123" or numeric id)
     flw_subaccount_id = models.CharField(max_length=100, blank=True, null=True)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -43,7 +43,11 @@ class PaymentTransaction(models.Model):
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
         null=True, related_name="received_payments"
     )
-    reference = models.CharField(max_length=200, unique=True)
+    reference = models.CharField(max_length=200, unique=True)  # tx_ref string
+
+    # ── Flutterwave's numeric transaction ID — required for refunds ──
+    flw_transaction_id = models.BigIntegerField(null=True, blank=True)
+
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     seller_amount = models.DecimalField(max_digits=12, decimal_places=2)
     platform_amount = models.DecimalField(max_digits=12, decimal_places=2)
@@ -54,7 +58,7 @@ class PaymentTransaction(models.Model):
     buyer_name = models.CharField(max_length=200, blank=True)
     order_id = models.IntegerField(null=True, blank=True)
 
-    # Flutterwave response payload
+    # Full Flutterwave response payload
     flw_response = models.JSONField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
