@@ -154,6 +154,11 @@ export default function BuyerBookingsPage() {
   const proceedToFlutterwave = () => {
     if (!activeBooking) return;
 
+    if (!activeBooking.vendor_subaccount_code) {
+  showToast("Vendor is not set up to receive payments yet.", false);
+  return;
+}
+
     const FlutterwaveCheckout = (window as any).FlutterwaveCheckout;
 
     if (typeof FlutterwaveCheckout !== "function") {
@@ -163,15 +168,25 @@ export default function BuyerBookingsPage() {
 
     // ✅ Synchronous call — browser sees this as a direct user gesture
     FlutterwaveCheckout({
-      public_key: process.env.NEXT_PUBLIC_FLW_PUBLIC_KEY,
-      tx_ref: referenceRef.current,
-      amount: amountAfterCredits,
-      currency: "NGN",
-      payment_options: "card,banktransfer,ussd",
-      customer: {
-        email: user?.email,
-        name: user?.username,
-      },
+  public_key: process.env.NEXT_PUBLIC_FLW_PUBLIC_KEY,
+  tx_ref: referenceRef.current,
+  amount: amountAfterCredits,
+  currency: "NGN",
+  payment_options: "card,banktransfer,ussd",
+
+  // ✅ ADD THIS BLOCK (THIS FIXES SPLIT PAYMENTS)
+  subaccounts: activeBooking.vendor_subaccount_code
+    ? [
+        {
+          id: activeBooking.vendor_subaccount_code,
+        },
+      ]
+    : [],
+
+  customer: {
+    email: user?.email,
+    name: user?.username,
+  },
       meta: {
         booking_id: payingId,
         listing_id: activeBooking.listing,
@@ -345,7 +360,6 @@ export default function BuyerBookingsPage() {
               <div className="flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-3 mb-5">
                 <AlertCircle className="w-4 h-4 text-blue-500 flex-shrink-0" />
                 <p className="text-xs text-blue-700 dark:text-blue-300">
-                  Payment is held in escrow and only released to the vendor after you confirm the service was completed.
                 </p>
               </div>
 
