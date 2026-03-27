@@ -6,61 +6,20 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { motion } from "framer-motion";
 import {
   Package, CreditCard, ArrowLeft, Shield, Lock, Sparkles, Check,
-  Calendar, MapPin, Clock, Building2, Loader, Tag,
+  Calendar, MapPin, Clock, Building2, Loader
 } from "lucide-react";
 import { useCartStore } from "@/lib/cartStore";
 import { useBookingStore } from "@/lib/bookingStore";
 import { useRouter } from "next/navigation";
 import { useAuth, fetchWithAuth } from "@/lib/authStore";
-import { usePaystackPayment } from "react-paystack";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+const FLW_PUBLIC_KEY = process.env.NEXT_PUBLIC_FLW_PUBLIC_KEY!;
 
-interface PricePreview {
-  original_amount: string;
-  discount_eligible: boolean;
-  discount_percent: number;
-  discount_amount: string;
-  final_amount: string;
-  discount_message: string | null;
-  subaccount_code: string | null;   // ✅ vendor's Paystack subaccount
-  vendor_share: number | null;       // ✅ vendor's percentage e.g. 75
-}
-
-function PaystackButton({
-  config, isProcessing, setIsProcessing, isLoggedIn, onSuccess, onClose, label,
-}: {
-  config: Parameters<typeof usePaystackPayment>[0];
-  isProcessing: boolean;
-  setIsProcessing: (v: boolean) => void;
-  isLoggedIn: boolean;
-  onSuccess: (ref: any) => void;
-  onClose: () => void;
-  label: string;
-}) {
-  const initializePayment = usePaystackPayment(config);
-  return (
-    <motion.button
-      whileHover={{ scale: isProcessing ? 1 : 1.02 }}
-      whileTap={{ scale: isProcessing ? 1 : 0.98 }}
-      onClick={() => {
-        if (!isLoggedIn || isProcessing) return;
-        setIsProcessing(true);
-        initializePayment({ onSuccess, onClose });
-      }}
-      disabled={isProcessing || !isLoggedIn}
-      className={`w-full py-8 rounded-3xl font-black text-3xl shadow-2xl
-        bg-gradient-to-r from-purple-600 to-teal-600 text-white
-        flex items-center justify-center gap-4
-        ${isProcessing ? "opacity-70 cursor-not-allowed" : "hover:shadow-purple-500/50"}`}
-    >
-      {isProcessing ? (
-        <><Loader className="w-8 h-8 animate-spin" /> Processing...</>
-      ) : (
-        <><CreditCard className="w-10 h-10" /> {label}</>
-      )}
-    </motion.button>
-  );
+declare global {
+  interface Window {
+    FlutterwaveCheckout: (config: any) => void;
+  }
 }
 
 export default function CheckoutPage() {
@@ -72,142 +31,121 @@ export default function CheckoutPage() {
   const isServiceBooking = !!booking && cart.length === 0;
   const isFoodOrder = cart.length > 0;
 
-  const rawTotal = isServiceBooking
-    ? (booking?.total || 0)
-    : cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const foodTotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const serviceTotal = booking?.total || 0;
+  const finalTotal = isServiceBooking ? serviceTotal : foodTotal;
 
-  const [pricePreview, setPricePreview] = useState<PricePreview | null>(null);
-  const [previewLoading, setPreviewLoading] = useState(false);
-  const [paystackReady, setPaystackReady] = useState(false);
-  const [chargeAmount, setChargeAmount] = useState(rawTotal);
-
-  useEffect(() => {
-    if (!user || rawTotal <= 0) return;
-    const fetchPreview = async () => {
-      setPreviewLoading(true);
-      setPaystackReady(false);
-      try {
-        const res = await fetchWithAuth(`${API_URL}/api/payments/preview/`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            amount: rawTotal,
-            // ✅ Pass listing_id so backend can look up vendor's subaccount
-            listing_id: isServiceBooking ? booking?.providerId : (cart[0]?.id ?? null),
-          }),
-        });
-        if (res.ok) {
-          const data: PricePreview = await res.json();
-          setPricePreview(data);
-          setChargeAmount(parseFloat(data.final_amount));
-        }
-      } catch {
-        setChargeAmount(rawTotal);
-      } finally {
-        setPreviewLoading(false);
-        setPaystackReady(true);
-      }
-    };
-    fetchPreview();
-  }, [user, rawTotal]);
-
-  const chargeAmountInKobo = Math.round(chargeAmount * 100);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<"card" | "transfer">("card");
+  const [flwLoaded, setFlwLoaded] = useState(false);
 
-  const referenceRef = useRef(
-    `STUDEX-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`
-  );
+  const txRef = useRef(`STUDEX-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`);
 
-  // ✅ Build Paystack config with subaccount split if available
-  const paystackSubaccount = pricePreview?.subaccount_code ?? null;
-  const vendorShare = pricePreview?.vendor_share ?? 75; // default 75% to vendor
+  // Load Flutterwave script
+  useEffect(() => {
+    if (document.getElementById("flw-script")) { setFlwLoaded(true); return; }
+    const script = document.createElement("script");
+    script.id = "flw-script";
+    script.src = "https://checkout.flutterwave.com/v3.js";
+    script.onload = () => setFlwLoaded(true);
+    document.head.appendChild(script);
+  }, []);
 
-  const config: Parameters<typeof usePaystackPayment>[0] = {
-    reference: referenceRef.current,
-    email: user?.email || "user@studex.com",
-    amount: chargeAmountInKobo,
-    publicKey: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY!,
-    channels: paymentMethod === "transfer"
-      ? (["bank_transfer"] as any)
-      : (["card", "bank", "ussd", "bank_transfer"] as any),
-    // ✅ Subaccount split — sends vendor their cut automatically
-    ...(paystackSubaccount ? {
-      subaccount: paystackSubaccount,
-      bearer: "account",           // platform bears Paystack's transaction fee
-      transaction_charge: 0,       // use percentage split, not fixed charge
-    } : {}),
-    metadata: {
-      custom_fields: [
-        { display_name: "Customer", variable_name: "customer", value: user?.username || "" },
-        {
-          display_name: "Order Type", variable_name: "type",
-          value: isServiceBooking ? "service_booking" : "product_order",
-        },
-        // ✅ Pass listing_id in metadata so webhook can link to correct listing
-        {
-          display_name: "Listing ID", variable_name: "listing_id",
-          value: String(isServiceBooking ? booking?.providerId ?? "" : cart[0]?.id ?? ""),
-        },
-      ],
-    },
-  };
-
-  const createOrder = async (paymentRef: string) => {
+  const createOrder = async (txRef: string, transactionId: string) => {
     if (isServiceBooking && booking) {
       const res = await fetchWithAuth(`${API_URL}/api/payments/verify/`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          reference: paymentRef,
+          reference: txRef,
+          transaction_id: transactionId,
           listing_id: booking.providerId,
           order_type: "service",
-          booking_id: booking.bookingId ?? null,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Order creation failed");
-      return data;
+      return data.order_id;
     }
+
     const res = await fetchWithAuth(`${API_URL}/api/payments/verify/`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        reference: paymentRef,
-        items: cart.map((item) => ({ listing_id: item.id, quantity: item.quantity })),
+        reference: txRef,
+        transaction_id: transactionId,
+        items: cart.map(item => ({ listing_id: item.id, quantity: item.quantity })),
         order_type: "product",
       }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Order creation failed");
-    return data;
+    return data.order_id;
   };
 
-  const handlePaystackSuccess = useCallback(async (ref: any) => {
-    if (!isLoggedIn) { router.push("/auth"); return; }
-    try {
-      const result = await createOrder(ref.reference);
-      // ✅ Clear cart/booking on success
-      if (isFoodOrder) clearCart();
-      if (isServiceBooking) clearBooking();
-      // ✅ Navigate using order_id — always defined on success
-      if (result.order_id) {
-        router.push(`/order-confirmation/${result.order_id}`);
-      } else {
-        // Already processed — look up via reference
-        router.push(`/order-confirmation/ref/${ref.reference}`);
-      }
-    } catch (error: any) {
-      // ✅ Payment went through even if our server had an issue
-      // Clear cart so user is not double-charged
-      if (isFoodOrder) clearCart();
-      if (isServiceBooking) clearBooking();
-      // Show friendly message with reference number
-      router.push(`/payment-received?ref=${ref.reference}`);
-    }
-  }, [isLoggedIn, isFoodOrder, isServiceBooking]);
+  const handlePayment = useCallback(() => {
+    if (!FLW_PUBLIC_KEY) { alert("Flutterwave key missing. Check your .env file."); return; }
+    if (finalTotal <= 0) { alert("Cannot process zero payment."); return; }
+    if (!flwLoaded || !window.FlutterwaveCheckout) { alert("Payment system loading. Please try again."); return; }
 
-  const handlePaystackClose = useCallback(() => { setIsProcessing(false); }, []);
+    setIsProcessing(true);
+
+    // Get vendor subaccount if available
+    const getSubaccount = async () => {
+      if (isServiceBooking && booking?.providerId) {
+        try {
+          const res = await fetchWithAuth(`${API_URL}/api/payments/seller-bank-account/`);
+          const data = await res.json();
+          return data.flw_subaccount_id || null;
+        } catch { return null; }
+      }
+      return null;
+    };
+
+    getSubaccount().then(subaccountId => {
+      window.FlutterwaveCheckout({
+        public_key: FLW_PUBLIC_KEY,
+        tx_ref: txRef.current,
+        amount: finalTotal,
+        currency: "NGN",
+        payment_options: "card,banktransfer,ussd,opay",
+        customer: {
+          email: user?.email || "user@studex.com",
+          name: user?.username || "StudEx User",
+        },
+        ...(subaccountId ? {
+          subaccounts: [{
+            id: subaccountId,
+            transaction_split_ratio: 70,
+          }]
+        } : {}),
+        meta: {
+          listing_id: isServiceBooking ? booking?.providerId : null,
+          type: isServiceBooking ? "service_booking" : "product_order",
+          customer: user?.username || "",
+        },
+        customizations: {
+          title: "StudEx",
+          description: isServiceBooking ? "Service Booking" : "Product Order",
+          logo: "https://studexng.vercel.app/images/logo-1.jpg",
+        },
+        callback: async (response: any) => {
+          if (response.status === "successful" || response.status === "completed") {
+            try {
+              const orderId = await createOrder(response.tx_ref, String(response.transaction_id));
+              if (isFoodOrder) clearCart();
+              if (isServiceBooking) clearBooking();
+              router.push(`/order-confirmation/${orderId}`);
+            } catch (error: any) {
+              console.error("Order creation failed:", error.message);
+              alert(`Payment received but order failed. Contact support with ref: ${response.tx_ref}`);
+              setIsProcessing(false);
+            }
+          } else {
+            setIsProcessing(false);
+          }
+        },
+        onclose: () => { setIsProcessing(false); },
+      });
+    });
+  }, [finalTotal, isLoggedIn, flwLoaded, isFoodOrder, isServiceBooking, user]);
 
   if (!isFoodOrder && !isServiceBooking) {
     return (
@@ -232,17 +170,14 @@ export default function CheckoutPage() {
       <motion.div initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
         className="sticky top-0 bg-white/95 backdrop-blur-xl z-50 border-b border-purple-100 shadow-lg">
         <div className="flex items-center justify-between px-6 py-5 max-w-4xl mx-auto">
-          <Link href={isServiceBooking ? `/lashes/${booking?.providerId}` : "/cart"}>
-            <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
-              className="p-2 hover:bg-purple-100 rounded-full transition">
+          <Link href={isServiceBooking ? `/listing/${booking?.providerId}` : "/cart"}>
+            <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} className="p-2 hover:bg-purple-100 rounded-full transition">
               <ArrowLeft className="w-7 h-7 text-purple-600" />
             </motion.div>
           </Link>
           <div className="text-center">
             <h1 className="text-2xl font-black bg-gradient-to-r from-purple-600 to-teal-600 bg-clip-text text-transparent">Secure Checkout</h1>
-            <p className="text-xs text-gray-500 flex items-center gap-1 justify-center">
-              <Shield className="w-3 h-3" /> Powered by Paystack
-            </p>
+            <p className="text-xs text-gray-500 flex items-center gap-1 justify-center"><Shield className="w-3 h-3" /> Powered by Flutterwave</p>
           </div>
           <div className="w-10" />
         </div>
@@ -250,56 +185,41 @@ export default function CheckoutPage() {
 
       <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-teal-50 px-6 pt-8 pb-32 max-w-4xl mx-auto">
 
-        {/* Order Summary */}
+        {/* ORDER SUMMARY */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-3xl p-8 shadow-lg border border-purple-100 mb-6">
+          className="bg-white/90 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-white mb-6">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-black text-gray-900 flex items-center gap-3">
-              {isServiceBooking
-                ? <Calendar className="w-7 h-7 text-purple-600" />
-                : <Package className="w-7 h-7 text-purple-600" />}
+              {isServiceBooking ? <Calendar className="w-7 h-7 text-purple-600" /> : <Package className="w-7 h-7 text-purple-600" />}
               {isServiceBooking ? "Your Appointment" : "Your Order"}
             </h2>
             <Sparkles className="w-6 h-6 text-teal-500" />
           </div>
 
           <div className="space-y-5">
-            {/* SERVICE BOOKING */}
             {isServiceBooking && booking && (
               <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
-                className="bg-gradient-to-r from-purple-50 to-teal-50 rounded-3xl p-6 border border-purple-100">
+                className="bg-gradient-to-r from-purple-100 to-teal-100 rounded-3xl p-8">
                 <div className="flex items-center gap-5 mb-6">
-                  {booking.providerImg ? (
-                    <div className="relative w-24 h-24 rounded-3xl overflow-hidden ring-4 ring-purple-200">
-                      <Image
-                        src={booking.providerImg.startsWith("http") ? booking.providerImg : `/images/${booking.providerImg}`}
-                        alt={booking.providerName} fill className="object-cover" />
-                    </div>
-                  ) : (
-                    <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-purple-400 to-teal-400 flex items-center justify-center ring-4 ring-purple-200 flex-shrink-0">
-                      <span className="text-4xl font-black text-white">
-                        {booking.providerName?.[0]?.toUpperCase() || "S"}
-                      </span>
-                    </div>
-                  )}
+                  <div className="relative w-24 h-24 rounded-3xl overflow-hidden ring-4 ring-purple-200">
+                    <Image src={`/images/${booking.providerImg}`} alt={booking.providerName} fill className="object-cover" />
+                  </div>
                   <div>
-                    <h3 className="text-2xl font-black text-gray-900">{booking.providerName}</h3>
-                    <p className="text-purple-600 font-bold">Service Booking</p>
+                    <h3 className="text-2xl font-black">{booking.providerName}</h3>
+                    <p className="text-purple-700 font-bold">Service Booking</p>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4 text-base">
-                  <div className="flex items-center gap-3 text-gray-700"><Calendar className="w-5 h-5 text-purple-500" /><span className="font-medium">{booking.date}</span></div>
-                  <div className="flex items-center gap-3 text-gray-700"><Clock className="w-5 h-5 text-purple-500" /><span className="font-medium">{booking.time}</span></div>
-                  <div className="flex items-center gap-3 col-span-2 text-gray-700"><MapPin className="w-5 h-5 text-purple-500" /><span className="font-medium">{booking.location}</span></div>
+                <div className="grid grid-cols-2 gap-4 text-lg">
+                  <div className="flex items-center gap-3"><Calendar className="w-5 h-5" /><span className="font-medium">{booking.date}</span></div>
+                  <div className="flex items-center gap-3"><Clock className="w-5 h-5" /><span className="font-medium">{booking.time}</span></div>
+                  <div className="flex items-center gap-3 col-span-2"><MapPin className="w-5 h-5" /><span className="font-medium">{booking.location}</span></div>
                 </div>
               </motion.div>
             )}
 
-            {/* PRODUCT/FOOD */}
             {isFoodOrder && cart.map((item, i) => (
-              <motion.div key={item.id} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: i * 0.1 }}
-                className="flex justify-between items-center p-4 bg-gradient-to-r from-purple-50 to-teal-50 rounded-2xl border border-purple-100">
+              <motion.div key={item.id} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.1 }}
+                className="flex justify-between items-center p-4 bg-gradient-to-r from-purple-50 to-teal-50 rounded-2xl">
                 <div className="flex-1">
                   <p className="font-bold text-gray-900 text-lg">{item.title}</p>
                   <p className="text-sm text-purple-600 font-medium">×{item.quantity}</p>
@@ -308,168 +228,56 @@ export default function CheckoutPage() {
               </motion.div>
             ))}
 
-            {/* PRICE BREAKDOWN */}
-            <div className="border-t-2 border-purple-100 pt-6 mt-6 space-y-3">
-              {previewLoading ? (
-                <div className="animate-pulse h-20 bg-purple-50 rounded-2xl" />
-              ) : (
-                <>
-                  <div className="flex justify-between items-center text-base">
-                    <span className="text-gray-500 font-medium">{isServiceBooking ? "Service Price" : "Order Total"}</span>
-                    <span className="font-bold text-gray-700">₦{rawTotal.toLocaleString()}</span>
-                  </div>
-
-                  {pricePreview?.discount_eligible && (
-                    <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
-                      className="flex justify-between items-center text-base">
-                      <span className="text-green-600 font-bold flex items-center gap-2">
-                        <Tag className="w-4 h-4" /> Profile Discount ({pricePreview.discount_percent}% off)
-                      </span>
-                      <span className="text-green-600 font-black">−₦{Number(pricePreview.discount_amount).toLocaleString()}</span>
-                    </motion.div>
-                  )}
-
-                  <div className="flex justify-between items-center text-base">
-                    <span className="text-gray-500 font-medium">Platform Fee</span>
-                    <span className="text-green-600 font-bold">Included</span>
-                  </div>
-
-                  <motion.div initial={{ scale: 0.97 }} animate={{ scale: 1 }}
-                    className="bg-gradient-to-r from-purple-600 to-teal-600 rounded-2xl p-6 text-white mt-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-xl font-bold">Total Amount</span>
-                      <div className="text-right">
-                        {pricePreview?.discount_eligible && (
-                          <p className="text-sm line-through opacity-60">₦{rawTotal.toLocaleString()}</p>
-                        )}
-                        <span className="text-4xl font-black">₦{chargeAmount.toLocaleString()}</span>
-                      </div>
-                    </div>
-                  </motion.div>
-
-                  {pricePreview?.discount_eligible && (
-                    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-                      className="bg-green-50 border-2 border-green-200 rounded-2xl p-4 text-center">
-                      <p className="text-green-700 font-black text-sm">{pricePreview.discount_message}</p>
-                      <p className="text-green-600 text-xs mt-1">One-time reward for completing your profile ✓</p>
-                    </motion.div>
-                  )}
-                </>
-              )}
+            <div className="border-t-2 border-purple-200 pt-6 mt-6">
+              <div className="flex justify-between items-center mb-4">
+                <span className="text-gray-600 font-medium">Platform Fee</span>
+                <span className="text-green-600 font-bold">Included</span>
+              </div>
+              <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }}
+                className="bg-gradient-to-r from-purple-600 to-teal-600 rounded-2xl p-6 text-white">
+                <div className="flex justify-between items-center">
+                  <span className="text-xl font-bold">Total Amount</span>
+                  <span className="text-4xl font-black">₦{finalTotal.toLocaleString()}</span>
+                </div>
+              </motion.div>
             </div>
           </div>
         </motion.div>
 
-        {/* PAYMENT METHOD */}
+        {/* SECURITY BADGES */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
-          className="space-y-4 mb-6">
-          <h2 className="text-xl font-black text-gray-900">Choose Payment Method</h2>
-
-          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
-            onClick={() => setPaymentMethod("card")}
-            className={`w-full rounded-2xl p-6 transition-all text-left ${
-              paymentMethod === "card"
-                ? "bg-gradient-to-r from-purple-600 to-teal-600 text-white shadow-xl"
-                : "bg-white text-gray-800 shadow-md border border-purple-100"
-            }`}>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <CreditCard className="w-8 h-8" />
-                <div>
-                  <p className="text-xl font-black">Card / USSD / Bank</p>
-                  <p className={`text-sm font-medium ${paymentMethod === "card" ? "opacity-90" : "text-gray-500"}`}>
-                    Visa, Mastercard, Verve, USSD
-                  </p>
-                </div>
-              </div>
-              {paymentMethod === "card" && <Check className="w-8 h-8" />}
-            </div>
-          </motion.button>
-
-          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
-            onClick={() => setPaymentMethod("transfer")}
-            className={`w-full rounded-2xl p-6 transition-all text-left ${
-              paymentMethod === "transfer"
-                ? "bg-gradient-to-r from-purple-600 to-teal-600 text-white shadow-xl"
-                : "bg-white text-gray-800 shadow-md border border-purple-100"
-            }`}>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <Building2 className="w-8 h-8" />
-                <div>
-                  <p className="text-xl font-black">Bank Transfer</p>
-                  <p className={`text-sm font-medium ${paymentMethod === "transfer" ? "opacity-90" : "text-gray-500"}`}>
-                    Opay, Palmpay, GTB, Access & all banks
-                  </p>
-                </div>
-              </div>
-              {paymentMethod === "transfer" && <Check className="w-8 h-8" />}
-            </div>
-          </motion.button>
-        </motion.div>
-
-        {paymentMethod === "transfer" && (
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-            className="bg-blue-50 border border-blue-200 rounded-2xl p-4 mb-6">
-            <p className="text-blue-800 font-bold text-sm">How bank transfer works:</p>
-            <p className="text-blue-700 text-sm mt-1">
-              After clicking Pay, Paystack will generate a unique account number for this transaction.
-              Transfer the exact amount from any bank app and your order will be confirmed automatically.
-            </p>
-          </motion.div>
-        )}
-
-        {/* Security badges */}
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
-          className="bg-white rounded-3xl p-6 shadow-lg border border-purple-100 mb-6">
+          className="bg-white/90 backdrop-blur-xl rounded-3xl p-6 shadow-xl border border-white mb-6">
           <div className="flex items-center justify-center gap-8 text-center">
-            {[
-              { icon: Shield, label: "Secure", color: "text-green-600" },
-              { icon: Lock, label: "Encrypted", color: "text-blue-600" },
-              { icon: Check, label: "Protected", color: "text-purple-600" },
-            ].map(({ icon: Icon, label, color }) => (
-              <div key={label} className="flex flex-col items-center">
-                <Icon className={`w-10 h-10 ${color} mb-2`} />
-                <p className="text-xs font-bold text-gray-700">{label}</p>
-              </div>
-            ))}
+            <div className="flex flex-col items-center"><Shield className="w-10 h-10 text-green-600 mb-2" /><p className="text-xs font-bold text-gray-700">Secure</p></div>
+            <div className="flex flex-col items-center"><Lock className="w-10 h-10 text-blue-600 mb-2" /><p className="text-xs font-bold text-gray-700">Encrypted</p></div>
+            <div className="flex flex-col items-center"><Check className="w-10 h-10 text-purple-600 mb-2" /><p className="text-xs font-bold text-gray-700">Protected</p></div>
           </div>
         </motion.div>
 
-        {/* ✅ FIXED: Split payment info box — white background, dark readable text */}
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}
-          className="bg-white rounded-2xl p-6 mb-8 border-2 border-purple-200 shadow-md">
-          <div className="flex items-start gap-4">
-            <div className="w-12 h-12 bg-gradient-to-br from-purple-100 to-teal-100 rounded-2xl flex items-center justify-center flex-shrink-0">
-              <Shield className="w-6 h-6 text-purple-600" />
-            </div>
-            <div>
-              <p className="font-black text-lg text-gray-900">Automatic Split Payment</p>
-              <p className="text-sm text-gray-600 mt-1 leading-relaxed">
-                Your payment is split automatically by Paystack — 75% goes directly to the seller,
-                25% to StudEx. Refunds are processed back to your original payment method instantly.
-              </p>
-            </div>
-          </div>
+        {/* SPLIT PAYMENT INFO */}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
+          className="bg-purple-50 border-2 border-purple-200 rounded-2xl p-6 mb-8 text-center">
+          <Shield className="w-12 h-12 text-purple-600 mx-auto mb-3" />
+          <p className="font-black text-lg text-gray-900">Automatic Split Payment</p>
+          <p className="text-sm text-gray-700 mt-2">
+            Your payment is split automatically by Flutterwave — 70% goes directly to the seller, 30% to StudEx.
+            Refunds are processed back to your original payment method.
+          </p>
         </motion.div>
 
-        {paystackReady && chargeAmountInKobo > 0 ? (
-          <PaystackButton
-            config={config}
-            isProcessing={isProcessing}
-            setIsProcessing={setIsProcessing}
-            isLoggedIn={!!isLoggedIn}
-            label={`Pay ₦${chargeAmount.toLocaleString()} Now`}
-            onSuccess={handlePaystackSuccess}
-            onClose={handlePaystackClose}
-          />
-        ) : (
-          <motion.button disabled
-            className="w-full py-8 rounded-3xl font-black text-3xl shadow-2xl bg-gradient-to-r from-purple-600 to-teal-600 text-white flex items-center justify-center gap-4 opacity-70 cursor-not-allowed">
-            <Loader className="w-8 h-8 animate-spin" />
-            {previewLoading ? "Calculating price..." : "Loading..."}
-          </motion.button>
-        )}
+        {/* PAY BUTTON */}
+        <motion.button
+          whileHover={{ scale: isProcessing ? 1 : 1.02 }}
+          whileTap={{ scale: isProcessing ? 1 : 0.98 }}
+          onClick={handlePayment}
+          disabled={isProcessing || !isLoggedIn || !flwLoaded}
+          className={`w-full py-8 rounded-3xl font-black text-3xl shadow-2xl bg-gradient-to-r from-purple-600 to-teal-600 text-white flex items-center justify-center gap-4 ${(isProcessing || !isAuthReady || !isHydrated) ? "opacity-70 cursor-not-allowed" : ""}`}>
+          {isProcessing ? (
+            <><Loader className="w-8 h-8 animate-spin" /> Processing...</>
+          ) : (
+            <><CreditCard className="w-10 h-10" /> Pay ₦{finalTotal.toLocaleString()} Now</>
+          )}
+        </motion.button>
 
         <p className="text-center text-xs text-gray-600 mt-6">
           By completing this purchase you agree to StudEx{" "}

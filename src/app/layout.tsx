@@ -9,6 +9,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { usePathname } from "next/navigation";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { useEffect, useState } from "react";
+import Script from "next/script";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -44,6 +45,12 @@ export default function RootLayout({
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+      <script
+        src="https://checkout.flutterwave.com/v3.js"
+        async
+      ></script>
+      
         <meta name="theme-color" content="#7C3AED" />
         <meta name="description" content="Nigeria's #1 campus marketplace. Book lashes, nails, laundry, food and more from verified student vendors at Pan-Atlantic University. Fast, safe, and affordable." />
         <meta name="keywords" content="campus marketplace, student services, PAU marketplace, Pan-Atlantic University, student vendors, lashes PAU, nails PAU, laundry PAU, food delivery campus, StudEx, studex.ng" />

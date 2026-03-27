@@ -14,5 +14,5 @@ urlpatterns = [
 
     # Paystack webhook — register this URL in Paystack Dashboard → Settings → Webhooks
     # Full URL to enter: https://yourdomain.com/api/payments/webhook/
-    path("webhook/", views.paystack_webhook, name="paystack-webhook"),
+    path("webhook/", views.flutterwave_webhook, name="flutterwave-webhook"),
 ]
