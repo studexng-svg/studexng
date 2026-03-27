@@ -5,6 +5,7 @@ from services.serializers import ListingSerializer
 from services.models import Listing
 import uuid
 
+
 class OrderSerializer(serializers.ModelSerializer):
     listing = ListingSerializer(read_only=True)
     listing_id = serializers.IntegerField(write_only=True)
@@ -16,9 +17,7 @@ class OrderSerializer(serializers.ModelSerializer):
         read_only_fields = ['reference', 'amount', 'status', 'created_at', 'paid_at']
 
     def create(self, validated_data):
-        from wallet.models import EscrowTransaction
         from decimal import Decimal
-
         listing_id = validated_data.pop('listing_id')
         listing = Listing.objects.get(id=listing_id)
 
@@ -26,11 +25,7 @@ class OrderSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("This listing is no longer available.")
 
         reference = f"ORD-{uuid.uuid4().hex[:12].upper()}"
-
         total_amount = Decimal(str(listing.price))
-        platform_fee_percentage = Decimal('0.05')
-        platform_fee = total_amount * platform_fee_percentage
-        seller_amount = total_amount - platform_fee
 
         order = Order.objects.create(
             reference=reference,
@@ -39,17 +34,7 @@ class OrderSerializer(serializers.ModelSerializer):
             status='pending',
             **validated_data
         )
-
-        EscrowTransaction.objects.create(
-            order=order,
-            buyer=self.context['request'].user,
-            seller=listing.vendor,
-            total_amount=total_amount,
-            seller_amount=seller_amount,
-            platform_fee=platform_fee,
-            status='held'
-        )
-
+        # No escrow — Flutterwave handles split payments and vendor payouts directly
         return order
 
 
@@ -75,7 +60,6 @@ class DisputeSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         validated_data['filer'] = self.context['request'].user
-
         order = validated_data['order']
         user = self.context['request'].user
 
@@ -88,7 +72,6 @@ class DisputeSerializer(serializers.ModelSerializer):
 
         order.status = 'disputed'
         order.save()
-
         return super().create(validated_data)
 
 
@@ -120,30 +103,14 @@ class DisputeResolutionSerializer(serializers.Serializer):
         order = instance.order
         resolution = validated_data['resolution']
 
+        # Flutterwave handles vendor payouts — these just update order status.
+        # Actual refunds must go through POST /api/payments/refund/
         if resolution == 'release_to_provider':
-            from wallet.models import EscrowTransaction
-            escrow = EscrowTransaction.objects.filter(order=order, status='held').first()
-            if escrow:
-                escrow.status = 'released'
-                escrow.save()
-                seller = order.listing.vendor
-                seller.wallet_balance += escrow.seller_amount
-                seller.save()
             order.status = 'completed'
             order.save()
-
         elif resolution == 'refund_customer':
-            from wallet.models import EscrowTransaction
-            escrow = EscrowTransaction.objects.filter(order=order, status='held').first()
-            if escrow:
-                escrow.status = 'refunded'
-                escrow.save()
-                buyer = order.buyer
-                buyer.wallet_balance += escrow.total_amount
-                buyer.save()
             order.status = 'cancelled'
             order.save()
-
         elif resolution == 'partial_split':
             instance.status = 'under_review'
             instance.save()
@@ -178,18 +145,21 @@ class BookingSerializer(serializers.ModelSerializer):
             'listing_price', 'vendor_name', 'vendor_subaccount_code',
             'scheduled_date', 'scheduled_time', 'note', 'status', 'created_at',
         ]
-        read_only_fields = ['id', 'buyer_username', 'vendor_username', 'listing_title', 'listing_price', 'vendor_name', 'vendor_subaccount_code', 'status', 'created_at']
+        read_only_fields = [
+            'id', 'buyer_username', 'vendor_username', 'listing_title', 'listing_price',
+            'vendor_name', 'vendor_subaccount_code', 'status', 'created_at'
+        ]
 
     def get_vendor_name(self, obj):
         vendor = obj.listing.vendor
         return getattr(vendor, 'business_name', None) or vendor.username
 
     def get_vendor_subaccount_code(self, obj):
-        """Return vendor's Paystack subaccount code so frontend can pass it at payment init."""
+        """Return vendor's Flutterwave subaccount ID for split payment at checkout."""
         try:
             from payments.models import SellerBankAccount
             bank = SellerBankAccount.objects.filter(user=obj.listing.vendor).first()
-            return bank.paystack_subaccount_code if bank else None
+            return bank.flw_subaccount_id if bank else None
         except Exception:
             return None
 

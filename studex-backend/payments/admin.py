@@ -8,14 +8,14 @@ from .models import SellerBankAccount, PaymentTransaction
 
 @admin.register(SellerBankAccount)
 class SellerBankAccountAdmin(admin.ModelAdmin):
-    list_display = ['user', 'bank_name', 'account_number', 'account_name', 'flw_subaccount_id', 'is_active', 'created_at']
+    list_display = ['user', 'bank_name', 'account_number', 'account_name', 'flw_subaccount_display', 'is_active', 'created_at']
     search_fields = ['user__username', 'bank_name', 'account_number', 'account_name']
     list_filter = ['is_active', 'bank_name']
     readonly_fields = ['created_at', 'updated_at']
 
-    def flw_subaccount_id(self, obj):
-        return obj.paystack_subaccount_code or '—'
-    flw_subaccount_id.short_description = 'FLW Subaccount ID'
+    def flw_subaccount_display(self, obj):
+        return obj.flw_subaccount_id or '—'
+    flw_subaccount_display.short_description = 'FLW Subaccount ID'
 
 
 @admin.register(PaymentTransaction)
@@ -27,7 +27,7 @@ class PaymentTransactionAdmin(admin.ModelAdmin):
     ]
     list_filter = ['status', 'order_type', 'created_at']
     search_fields = ['reference', 'buyer__username', 'seller__username', 'buyer_email']
-    readonly_fields = ['created_at', 'updated_at', 'paystack_response']
+    readonly_fields = ['created_at', 'updated_at', 'flw_response']
     ordering = ['-created_at']
     date_hierarchy = 'created_at'
     list_per_page = 50
@@ -38,11 +38,11 @@ class PaymentTransactionAdmin(admin.ModelAdmin):
 
     def seller_amount_display(self, obj):
         return format_html('<span style="color:green;">₦{:,.2f}</span>', float(obj.seller_amount))
-    seller_amount_display.short_description = 'Vendor (70%)'
+    seller_amount_display.short_description = 'Vendor Share'
 
     def platform_amount_display(self, obj):
         return format_html('<span style="color:purple;">₦{:,.2f}</span>', float(obj.platform_amount))
-    platform_amount_display.short_description = 'Platform (30%)'
+    platform_amount_display.short_description = 'Platform Fee'
 
     def colored_status(self, obj):
         colors = {'success': 'green', 'pending': 'orange', 'failed': 'red', 'refunded': 'blue'}
@@ -56,7 +56,7 @@ class PaymentTransactionAdmin(admin.ModelAdmin):
         response = HttpResponse(content_type='text/csv')
         response['Content-Disposition'] = 'attachment; filename="transactions.csv"'
         writer = csv.writer(response)
-        writer.writerow(['Reference', 'Buyer', 'Seller', 'Amount', 'Vendor Amount', 'Platform Amount', 'Type', 'Status', 'Date'])
+        writer.writerow(['Reference', 'Buyer', 'Seller', 'Amount', 'Vendor Amount', 'Platform Fee', 'Type', 'Status', 'Date'])
         for t in queryset:
             writer.writerow([
                 t.reference, t.buyer.username if t.buyer else 'N/A',

@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft, Calendar, Clock, CheckCircle2, XCircle,
-  CreditCard, AlertCircle, Loader, RefreshCw, MessageCircle,
+  CreditCard, AlertCircle, Loader, RefreshCw,
   ChevronRight, Hourglass, Ban,
 } from "lucide-react";
 import { useAuth, fetchWithAuth, getToken } from "@/lib/authStore";
@@ -28,7 +28,6 @@ interface Booking {
   created_at: string;
 }
 
-// ─── STATUS CONFIG ─────────────────────────────────────────────
 const STATUS = {
   pending: {
     label: "Awaiting Vendor",
@@ -64,35 +63,6 @@ const STATUS = {
   },
 };
 
-// ─── LOAD FLUTTERWAVE SCRIPT DYNAMICALLY ──────────────────────
-function loadFlutterwaveScript(): Promise<void> {
-  return new Promise((resolve, reject) => {
-    // Already loaded
-    if (typeof (window as any).FlutterwaveCheckout === "function") {
-      resolve();
-      return;
-    }
-
-    // Script tag already injected, wait for it
-    const existing = document.querySelector(
-      'script[src="https://checkout.flutterwave.com/v3.js"]'
-    );
-    if (existing) {
-      existing.addEventListener("load", () => resolve());
-      existing.addEventListener("error", () => reject(new Error("Flutterwave failed to load")));
-      return;
-    }
-
-    // Inject fresh
-    const script = document.createElement("script");
-    script.src = "https://checkout.flutterwave.com/v3.js";
-    script.async = true;
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error("Flutterwave failed to load"));
-    document.head.appendChild(script);
-  });
-}
-
 export default function BuyerBookingsPage() {
   const router = useRouter();
   const { user, isLoggedIn, isHydrated } = useAuth();
@@ -102,16 +72,9 @@ export default function BuyerBookingsPage() {
   const [payingId, setPayingId] = useState<number | null>(null);
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
   const [filter, setFilter] = useState<"all" | "pending" | "confirmed" | "cancelled" | "paid">("all");
-  const [flwReady, setFlwReady] = useState(false);
-
-  // ─── PRE-LOAD FLUTTERWAVE SCRIPT ON MOUNT ─────────────────────
-  useEffect(() => {
-    loadFlutterwaveScript()
-      .then(() => setFlwReady(true))
-      .catch(() => {
-        // Will retry on pay click
-      });
-  }, []);
+  const [useCredits, setUseCredits] = useState(false);
+  const [loyaltyBalance, setLoyaltyBalance] = useState(0);
+  const referenceRef = useRef(`STUDEX-BKG-${Date.now()}`);
 
   useEffect(() => {
     if (isHydrated && !isLoggedIn) router.push("/auth");
@@ -121,6 +84,20 @@ export default function BuyerBookingsPage() {
     if (!isHydrated || !isLoggedIn) return;
     loadBookings();
   }, [isHydrated, isLoggedIn]);
+
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    fetchWithAuth(`${API_URL}/api/loyalty/status/`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) setLoyaltyBalance(parseFloat(d.credit_balance) || 0); })
+      .catch(() => {});
+  }, [isLoggedIn]);
+
+  useEffect(() => {
+    if (payingId) {
+      referenceRef.current = `STUDEX-BKG-${Date.now()}-${payingId}`;
+    }
+  }, [payingId]);
 
   const loadBookings = async () => {
     setLoading(true);
@@ -140,7 +117,7 @@ export default function BuyerBookingsPage() {
 
   const showToast = (msg: string, ok = true) => {
     setToast({ msg, ok });
-    setTimeout(() => setToast(null), 3000);
+    setTimeout(() => setToast(null), 3500);
   };
 
   const cancelBooking = async (id: number) => {
@@ -158,51 +135,33 @@ export default function BuyerBookingsPage() {
     }
   };
 
-  const [useCredits, setUseCredits] = useState(false);
-  const [loyaltyBalance, setLoyaltyBalance] = useState(0);
-
-  useEffect(() => {
-    if (!isLoggedIn) return;
-    fetchWithAuth(`${API_URL}/api/loyalty/status/`)
-      .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d) setLoyaltyBalance(parseFloat(d.credit_balance) || 0); })
-      .catch(() => {});
-  }, [isLoggedIn]);
-
   const activeBooking = bookings.find(b => b.id === payingId);
   const listingPrice = activeBooking ? parseFloat(activeBooking.listing_price) : 0;
   const creditsToApply = useCredits ? Math.min(loyaltyBalance, listingPrice) : 0;
   const amountAfterCredits = Math.max(listingPrice - creditsToApply, 0);
-  const referenceRef = useRef(`STUDEX-BKG-${Date.now()}`);
 
-  useEffect(() => {
-    if (payingId) {
-      referenceRef.current = `STUDEX-BKG-${Date.now()}-${payingId}`;
-    }
-  }, [payingId]);
-
-  const handlePay = (bookingId: number) => {
-    setPayingId(bookingId);
-  };
-
-  // ─── PROCEED TO FLUTTERWAVE ────────────────────────────────────
-  const proceedToFlutterwave = async () => {
+  // ─────────────────────────────────────────────────────────────────
+  // ROOT CAUSE OF PRODUCTION BUG:
+  //
+  // Flutterwave opens a popup/overlay. Browsers only allow popups
+  // that are triggered synchronously from a real user gesture (click).
+  // Any `await` before calling FlutterwaveCheckout() breaks this chain
+  // and the browser silently blocks the popup in production.
+  //
+  // The script is already loaded by layout.tsx <Script strategy="afterInteractive">
+  // so we just call window.FlutterwaveCheckout directly — NO async, NO await.
+  // ─────────────────────────────────────────────────────────────────
+  const proceedToFlutterwave = () => {
     if (!activeBooking) return;
-
-    // Ensure script is loaded (retry if not ready yet)
-    if (!flwReady || typeof (window as any).FlutterwaveCheckout !== "function") {
-      showToast("Loading payment gateway...", true);
-      try {
-        await loadFlutterwaveScript();
-        setFlwReady(true);
-      } catch {
-        showToast("Payment system unavailable. Check your connection and retry.", false);
-        return;
-      }
-    }
 
     const FlutterwaveCheckout = (window as any).FlutterwaveCheckout;
 
+    if (typeof FlutterwaveCheckout !== "function") {
+      showToast("Payment gateway not ready. Please refresh the page.", false);
+      return;
+    }
+
+    // ✅ Synchronous call — browser sees this as a direct user gesture
     FlutterwaveCheckout({
       public_key: process.env.NEXT_PUBLIC_FLW_PUBLIC_KEY,
       tx_ref: referenceRef.current,
@@ -222,7 +181,6 @@ export default function BuyerBookingsPage() {
       callback: async (response: any) => {
         try {
           const token = getToken();
-
           const res = await fetch(`${API_URL}/api/payments/verify/`, {
             method: "POST",
             headers: {
@@ -237,9 +195,7 @@ export default function BuyerBookingsPage() {
               use_credits: useCredits,
             }),
           });
-
           const data = await res.json();
-
           if (res.ok) {
             showToast("Payment successful! Booking confirmed ✓");
             setPayingId(null);
@@ -257,6 +213,10 @@ export default function BuyerBookingsPage() {
         showToast("Payment cancelled.", false);
       },
     });
+  };
+
+  const handlePay = (bookingId: number) => {
+    setPayingId(bookingId);
   };
 
   const filtered = filter === "all" ? bookings : bookings.filter(b => b.status === filter);
@@ -282,40 +242,46 @@ export default function BuyerBookingsPage() {
       {/* TOAST */}
       <AnimatePresence>
         {toast && (
-          <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
-            className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-full font-bold text-sm shadow-xl ${
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className={`fixed top-4 left-1/2 -translate-x-1/2 z-[9999] px-6 py-3 rounded-full font-bold text-sm shadow-xl whitespace-nowrap ${
               toast.ok ? "bg-teal-500 text-white" : "bg-red-500 text-white"
-            }`}>
+            }`}
+          >
             {toast.msg}
           </motion.div>
         )}
       </AnimatePresence>
 
       {/* PAYMENT CONFIRMATION MODAL
-          FIX: Changed items-end to items-center on all screens so the bottom nav
-          never overlaps the modal. Also added bottom safe-area padding. */}
+          z-[9999] ensures it renders above the bottom nav (z-50).
+          items-center on all screen sizes so the nav never clips it. */}
       <AnimatePresence>
         {payingId && activeBooking && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
-            style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom, 0px))" }}
+            className="fixed inset-0 bg-black/60 z-[9999] flex items-center justify-center p-4"
+            style={{ paddingBottom: "env(safe-area-inset-bottom, 16px)" }}
           >
             <motion.div
-              initial={{ y: 80, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 80, opacity: 0 }}
-              className="bg-white dark:bg-gray-900 rounded-3xl p-6 w-full max-w-md shadow-2xl overflow-y-auto max-h-[90dvh]"
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              className="bg-white dark:bg-gray-900 rounded-3xl p-6 w-full max-w-md shadow-2xl overflow-y-auto"
+              style={{ maxHeight: "calc(100dvh - 3rem)" }}
             >
               <h2 className="text-xl font-black text-gray-900 dark:text-white mb-1">Confirm Payment</h2>
               <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">You're about to pay for this confirmed booking.</p>
 
               <div className="bg-gray-50 dark:bg-gray-800 rounded-2xl p-4 mb-5 space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Service</span>
-                  <span className="font-bold text-gray-900 dark:text-white">{activeBooking.listing_title}</span>
+                <div className="flex justify-between text-sm gap-4">
+                  <span className="text-gray-500 flex-shrink-0">Service</span>
+                  <span className="font-bold text-gray-900 dark:text-white text-right">{activeBooking.listing_title}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">Vendor</span>
@@ -337,14 +303,15 @@ export default function BuyerBookingsPage() {
                 </div>
               </div>
 
-              {/* Loyalty credits toggle */}
               {loyaltyBalance > 0 && (
-                <button onClick={() => setUseCredits(v => !v)}
+                <button
+                  onClick={() => setUseCredits(v => !v)}
                   className={`w-full flex items-center justify-between rounded-2xl p-4 mb-4 border-2 transition ${
                     useCredits
                       ? "bg-amber-50 dark:bg-amber-900/20 border-amber-400"
                       : "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700"
-                  }`}>
+                  }`}
+                >
                   <div className="flex items-center gap-3">
                     <span className="text-2xl">🎁</span>
                     <div className="text-left">
@@ -383,12 +350,17 @@ export default function BuyerBookingsPage() {
               </div>
 
               <div className="flex gap-3">
-                <button onClick={() => setPayingId(null)}
-                  className="flex-1 py-3 bg-gray-100 dark:bg-gray-800 rounded-2xl font-bold text-gray-600 dark:text-gray-300 text-sm">
+                <button
+                  onClick={() => setPayingId(null)}
+                  className="flex-1 py-3 bg-gray-100 dark:bg-gray-800 rounded-2xl font-bold text-gray-600 dark:text-gray-300 text-sm"
+                >
                   Cancel
                 </button>
-                <button onClick={proceedToFlutterwave}
-                  className="flex-1 py-3 bg-gradient-to-r from-teal-500 to-emerald-500 text-white rounded-2xl font-black text-sm flex items-center justify-center gap-2 shadow-lg">
+                {/* ✅ Direct synchronous onClick — no await, preserves user gesture */}
+                <button
+                  onClick={proceedToFlutterwave}
+                  className="flex-1 py-3 bg-gradient-to-r from-teal-500 to-emerald-500 text-white rounded-2xl font-black text-sm flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-transform"
+                >
                   <CreditCard className="w-4 h-4" /> Pay ₦{amountAfterCredits.toLocaleString()}
                 </button>
               </div>
@@ -400,32 +372,48 @@ export default function BuyerBookingsPage() {
       {/* HEADER */}
       <div className="sticky top-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 z-40 px-4 py-4">
         <div className="flex items-center justify-between max-w-2xl mx-auto">
-          <button onClick={() => router.back()} className="text-purple-600 p-2 rounded-full hover:bg-purple-50 dark:hover:bg-purple-900/20 transition">
+          <button
+            onClick={() => router.back()}
+            className="text-purple-600 p-2 rounded-full hover:bg-purple-50 dark:hover:bg-purple-900/20 transition"
+          >
             <ArrowLeft className="w-5 h-5" />
           </button>
           <h1 className="text-xl font-black bg-gradient-to-r from-purple-600 to-teal-500 bg-clip-text text-transparent">
             My Bookings
           </h1>
-          <button onClick={loadBookings} className="text-gray-400 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition">
+          <button
+            onClick={loadBookings}
+            className="text-gray-400 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition"
+          >
             <RefreshCw className="w-5 h-5" />
           </button>
         </div>
       </div>
 
-      {/* FIX: pb-[calc(7rem+env(safe-area-inset-bottom,0px))] gives enough clearance
-          for the bottom nav on all devices including notched iPhones */}
-      <div className="max-w-2xl mx-auto p-4 pb-[calc(7rem+env(safe-area-inset-bottom,0px))] space-y-4 bg-[#FFF8F0] dark:bg-gray-950 min-h-screen">
-
+      {/* SCROLL BODY
+          paddingBottom via inline style uses env(safe-area-inset-bottom) so
+          iPhone home-indicator + bottom nav never hide the last card's Pay button */}
+      <div
+        className="max-w-2xl mx-auto p-4 space-y-4 bg-[#FFF8F0] dark:bg-gray-950 min-h-screen"
+        style={{ paddingBottom: "calc(6rem + env(safe-area-inset-bottom, 0px))" }}
+      >
         {/* FILTER TABS */}
         <div className="flex gap-2 overflow-x-auto pb-1">
           {(["all", "pending", "confirmed", "cancelled"] as const).map(f => (
-            <button key={f} onClick={() => setFilter(f)}
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
               className={`flex-shrink-0 px-4 py-2 rounded-xl text-sm font-bold capitalize transition ${
                 filter === f
                   ? "bg-purple-600 text-white shadow-md"
                   : "bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700"
-              }`}>
-              {f} {counts[f] > 0 && <span className={`ml-1 text-xs ${filter === f ? "opacity-80" : "text-purple-500"}`}>({counts[f]})</span>}
+              }`}
+            >
+              {f}{counts[f] > 0 && (
+                <span className={`ml-1 text-xs ${filter === f ? "opacity-80" : "text-purple-500"}`}>
+                  ({counts[f]})
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -442,9 +430,13 @@ export default function BuyerBookingsPage() {
         {filtered.length === 0 && !error && (
           <div className="text-center py-20">
             <Calendar className="w-14 h-14 text-gray-300 dark:text-gray-700 mx-auto mb-4" />
-            <p className="font-black text-gray-500 dark:text-gray-400 text-lg">No {filter === "all" ? "" : filter} bookings</p>
+            <p className="font-black text-gray-500 dark:text-gray-400 text-lg">
+              No {filter === "all" ? "" : filter} bookings
+            </p>
             <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">
-              {filter === "all" ? "Book a service from any vendor listing to get started." : `You have no ${filter} bookings right now.`}
+              {filter === "all"
+                ? "Book a service from any vendor listing to get started."
+                : `You have no ${filter} bookings right now.`}
             </p>
           </div>
         )}
@@ -458,12 +450,14 @@ export default function BuyerBookingsPage() {
             const isPending = booking.status === "pending";
 
             return (
-              <motion.div key={booking.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-                className={`rounded-2xl border p-4 ${cfg.bg}`}>
-
-                {/* Top row: title + status badge */}
+              <motion.div
+                key={booking.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className={`rounded-2xl border p-4 ${cfg.bg}`}
+              >
                 <div className="flex items-start justify-between gap-2 mb-3">
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-0">
                     <p className="font-black text-gray-900 dark:text-white text-base leading-tight">
                       {booking.listing_title}
                     </p>
@@ -477,7 +471,6 @@ export default function BuyerBookingsPage() {
                   </span>
                 </div>
 
-                {/* Date / Time / Price */}
                 <div className="grid grid-cols-3 gap-2 mb-3">
                   <div className="bg-white/60 dark:bg-gray-800/60 rounded-xl p-2.5 text-center">
                     <Calendar className="w-4 h-4 mx-auto mb-1 text-gray-400" />
@@ -493,35 +486,36 @@ export default function BuyerBookingsPage() {
                   </div>
                 </div>
 
-                {/* Status message */}
                 <p className={`text-xs font-medium mb-3 ${cfg.color}`}>{cfg.message}</p>
 
-                {/* Note */}
                 {booking.note && (
                   <div className="bg-white/50 dark:bg-gray-800/40 rounded-xl p-2.5 mb-3">
                     <p className="text-xs text-gray-500 dark:text-gray-400 italic">Note: {booking.note}</p>
                   </div>
                 )}
 
-                {/* Action buttons */}
                 <div className="flex gap-2">
                   {isConfirmed && (
-                    <button onClick={() => handlePay(booking.id)}
-                      className="flex-1 py-3 bg-gradient-to-r from-teal-500 to-emerald-500 text-white rounded-xl font-black text-sm flex items-center justify-center gap-2 shadow-md">
+                    <button
+                      onClick={() => handlePay(booking.id)}
+                      className="flex-1 py-3 bg-gradient-to-r from-teal-500 to-emerald-500 text-white rounded-xl font-black text-sm flex items-center justify-center gap-2 shadow-md active:scale-95 transition-transform"
+                    >
                       <CreditCard className="w-4 h-4" /> Pay Now
                     </button>
                   )}
-
                   {isPending && (
-                    <button onClick={() => cancelBooking(booking.id)}
-                      className="flex-shrink-0 py-3 px-4 bg-white dark:bg-gray-800 border border-red-200 dark:border-red-800 text-red-500 rounded-xl font-bold text-sm flex items-center gap-1.5">
+                    <button
+                      onClick={() => cancelBooking(booking.id)}
+                      className="flex-shrink-0 py-3 px-4 bg-white dark:bg-gray-800 border border-red-200 dark:border-red-800 text-red-500 rounded-xl font-bold text-sm flex items-center gap-1.5"
+                    >
                       <Ban className="w-4 h-4" /> Cancel
                     </button>
                   )}
-
                   {booking.status === "cancelled" && (
-                    <button onClick={() => router.push("/home")}
-                      className="flex-1 py-3 bg-white dark:bg-gray-800 border border-purple-200 dark:border-purple-800 text-purple-600 rounded-xl font-bold text-sm flex items-center justify-center gap-2">
+                    <button
+                      onClick={() => router.push("/home")}
+                      className="flex-1 py-3 bg-white dark:bg-gray-800 border border-purple-200 dark:border-purple-800 text-purple-600 rounded-xl font-bold text-sm flex items-center justify-center gap-2"
+                    >
                       Find another vendor <ChevronRight className="w-4 h-4" />
                     </button>
                   )}

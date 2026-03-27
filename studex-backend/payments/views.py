@@ -42,7 +42,7 @@ def seller_bank_account(request):
                 "bank_name": account.bank_name,
                 "account_number": account.account_number,
                 "account_name": account.account_name,
-                "flw_subaccount_id": account.paystack_subaccount_code,
+                "flw_subaccount_id": account.flw_subaccount_id,
             })
         except SellerBankAccount.DoesNotExist:
             return Response({}, status=200)
@@ -68,7 +68,7 @@ def seller_bank_account(request):
             "bank_name": bank_name,
             "account_number": account_number,
             "account_name": account_name,
-            "paystack_subaccount_code": subaccount_id,
+            "flw_subaccount_id": subaccount_id,
         }
     )
 
@@ -81,7 +81,7 @@ def seller_bank_account(request):
 
 
 # ─────────────────────────────────────────
-# VERIFY BANK ACCOUNT
+# VERIFY BANK ACCOUNT — auto-fill account name
 # ─────────────────────────────────────────
 
 @api_view(["POST"])
@@ -93,17 +93,49 @@ def verify_bank_account(request):
     if not account_number or not bank_code:
         return Response({"error": "account_number and bank_code required."}, status=400)
 
-    res = requests.post(
-        f"{FLW_BASE}/accounts/resolve",
-        headers=FLW_HEADERS,
-        json={"account_number": account_number, "account_bank": bank_code},
-    )
+    # ── Wrapped in try/except so ANY Flutterwave error returns 400, never 500 ──
+    try:
+        res = requests.post(
+            f"{FLW_BASE}/accounts/resolve",
+            headers=FLW_HEADERS,
+            json={"account_number": account_number, "account_bank": bank_code},
+            timeout=10,
+        )
 
-    if res.status_code == 200 and res.json().get("status") == "success":
-        data = res.json().get("data", {})
-        return Response({"account_name": data.get("account_name", "")})
+        logger.info(f"FLW resolve: status={res.status_code} body={res.text[:300]}")
 
-    return Response({"error": "Could not verify account. Please check the details."}, status=400)
+        if res.status_code == 200:
+            data = res.json()
+            if data.get("status") == "success":
+                account_name = data.get("data", {}).get("account_name", "")
+                return Response({"account_name": account_name})
+            else:
+                return Response(
+                    {"error": data.get("message", "Could not verify account.")},
+                    status=400
+                )
+
+        # Non-200 from Flutterwave → return their message as a 400
+        try:
+            flw_msg = res.json().get("message", "Verification unavailable.")
+        except Exception:
+            flw_msg = "Verification unavailable."
+
+        logger.warning(f"FLW resolve non-200: {res.status_code} — {flw_msg}")
+        return Response({"error": flw_msg}, status=400)
+
+    except requests.exceptions.Timeout:
+        logger.warning("FLW account resolve timed out")
+        return Response(
+            {"error": "Verification timed out. Enter your account name manually."},
+            status=400
+        )
+    except Exception as e:
+        logger.error(f"verify_bank_account unexpected error: {e}", exc_info=True)
+        return Response(
+            {"error": "Verification unavailable. Please enter your account name manually."},
+            status=400
+        )
 
 
 # ─────────────────────────────────────────
@@ -113,8 +145,8 @@ def verify_bank_account(request):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def verify_payment(request):
-    reference = request.data.get("reference")  # Flutterwave tx_ref
-    transaction_id = request.data.get("transaction_id")  # Flutterwave transaction_id
+    reference = request.data.get("reference")
+    transaction_id = request.data.get("transaction_id")
     order_type = request.data.get("order_type", "product")
     listing_id = request.data.get("listing_id")
     items = request.data.get("items", [])
@@ -123,23 +155,28 @@ def verify_payment(request):
     if not reference and not transaction_id:
         return Response({"error": "Payment reference is required."}, status=400)
 
-    # Prevent duplicate processing
     ref_key = reference or str(transaction_id)
     if PaymentTransaction.objects.filter(reference=ref_key, status="success").exists():
         existing = PaymentTransaction.objects.get(reference=ref_key, status="success")
         return Response({"order_id": existing.order_id, "message": "Already processed."})
 
     # Verify with Flutterwave
-    if transaction_id:
-        verify_res = requests.get(
-            f"{FLW_BASE}/transactions/{transaction_id}/verify",
-            headers=FLW_HEADERS,
-        )
-    else:
-        verify_res = requests.get(
-            f"{FLW_BASE}/transactions/verify_by_reference?tx_ref={reference}",
-            headers=FLW_HEADERS,
-        )
+    try:
+        if transaction_id:
+            verify_res = requests.get(
+                f"{FLW_BASE}/transactions/{transaction_id}/verify",
+                headers=FLW_HEADERS, timeout=15,
+            )
+        else:
+            verify_res = requests.get(
+                f"{FLW_BASE}/transactions/verify_by_reference?tx_ref={reference}",
+                headers=FLW_HEADERS, timeout=15,
+            )
+    except requests.exceptions.Timeout:
+        return Response({"error": "Payment verification timed out. Please contact support."}, status=400)
+    except Exception as e:
+        logger.error(f"Flutterwave verification request failed: {e}", exc_info=True)
+        return Response({"error": "Payment verification failed. Please contact support."}, status=400)
 
     if verify_res.status_code != 200:
         logger.error(f"Flutterwave verification HTTP error: {verify_res.status_code}")
@@ -173,7 +210,7 @@ def verify_payment(request):
         order_type=order_type,
         buyer_email=buyer_email,
         buyer_name=request.user.get_full_name() or request.user.username,
-        paystack_response=flw_data,
+        flw_response=flw_data,
     )
 
     try:
@@ -187,7 +224,7 @@ def verify_payment(request):
                 if listing.stock_quantity <= 0:
                     return Response({"error": f'"{listing.title}" is out of stock.'}, status=400)
                 if listing.stock_quantity < qty:
-                    return Response({"error": f'Only {listing.stock_quantity} of "{listing.title}" available. Stock limit exceeded.'}, status=400)
+                    return Response({"error": f'Only {listing.stock_quantity} of "{listing.title}" available.'}, status=400)
 
             order = Order.objects.create(
                 buyer=request.user, listing=listing,
@@ -208,7 +245,6 @@ def verify_payment(request):
             except Exception as e:
                 logger.warning(f"Could not update booking status to paid: {e}")
 
-            # Notify vendor
             try:
                 from notifications.models import Notification
                 Notification.objects.create(
@@ -217,11 +253,10 @@ def verify_payment(request):
                     title=f'💰 Payment Received — {listing.title}',
                     message=(
                         f'{request.user.username} has paid ₦{amount_paid:,.0f} for '
-                        f'"{listing.title}". Funds are held in escrow.'
+                        f'"{listing.title}". Flutterwave will transfer your share within 1-2 business days.'
                     ),
                     action_url='/vendor/dashboard',
                 )
-                logger.info(f"[StudEx] Payment notification sent to {listing.vendor.username}")
             except Exception as ne:
                 logger.warning(f"Payment notification failed: {ne}")
 
@@ -234,7 +269,7 @@ def verify_payment(request):
                     if listing.stock_quantity <= 0:
                         return Response({"error": f'"{listing.title}" is out of stock.'}, status=400)
                     if listing.stock_quantity < qty:
-                        return Response({"error": f'Only {listing.stock_quantity} of "{listing.title}" available. You requested {qty}. Stock limit exceeded.'}, status=400)
+                        return Response({"error": f'Only {listing.stock_quantity} of "{listing.title}" available. You requested {qty}.'}, status=400)
 
                 order = Order.objects.create(
                     buyer=request.user, listing=listing,
@@ -248,7 +283,6 @@ def verify_payment(request):
                 except Exception as e:
                     logger.warning(f"reduce_stock failed: {e}")
 
-                # Notify vendor
                 try:
                     from notifications.models import Notification
                     Notification.objects.create(
@@ -257,7 +291,7 @@ def verify_payment(request):
                         title=f'💰 Payment Received — {listing.title}',
                         message=(
                             f'{request.user.username} has paid ₦{listing.price * qty:,.0f} for '
-                            f'"{listing.title}" (qty: {qty}). Funds are held in escrow.'
+                            f'"{listing.title}" (qty: {qty}). Flutterwave will transfer your share within 1-2 business days.'
                         ),
                         action_url='/vendor/dashboard',
                     )
@@ -270,7 +304,6 @@ def verify_payment(request):
         txn.order_id = order_id
         txn.save()
 
-        # Deduct loyalty credits
         credits_used = Decimal("0")
         if use_credits:
             try:
@@ -314,16 +347,13 @@ def seller_transactions(request):
         seller=request.user, status="success"
     ).order_by("-created_at")[:50]
 
-    data = []
-    for t in txns:
-        data.append({
-            "id": t.id, "reference": t.reference,
-            "amount": float(t.amount), "seller_amount": float(t.seller_amount),
-            "platform_amount": float(t.platform_amount), "order_type": t.order_type,
-            "buyer_name": t.buyer_name, "buyer_email": t.buyer_email,
-            "order_id": t.order_id, "created_at": t.created_at.isoformat(),
-        })
-    return Response(data)
+    return Response([{
+        "id": t.id, "reference": t.reference,
+        "amount": float(t.amount), "seller_amount": float(t.seller_amount),
+        "platform_amount": float(t.platform_amount), "order_type": t.order_type,
+        "buyer_name": t.buyer_name, "buyer_email": t.buyer_email,
+        "order_id": t.order_id, "created_at": t.created_at.isoformat(),
+    } for t in txns])
 
 
 # ─────────────────────────────────────────
@@ -350,24 +380,26 @@ def refund_payment(request):
     if txn.status == "refunded":
         return Response({"error": "This transaction has already been refunded."}, status=400)
 
-    # Flutterwave refund
-    refund_res = requests.post(
-        f"{FLW_BASE}/transactions/{reference}/refund",
-        headers=FLW_HEADERS,
-        json={"amount": float(txn.amount), "comments": reason},
-    )
-
-    if refund_res.status_code in [200, 201]:
-        txn.status = "refunded"
-        txn.save()
-        return Response({
-            "message": "Refund initiated. Amount returns to original payment method within 3-5 business days.",
-            "reference": reference, "amount": float(txn.amount),
-        })
-
-    error_data = refund_res.json()
-    logger.error(f"Flutterwave refund failed: {error_data}")
-    return Response({"error": error_data.get("message", "Refund failed. Please contact support.")}, status=400)
+    try:
+        refund_res = requests.post(
+            f"{FLW_BASE}/transactions/{reference}/refund",
+            headers=FLW_HEADERS,
+            json={"amount": float(txn.amount), "comments": reason},
+            timeout=15,
+        )
+        if refund_res.status_code in [200, 201]:
+            txn.status = "refunded"
+            txn.save()
+            return Response({
+                "message": "Refund initiated. Amount returns to original payment method within 3-5 business days.",
+                "reference": reference, "amount": float(txn.amount),
+            })
+        error_data = refund_res.json()
+        logger.error(f"Flutterwave refund failed: {error_data}")
+        return Response({"error": error_data.get("message", "Refund failed. Please contact support.")}, status=400)
+    except Exception as e:
+        logger.error(f"Refund request failed: {e}", exc_info=True)
+        return Response({"error": "Refund request failed. Please contact support."}, status=400)
 
 
 # ─────────────────────────────────────────
@@ -377,28 +409,26 @@ def refund_payment(request):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def seller_earnings(request):
-    user = request.user
     from django.db.models import Sum
+    user = request.user
 
     total_orders = Order.objects.filter(listing__vendor=user).count()
 
-    try:
-        from wallet.models import EscrowTransaction
-        escrows = EscrowTransaction.objects.filter(seller=user)
-        total_earned = escrows.filter(status="released").aggregate(Sum("seller_amount"))["seller_amount__sum"] or 0
-        pending = escrows.filter(status="held").aggregate(Sum("seller_amount"))["seller_amount__sum"] or 0
-    except Exception:
-        txns = PaymentTransaction.objects.filter(seller=user, status="success")
-        total_earned = txns.aggregate(Sum("seller_amount"))["seller_amount__sum"] or 0
-        pending = 0
+    # Read directly from PaymentTransaction — no escrow dependency
+    txns = PaymentTransaction.objects.filter(seller=user, status="success")
+    total_earned = txns.aggregate(Sum("seller_amount"))["seller_amount__sum"] or 0
+    pending = 0  # Flutterwave handles payout timing
 
     commission_rate = 30 if total_orders < 10 else (20 if total_orders < 50 else 15)
 
     return Response({
-        "total_earned": float(total_earned), "pending": float(pending),
-        "available": float(total_earned), "total_orders": total_orders,
+        "total_earned": float(total_earned),
+        "pending": float(pending),
+        "available": float(total_earned),
+        "total_orders": total_orders,
         "commission_rate": commission_rate,
     })
+
 
 # ─────────────────────────────────────────
 # PRICE PREVIEW
@@ -437,6 +467,7 @@ def preview_price(request):
         ),
     })
 
+
 # ─────────────────────────────────────────
 # HELPERS
 # ─────────────────────────────────────────
@@ -444,7 +475,6 @@ def preview_price(request):
 def _create_or_update_flw_subaccount(user, bank_code, account_number, account_name):
     try:
         existing = SellerBankAccount.objects.filter(user=user).first()
-
         payload = {
             "account_bank": bank_code,
             "account_number": account_number,
@@ -452,18 +482,18 @@ def _create_or_update_flw_subaccount(user, bank_code, account_number, account_na
             "business_email": user.email,
             "country": "NG",
             "split_type": "percentage",
-            "split_value": 0.7,  # vendor gets 70%
+            "split_value": 0.7,
         }
 
-        if existing and existing.paystack_subaccount_code:
+        if existing and existing.flw_subaccount_id:
             res = requests.put(
-                f"{FLW_BASE}/subaccounts/{existing.paystack_subaccount_code}",
-                headers=FLW_HEADERS, json=payload,
+                f"{FLW_BASE}/subaccounts/{existing.flw_subaccount_id}",
+                headers=FLW_HEADERS, json=payload, timeout=15,
             )
         else:
             res = requests.post(
                 f"{FLW_BASE}/subaccounts",
-                headers=FLW_HEADERS, json=payload,
+                headers=FLW_HEADERS, json=payload, timeout=15,
             )
 
         if res.status_code in [200, 201]:
@@ -505,22 +535,18 @@ def _get_bank_name(bank_code):
 # FLUTTERWAVE WEBHOOK
 # ─────────────────────────────────────────
 
-import hashlib
-import hmac
 import json
 from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse
+
 
 @csrf_exempt
 def flutterwave_webhook(request):
     if request.method != "POST":
         return HttpResponse(status=405)
 
-    # Verify Flutterwave signature
     flw_signature = request.headers.get("verif-hash", "")
-    secret_hash = settings.FLW_WEBHOOK_HASH
-
-    if flw_signature != secret_hash:
+    if flw_signature != settings.FLW_WEBHOOK_HASH:
         logger.warning("Flutterwave webhook: invalid signature")
         return HttpResponse(status=401)
 
@@ -531,45 +557,41 @@ def flutterwave_webhook(request):
 
     event = payload.get("event")
     data = payload.get("data", {})
-
     logger.info(f"Flutterwave webhook received: {event}")
 
-    if event == "charge.completed":
-        if data.get("status") == "successful":
-            tx_ref = data.get("tx_ref")
-            transaction_id = data.get("id")
-            amount = Decimal(str(data.get("amount", 0)))
+    if event == "charge.completed" and data.get("status") == "successful":
+        tx_ref = data.get("tx_ref")
+        amount = Decimal(str(data.get("amount", 0)))
 
-            if PaymentTransaction.objects.filter(reference=tx_ref, status="success").exists():
-                logger.info(f"Webhook: {tx_ref} already processed")
-                return HttpResponse(status=200)
+        if PaymentTransaction.objects.filter(reference=tx_ref, status="success").exists():
+            return HttpResponse(status=200)
 
-            customer_email = data.get("customer", {}).get("email")
-            try:
-                from django.contrib.auth import get_user_model
-                User = get_user_model()
-                buyer = User.objects.filter(email=customer_email).first()
-            except Exception:
-                buyer = None
+        customer_email = data.get("customer", {}).get("email")
+        try:
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            buyer = User.objects.filter(email=customer_email).first()
+        except Exception:
+            buyer = None
 
-            if buyer:
-                meta = data.get("meta", {})
-                listing_id = meta.get("listing_id")
-                seller = _get_seller_from_listing(listing_id)
-                seller_rate, platform_rate = get_commission_split(amount)
-                seller_amount = (amount * seller_rate).quantize(Decimal("0.01"))
-                platform_amount = (amount * platform_rate).quantize(Decimal("0.01"))
+        if buyer:
+            meta = data.get("meta", {})
+            listing_id = meta.get("listing_id")
+            seller = _get_seller_from_listing(listing_id)
+            seller_rate, platform_rate = get_commission_split(amount)
+            seller_amount = (amount * seller_rate).quantize(Decimal("0.01"))
+            platform_amount = (amount * platform_rate).quantize(Decimal("0.01"))
 
-                PaymentTransaction.objects.get_or_create(
-                    reference=tx_ref,
-                    defaults={
-                        "buyer": buyer, "seller": seller, "amount": amount,
-                        "seller_amount": seller_amount, "platform_amount": platform_amount,
-                        "status": "success", "order_type": meta.get("type", "product"),
-                        "buyer_email": customer_email,
-                        "buyer_name": buyer.get_full_name() or buyer.username,
-                        "paystack_response": data,
-                    }
-                )
+            PaymentTransaction.objects.get_or_create(
+                reference=tx_ref,
+                defaults={
+                    "buyer": buyer, "seller": seller, "amount": amount,
+                    "seller_amount": seller_amount, "platform_amount": platform_amount,
+                    "status": "success", "order_type": meta.get("type", "product"),
+                    "buyer_email": customer_email,
+                    "buyer_name": buyer.get_full_name() or buyer.username,
+                    "flw_response": data,
+                }
+            )
 
     return HttpResponse(status=200)

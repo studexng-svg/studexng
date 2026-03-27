@@ -5,13 +5,15 @@ from django.conf import settings
 
 class SellerBankAccount(models.Model):
     """Stores seller's bank account for Flutterwave subaccount and payouts."""
-    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="bank_account")
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="bank_account"
+    )
     bank_code = models.CharField(max_length=20)
     bank_name = models.CharField(max_length=100)
     account_number = models.CharField(max_length=20)
     account_name = models.CharField(max_length=200)
     # Flutterwave subaccount ID for split payments
-    paystack_subaccount_code = models.CharField(max_length=100, blank=True, null=True)  # reused field, stores FLW subaccount ID
+    flw_subaccount_id = models.CharField(max_length=100, blank=True, null=True)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -33,12 +35,18 @@ class PaymentTransaction(models.Model):
         ("service", "Service"),
     ]
 
-    buyer = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name="payments")
-    seller = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name="received_payments")
+    buyer = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, related_name="payments"
+    )
+    seller = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, related_name="received_payments"
+    )
     reference = models.CharField(max_length=200, unique=True)
     amount = models.DecimalField(max_digits=12, decimal_places=2)
-    seller_amount = models.DecimalField(max_digits=12, decimal_places=2)   # 70%
-    platform_amount = models.DecimalField(max_digits=12, decimal_places=2) # 30%
+    seller_amount = models.DecimalField(max_digits=12, decimal_places=2)
+    platform_amount = models.DecimalField(max_digits=12, decimal_places=2)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
     order_type = models.CharField(max_length=20, choices=ORDER_TYPE_CHOICES, default="product")
 
@@ -46,8 +54,8 @@ class PaymentTransaction(models.Model):
     buyer_name = models.CharField(max_length=200, blank=True)
     order_id = models.IntegerField(null=True, blank=True)
 
-    # Stores Flutterwave response data
-    paystack_response = models.JSONField(null=True, blank=True)
+    # Flutterwave response payload
+    flw_response = models.JSONField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
