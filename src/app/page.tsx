@@ -8,12 +8,12 @@ import { generateStructuredData } from "@/lib/metadata";
 
 const reviews = [
   { name: "Valerie", text: "It was really neat and the registration was easy", stars: 5 },
-  { name: "Emeh & Evelyn", text: "Loved the interface and how easy it was to navigate", stars: 5 },
+  { name: "Emeh & Evelyn", text: "I love the interface and how easy it is to navigate", stars: 5 },
   { name: "Kachi", text: "It was super easy to navigate and everything worked perfectly for me", stars: 5 },
-  { name: "Anonymous", text: "Love the variety of vendors on there. I hope all the services will actually be available when you launch fully!", stars: 4 },
-  { name: "Khalid, Semilore & Samuel", text: "Like the website layout and navigation", stars: 5 },
-  { name: "Rehwa & Chierika", text: "Love everything about the idea and website", stars: 5 },
-  { name: "Lolope & Nonhe", text: "Like the aesthetics", stars: 5 },
+  { name: "Kachi", text: "I love the variety of vendors on there. I hope all the services will actually be available when you launch fully!", stars: 4 },
+  { name: "Khalid, Semilore & Samuel", text: "I like the website layout and navigation", stars: 5 },
+  { name: "Rehwa & Chierika", text: "I love everything about the idea and website", stars: 5 },
+  { name: "Lolope & Nonye", text: "I like the aesthetics", stars: 5 },
 ];
 
 function ReviewCarousel() {
@@ -36,7 +36,7 @@ function ReviewCarousel() {
       <div className="max-w-4xl mx-auto px-6 relative z-10">
         <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="text-center mb-16">
           <h2 className="text-5xl md:text-6xl font-black text-white mb-4">What Students Say</h2>
-          <p className="text-xl text-white/70">Real feedback from real PAU students</p>
+          <p className="text-xl text-white/70">Feedback from students</p>
         </motion.div>
 
         {/* Main carousel */}
