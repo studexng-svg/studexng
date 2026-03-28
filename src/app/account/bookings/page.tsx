@@ -9,7 +9,7 @@ import {
   CreditCard, AlertCircle, Loader, RefreshCw,
   ChevronRight, Hourglass, Ban,
 } from "lucide-react";
-import { useAuth, fetchWithAuth, getToken } from "@/lib/authStore";
+import { useAuth, fetchWithAuth } from "@/lib/authStore";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -75,24 +75,23 @@ export default function BuyerBookingsPage() {
   const [useCredits, setUseCredits] = useState(false);
   const [loyaltyBalance, setLoyaltyBalance] = useState(0);
   const [flwReady, setFlwReady] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+
   const referenceRef = useRef(`STUDEX-BKG-${Date.now()}`);
   const activeBookingRef = useRef<Booking | null>(null);
+  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Load Flutterwave script on mount
   useEffect(() => {
     if (typeof window === "undefined") return;
     if ((window as any).FlutterwaveCheckout) { setFlwReady(true); return; }
     const existing = document.getElementById("flw-script");
-    if (existing) {
-      existing.addEventListener("load", () => setFlwReady(true));
-      return;
-    }
+    if (existing) { existing.addEventListener("load", () => setFlwReady(true)); return; }
     const script = document.createElement("script");
     script.id = "flw-script";
     script.src = "https://checkout.flutterwave.com/v3.js";
     script.async = true;
     script.onload = () => setFlwReady(true);
-    script.onerror = () => console.error("Failed to load Flutterwave");
     document.head.appendChild(script);
   }, []);
 
@@ -116,10 +115,14 @@ export default function BuyerBookingsPage() {
   useEffect(() => {
     if (payingId) {
       referenceRef.current = `STUDEX-BKG-${Date.now()}-${payingId}`;
-      // Store in ref so callback closure always has fresh value
       activeBookingRef.current = bookings.find(b => b.id === payingId) || null;
     }
   }, [payingId, bookings]);
+
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => { if (pollIntervalRef.current) clearInterval(pollIntervalRef.current); };
+  }, []);
 
   const loadBookings = async () => {
     setLoading(true);
@@ -139,7 +142,7 @@ export default function BuyerBookingsPage() {
 
   const showToast = (msg: string, ok = true) => {
     setToast({ msg, ok });
-    setTimeout(() => setToast(null), 3500);
+    setTimeout(() => setToast(null), 4000);
   };
 
   const cancelBooking = async (id: number) => {
@@ -148,8 +151,80 @@ export default function BuyerBookingsPage() {
       const res = await fetchWithAuth(`${API_URL}/api/orders/bookings/${id}/cancel/`, { method: "POST" });
       if (res.ok) { showToast("Booking cancelled."); loadBookings(); }
       else showToast("Could not cancel. Try again.", false);
+    } catch { showToast("Error cancelling booking.", false); }
+  };
+
+  /**
+   * Poll the backend every 2 seconds for up to 30 seconds.
+   * The webhook creates the order server-side — we just wait for it.
+   */
+  const startPolling = (txRef: string) => {
+    setVerifying(true);
+    showToast("Verifying payment...", true);
+    let attempts = 0;
+    const maxAttempts = 15; // 15 × 2s = 30s
+
+    if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+
+    pollIntervalRef.current = setInterval(async () => {
+      attempts++;
+      try {
+        const res = await fetchWithAuth(`${API_URL}/api/payments/check-status/?tx_ref=${txRef}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.status === "paid" && data.order_id) {
+            clearInterval(pollIntervalRef.current!);
+            setVerifying(false);
+            showToast("🎉 Payment confirmed! Booking is now paid.");
+            await loadBookings();
+            setTimeout(() => router.push(`/account/orders/${data.order_id}`), 1200);
+            return;
+          }
+        }
+      } catch { /* continue polling */ }
+
+      if (attempts >= maxAttempts) {
+        clearInterval(pollIntervalRef.current!);
+        setVerifying(false);
+        // Try direct verify as fallback
+        await fallbackVerify(txRef);
+      }
+    }, 2000);
+  };
+
+  /**
+   * Fallback: call verify endpoint directly if polling times out.
+   */
+  const fallbackVerify = async (txRef: string) => {
+    const booking = activeBookingRef.current;
+    if (!booking) {
+      showToast("Payment received. Refresh to see updated status.", true);
+      await loadBookings();
+      return;
+    }
+
+    try {
+      const res = await fetchWithAuth(`${API_URL}/api/payments/verify/`, {
+        method: "POST",
+        body: JSON.stringify({
+          reference: txRef,
+          listing_id: booking.listing,
+          order_type: "service",
+          use_credits: useCredits,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.order_id) {
+        showToast("🎉 Payment confirmed!");
+        await loadBookings();
+        setTimeout(() => router.push(`/account/orders/${data.order_id}`), 1200);
+      } else {
+        showToast("Payment received. Check your orders page.", true);
+        await loadBookings();
+      }
     } catch {
-      showToast("Error cancelling booking.", false);
+      showToast("Payment received. Check your orders page.", true);
+      await loadBookings();
     }
   };
 
@@ -165,103 +240,47 @@ export default function BuyerBookingsPage() {
     if (typeof FlutterwaveCheckout !== "function") {
       const script = document.createElement("script");
       script.src = "https://checkout.flutterwave.com/v3.js";
-      script.onload = () => {
-        setFlwReady(true);
-        showToast("Payment ready! Tap Pay again.", true);
-      };
+      script.onload = () => { setFlwReady(true); showToast("Ready! Tap Pay again.", true); };
       document.head.appendChild(script);
       showToast("Loading payment... tap Pay again in 3 seconds.", false);
       return;
     }
 
-    const bookingForPayment = activeBookingRef.current || activeBooking;
-    const subaccountId = bookingForPayment?.vendor_subaccount_code?.trim();
+    const subaccountId = (activeBookingRef.current || activeBooking).vendor_subaccount_code?.trim();
+    const txRef = referenceRef.current;
 
-    // Strip key of any accidental whitespace/newlines from env
-    const flwKey = (process.env.NEXT_PUBLIC_FLW_PUBLIC_KEY || "").trim();
+    setPayingId(null); // Close modal before opening FLW
 
-    const flwConfig: Record<string, any> = {
-      public_key: flwKey,
-      tx_ref: referenceRef.current,
+    FlutterwaveCheckout({
+      public_key: (process.env.NEXT_PUBLIC_FLW_PUBLIC_KEY || "").trim(),
+      tx_ref: txRef,
       amount: amountAfterCredits,
       currency: "NGN",
       payment_options: "card,banktransfer,ussd",
+      ...(subaccountId && subaccountId.startsWith("RS_") ? { subaccounts: [{ id: subaccountId }] } : {}),
       customer: {
         email: (user?.email || "").trim(),
         name: (user?.username || "").trim(),
         phone_number: "",
       },
+      meta: {
+        listing_id: (activeBookingRef.current || activeBooking).listing,
+        type: "booking_payment",
+      },
       customizations: {
         title: "StudEx",
         description: "Service Booking",
       },
-    };
-
-    // Only add subaccounts if we have a valid RS_ id
-    if (subaccountId && subaccountId.startsWith("RS_")) {
-      flwConfig.subaccounts = [{ id: subaccountId }];
-    }
-
-    FlutterwaveCheckout({
-      ...flwConfig,
-      callback: async (response: any) => {
-        // Close the modal first so user sees the app
-        setPayingId(null);
-        showToast("Verifying payment...", true);
-
-        try {
-          // Read token directly from Zustand persisted storage
-          let token: string | null = null;
-          try {
-            const stored = localStorage.getItem("auth-storage");
-            token = stored ? JSON.parse(stored)?.state?.accessToken ?? null : null;
-          } catch {}
-          if (!token) token = getToken();
-
-          if (!token) {
-            showToast("Session expired. Payment received — please refresh.", false);
-            router.push("/account/bookings");
-            return;
-          }
-
-          const res = await fetch(`${API_URL}/api/payments/verify/`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-              reference: response.tx_ref,
-              transaction_id: String(response.transaction_id),
-              listing_id: (activeBookingRef.current || activeBooking)?.listing,
-              order_type: "service",
-              use_credits: useCredits,
-            }),
-          });
-
-          const data = await res.json();
-
-          if (res.ok) {
-            showToast("🎉 Booking confirmed! Payment successful.");
-            // Reload bookings so status shows "paid"
-            await loadBookings();
-            // Redirect to orders page
-            setTimeout(() => {
-              router.push("/account/orders");
-            }, 1500);
-          } else {
-            showToast(data.error || "Payment received but verification failed. Contact support.", false);
-            await loadBookings();
-          }
-        } catch (err) {
-          console.error("Verify callback error:", err);
-          showToast("Payment received. Refreshing your bookings...", false);
-          await loadBookings();
-          setTimeout(() => router.push("/account/bookings"), 2000);
+      callback: (response: any) => {
+        // Callback fires when payment is done — start polling regardless of response details
+        if (response.status === "successful" || response.status === "completed") {
+          startPolling(response.tx_ref || txRef);
         }
       },
       onclose: () => {
-        setPayingId(null);
+        // User closed checkout — start polling anyway in case payment went through
+        // Poll for a few seconds to catch payments that completed just before close
+        startPolling(txRef);
       },
     });
   };
@@ -269,7 +288,6 @@ export default function BuyerBookingsPage() {
   const handlePay = (bookingId: number) => setPayingId(bookingId);
 
   const filtered = filter === "all" ? bookings : bookings.filter(b => b.status === filter);
-
   const counts = {
     all: bookings.length,
     pending: bookings.filter(b => b.status === "pending").length,
@@ -288,32 +306,39 @@ export default function BuyerBookingsPage() {
 
   return (
     <>
+      {/* TOAST */}
       <AnimatePresence>
         {toast && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
-            className={`fixed top-4 left-1/2 -translate-x-1/2 z-[9999] px-6 py-3 rounded-full font-bold text-sm shadow-xl whitespace-nowrap ${
-              toast.ok ? "bg-teal-500 text-white" : "bg-red-500 text-white"
-            }`}
-          >
+          <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
+            className={`fixed top-4 left-1/2 -translate-x-1/2 z-[9999] px-6 py-3 rounded-full font-bold text-sm shadow-xl whitespace-nowrap ${toast.ok ? "bg-teal-500 text-white" : "bg-red-500 text-white"}`}>
             {toast.msg}
           </motion.div>
         )}
       </AnimatePresence>
 
+      {/* VERIFYING OVERLAY */}
+      <AnimatePresence>
+        {verifying && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/40 z-[9998] flex items-center justify-center">
+            <div className="bg-white dark:bg-gray-900 rounded-3xl p-8 shadow-2xl text-center max-w-xs mx-4">
+              <Loader className="w-12 h-12 text-purple-600 animate-spin mx-auto mb-4" />
+              <p className="font-black text-gray-900 dark:text-white text-lg">Confirming Payment</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">Please wait while we verify your payment...</p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* PAYMENT MODAL */}
       <AnimatePresence>
         {payingId && activeBooking && (
-          <motion.div
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 z-[9999] flex items-center justify-center p-4"
-          >
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 z-[9999] flex items-center justify-center p-4">
+            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }} transition={{ type: "spring", damping: 25, stiffness: 300 }}
               className="bg-white dark:bg-gray-900 rounded-3xl p-6 w-full max-w-md shadow-2xl overflow-y-auto"
-              style={{ maxHeight: "calc(100dvh - 3rem)" }}
-            >
+              style={{ maxHeight: "calc(100dvh - 3rem)" }}>
               <h2 className="text-xl font-black text-gray-900 dark:text-white mb-1">Confirm Payment</h2>
               <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">You're about to pay for this confirmed booking.</p>
 
@@ -342,9 +367,7 @@ export default function BuyerBookingsPage() {
 
               {loyaltyBalance > 0 && (
                 <button onClick={() => setUseCredits(v => !v)}
-                  className={`w-full flex items-center justify-between rounded-2xl p-4 mb-4 border-2 transition ${
-                    useCredits ? "bg-amber-50 dark:bg-amber-900/20 border-amber-400" : "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700"
-                  }`}>
+                  className={`w-full flex items-center justify-between rounded-2xl p-4 mb-4 border-2 transition ${useCredits ? "bg-amber-50 dark:bg-amber-900/20 border-amber-400" : "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700"}`}>
                   <div className="flex items-center gap-3">
                     <span className="text-2xl">🎁</span>
                     <div className="text-left">
@@ -361,7 +384,7 @@ export default function BuyerBookingsPage() {
               {useCredits && creditsToApply > 0 && (
                 <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-xl p-3 mb-4">
                   <div className="flex justify-between text-sm mb-1">
-                    <span className="text-gray-500">Original price</span>
+                    <span className="text-gray-500">Original</span>
                     <span className="text-gray-500 line-through">₦{listingPrice.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between text-sm mb-1">
@@ -398,6 +421,7 @@ export default function BuyerBookingsPage() {
         )}
       </AnimatePresence>
 
+      {/* HEADER */}
       <div className="sticky top-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 z-40 px-4 py-4">
         <div className="flex items-center justify-between max-w-2xl mx-auto">
           <button onClick={() => router.back()} className="text-purple-600 p-2 rounded-full hover:bg-purple-50 dark:hover:bg-purple-900/20 transition">
@@ -414,9 +438,7 @@ export default function BuyerBookingsPage() {
         <div className="flex gap-2 overflow-x-auto pb-1">
           {(["all", "pending", "confirmed", "cancelled"] as const).map(f => (
             <button key={f} onClick={() => setFilter(f)}
-              className={`flex-shrink-0 px-4 py-2 rounded-xl text-sm font-bold capitalize transition ${
-                filter === f ? "bg-purple-600 text-white shadow-md" : "bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700"
-              }`}>
+              className={`flex-shrink-0 px-4 py-2 rounded-xl text-sm font-bold capitalize transition ${filter === f ? "bg-purple-600 text-white shadow-md" : "bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700"}`}>
               {f}{counts[f] > 0 && <span className={`ml-1 text-xs ${filter === f ? "opacity-80" : "text-purple-500"}`}>({counts[f]})</span>}
             </button>
           ))}
