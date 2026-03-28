@@ -76,6 +76,7 @@ export default function BuyerBookingsPage() {
   const [loyaltyBalance, setLoyaltyBalance] = useState(0);
   const [flwReady, setFlwReady] = useState(false);
   const referenceRef = useRef(`STUDEX-BKG-${Date.now()}`);
+  const activeBookingRef = useRef<Booking | null>(null);
 
   // Load Flutterwave script on mount
   useEffect(() => {
@@ -115,8 +116,10 @@ export default function BuyerBookingsPage() {
   useEffect(() => {
     if (payingId) {
       referenceRef.current = `STUDEX-BKG-${Date.now()}-${payingId}`;
+      // Store in ref so callback closure always has fresh value
+      activeBookingRef.current = bookings.find(b => b.id === payingId) || null;
     }
-  }, [payingId]);
+  }, [payingId, bookings]);
 
   const loadBookings = async () => {
     setLoading(true);
@@ -171,7 +174,8 @@ export default function BuyerBookingsPage() {
       return;
     }
 
-    const subaccountId = activeBooking.vendor_subaccount_code?.trim();
+    const bookingForPayment = activeBookingRef.current || activeBooking;
+    const subaccountId = bookingForPayment?.vendor_subaccount_code?.trim();
 
     // Strip key of any accidental whitespace/newlines from env
     const flwKey = (process.env.NEXT_PUBLIC_FLW_PUBLIC_KEY || "").trim();
@@ -201,8 +205,25 @@ export default function BuyerBookingsPage() {
     FlutterwaveCheckout({
       ...flwConfig,
       callback: async (response: any) => {
+        // Close the modal first so user sees the app
+        setPayingId(null);
+        showToast("Verifying payment...", true);
+
         try {
-          const token = getToken();
+          // Read token directly from Zustand persisted storage
+          let token: string | null = null;
+          try {
+            const stored = localStorage.getItem("auth-storage");
+            token = stored ? JSON.parse(stored)?.state?.accessToken ?? null : null;
+          } catch {}
+          if (!token) token = getToken();
+
+          if (!token) {
+            showToast("Session expired. Payment received — please refresh.", false);
+            router.push("/account/bookings");
+            return;
+          }
+
           const res = await fetch(`${API_URL}/api/payments/verify/`, {
             method: "POST",
             headers: {
@@ -211,22 +232,32 @@ export default function BuyerBookingsPage() {
             },
             body: JSON.stringify({
               reference: response.tx_ref,
-              transaction_id: response.transaction_id,
-              listing_id: activeBooking.listing,
+              transaction_id: String(response.transaction_id),
+              listing_id: (activeBookingRef.current || activeBooking)?.listing,
               order_type: "service",
               use_credits: useCredits,
             }),
           });
+
           const data = await res.json();
+
           if (res.ok) {
-            showToast("Payment successful! Booking confirmed ✓");
-            setPayingId(null);
-            loadBookings();
+            showToast("🎉 Booking confirmed! Payment successful.");
+            // Reload bookings so status shows "paid"
+            await loadBookings();
+            // Redirect to orders page
+            setTimeout(() => {
+              router.push("/account/orders");
+            }, 1500);
           } else {
-            showToast(data.error || "Payment verification failed", false);
+            showToast(data.error || "Payment received but verification failed. Contact support.", false);
+            await loadBookings();
           }
-        } catch {
-          showToast("Payment received. Please check your bookings.", false);
+        } catch (err) {
+          console.error("Verify callback error:", err);
+          showToast("Payment received. Refreshing your bookings...", false);
+          await loadBookings();
+          setTimeout(() => router.push("/account/bookings"), 2000);
         }
       },
       onclose: () => {
