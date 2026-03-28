@@ -173,28 +173,33 @@ export default function BuyerBookingsPage() {
 
     const subaccountId = activeBooking.vendor_subaccount_code?.trim();
 
-    FlutterwaveCheckout({
-      public_key: process.env.NEXT_PUBLIC_FLW_PUBLIC_KEY,
+    // Strip key of any accidental whitespace/newlines from env
+    const flwKey = (process.env.NEXT_PUBLIC_FLW_PUBLIC_KEY || "").trim();
+
+    const flwConfig: Record<string, any> = {
+      public_key: flwKey,
       tx_ref: referenceRef.current,
       amount: amountAfterCredits,
       currency: "NGN",
       payment_options: "card,banktransfer,ussd",
-      // CORRECT FORMAT: just { id } — split ratio is configured on the subaccount in FLW dashboard
-      ...(subaccountId ? { subaccounts: [{ id: subaccountId }] } : {}),
       customer: {
-        email: user?.email,
-        name: user?.username,
-      },
-      meta: {
-        booking_id: payingId,
-        listing_id: activeBooking.listing,
-        type: "booking_payment",
+        email: (user?.email || "").trim(),
+        name: (user?.username || "").trim(),
+        phone_number: "",
       },
       customizations: {
         title: "StudEx",
-        description: `Booking: ${activeBooking.listing_title}`,
-        logo: "https://studexng.vercel.app/images/logo-1.jpg",
+        description: "Service Booking",
       },
+    };
+
+    // Only add subaccounts if we have a valid RS_ id
+    if (subaccountId && subaccountId.startsWith("RS_")) {
+      flwConfig.subaccounts = [{ id: subaccountId }];
+    }
+
+    FlutterwaveCheckout({
+      ...flwConfig,
       callback: async (response: any) => {
         try {
           const token = getToken();
