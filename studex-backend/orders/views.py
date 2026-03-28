@@ -3,14 +3,12 @@ from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from django.db import models, transaction
+from django.db import models
 from django.utils import timezone
 from django.contrib.auth import get_user_model
 from decimal import Decimal
 from .models import Order, Booking, Dispute
-from .serializers import (
-    OrderSerializer, DisputeSerializer, BookingSerializer
-)
+from .serializers import OrderSerializer, DisputeSerializer, BookingSerializer
 import logging
 
 logger = logging.getLogger(__name__)
@@ -21,11 +19,8 @@ def _notify(recipient, notification_type, title, message, action_url=""):
     try:
         from notifications.models import Notification
         Notification.objects.create(
-            recipient=recipient,
-            notification_type=notification_type,
-            title=title,
-            message=message,
-            action_url=action_url,
+            recipient=recipient, notification_type=notification_type,
+            title=title, message=message, action_url=action_url,
         )
     except Exception as e:
         logger.warning(f"Notification creation failed: {e}")
@@ -38,7 +33,6 @@ class OrderViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        # Always return orders where user is the buyer
         return self.queryset.filter(buyer=user).order_by('-created_at')
 
     def perform_create(self, serializer):
@@ -68,7 +62,7 @@ class OrderViewSet(viewsets.ModelViewSet):
             title=f'✅ Order Confirmed — {order.listing.title}',
             message=(
                 f'{request.user.username} has confirmed the order for '
-                f'"{order.listing.title}". Payment was split to your account via Flutterwave.'
+                f'"{order.listing.title}". Flutterwave will transfer your share within 1-2 business days.'
             ),
             action_url='/vendor/dashboard',
         )
@@ -110,7 +104,7 @@ class OrderViewSet(viewsets.ModelViewSet):
             logger.warning(f"Vendor badge update skipped: {e}")
 
         response_data = {
-            "message": "Order confirmed! Payment was split to the vendor via Flutterwave.",
+            "message": "Order confirmed! Flutterwave will transfer payment to the vendor.",
             "order": self.get_serializer(order).data,
             "can_review": True,
         }
@@ -226,3 +220,22 @@ class BookingViewSet(viewsets.ModelViewSet):
             )
 
         return Response({'detail': 'Booking cancelled.', 'status': 'cancelled'})
+
+    @action(detail=False, methods=['get'], url_path='vendor-paid')
+    def vendor_paid_bookings(self, request):
+        """
+        Returns paid bookings for this vendor's listings.
+        Used in Vendor Dashboard → Orders tab.
+        """
+        from services.models import Listing
+        vendor_listing_ids = Listing.objects.filter(
+            vendor=request.user
+        ).values_list('id', flat=True)
+
+        paid_bookings = Booking.objects.filter(
+            listing__id__in=vendor_listing_ids,
+            status="paid",
+        ).select_related('buyer', 'listing', 'listing__vendor').order_by('-created_at')
+
+        serializer = self.get_serializer(paid_bookings, many=True)
+        return Response(serializer.data)

@@ -14,8 +14,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 type Tab = "messages" | "bookings" | "earnings" | "listings" | "orders" | "reviews";
 
-// ✅ Calculate vendor cut based on order amount (matches backend tiers)
-function getVendorCut(amount: number, totalOrders: number = 0): number {
+function getVendorCut(totalOrders: number = 0): number {
   if (totalOrders >= 50) return 0.85;
   if (totalOrders >= 10) return 0.80;
   return 0.75;
@@ -29,7 +28,6 @@ export default function VendorDashboard() {
   const [msgBadge, setMsgBadge] = useState(0);
   const [bookingBadge, setBookingBadge] = useState(0);
 
-  // ✅ Auto-switch to listings tab if ?tab=listings is in URL
   useEffect(() => {
     const tab = searchParams.get("tab") as Tab | null;
     if (tab && ["messages", "bookings", "earnings", "listings", "orders", "reviews"].includes(tab)) {
@@ -272,7 +270,6 @@ function BookingsTab() {
 
   useEffect(() => {
     loadBookings();
-    // Get total orders for cut calculation
     fetchWithAuth(`${API_URL}/api/payments/seller/earnings/`).then(r => r.ok ? r.json() : null).then(d => { if (d) setTotalOrders(d.total_orders || 0); }).catch(() => {});
   }, []);
 
@@ -292,7 +289,7 @@ function BookingsTab() {
   };
 
   const filtered = bookings.filter(b => filter === "all" || b.status === filter);
-  const vendorRate = getVendorCut(0, totalOrders);
+  const vendorRate = getVendorCut(totalOrders);
   const vendorPct = Math.round(vendorRate * 100);
 
   if (loading) return <LoadingSpinner />;
@@ -319,7 +316,6 @@ function BookingsTab() {
                 <div className="bg-gray-800 rounded-xl p-3"><p className="text-gray-500 text-xs mb-1">Date</p><p className="font-semibold text-white">{booking.scheduled_date}</p></div>
                 <div className="bg-gray-800 rounded-xl p-3"><p className="text-gray-500 text-xs mb-1">Time</p><p className="font-semibold text-white">{booking.scheduled_time}</p></div>
                 <div className="bg-gray-800 rounded-xl p-3"><p className="text-gray-500 text-xs mb-1">Price</p><p className="font-bold text-teal-400">₦{Number(booking.listing_price || 0).toLocaleString()}</p></div>
-                {/* ✅ Dynamic cut based on tier */}
                 <div className="bg-gray-800 rounded-xl p-3"><p className="text-gray-500 text-xs mb-1">Your cut ({vendorPct}%)</p><p className="font-bold text-green-400">₦{(Number(booking.listing_price || 0) * vendorRate).toLocaleString()}</p></div>
               </div>
               {booking.note && <div className="mt-3 bg-gray-800 rounded-xl p-3"><p className="text-gray-500 text-xs mb-1">Customer note</p><p className="text-sm text-gray-300">{booking.note}</p></div>}
@@ -363,14 +359,11 @@ function EarningsTab() {
 
   if (loading) return <LoadingSpinner />;
 
-  const vendorRate = data?.vendor_rate || 75;
-  const platformRate = data?.commission_rate || 25;
-
   const stats = [
     { label: "Total Earned", value: `₦${Number(data?.total_earned || 0).toLocaleString()}`, color: "text-teal-400", bg: "from-teal-900/30 to-teal-800/10" },
     { label: "Pending", value: `₦${Number(data?.pending || 0).toLocaleString()}`, color: "text-amber-400", bg: "from-amber-900/30 to-amber-800/10" },
     { label: "Available", value: `₦${Number(data?.available || 0).toLocaleString()}`, color: "text-green-400", bg: "from-green-900/30 to-green-800/10" },
-    { label: "Your Cut", value: `${vendorRate}%`, color: "text-purple-400", bg: "from-purple-900/30 to-purple-800/10" },
+    { label: "Total Orders", value: data?.total_orders || 0, color: "text-purple-400", bg: "from-purple-900/30 to-purple-800/10" },
   ];
 
   return (
@@ -384,13 +377,12 @@ function EarningsTab() {
         ))}
       </div>
 
-      {/* ✅ FIXED: Commission tiers — vendor-first display, no escrow language */}
       <div className="bg-gray-900 rounded-2xl p-5 border border-gray-800">
         <h3 className="font-bold text-white mb-1 flex items-center gap-2">
           <TrendingUp className="w-5 h-5 text-teal-400" />
           Your Earnings Tiers
         </h3>
-        <p className="text-xs text-gray-500 mb-4">The more you sell, the more you keep. Paystack splits payments automatically.</p>
+        <p className="text-xs text-gray-500 mb-4">The more you sell, the more you keep. Flutterwave splits payments automatically.</p>
         <div className="grid grid-cols-3 gap-3 text-sm">
           {[
             { orders: "1–9 orders", vendorRate: "75%", platformRate: "25%", active: (data?.total_orders || 0) < 10 },
@@ -408,7 +400,7 @@ function EarningsTab() {
         </div>
         <div className="mt-4 bg-gray-800 rounded-xl p-3">
           <p className="text-xs text-gray-400">
-            💡 <strong className="text-white">How it works:</strong> When a buyer pays, Paystack automatically sends your cut directly to your bank account. StudEx keeps the platform fee. No manual transfers needed.
+            💡 <strong className="text-white">How it works:</strong> When a buyer pays, Flutterwave automatically sends your cut directly to your bank account. StudEx keeps the platform fee. No manual transfers needed.
           </p>
         </div>
       </div>
@@ -557,44 +549,105 @@ function ListingsTab() {
 }
 
 /* ─── ORDERS TAB ─────────────────────────────────────────────── */
+// Shows all PAID bookings for this vendor's listings.
+// A paid booking = buyer has completed payment → vendor must deliver the service.
 function OrdersTab() {
-  const [orders, setOrders] = useState<any[]>([]);
+  const [paidBookings, setPaidBookings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [totalOrders, setTotalOrders] = useState(0);
 
   useEffect(() => {
     const load = async () => {
       try {
-        const res = await fetchWithAuth(`${API_URL}/api/orders/orders/`);
-        const data = await res.json();
-        setOrders(Array.isArray(data) ? data : (data.results || []));
+        // New endpoint: GET /api/orders/bookings/vendor-paid/
+        const res = await fetchWithAuth(`${API_URL}/api/orders/bookings/vendor-paid/`);
+        if (res.ok) {
+          const data = await res.json();
+          setPaidBookings(Array.isArray(data) ? data : (data.results || []));
+        }
       } catch {} finally { setLoading(false); }
     };
     load();
-    fetchWithAuth(`${API_URL}/api/payments/seller/earnings/`).then(r => r.ok ? r.json() : null).then(d => { if (d) setTotalOrders(d.total_orders || 0); }).catch(() => {});
+    fetchWithAuth(`${API_URL}/api/payments/seller/earnings/`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) setTotalOrders(d.total_orders || 0); })
+      .catch(() => {});
   }, []);
 
   if (loading) return <LoadingSpinner />;
 
-  const vendorRate = getVendorCut(0, totalOrders);
+  const vendorRate = getVendorCut(totalOrders);
   const vendorPct = Math.round(vendorRate * 100);
 
   return (
     <div className="overflow-y-auto pb-4" style={{ maxHeight: "calc(100vh - 200px)" }}>
-      <div className="mb-4"><h2 className="font-black text-white text-lg">Orders</h2><p className="text-gray-500 text-sm">{orders.length} total</p></div>
-      {orders.length === 0 ? <EmptyState icon={ShoppingBag} message="No orders yet" /> : (
+      <div className="mb-4 flex items-center justify-between">
+        <div>
+          <h2 className="font-black text-white text-lg">Paid Orders</h2>
+          <p className="text-gray-500 text-sm">{paidBookings.length} bookings awaiting delivery</p>
+        </div>
+        {paidBookings.length > 0 && (
+          <span className="bg-green-900/30 text-green-400 text-xs font-bold px-3 py-1.5 rounded-full border border-green-800">
+            ✓ Payment received
+          </span>
+        )}
+      </div>
+
+      {paidBookings.length === 0 ? (
+        <EmptyState icon={ShoppingBag} message="No paid orders yet. Once a buyer pays for a booking, it appears here." />
+      ) : (
         <div className="space-y-4">
-          {orders.map(order => (
-            <div key={order.id} className="bg-gray-900 rounded-2xl p-5 border border-gray-800">
-              <div className="flex items-center justify-between mb-3">
-                <div><p className="font-bold text-white">{order.listing?.title}</p><p className="text-xs text-gray-500">#{order.reference}</p></div>
-                <StatusBadge status={order.status} />
+          {paidBookings.map(booking => (
+            <div key={booking.id} className="bg-gray-900 rounded-2xl p-5 border border-gray-800">
+              {/* Buyer + service */}
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center text-sm font-black flex-shrink-0">
+                  {booking.buyer_username?.[0]?.toUpperCase() || "?"}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-white">{booking.buyer_username}</p>
+                  <p className="text-xs text-gray-400 truncate">{booking.listing_title}</p>
+                </div>
+                <span className="bg-blue-900/40 text-blue-400 text-xs font-bold px-3 py-1 rounded-full">
+                  Paid ✓
+                </span>
               </div>
-              <div className="flex items-center justify-between text-sm">
-                <div><p className="text-xs text-gray-500">Buyer</p><p className="font-semibold text-white">{order.buyer}</p></div>
-                <div className="text-right"><p className="text-xs text-gray-500">Total</p><p className="font-bold text-teal-400">₦{Number(order.amount).toLocaleString()}</p></div>
-                {/* ✅ Dynamic cut */}
-                <div className="text-right"><p className="text-xs text-gray-500">Your cut ({vendorPct}%)</p><p className="font-bold text-green-400">₦{(Number(order.amount) * vendorRate).toLocaleString()}</p></div>
+
+              {/* Details grid */}
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                <div className="bg-gray-800 rounded-xl p-3">
+                  <p className="text-gray-500 text-xs mb-1">📅 Date</p>
+                  <p className="font-semibold text-white text-sm">{booking.scheduled_date}</p>
+                </div>
+                <div className="bg-gray-800 rounded-xl p-3">
+                  <p className="text-gray-500 text-xs mb-1">🕐 Time</p>
+                  <p className="font-semibold text-white text-sm">{booking.scheduled_time}</p>
+                </div>
+                <div className="bg-gray-800 rounded-xl p-3">
+                  <p className="text-gray-500 text-xs mb-1">💳 Total paid</p>
+                  <p className="font-bold text-teal-400 text-sm">₦{Number(booking.listing_price || 0).toLocaleString()}</p>
+                </div>
+                <div className="bg-gray-800 rounded-xl p-3">
+                  <p className="text-gray-500 text-xs mb-1">💰 Your cut ({vendorPct}%)</p>
+                  <p className="font-bold text-green-400 text-sm">
+                    ₦{(Number(booking.listing_price || 0) * vendorRate).toLocaleString()}
+                  </p>
+                </div>
+              </div>
+
+              {/* Customer note */}
+              {booking.note && (
+                <div className="bg-gray-800 rounded-xl p-3 mb-4">
+                  <p className="text-gray-500 text-xs mb-1">Customer note</p>
+                  <p className="text-sm text-gray-300">{booking.note}</p>
+                </div>
+              )}
+
+              {/* Payout info */}
+              <div className="bg-teal-900/20 border border-teal-800 rounded-xl p-3">
+                <p className="text-xs text-teal-400">
+                  💸 <strong>Flutterwave</strong> will transfer ₦{(Number(booking.listing_price || 0) * vendorRate).toLocaleString()} to your bank account within 1–2 business days.
+                </p>
               </div>
             </div>
           ))}
@@ -649,13 +702,19 @@ function ReviewsTab() {
   );
 }
 
-/* ─── SHARED ─────────────────────────────────────────────────── */
-function StatusBadge({ status, small }: { status: string; small?: boolean }) {
-  const map: Record<string, string> = { pending: "bg-amber-900/40 text-amber-400", confirmed: "bg-teal-900/40 text-teal-400", completed: "bg-green-900/40 text-green-400", cancelled: "bg-red-900/40 text-red-400", held: "bg-amber-900/40 text-amber-400", released: "bg-green-900/40 text-green-400", paid: "bg-blue-900/40 text-blue-400" };
-  return <span className={`${map[status] || "bg-gray-800 text-gray-400"} ${small ? "text-xs px-2 py-0.5" : "text-xs px-3 py-1"} rounded-full font-bold capitalize`}>{status}</span>;
+/* ─── SHARED COMPONENTS ──────────────────────────────────────── */
+function StatusBadge({ status }: { status: string }) {
+  const map: Record<string, string> = {
+    pending: "bg-amber-900/40 text-amber-400",
+    confirmed: "bg-teal-900/40 text-teal-400",
+    completed: "bg-green-900/40 text-green-400",
+    cancelled: "bg-red-900/40 text-red-400",
+    paid: "bg-blue-900/40 text-blue-400",
+  };
+  return <span className={`${map[status] || "bg-gray-800 text-gray-400"} text-xs px-3 py-1 rounded-full font-bold capitalize`}>{status}</span>;
 }
 function EmptyState({ icon: Icon, message }: { icon: any; message: string }) {
-  return <div className="flex flex-col items-center justify-center py-16 text-gray-600"><Icon className="w-12 h-12 mb-3 opacity-30" /><p className="font-semibold">{message}</p></div>;
+  return <div className="flex flex-col items-center justify-center py-16 text-gray-600"><Icon className="w-12 h-12 mb-3 opacity-30" /><p className="font-semibold text-center px-4">{message}</p></div>;
 }
 function LoadingSpinner() {
   return <div className="flex items-center justify-center py-16"><Loader className="w-8 h-8 text-teal-400 animate-spin" /></div>;
