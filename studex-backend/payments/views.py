@@ -11,7 +11,7 @@ from .models import SellerBankAccount, PaymentTransaction
 
 logger = logging.getLogger(__name__)
 
-# .strip() prevents \n or trailing spaces in env var from crashing HTTP headers
+# .strip() prevents \n or trailing spaces from crashing HTTP headers
 FLW_SECRET = (getattr(settings, "FLW_SECRET_KEY", "") or "").strip()
 if not FLW_SECRET:
     logger.error("FLW_SECRET_KEY is not set in Django settings / environment variables!")
@@ -172,7 +172,7 @@ def seller_bank_account(request):
 @permission_classes([IsAuthenticated])
 def verify_payment(request):
     reference = request.data.get("reference")
-    transaction_id = request.data.get("transaction_id")  # numeric Flutterwave ID
+    transaction_id = request.data.get("transaction_id")
     order_type = request.data.get("order_type", "product")
     listing_id = request.data.get("listing_id")
     items = request.data.get("items", [])
@@ -217,9 +217,7 @@ def verify_payment(request):
     amount_paid = Decimal(str(flw_data["amount"]))
     buyer_email = flw_data.get("customer", {}).get("email", request.user.email)
     ref_key = flw_data.get("tx_ref", ref_key)
-
-    # ── Store the numeric transaction ID — needed for refunds later ──
-    flw_transaction_id = flw_data.get("id")  # this is the numeric ID e.g. 12345678
+    flw_transaction_id = flw_data.get("id")
 
     seller_rate, platform_rate = get_commission_split(amount_paid)
     seller_amount = (amount_paid * seller_rate).quantize(Decimal("0.01"))
@@ -231,7 +229,7 @@ def verify_payment(request):
         buyer=request.user,
         seller=seller,
         reference=ref_key,
-        flw_transaction_id=flw_transaction_id,  # ← saved for refunds
+        flw_transaction_id=flw_transaction_id,
         amount=amount_paid,
         seller_amount=seller_amount,
         platform_amount=platform_amount,
@@ -393,8 +391,6 @@ def seller_transactions(request):
 
 # ─────────────────────────────────────────
 # REFUND
-# Flutterwave refunds require the NUMERIC transaction ID (e.g. 12345678)
-# not the tx_ref string. We store flw_transaction_id at payment time for this.
 # ─────────────────────────────────────────
 
 @api_view(["POST"])
@@ -417,7 +413,6 @@ def refund_payment(request):
     if txn.status == "refunded":
         return Response({"error": "This transaction has already been refunded."}, status=400)
 
-    # Must use the numeric Flutterwave transaction ID for refunds
     if not txn.flw_transaction_id:
         logger.error(f"Refund attempted but flw_transaction_id missing for ref: {reference}")
         return Response({
@@ -438,7 +433,6 @@ def refund_payment(request):
             txn.status = "refunded"
             txn.save()
 
-            # Notify buyer
             try:
                 from notifications.models import Notification
                 Notification.objects.create(
@@ -484,7 +478,6 @@ def seller_earnings(request):
     total_orders = Order.objects.filter(listing__vendor=user).count()
     txns = PaymentTransaction.objects.filter(seller=user, status="success")
     total_earned = txns.aggregate(Sum("seller_amount"))["seller_amount__sum"] or 0
-
     commission_rate = 30 if total_orders < 10 else (20 if total_orders < 50 else 15)
 
     return Response({
@@ -539,6 +532,22 @@ def preview_price(request):
 # ─────────────────────────────────────────
 
 def _create_or_update_flw_subaccount(user, bank_code, account_number, account_name):
+    """
+    Creates or updates a Flutterwave subaccount for a vendor.
+
+    IMPORTANT: We store `subaccount_id` (the RS_xxx string), NOT `id` (integer).
+    The JS SDK requires the RS_xxx string format for split payments.
+
+    Flutterwave API response structure:
+    {
+      "status": "success",
+      "data": {
+        "id": 12345,                        ← numeric, DO NOT use for JS SDK
+        "subaccount_id": "RS_ABC123...",    ← string, USE THIS for JS SDK
+        ...
+      }
+    }
+    """
     try:
         existing = SellerBankAccount.objects.filter(user=user).first()
         payload = {
@@ -562,8 +571,15 @@ def _create_or_update_flw_subaccount(user, bank_code, account_number, account_na
                 headers=FLW_HEADERS, json=payload, timeout=15,
             )
 
+        logger.info(f"FLW subaccount response: {res.status_code} {res.text[:400]}")
+
         if res.status_code in [200, 201]:
-            return res.json()["data"]["id"]
+            data = res.json().get("data", {})
+            # ✅ Use subaccount_id (RS_xxx string) — required by Flutterwave JS SDK
+            # data["id"] is a numeric integer and causes 400 errors in the JS SDK
+            subaccount_id = data.get("subaccount_id") or str(data.get("id", ""))
+            logger.info(f"Stored subaccount_id: {subaccount_id}")
+            return subaccount_id
 
         logger.error(f"Flutterwave subaccount error: {res.status_code} {res.text[:300]}")
         return None

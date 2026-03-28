@@ -97,8 +97,12 @@ export default function OrderDetailPage() {
   }[s] || "bg-gray-100 text-gray-500");
 
   const statusLabel = (s: string) => ({
-    pending: "Pending Payment", paid: "In Escrow", seller_completed: "Seller Completed",
-    completed: "Completed", disputed: "Disputed", cancelled: "Cancelled",
+    pending: "Pending Payment",
+    paid: "In Progress",
+    seller_completed: "Seller Completed",
+    completed: "Completed",
+    disputed: "Disputed",
+    cancelled: "Cancelled",
   }[s] || s);
 
   if (!isHydrated || loading) return (
@@ -115,7 +119,9 @@ export default function OrderDetailPage() {
         <AlertCircle className="w-14 h-14 text-red-500 mx-auto mb-3" />
         <h2 className="text-xl font-black text-gray-800 dark:text-white mb-2">Order Not Found</h2>
         <Link href="/account/orders">
-          <button className="mt-4 px-6 py-3 bg-gradient-to-r from-purple-600 to-teal-500 text-white font-bold rounded-xl">Back to Orders</button>
+          <button className="mt-4 px-6 py-3 bg-gradient-to-r from-purple-600 to-teal-500 text-white font-bold rounded-xl">
+            Back to Orders
+          </button>
         </Link>
       </div>
     </div>
@@ -135,7 +141,9 @@ export default function OrderDetailPage() {
               <ChevronLeft className="w-6 h-6 text-purple-600" />
             </button>
           </Link>
-          <h1 className="text-xl font-black bg-gradient-to-r from-purple-600 to-teal-500 bg-clip-text text-transparent">Order Details</h1>
+          <h1 className="text-xl font-black bg-gradient-to-r from-purple-600 to-teal-500 bg-clip-text text-transparent">
+            Order Details
+          </h1>
           <button onClick={handleOpenChat}
             className="p-2 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-full transition">
             <MessageCircle className="w-6 h-6 text-purple-600" />
@@ -160,7 +168,11 @@ export default function OrderDetailPage() {
             <div>
               <p className="text-xs text-gray-400 font-medium">Reference</p>
               <p className="font-black text-gray-800 dark:text-white text-sm mt-0.5">#{order.reference}</p>
-              <p className="text-xs text-gray-400 mt-1">{new Date(order.created_at).toLocaleDateString("en-NG", { day: "numeric", month: "long", year: "numeric" })}</p>
+              <p className="text-xs text-gray-400 mt-1">
+                {new Date(order.created_at).toLocaleDateString("en-NG", {
+                  day: "numeric", month: "long", year: "numeric"
+                })}
+              </p>
             </div>
             <div className={`px-3 py-1.5 rounded-full font-bold text-xs flex items-center gap-1.5 ${statusColor(order.status)}`}>
               {isCompleted ? <CheckCircle className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
@@ -169,17 +181,19 @@ export default function OrderDetailPage() {
           </div>
         </motion.div>
 
-        {/* ESCROW NOTICE */}
+        {/* IN-PROGRESS NOTICE — no escrow language */}
         {canConfirm && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
             className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-2xl p-4">
             <div className="flex gap-3">
               <Clock className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
               <div>
-                <p className="font-bold text-amber-900 dark:text-amber-300 text-sm">Payment Held in Escrow</p>
+                <p className="font-bold text-amber-900 dark:text-amber-300 text-sm">Awaiting Your Confirmation</p>
                 <p className="text-xs text-amber-800 dark:text-amber-400 mt-1">
-                  ₦{parseFloat(String(order.amount)).toLocaleString("en-NG", { minimumFractionDigits: 2 })} is secured.{" "}
-                  {order.status === 'seller_completed' ? "Seller marked complete — confirm to release payment." : "Waiting for seller to complete."}
+                  ₦{parseFloat(String(order.amount)).toLocaleString("en-NG", { minimumFractionDigits: 2 })} paid via Flutterwave.{" "}
+                  {order.status === 'seller_completed'
+                    ? "The vendor has marked this complete — confirm below if you received the service."
+                    : "Waiting for the vendor to deliver and mark the service complete."}
                 </p>
               </div>
             </div>
@@ -193,8 +207,10 @@ export default function OrderDetailPage() {
             <div className="flex gap-3">
               <CheckCircle className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
               <div>
-                <p className="font-bold text-emerald-900 dark:text-emerald-300 text-sm">Order Completed</p>
-                <p className="text-xs text-emerald-700 dark:text-emerald-400 mt-1">Payment has been released to the seller.</p>
+                <p className="font-bold text-emerald-900 dark:text-emerald-300 text-sm">Order Completed ✓</p>
+                <p className="text-xs text-emerald-700 dark:text-emerald-400 mt-1">
+                  This order is complete. Flutterwave will transfer the vendor's share within 1-2 business days.
+                </p>
               </div>
             </div>
           </motion.div>
@@ -212,7 +228,7 @@ export default function OrderDetailPage() {
               <span className="font-bold text-gray-800 dark:text-white text-sm">{order.listing?.title}</span>
             </div>
             <div className="flex justify-between py-2 border-b border-gray-50 dark:border-gray-800">
-              <span className="text-sm text-gray-400">Seller</span>
+              <span className="text-sm text-gray-400">Vendor</span>
               <span className="font-bold text-gray-800 dark:text-white text-sm">{order.listing?.vendor?.username}</span>
             </div>
             <div className="flex justify-between pt-2">
@@ -226,11 +242,12 @@ export default function OrderDetailPage() {
 
         {/* CONFIRM BUTTON */}
         {canConfirm && (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="space-y-3">
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
+            className="space-y-3">
             <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
               onClick={() => setShowModal(true)}
               className="w-full py-4 bg-gradient-to-r from-purple-600 to-teal-500 text-white rounded-2xl font-black text-base shadow-lg flex items-center justify-center gap-2">
-              <CheckCircle className="w-5 h-5" /> Confirm Receipt
+              <CheckCircle className="w-5 h-5" /> Confirm Service Received
             </motion.button>
             <button className="w-full py-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-2xl font-bold text-sm border border-red-100 dark:border-red-800">
               Report an Issue
@@ -258,17 +275,19 @@ export default function OrderDetailPage() {
           <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
             className="bg-white dark:bg-gray-900 rounded-3xl p-6 w-full max-w-md shadow-2xl"
             onClick={e => e.stopPropagation()}>
-            <h3 className="text-xl font-black text-gray-900 dark:text-white mb-2">Confirm Receipt?</h3>
-            <p className="text-gray-500 dark:text-gray-400 text-sm mb-5">Only confirm if you received the order. This releases payment to the seller.</p>
+            <h3 className="text-xl font-black text-gray-900 dark:text-white mb-2">Confirm Service Received?</h3>
+            <p className="text-gray-500 dark:text-gray-400 text-sm mb-5">
+              Only confirm if the vendor delivered the service. This completes the order.
+            </p>
             <div className="bg-purple-50 dark:bg-purple-900/20 rounded-xl p-4 mb-5 text-center">
-              <p className="text-xs text-gray-400">Amount to release</p>
+              <p className="text-xs text-gray-400">Amount paid</p>
               <p className="text-3xl font-black text-purple-600 mt-1">
                 ₦{parseFloat(String(order.amount)).toLocaleString("en-NG", { minimumFractionDigits: 2 })}
               </p>
               <p className="text-xs text-gray-400 mt-1">to {order.listing?.vendor?.username}</p>
             </div>
             <p className="text-xs text-center text-amber-600 dark:text-amber-400 mb-4">
-              🎁 Complete 5 orders to earn ₦100 loyalty credits!
+              🎁 Complete 10 orders to earn ₦200 loyalty credits!
             </p>
             <div className="flex gap-3">
               <button onClick={() => setShowModal(false)} disabled={confirming}
@@ -278,7 +297,9 @@ export default function OrderDetailPage() {
               <motion.button whileTap={{ scale: 0.97 }} onClick={handleConfirm} disabled={confirming}
                 className="flex-1 py-3 bg-gradient-to-r from-purple-600 to-teal-500 text-white rounded-xl font-black disabled:opacity-50 flex items-center justify-center gap-2">
                 {confirming
-                  ? <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: "linear" }}><Clock className="w-5 h-5" /></motion.div>
+                  ? <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: "linear" }}>
+                      <Clock className="w-5 h-5" />
+                    </motion.div>
                   : <><CheckCircle className="w-5 h-5" /> Confirm</>}
               </motion.button>
             </div>
