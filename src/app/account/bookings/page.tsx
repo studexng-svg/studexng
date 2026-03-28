@@ -174,24 +174,29 @@ export default function BuyerBookingsPage() {
   currency: "NGN",
   payment_options: "card,banktransfer,ussd",
 
-  // ✅ ADD THIS BLOCK (THIS FIXES SPLIT PAYMENTS)
   subaccounts: activeBooking.vendor_subaccount_code
     ? [
         {
           id: activeBooking.vendor_subaccount_code,
+          transaction_split_ratio: 1,
         },
       ]
     : [],
+
+  transaction_charge_type: "percentage",
+  transaction_charge: 10, // your platform cut
 
   customer: {
     email: user?.email,
     name: user?.username,
   },
-      meta: {
-        booking_id: payingId,
-        listing_id: activeBooking.listing,
-        type: "booking_payment",
-      },
+
+  meta: {
+    booking_id: payingId,
+    listing_id: activeBooking.listing,
+    type: "booking_payment",
+  },
+
 
       callback: async (response: any) => {
         try {
