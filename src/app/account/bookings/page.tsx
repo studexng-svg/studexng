@@ -19,7 +19,7 @@ interface Booking {
   listing_title: string;
   listing_price: string;
   vendor_name: string;
-  vendor_subaccount_code: string | null; // Flutterwave numeric subaccount ID
+  vendor_subaccount_code: string | null;
   buyer_username: string;
   scheduled_date: string;
   scheduled_time: string;
@@ -137,16 +137,15 @@ export default function BuyerBookingsPage() {
   const amountAfterCredits = Math.max(listingPrice - creditsToApply, 0);
 
   // ─────────────────────────────────────────────────────────────────
-  // FLUTTERWAVE PAYMENT
-  // Must be called synchronously from a click — no await before
-  // FlutterwaveCheckout() or the browser blocks the popup.
+  // FLUTTERWAVE SUBACCOUNTS — CRITICAL FORMAT RULES:
   //
-  // SUBACCOUNTS FIX:
-  // Flutterwave's JS SDK `subaccounts` field expects an array of objects
-  // where `id` is the numeric subaccount ID (integer, not a string like RS_xxx).
-  // Your backend stores this as flw_subaccount_id and returns it as
-  // vendor_subaccount_code in the booking serializer.
-  // We pass it as a number using parseInt() to satisfy Flutterwave's API.
+  // 1. `id` MUST be a STRING — Flutterwave internally calls .trim() on it.
+  //    Passing an integer causes "subaccount.id?.trim is not a function".
+  //
+  // 2. Field name is `ratio` (NOT `transaction_split_ratio`).
+  //    ratio is a number 0-100 representing vendor's percentage.
+  //
+  // 3. The call must be synchronous from onClick — no await before it.
   // ─────────────────────────────────────────────────────────────────
   const proceedToFlutterwave = () => {
     if (!activeBooking) return;
@@ -157,17 +156,15 @@ export default function BuyerBookingsPage() {
       return;
     }
 
-    // Parse subaccount ID — Flutterwave requires a number, not a string
-    const subaccountId = activeBooking.vendor_subaccount_code
-      ? parseInt(activeBooking.vendor_subaccount_code, 10)
-      : null;
+    // vendor_subaccount_code is already a string from the API — use it directly
+    const subaccountId = activeBooking.vendor_subaccount_code?.trim();
 
-    if (!subaccountId || isNaN(subaccountId)) {
+    if (!subaccountId) {
       showToast("Vendor has not set up their payout account yet.", false);
       return;
     }
 
-    // ✅ Synchronous call — preserves browser user-gesture context
+    // ✅ Synchronous — preserves browser user-gesture for popup
     FlutterwaveCheckout({
       public_key: process.env.NEXT_PUBLIC_FLW_PUBLIC_KEY,
       tx_ref: referenceRef.current,
@@ -175,12 +172,13 @@ export default function BuyerBookingsPage() {
       currency: "NGN",
       payment_options: "card,banktransfer,ussd",
 
-      // ✅ Correct subaccounts format for Flutterwave JS SDK
-      // id must be a number. ratio controls the split (vendor gets 70%).
+      // ✅ CORRECT FORMAT:
+      // - id: string (not number — Flutterwave calls .trim() on it internally)
+      // - ratio: number 0–100 (vendor's share percentage)
       subaccounts: [
         {
-          id: subaccountId,
-          transaction_split_ratio: 70,
+          id: subaccountId,   // string e.g. "RS_ABC123" or "12345678"
+          ratio: 70,          // vendor gets 70%
         },
       ],
 
@@ -348,7 +346,6 @@ export default function BuyerBookingsPage() {
                 </div>
               )}
 
-              {/* Info note — no escrow language */}
               <div className="flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-3 mb-5">
                 <AlertCircle className="w-4 h-4 text-blue-500 flex-shrink-0" />
                 <p className="text-xs text-blue-700 dark:text-blue-300">
@@ -361,8 +358,10 @@ export default function BuyerBookingsPage() {
                   className="flex-1 py-3 bg-gray-100 dark:bg-gray-800 rounded-2xl font-bold text-gray-600 dark:text-gray-300 text-sm">
                   Cancel
                 </button>
-                <button onClick={proceedToFlutterwave}
-                  className="flex-1 py-3 bg-gradient-to-r from-teal-500 to-emerald-500 text-white rounded-2xl font-black text-sm flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-transform">
+                <button
+                  onClick={proceedToFlutterwave}
+                  className="flex-1 py-3 bg-gradient-to-r from-teal-500 to-emerald-500 text-white rounded-2xl font-black text-sm flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-transform"
+                >
                   <CreditCard className="w-4 h-4" /> Pay ₦{amountAfterCredits.toLocaleString()}
                 </button>
               </div>

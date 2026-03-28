@@ -408,7 +408,7 @@ export default function ListingDetailPage() {
                           <CheckCircle className="w-14 h-14 text-green-500 mx-auto" />
                           <p className="font-black text-gray-900 dark:text-white text-lg">Booking Request Sent!</p>
                           <p className="text-gray-500 text-sm">The vendor will confirm your booking. You'll see it in your bookings.</p>
-                          <button onClick={() => router.push("/book")}
+                          <button onClick={() => router.push("/account/bookings")}
                             className="mt-2 px-6 py-2.5 bg-purple-600 text-white rounded-full font-bold text-sm">
                             View My Bookings
                           </button>
