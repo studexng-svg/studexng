@@ -111,10 +111,7 @@ export default function CheckoutPage() {
           name: user?.username || "StudEx User",
         },
         ...(subaccountId ? {
-          subaccounts: [{
-            id: subaccountId,
-            transaction_split_ratio: 70,
-          }]
+          subaccounts: [{ id: subaccountId }]
         } : {}),
         meta: {
           listing_id: isServiceBooking ? booking?.providerId : null,
