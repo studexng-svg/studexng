@@ -20,6 +20,7 @@ from .serializers import (
 )
 from .models import User, SellerApplication, Profile
 from .utils import send_notification
+import re
 
 
 # ─── Username availability check ─────────────────────────────────────────────
@@ -27,11 +28,6 @@ from .utils import send_notification
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def check_username(request):
-    """
-    GET /api/auth/check-username/?username=chinedu_tech
-    Returns {"available": true/false}
-    Used by signup form for real-time username availability check.
-    """
     username = request.query_params.get('username', '').strip()
     if not username:
         return Response({'available': False, 'error': 'No username provided'}, status=400)
@@ -48,7 +44,6 @@ def register_user(request):
     if serializer.is_valid():
         user = serializer.save()
 
-        # ✅ Send welcome notification immediately on signup
         send_notification(
             recipient=user,
             notification_type='welcome',
@@ -96,13 +91,56 @@ def get_user_profile(request):
 @api_view(['PUT', 'PATCH'])
 @permission_classes([IsAuthenticated])
 def update_user_profile(request):
-    serializer = UserProfileSerializer(request.user, data=request.data, partial=True)
+    """
+    Updates user profile fields.
+    Now supports username changes with uniqueness validation.
+    """
+    user = request.user
+    data = request.data
+
+    # ── Username update ────────────────────────────────────────────────────
+    new_username = data.get('username', '').strip()
+    if new_username and new_username != user.username:
+        # Validate format: letters, numbers, underscores only
+        if not re.match(r'^[a-zA-Z0-9_]+$', new_username):
+            return Response(
+                {'username': ['Username can only contain letters, numbers, and underscores. No spaces.']},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        # Validate length
+        if len(new_username) < 3:
+            return Response(
+                {'username': ['Username must be at least 3 characters.']},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        if len(new_username) > 30:
+            return Response(
+                {'username': ['Username cannot exceed 30 characters.']},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        # Check uniqueness (case-insensitive)
+        if User.objects.filter(username__iexact=new_username).exclude(pk=user.pk).exists():
+            return Response(
+                {'username': ['A user with that username already exists.']},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        user.username = new_username
+
+    # ── Other fields handled by serializer ────────────────────────────────
+    # Pass remaining data to the serializer but exclude username
+    # (we've already handled it above)
+    serializer_data = {k: v for k, v in data.items() if k != 'username'}
+    serializer = UserProfileSerializer(user, data=serializer_data, partial=True)
+
     if serializer.is_valid():
         serializer.save()
+        # Re-fetch fresh data after save
+        user.refresh_from_db()
         return Response({
             'message': 'Profile updated successfully',
-            'user': UserProfileSerializer(request.user).data,
+            'user': UserProfileSerializer(user).data,
         }, status=status.HTTP_200_OK)
+
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -153,7 +191,6 @@ def logout_user(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def me(request):
-    """Returns fresh user data — called on account page load."""
     user = request.user
     unread_notifications = 0
     try:
@@ -217,7 +254,6 @@ class SellerApplicationViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         application = serializer.save(user=self.request.user)
 
-        # ✅ Notify the applicant that their application was received
         send_notification(
             recipient=self.request.user,
             notification_type='vendor_application',

@@ -49,7 +49,7 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
     'django_filters',
-    'django_apscheduler',  # ← booking reminder scheduler
+    'django_apscheduler',
 
     # Cloud storage
     'cloudinary',
@@ -106,12 +106,10 @@ WSGI_APPLICATION = 'studex.wsgi.application'
 DATABASE_URL = config('DATABASE_URL', default='')
 
 if DATABASE_URL:
-    # Production — Render PostgreSQL
     DATABASES = {
         'default': dj_database_url.parse(DATABASE_URL, conn_max_age=600)
     }
 else:
-    # Local — SQLite
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
@@ -150,6 +148,16 @@ MEDIA_ROOT = BASE_DIR / 'media'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # =======================================
+# FILE UPLOAD SIZE LIMITS
+# Increased from Django's default 2.5MB to support:
+# - iPhone camera HEIC/HEIF photos (can be 6–15MB)
+# - High-resolution JPEG photos from Android cameras
+# - Professional photography portfolio images
+# =======================================
+DATA_UPLOAD_MAX_MEMORY_SIZE = 20 * 1024 * 1024   # 20MB — max size of non-file POST data
+FILE_UPLOAD_MAX_MEMORY_SIZE = 20 * 1024 * 1024   # 20MB — files larger than this go to disk
+
+# =======================================
 # CLOUDINARY MEDIA STORAGE
 # =======================================
 CLOUDINARY_STORAGE = {
@@ -158,9 +166,9 @@ CLOUDINARY_STORAGE = {
     'API_SECRET': config('CLOUDINARY_API_SECRET', default=''),
 }
 
-# Use Cloudinary in production, local filesystem in development
 if not DEBUG and config('CLOUDINARY_CLOUD_NAME', default=''):
     DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+
 AUTH_USER_MODEL = 'accounts.User'
 
 # =======================================
@@ -219,7 +227,7 @@ FLW_PUBLIC_KEY = config('FLW_PUBLIC_KEY', default='None')
 FLW_WEBHOOK_HASH = config('FLW_WEBHOOK_HASH', default='studex-flw-webhook-secret')
 
 # =======================================
-# CACHE (for login attempt tracking)
+# CACHE
 # =======================================
 CACHES = {
     'default': {
@@ -228,15 +236,15 @@ CACHES = {
 }
 
 # =======================================
-# EMAIL (optional)
+# EMAIL
 # =======================================
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
 # =======================================
-# APSCHEDULER — booking reminder settings
+# APSCHEDULER
 # =======================================
-APSCHEDULER_DATETIME_FORMAT = "N j, Y, f:s a"  # human-readable log format
-APSCHEDULER_RUN_NOW_TIMEOUT = 25               # seconds before a missed job is skipped
+APSCHEDULER_DATETIME_FORMAT = "N j, Y, f:s a"
+APSCHEDULER_RUN_NOW_TIMEOUT = 25
 
 # =======================================
 # SECURITY HEADERS (production only)

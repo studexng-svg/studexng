@@ -12,10 +12,12 @@ class SellerBankAccountAdmin(admin.ModelAdmin):
     search_fields = ['user__username', 'bank_name', 'account_number', 'account_name']
     list_filter = ['is_active', 'bank_name']
     readonly_fields = ['created_at', 'updated_at']
-
+ 
     def flw_subaccount_display(self, obj):
         return obj.flw_subaccount_id or '—'
     flw_subaccount_display.short_description = 'FLW Subaccount ID'
+ 
+ 
 
 
 @admin.register(PaymentTransaction)
@@ -33,21 +35,31 @@ class PaymentTransactionAdmin(admin.ModelAdmin):
     list_per_page = 50
 
     def amount_display(self, obj):
-        return format_html('<strong>₦{:,.2f}</strong>', float(obj.amount))
+        # ✅ Format the number to a string FIRST, then pass to format_html
+        # Passing float directly with {:,.2f} breaks in Python 3.14 because
+        # format_html wraps args in SafeString which only supports string format specs
+        amount = f"₦{float(obj.amount):,.2f}"
+        return format_html('<strong>{}</strong>', amount)
     amount_display.short_description = 'Total'
 
     def seller_amount_display(self, obj):
-        return format_html('<span style="color:green;">₦{:,.2f}</span>', float(obj.seller_amount))
+        amount = f"₦{float(obj.seller_amount):,.2f}"
+        return format_html('<span style="color:green;">{}</span>', amount)
     seller_amount_display.short_description = 'Vendor Share'
 
     def platform_amount_display(self, obj):
-        return format_html('<span style="color:purple;">₦{:,.2f}</span>', float(obj.platform_amount))
+        amount = f"₦{float(obj.platform_amount):,.2f}"
+        return format_html('<span style="color:purple;">{}</span>', amount)
     platform_amount_display.short_description = 'Platform Fee'
 
     def colored_status(self, obj):
         colors = {'success': 'green', 'pending': 'orange', 'failed': 'red', 'refunded': 'blue'}
         color = colors.get(obj.status, 'black')
-        return format_html('<span style="color:{}; font-weight:bold;">{}</span>', color, obj.status.upper())
+        return format_html(
+            '<span style="color:{};font-weight:bold;">{}</span>',
+            color,
+            obj.status.upper()
+        )
     colored_status.short_description = 'Status'
 
     actions = ['export_to_csv']
@@ -59,10 +71,12 @@ class PaymentTransactionAdmin(admin.ModelAdmin):
         writer.writerow(['Reference', 'Buyer', 'Seller', 'Amount', 'Vendor Amount', 'Platform Fee', 'Type', 'Status', 'Date'])
         for t in queryset:
             writer.writerow([
-                t.reference, t.buyer.username if t.buyer else 'N/A',
+                t.reference,
+                t.buyer.username if t.buyer else 'N/A',
                 t.seller.username if t.seller else 'N/A',
                 float(t.amount), float(t.seller_amount), float(t.platform_amount),
-                t.order_type, t.status, t.created_at.strftime('%Y-%m-%d %H:%M:%S')
+                t.order_type, t.status,
+                t.created_at.strftime('%Y-%m-%d %H:%M:%S'),
             ])
         return response
     export_to_csv.short_description = "Export to CSV"
