@@ -13,7 +13,7 @@ export default function TermsPage() {
         <h2 className="text-lg font-bold text-gray-800 dark:text-gray-200">4. Refunds</h2>
         <p>Refunds are processed back to your original payment method. Contact support within 24 hours of a failed delivery to request a refund.</p>
         <h2 className="text-lg font-bold text-gray-800 dark:text-gray-200">5. Contact</h2>
-        <p>For support, contact us at studex.ng@gmail.com.</p>
+        <p>For support, contact us at studex.biz@pau.edu.ng</p>
       </div>
     </div>
   );

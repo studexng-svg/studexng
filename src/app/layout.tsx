@@ -10,8 +10,21 @@ import { usePathname } from "next/navigation";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { useEffect, useState } from "react";
 import Script from "next/script";
+import { useNotifications } from "@/hooks/useNotifications";
+import { NotificationToastContainer } from "@/components/NotificationToast";
 
 const inter = Inter({ subsets: ["latin"] });
+
+// ── Wraps the whole app to provide real-time toast notifications ──────────────
+function NotificationProvider({ children }: { children: React.ReactNode }) {
+  const { toasts, dismissToast } = useNotifications();
+  return (
+    <>
+      {children}
+      <NotificationToastContainer toasts={toasts} onDismiss={dismissToast} />
+    </>
+  );
+}
 
 export default function RootLayout({
   children,
@@ -107,27 +120,28 @@ export default function RootLayout({
 
       <body className={`${inter.className} bg-[#FFF8F0] dark:bg-gray-950 text-gray-900 dark:text-gray-100`}>
         <ThemeProvider>
-          <main
-            className={
-              hideNav
-                ? "min-h-screen bg-[#FFF8F0] dark:bg-gray-950"
-                : "min-h-screen bg-[#FFF8F0] dark:bg-gray-950 pb-[5.5rem]"
-            }
-          >
-            {children}
-          </main>
+          <NotificationProvider>
+            <main
+              className={
+                hideNav
+                  ? "min-h-screen bg-[#FFF8F0] dark:bg-gray-950"
+                  : "min-h-screen bg-[#FFF8F0] dark:bg-gray-950 pb-[5.5rem]"
+              }
+            >
+              {children}
+            </main>
 
-          {!hideNav && (
-            <div className="fixed inset-x-0 bottom-0 z-50">
-              <BottomNav />
-            </div>
-          )}
+            {!hideNav && (
+              <div className="fixed inset-x-0 bottom-0 z-50">
+                <BottomNav />
+              </div>
+            )}
 
-          <CookieConsent />
-          <Toaster position="top-center" richColors closeButton />
+            <CookieConsent />
+            <Toaster position="top-center" richColors closeButton />
+          </NotificationProvider>
         </ThemeProvider>
 
-        {/* ✅ FIX: Proper Flutterwave script loading */}
         <Script
           src="https://checkout.flutterwave.com/v3.js"
           strategy="afterInteractive"

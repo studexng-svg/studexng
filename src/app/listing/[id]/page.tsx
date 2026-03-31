@@ -8,7 +8,7 @@ import Image from "next/image";
 import {
   ArrowLeft, Star, MessageCircle, ShoppingCart, Calendar,
   Clock, FileText, CheckCircle, Loader, AlertCircle,
-  Shield, ChevronDown, ChevronUp, Send
+  ChevronDown, ChevronUp, Send, MapPin
 } from "lucide-react";
 import { useAuth, fetchWithAuth } from "@/lib/authStore";
 import { useCartStore } from "@/lib/cartStore";
@@ -72,6 +72,7 @@ export default function ListingDetailPage() {
   const [bookingDate, setBookingDate] = useState("");
   const [bookingTime, setBookingTime] = useState("");
   const [bookingNote, setBookingNote] = useState("");
+  const [bookingLocation, setBookingLocation] = useState(""); // ← NEW
   const [bookingStep, setBookingStep] = useState<"form" | "confirming" | "done">("form");
   const [bookingError, setBookingError] = useState("");
   const [toast, setToast] = useState("");
@@ -100,8 +101,8 @@ export default function ListingDetailPage() {
             setReviews(Array.isArray(rd) ? rd : (rd.results || []));
           }
         } catch {}
-      } catch (err: any) {
-        setError(err.message || "Failed to load listing");
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : "Failed to load listing");
       } finally {
         setLoading(false);
       }
@@ -129,8 +130,10 @@ export default function ListingDetailPage() {
     if (!isLoggedIn) { router.push("/auth"); return; }
     if (!bookingDate) { setBookingError("Please pick a date."); return; }
     if (!bookingTime) { setBookingError("Please pick a time slot."); return; }
+    if (!bookingLocation.trim()) { setBookingError("Please enter a location for this appointment."); return; }
     setBookingError("");
     setBookingStep("confirming");
+
     try {
       const freshRes = await fetch(`${API_URL}/api/services/listings/${listing!.id}/`);
       if (freshRes.ok) {
@@ -143,6 +146,7 @@ export default function ListingDetailPage() {
         }
       }
     } catch {}
+
     try {
       const res = await fetchWithAuth(`${API_URL}/api/orders/bookings/`, {
         method: "POST",
@@ -151,23 +155,24 @@ export default function ListingDetailPage() {
           scheduled_date: bookingDate,
           scheduled_time: bookingTime,
           note: bookingNote,
+          location: bookingLocation.trim(), // ← NEW
         }),
       });
       if (!res.ok) {
         const data = await res.json();
         const msg = data.detail || data.scheduled_date?.[0] || data.listing?.[0]
-          || data.scheduled_time?.[0] || data.non_field_errors?.[0]
+          || data.scheduled_time?.[0] || data.location?.[0]
+          || data.non_field_errors?.[0]
           || Object.values(data).flat().join(" ") || "Booking failed";
         throw new Error(msg);
       }
       setBookingStep("done");
-    } catch (err: any) {
-      setBookingError(err.message || "Could not place booking. Try again.");
+    } catch (err: unknown) {
+      setBookingError(err instanceof Error ? err.message : "Could not place booking. Try again.");
       setBookingStep("form");
     }
   };
 
-  // Opens the booking form and scrolls to it
   const openBooking = () => {
     if (!isLoggedIn) { router.push("/auth"); return; }
     setShowBooking(true);
@@ -204,7 +209,7 @@ export default function ListingDetailPage() {
 
   return (
     <>
-      {/* Toast */}
+      {/* Inline page toast (add to cart etc.) */}
       {toast && (
         <motion.div initial={{ y: -40, opacity: 0 }} animate={{ y: 70, opacity: 1 }}
           className="fixed top-0 left-1/2 -translate-x-1/2 z-50 bg-green-500 text-white px-6 py-3 rounded-full font-bold text-sm shadow-lg">
@@ -234,13 +239,6 @@ export default function ListingDetailPage() {
         </div>
       </div>
 
-      {/*
-        pb-28 — gives 112px of space at the bottom.
-        The bottom nav is ~70px tall. This means the last element on the page
-        always has ~42px of breathing room above the nav. Nothing gets hidden.
-        There is NO fixed bottom bar on this page anymore — that was the cause
-        of the overlap. Book Now and Add to Cart are inline in the page content.
-      */}
       <div className="pb-28 bg-gray-50 dark:bg-gray-950 min-h-screen">
 
         {/* Hero image */}
@@ -321,10 +319,7 @@ export default function ListingDetailPage() {
             </div>
           </div>
 
-          {/*
-            ── ADD TO CART (food / physical product only) ──
-            Lives inline in the page — scrolls naturally, bottom nav never covers it.
-          */}
+          {/* Add to Cart — food/physical products only */}
           {!isService && listing.is_available && (
             <button
               onClick={handleAddToCart}
@@ -334,17 +329,12 @@ export default function ListingDetailPage() {
             </button>
           )}
 
-          {/* Trust badges */}
-          <div className={`grid gap-2 ${totalReviews > 0 ? "grid-cols-3" : "grid-cols-2"}`}>
-            {[
-              { icon: Shield, label: "Escrow Protected", color: "text-green-600" },
-              { icon: CheckCircle, label: "Vendor Verified", color: "text-blue-600" },
-            ].map(({ icon: Icon, label, color }) => (
-              <div key={label} className="bg-white dark:bg-gray-900 rounded-xl p-3 text-center shadow-sm border border-gray-100 dark:border-gray-800">
-                <Icon className={`w-5 h-5 ${color} mx-auto mb-1`} />
-                <p className="text-[10px] text-gray-500 font-medium leading-tight">{label}</p>
-              </div>
-            ))}
+          {/* Trust badges — removed Escrow badge, kept Vendor Verified + Rating */}
+          <div className={`grid gap-2 ${totalReviews > 0 ? "grid-cols-2" : "grid-cols-1"}`}>
+            <div className="bg-white dark:bg-gray-900 rounded-xl p-3 text-center shadow-sm border border-gray-100 dark:border-gray-800">
+              <CheckCircle className="w-5 h-5 text-blue-600 mx-auto mb-1" />
+              <p className="text-[10px] text-gray-500 font-medium leading-tight">Vendor Verified</p>
+            </div>
             {totalReviews > 0 && (
               <div className="bg-white dark:bg-gray-900 rounded-xl p-3 text-center shadow-sm border border-gray-100 dark:border-gray-800">
                 <Star className="w-5 h-5 text-amber-500 fill-amber-500 mx-auto mb-1" />
@@ -353,12 +343,7 @@ export default function ListingDetailPage() {
             )}
           </div>
 
-          {/*
-            ── BOOKING SECTION (services only) ──
-            id="booking-section" lets openBooking() scroll here smoothly.
-            Book Now button is INSIDE this card, inline — user scrolls to it
-            naturally. Bottom nav sits below at all times, never overlaps.
-          */}
+          {/* Booking section — services only */}
           {isService && (
             <div id="booking-section" className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden">
 
@@ -374,11 +359,7 @@ export default function ListingDetailPage() {
                 {showBooking ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
               </button>
 
-              {/*
-                ── BOOK NOW button ──
-                Shown when the form is collapsed. Inline in the page, scrolls
-                with content. No fixed positioning. No conflict with bottom nav.
-              */}
+              {/* Book Now CTA when collapsed */}
               {!showBooking && listing.is_available && (
                 <div className="px-4 pb-4">
                   <button
@@ -407,7 +388,7 @@ export default function ListingDetailPage() {
                           className="text-center py-4 space-y-2">
                           <CheckCircle className="w-14 h-14 text-green-500 mx-auto" />
                           <p className="font-black text-gray-900 dark:text-white text-lg">Booking Request Sent!</p>
-                          <p className="text-gray-500 text-sm">The vendor will confirm your booking. You'll see it in your bookings.</p>
+                          <p className="text-gray-500 text-sm">The vendor will confirm your booking. You'll get a notification when they do.</p>
                           <button onClick={() => router.push("/account/bookings")}
                             className="mt-2 px-6 py-2.5 bg-purple-600 text-white rounded-full font-bold text-sm">
                             View My Bookings
@@ -432,7 +413,7 @@ export default function ListingDetailPage() {
                             </label>
                             <div className="grid grid-cols-3 gap-2">
                               {TIME_SLOTS.map(slot => (
-                                <button key={slot} onClick={() => setBookingTime(slot)}
+                                <button key={slot} type="button" onClick={() => setBookingTime(slot)}
                                   className={`py-2 rounded-xl text-xs font-bold border-2 transition ${
                                     bookingTime === slot
                                       ? "bg-purple-600 text-white border-purple-600"
@@ -442,6 +423,26 @@ export default function ListingDetailPage() {
                                 </button>
                               ))}
                             </div>
+                          </div>
+
+                          {/* ── LOCATION FIELD (NEW) ─────────────────────────────────────
+                              This is what gets included in reminders:
+                              "You have a Nail Art appointment at Cedar in 30 minutes"
+                          ────────────────────────────────────────────────────────────── */}
+                          <div>
+                            <label className="flex items-center gap-1.5 text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">
+                              <MapPin className="w-4 h-4 text-purple-500" /> Location
+                            </label>
+                            <input
+                              type="text"
+                              value={bookingLocation}
+                              onChange={e => setBookingLocation(e.target.value)}
+                              placeholder="e.g. Cedar hostel, room 12 / Trezadel lobby"
+                              className="w-full p-3 rounded-xl border-2 border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-white focus:outline-none focus:border-purple-500 text-sm font-medium"
+                            />
+                            <p className="text-xs text-gray-400 mt-1">
+                              Where should the vendor meet you? This appears in your appointment reminders.
+                            </p>
                           </div>
 
                           {/* Note */}
@@ -461,12 +462,12 @@ export default function ListingDetailPage() {
                             </div>
                           )}
 
-                          {/* Send Booking Request */}
+                          {/* Submit */}
                           <button
                             onClick={handleBooking}
-                            disabled={bookingStep === "confirming" || !bookingDate || !bookingTime}
+                            disabled={bookingStep === "confirming" || !bookingDate || !bookingTime || !bookingLocation.trim()}
                             className={`w-full py-4 rounded-xl font-black text-white text-base flex items-center justify-center gap-2 transition ${
-                              bookingStep === "confirming" || !bookingDate || !bookingTime
+                              bookingStep === "confirming" || !bookingDate || !bookingTime || !bookingLocation.trim()
                                 ? "bg-gray-300 dark:bg-gray-700 cursor-not-allowed opacity-60"
                                 : "bg-gradient-to-r from-purple-600 to-teal-500 hover:opacity-90 active:scale-95"
                             }`}>
@@ -476,7 +477,7 @@ export default function ListingDetailPage() {
                           </button>
 
                           <p className="text-xs text-gray-400 text-center">
-                            Vendor must confirm before it's finalised. Payment is only charged after confirmation.
+                            Vendor must confirm before it's finalised. You'll receive reminders at 30, 15, 10 and 5 minutes before your appointment.
                           </p>
                         </>
                       )}
@@ -517,7 +518,6 @@ export default function ListingDetailPage() {
 
         </div>
       </div>
-      {/* ── NO fixed bottom bar here. That was the entire problem. ── */}
     </>
   );
 }
