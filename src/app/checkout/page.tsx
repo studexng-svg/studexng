@@ -110,9 +110,8 @@ export default function CheckoutPage() {
           email: user?.email || "user@studex.com",
           name: user?.username || "StudEx User",
         },
-        ...(subaccountId ? {
-          subaccounts: [{ id: subaccountId }]
-        } : {}),
+        // No split subaccounts — vendor receives full amount via their own payment
+        // StudEx ₦200 service fee is collected separately
         meta: {
           listing_id: isServiceBooking ? booking?.providerId : null,
           type: isServiceBooking ? "service_booking" : "product_order",
@@ -226,9 +225,13 @@ export default function CheckoutPage() {
             ))}
 
             <div className="border-t-2 border-purple-200 pt-6 mt-6">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-gray-600 font-medium">Vendor Price</span>
+                <span className="text-gray-700 font-bold">₦{(finalTotal - 200).toLocaleString()}</span>
+              </div>
               <div className="flex justify-between items-center mb-4">
-                <span className="text-gray-600 font-medium">Platform Fee</span>
-                <span className="text-green-600 font-bold">Included</span>
+                <span className="text-gray-600 font-medium">Service Fee</span>
+                <span className="text-purple-600 font-bold">₦200</span>
               </div>
               <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }}
                 className="bg-gradient-to-r from-purple-600 to-teal-600 rounded-2xl p-6 text-white">
@@ -251,14 +254,14 @@ export default function CheckoutPage() {
           </div>
         </motion.div>
 
-        {/* SPLIT PAYMENT INFO */}
+        {/* SERVICE FEE INFO */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
           className="bg-purple-50 border-2 border-purple-200 rounded-2xl p-6 mb-8 text-center">
           <Shield className="w-12 h-12 text-purple-600 mx-auto mb-3" />
-          <p className="font-black text-lg text-gray-900">Automatic Split Payment</p>
+          <p className="font-black text-lg text-gray-900">Transparent Pricing</p>
           <p className="text-sm text-gray-700 mt-2">
-            Your payment is split automatically by Flutterwave — 70% goes directly to the seller, 30% to StudEx.
-            Refunds are processed back to your original payment method.
+            A flat <strong>₦200 service fee</strong> is included in your total.
+            The vendor receives their full listed price. Refunds are processed back to your original payment method.
           </p>
         </motion.div>
 
