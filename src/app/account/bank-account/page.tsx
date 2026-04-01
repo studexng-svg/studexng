@@ -32,23 +32,20 @@ export default function BankAccountPage() {
   const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
 
+  // Redirect if not logged in
   useEffect(() => {
     if (isHydrated && !isLoggedIn) router.push("/auth");
   }, [isHydrated, isLoggedIn]);
 
-  // ── Fetch banks via our backend proxy (avoids CORS from browser → Flutterwave)
-  // Backend route: GET /api/payments/banks/
-  // No Authorization header needed — the endpoint is AllowAny
+  // Load banks from Paystack API
   useEffect(() => {
     const loadBanks = async () => {
       try {
-        const res = await fetch(`${API_URL}/api/payments/banks/`);
+        const res = await fetch("https://api.paystack.co/bank?country=nigeria&perPage=200&use_cursor=false");
         if (res.ok) {
           const data = await res.json();
-          const raw: Bank[] = (data.data || []).map((b: any) => ({
-            name: b.name,
-            code: b.code,
-          }));
+          const raw: Bank[] = data.data?.map((b: any) => ({ name: b.name, code: b.code })) || [];
+          // Deduplicate by code — keep first occurrence
           const seen = new Set<string>();
           const unique = raw.filter(b => {
             if (seen.has(b.code)) return false;
@@ -85,23 +82,24 @@ export default function BankAccountPage() {
             }
           }
         }
-      } catch {
-      } finally {
-        setPageLoading(false);
-      }
+      } catch {} finally { setPageLoading(false); }
     };
     load();
   }, [isHydrated, isLoggedIn]);
 
+  // Auto-verify account name when account_number has 10 digits and bank is selected
   const verifyAccount = useCallback(async (accNum: string, bankCode: string) => {
     if (accNum.length !== 10 || !bankCode) return;
     setVerifying(true);
     setVerifyError("");
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/payments/verify-bank-account/`, {
+      const fullUrl = `${API_URL}/api/payments/verify-bank-account/`;
+      console.log("Verifying at:", fullUrl, { account_number: accNum, bank_code: bankCode });
+      const res = await fetchWithAuth(fullUrl, {
         method: "POST",
         body: JSON.stringify({ account_number: accNum, bank_code: bankCode }),
       });
+      console.log("Verify status:", res.status);
       if (res.ok) {
         const data = await res.json();
         if (data.account_name) {
@@ -111,13 +109,13 @@ export default function BankAccountPage() {
           setVerifyError("Account not found — enter name manually.");
         }
       } else {
+        // Non-blocking — just show hint, don't prevent saving
         setVerifyError("Auto-verify unavailable — enter your account name below.");
       }
-    } catch {
+    } catch (err) {
+      console.error("Verify error:", err);
       setVerifyError("Auto-verify unavailable — enter your account name below.");
-    } finally {
-      setVerifying(false);
-    }
+    } finally { setVerifying(false); }
   }, []);
 
   const handleAccountNumberChange = (val: string) => {
@@ -174,9 +172,7 @@ export default function BankAccountPage() {
     } catch {
       setErrorMsg("Network error. Please try again.");
       setStatus("error");
-    } finally {
-      setSaving(false);
-    }
+    } finally { setSaving(false); }
   };
 
   const filteredBanks = banks.filter(b =>
@@ -207,17 +203,18 @@ export default function BankAccountPage() {
       </div>
 
       <div className="max-w-lg mx-auto p-4 mt-4 space-y-5">
-
+        {/* Info Banner */}
         <div className="bg-teal-900/20 border border-teal-700/40 rounded-2xl p-4 flex items-start gap-3">
           <Banknote className="w-5 h-5 text-teal-400 flex-shrink-0 mt-0.5" />
           <div>
             <p className="font-bold text-teal-300 text-sm">How payouts work</p>
             <p className="text-xs text-teal-400/80 mt-1">
-              Your cut (70–85%) is automatically split and sent to this account by Flutterwave within 1–2 business days after an order completes.
+              Your cut (70–85%) is held for 7 days after an order completes, then automatically sent to this account via Paystack.
             </p>
           </div>
         </div>
 
+        {/* Form */}
         <div className="bg-gray-900 rounded-2xl p-5 border border-gray-800 space-y-5">
 
           {/* Bank Selector */}
@@ -241,11 +238,8 @@ export default function BankAccountPage() {
                   {filteredBanks.length === 0 ? (
                     <p className="p-4 text-sm text-gray-500 text-center">No banks found</p>
                   ) : filteredBanks.map((bank, idx) => (
-                    <button
-                      key={`${bank.code}-${idx}`}
-                      onClick={() => handleSelectBank(bank)}
-                      className="w-full text-left px-4 py-3 text-sm text-white hover:bg-gray-700 border-b border-gray-700/50 last:border-0 transition"
-                    >
+                    <button key={`${bank.code}-${idx}`} onClick={() => handleSelectBank(bank)}
+                      className="w-full text-left px-4 py-3 text-sm text-white hover:bg-gray-700 border-b border-gray-700/50 last:border-0 transition">
                       {bank.name}
                     </button>
                   ))}
@@ -281,7 +275,7 @@ export default function BankAccountPage() {
             )}
           </div>
 
-          {/* Account Name */}
+          {/* Account Name — auto-filled or manual */}
           <div>
             <label className="text-xs text-gray-400 font-semibold uppercase mb-2 block">
               Account Name
@@ -300,6 +294,7 @@ export default function BankAccountPage() {
             />
           </div>
 
+          {/* Status Messages */}
           {status === "error" && (
             <div className="flex items-start gap-2 bg-red-900/30 border border-red-700/40 rounded-xl px-4 py-3">
               <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
@@ -313,26 +308,22 @@ export default function BankAccountPage() {
             </div>
           )}
 
-          <button
-            onClick={handleSave}
-            disabled={saving || !isComplete}
-            className="w-full py-4 bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-500 hover:to-teal-400 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl font-black text-white transition flex items-center justify-center gap-2"
-          >
-            {saving
-              ? <><Loader className="w-5 h-5 animate-spin" /> Saving...</>
-              : <><Check className="w-5 h-5" /> Save Bank Account</>
-            }
+          {/* Save Button */}
+          <button onClick={handleSave} disabled={saving || !isComplete}
+            className="w-full py-4 bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-500 hover:to-teal-400 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl font-black text-white transition flex items-center justify-center gap-2">
+            {saving ? <><Loader className="w-5 h-5 animate-spin" /> Saving...</> : <><Check className="w-5 h-5" /> Save Bank Account</>}
           </button>
         </div>
 
         <p className="text-xs text-gray-600 text-center px-4">
-          Your bank details are encrypted and only used for payouts via Flutterwave. We never charge your account.
+          Your bank details are encrypted and only used for payouts via Paystack. We never charge your account.
         </p>
       </div>
     </div>
   );
 }
 
+// Fallback in case Paystack API is unavailable
 const FALLBACK_BANKS: Bank[] = [
   { name: "Access Bank", code: "044" },
   { name: "Citibank", code: "023" },

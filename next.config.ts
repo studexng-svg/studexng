@@ -5,6 +5,7 @@ const nextConfig: NextConfig = {
   typescript: { ignoreBuildErrors: true },
   eslint: { ignoreDuringBuilds: true },
   images: {
+    unoptimized: false,
     remotePatterns: [
       { protocol: "http", hostname: "127.0.0.1", port: "8000", pathname: "/media/**" },
       { protocol: "http", hostname: "localhost", port: "8000", pathname: "/media/**" },
@@ -12,8 +13,6 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "studex-backend-v2.onrender.com", pathname: "/media/**" },
       { protocol: "https", hostname: "**.onrender.com", pathname: "/media/**" },
     ],
-    // Allow local /images/* paths to be optimized
-    localPatterns: [{ pathname: "/images/**" }],
   },
 };
 

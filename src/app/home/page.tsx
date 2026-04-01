@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Search, LogIn, UserPlus, Package, Zap, ArrowRight, Heart, Scissors, Shirt, Sparkles, X } from "lucide-react";
+import { Search, LogIn, UserPlus, Package, Zap, ArrowRight, Heart, X } from "lucide-react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
@@ -12,6 +12,34 @@ import { useWishlistStore } from "@/lib/wishlistStore";
 import ThemeToggle from "@/components/ThemeToggle";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+
+// Safe image component — uses next/image for http URLs, plain div for missing images
+function SafeImage({ src, alt, fill, sizes, className }: {
+  src: string | null | undefined;
+  alt: string;
+  fill?: boolean;
+  sizes?: string;
+  className?: string;
+}) {
+  const [error, setError] = useState(false);
+  if (!src || error || !src.startsWith("http")) {
+    return (
+      <div className={`w-full h-full bg-gradient-to-br from-purple-100 to-teal-100 dark:from-purple-900/30 dark:to-teal-900/30 flex items-center justify-center ${className || ""}`}>
+        <span className="text-3xl">✨</span>
+      </div>
+    );
+  }
+  return (
+    <Image
+      src={src}
+      alt={alt}
+      fill={fill}
+      sizes={sizes}
+      className={className}
+      onError={() => setError(true)}
+    />
+  );
+}
 
 export default function HomePage() {
   const { isLoggedIn } = useAuth();
@@ -25,7 +53,6 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Search state
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [searching, setSearching] = useState(false);
@@ -33,7 +60,6 @@ export default function HomePage() {
 
   useEffect(() => setMounted(true), []);
 
-  // Load categories and listings — plain fetch, no api lib needed
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -58,7 +84,6 @@ export default function HomePage() {
     fetchData();
   }, []);
 
-  // Debounced search — hits /api/services/listings/?search=query
   useEffect(() => {
     if (!searchQuery.trim()) {
       setSearchResults([]);
@@ -106,7 +131,6 @@ export default function HomePage() {
 
   return (
     <>
-      {/* TOAST */}
       {toast && (
         <motion.div initial={{ y: -50, opacity: 0 }} animate={{ y: 60, opacity: 1 }}
           className={`fixed top-4 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full shadow-lg z-50 font-medium text-sm text-white ${toast.includes("Wishlist") ? "bg-red-500" : "bg-green-500"}`}>
@@ -119,13 +143,13 @@ export default function HomePage() {
         className="sticky top-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-lg z-40 border-b border-purple-100 dark:border-gray-800 shadow-sm">
         <div className="flex items-center justify-between p-4 gap-3">
           <Link href="/home" className="flex items-center gap-2 flex-shrink-0">
-            <Image src="/images/logo-1.jpg" alt="StudEx" width={44} height={44} className="w-11 h-11 rounded-full object-cover shadow-lg" />
+            {/* Use regular img tag for logo to avoid next/image local path issues */}
+            <img src="/images/logo-1.jpg" alt="StudEx" className="w-11 h-11 rounded-full object-cover shadow-lg" />
             <span className="font-black text-xl bg-gradient-to-r from-teal-600 to-purple-600 bg-clip-text text-transparent">StudEx</span>
           </Link>
 
           <div className="flex items-center gap-2 flex-1 justify-end">
             {isLoggedIn ? (
-              /* ── WORKING SEARCH BAR ── */
               <div className="relative flex-1 max-w-xs">
                 <Search className="w-4 h-4 absolute left-3 top-3 text-purple-500 pointer-events-none" />
                 <input
@@ -143,8 +167,6 @@ export default function HomePage() {
                     <X className="w-4 h-4" />
                   </button>
                 )}
-
-                {/* Dropdown results */}
                 <AnimatePresence>
                   {showResults && (
                     <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
@@ -158,11 +180,14 @@ export default function HomePage() {
                           <Link key={item.id} href={`/category/${item.category?.slug || item.category}`}
                             onClick={() => { setShowResults(false); setSearchQuery(""); }}>
                             <div className="flex items-center gap-3 p-3 hover:bg-purple-50 dark:hover:bg-gray-700 transition border-b border-gray-50 dark:border-gray-700 last:border-0 cursor-pointer">
-                              <div className="w-10 h-10 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0">
-                                {item.image && (
-                                  <img src={item.image.startsWith("http") ? item.image : `/images/${item.image}`}
-                                    alt={item.title} className="w-full h-full object-cover" />
-                                )}
+                              <div className="w-10 h-10 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0 relative">
+                                <SafeImage
+                                  src={item.image?.startsWith("http") ? item.image : null}
+                                  alt={item.title}
+                                  fill
+                                  sizes="40px"
+                                  className="object-cover"
+                                />
                               </div>
                               <div className="flex-1 min-w-0">
                                 <p className="font-bold text-gray-900 dark:text-white text-sm truncate">{item.title}</p>
@@ -196,7 +221,6 @@ export default function HomePage() {
         </div>
       </motion.div>
 
-      {/* MAIN */}
       <div className="min-h-screen bg-[#FFF8F0] dark:bg-gray-950">
         <div className="p-4 space-y-6 pb-28">
 
@@ -218,7 +242,6 @@ export default function HomePage() {
             </Link>
           </motion.div>
 
-          {/* ERROR */}
           {error && (
             <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-center">
               <p className="text-red-600 text-sm">{error}</p>
@@ -239,8 +262,14 @@ export default function HomePage() {
                   <motion.div key={cat.id} initial={{ opacity: 0, scale: 0.9 }} whileInView={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.1 }} className="min-w-[130px]">
                     <Link href={`/category/${cat.slug}`}>
                       <motion.div {...cardHover} className="bg-white dark:bg-gray-800 p-3 rounded-xl text-center shadow border border-gray-100 dark:border-gray-700 cursor-pointer">
-                        <div className="relative w-full h-24 rounded-lg overflow-hidden mb-2">
-                          <Image src={cat.image?.startsWith("http") ? cat.image : `/images/placeholder.jpg`} alt={cat.title} fill sizes="130px" className="object-cover" />
+                        <div className="relative w-full h-24 rounded-lg overflow-hidden mb-2 bg-gradient-to-br from-purple-100 to-teal-100">
+                          <SafeImage
+                            src={cat.image?.startsWith("http") ? cat.image : null}
+                            alt={cat.title}
+                            fill
+                            sizes="130px"
+                            className="object-cover"
+                          />
                         </div>
                         <p className="text-xs font-bold text-gray-900 dark:text-white">{cat.title}</p>
                       </motion.div>
@@ -275,8 +304,14 @@ export default function HomePage() {
                   <motion.div key={listing.id} initial={{ opacity: 0, scale: 0.9 }} whileInView={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.1 }}>
                     <Link href={`/category/${listing.category?.slug || listing.category}`}>
                       <motion.div {...cardHover} className="bg-white dark:bg-gray-800 p-3 rounded-xl min-w-[155px] shadow border border-gray-100 dark:border-gray-700 relative cursor-pointer">
-                        <div className="relative w-full h-28 rounded-lg overflow-hidden mb-2">
-                          <Image src={listing.image?.startsWith("http") ? listing.image : `/images/placeholder.jpg`} alt={listing.title} fill sizes="155px" className="object-cover" />
+                        <div className="relative w-full h-28 rounded-lg overflow-hidden mb-2 bg-gradient-to-br from-purple-100 to-teal-100">
+                          <SafeImage
+                            src={listing.image?.startsWith("http") ? listing.image : null}
+                            alt={listing.title}
+                            fill
+                            sizes="155px"
+                            className="object-cover"
+                          />
                         </div>
                         <motion.button onClick={(e) => {
                           e.preventDefault(); e.stopPropagation();

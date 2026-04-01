@@ -31,9 +31,10 @@ export default function CheckoutPage() {
   const isServiceBooking = !!booking && cart.length === 0;
   const isFoodOrder = cart.length > 0;
 
+  const SERVICE_FEE = 200;
   const foodTotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const serviceTotal = booking?.total || 0;
-  const finalTotal = isServiceBooking ? serviceTotal : foodTotal;
+  const finalTotal = (isServiceBooking ? serviceTotal : foodTotal) + SERVICE_FEE;
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [flwLoaded, setFlwLoaded] = useState(false);
@@ -110,8 +111,11 @@ export default function CheckoutPage() {
           email: user?.email || "user@studex.com",
           name: user?.username || "StudEx User",
         },
-        // No split subaccounts — vendor receives full amount via their own payment
-        // StudEx ₦200 service fee is collected separately
+        // Vendor subaccount — vendor receives listing price directly
+        // StudEx receives the ₦200 service fee portion
+        ...(subaccountId && subaccountId.startsWith("RS_") ? {
+          subaccounts: [{ id: subaccountId }]
+        } : {}),
         meta: {
           listing_id: isServiceBooking ? booking?.providerId : null,
           type: isServiceBooking ? "service_booking" : "product_order",
@@ -227,11 +231,11 @@ export default function CheckoutPage() {
             <div className="border-t-2 border-purple-200 pt-6 mt-6">
               <div className="flex justify-between items-center mb-2">
                 <span className="text-gray-600 font-medium">Vendor Price</span>
-                <span className="text-gray-700 font-bold">₦{(finalTotal - 200).toLocaleString()}</span>
+                <span className="text-gray-700 font-bold">₦{(finalTotal - SERVICE_FEE).toLocaleString()}</span>
               </div>
               <div className="flex justify-between items-center mb-4">
                 <span className="text-gray-600 font-medium">Service Fee</span>
-                <span className="text-purple-600 font-bold">₦200</span>
+                <span className="text-purple-600 font-bold">₦{SERVICE_FEE.toLocaleString()}</span>
               </div>
               <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }}
                 className="bg-gradient-to-r from-purple-600 to-teal-600 rounded-2xl p-6 text-white">
