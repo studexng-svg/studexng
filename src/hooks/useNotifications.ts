@@ -1,10 +1,22 @@
 // src/hooks/useNotifications.ts
+// ─────────────────────────────────────────────────────────────────────────────
+// REPLACED: SSE (EventSource) → simple polling every 30 seconds
+//
+// WHY: SSE holds a Django worker thread open permanently per user.
+// With Render's ~4 gunicorn workers, 4 logged-in users = all workers frozen.
+//
+// HOW: Polls /api/notifications/status/ every 30 seconds.
+// Return signature is IDENTICAL to the old SSE version so layout.tsx,
+// NotificationToast, and any other consumer needs zero changes.
+// ─────────────────────────────────────────────────────────────────────────────
+
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useAuth, getToken } from "@/lib/authStore";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+const POLL_INTERVAL_MS = 30_000; // 30 seconds
 
 export interface NotificationPayload {
   id: number;
@@ -22,12 +34,14 @@ export interface ToastItem extends NotificationPayload {
 }
 
 export function useNotifications() {
-  // ✅ accessToken (not token) — matches your AuthState interface
   const { isLoggedIn, accessToken } = useAuth();
   const [unreadCount, setUnreadCount] = useState(0);
   const [toasts, setToasts] = useState<ToastItem[]>([]);
-  const esRef = useRef<EventSource | null>(null);
-  const reconnectTimer = useRef<NodeJS.Timeout | null>(null);
+
+  // Track which notification IDs we've already toasted so we don't
+  // show the same one again on the next poll
+  const seenIds = useRef<Set<number>>(new Set());
+  const pollTimer = useRef<NodeJS.Timeout | null>(null);
   const mountedRef = useRef(true);
 
   const dismissToast = useCallback((toastId: string) => {
@@ -42,11 +56,10 @@ export function useNotifications() {
   const addToast = useCallback((n: NotificationPayload) => {
     const toastId = `${n.id}-${Date.now()}`;
     const item: ToastItem = { ...n, toastId, visible: true };
-    setToasts(prev => [item, ...prev].slice(0, 5));
-    setTimeout(() => dismissToast(toastId), 6000);
+    setToasts(prev => [item, ...prev].slice(0, 5)); // max 5 toasts at once
+    setTimeout(() => dismissToast(toastId), 6000);  // auto-dismiss after 6s
   }, [dismissToast]);
 
-  // ✅ Use getToken() helper for one-off fetch calls — avoids stale closure issues
   const markRead = useCallback(async (notificationId: number) => {
     const token = getToken();
     if (!token) return;
@@ -63,7 +76,7 @@ export function useNotifications() {
     const token = getToken();
     if (!token) return;
     try {
-      await fetch(`${API_URL}/api/notifications/mark-all-read/`, {
+      await fetch(`${API_URL}/api/notifications/read-all/`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -71,70 +84,65 @@ export function useNotifications() {
     } catch {}
   }, []);
 
-  const fetchInitialCount = useCallback(async () => {
-    const token = getToken();
-    if (!token) return;
-    try {
-      const res = await fetch(`${API_URL}/api/notifications/`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setUnreadCount(data.unread_count || 0);
-      }
-    } catch {}
-  }, []);
-
-  const connect = useCallback(() => {
-    // Always read fresh token at connection time to avoid stale closure
+  // ── Core poll function ──────────────────────────────────────────────────
+  const poll = useCallback(async () => {
     const token = getToken();
     if (!token || !mountedRef.current) return;
 
-    if (esRef.current) {
-      esRef.current.close();
-      esRef.current = null;
-    }
+    try {
+      const res = await fetch(`${API_URL}/api/notifications/status/`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok || !mountedRef.current) return;
 
-    const url = `${API_URL}/api/notifications/stream/?token=${encodeURIComponent(token)}`;
-    const es = new EventSource(url);
-    esRef.current = es;
+      const data = await res.json();
 
-    es.onmessage = (event) => {
-      if (!mountedRef.current) return;
-      try {
-        const payload: NotificationPayload = JSON.parse(event.data);
-        if (payload.id && !payload.is_read) {
-          addToast(payload);
-          setUnreadCount(c => c + 1);
+      // Update unread count
+      setUnreadCount(data.unread_notifications ?? 0);
+
+      // Show toasts for any NEW unread notifications we haven't seen before
+      const notifications: NotificationPayload[] = data.notifications ?? [];
+      for (const n of notifications) {
+        if (!n.is_read && !seenIds.current.has(n.id)) {
+          seenIds.current.add(n.id);
+          // Don't toast on the very first load — only on subsequent polls
+          // (seenIds starts empty, so first poll populates it without toasting)
+          if (seenIds.current.size > notifications.length) {
+            addToast(n);
+          }
+        } else {
+          // Mark seen even if already read, so we track the baseline
+          seenIds.current.add(n.id);
         }
-      } catch {}
-    };
-
-    es.onerror = () => {
-      es.close();
-      esRef.current = null;
-      if (!mountedRef.current) return;
-      const delay = Math.min(3000 * Math.pow(1.5, Math.floor(Math.random() * 4)), 30000);
-      reconnectTimer.current = setTimeout(() => {
-        if (mountedRef.current) connect();
-      }, delay);
-    };
+      }
+    } catch {
+      // Network error — silently skip, retry on next interval
+    }
   }, [addToast]);
 
-  // Re-run when accessToken changes (login/logout/token refresh)
+  // ── Initialise on login, tear down on logout ───────────────────────────
   useEffect(() => {
     mountedRef.current = true;
-    if (!isLoggedIn || !accessToken) return;
 
-    fetchInitialCount();
-    connect();
+    if (!isLoggedIn || !accessToken) {
+      // Logged out — clear everything
+      if (pollTimer.current) clearInterval(pollTimer.current);
+      setUnreadCount(0);
+      setToasts([]);
+      seenIds.current.clear();
+      return;
+    }
+
+    // Run immediately on login, then every 30 seconds
+    poll();
+    pollTimer.current = setInterval(poll, POLL_INTERVAL_MS);
 
     return () => {
       mountedRef.current = false;
-      if (reconnectTimer.current) clearTimeout(reconnectTimer.current);
-      if (esRef.current) { esRef.current.close(); esRef.current = null; }
+      if (pollTimer.current) clearInterval(pollTimer.current);
     };
-  }, [isLoggedIn, accessToken, connect, fetchInitialCount]);
+  }, [isLoggedIn, accessToken, poll]);
 
+  // ── Return same shape as the old SSE hook ─────────────────────────────
   return { unreadCount, toasts, dismissToast, markRead, markAllRead };
 }
