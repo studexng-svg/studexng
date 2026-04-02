@@ -5,26 +5,11 @@ from django.conf import settings
 
 class Notification(models.Model):
     TYPE_CHOICES = (
-        # Admin notifications
         ('vendor_application', 'New Vendor Application'),
         ('new_listing', 'New Listing Needs Approval'),
-        # Vendor notifications
+        ('listing_approved', 'Listing Approved by Admin'),
         ('vendor_approved', 'Vendor Account Approved'),
         ('vendor_revoked', 'Vendor Account Deactivated'),
-        ('new_booking_request', 'New Booking Request'),
-        ('booking_paid', 'Booking Paid'),
-        ('order_confirmed', 'Order Confirmed by Buyer'),
-        ('booking_reminder_5min', 'Booking Starting in 5 Minutes'),
-        ('booking_time_now', 'Booking Time Now'),
-        # Buyer notifications
-        ('booking_confirmed', 'Booking Confirmed by Vendor'),
-        ('booking_cancelled', 'Booking Cancelled'),
-        ('payment_received', 'Payment Received'),
-        ('order_completed', 'Order Completed'),
-        # ✅ NEW: Seller application notifications
-        ('seller_approved', 'Seller Application Approved'),
-        ('seller_rejected', 'Seller Application Rejected'),
-        ('seller_revoked', 'Seller Status Revoked'),
     )
 
     recipient = models.ForeignKey(
@@ -46,6 +31,10 @@ class Notification(models.Model):
         return f"[{self.get_notification_type_display()}] → {target}"
 
     class Meta:
+        indexes = [
+            models.Index(fields=['recipient', 'is_read']),
+            models.Index(fields=['recipient', '-created_at']),
+        ]
         ordering = ['-created_at']
         verbose_name = "Notification"
         verbose_name_plural = "Notifications"

@@ -1,108 +1,122 @@
-# scheduler.py
+# studex-backend/scheduler.py  (leave it here — it imports from multiple apps)
+#
+# FIX: replaced `import pytz` with `from zoneinfo import ZoneInfo`
+# zoneinfo is built into Python 3.9+ — no pip install needed.
+#
+# If you need pytz elsewhere: pip install pytz  OR  add pytz to requirements.txt
+
 import logging
-from apscheduler.schedulers.background import BackgroundScheduler
-from django_apscheduler.jobstores import DjangoJobStore
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo          # ✅ replaces pytz — built into Python 3.9+
+
 from django.utils import timezone
-from datetime import timedelta
+from django_apscheduler.jobstores import DjangoJobStore
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.interval import IntervalTrigger
 
 logger = logging.getLogger(__name__)
+
+LAGOS_TZ = ZoneInfo("Africa/Lagos")   # ✅ replaces pytz.timezone("Africa/Lagos")
 
 
 def send_booking_reminders():
     """
-    Runs every minute. Finds bookings happening in exactly 5 minutes
-    and exactly at the scheduled time, then notifies the vendor.
+    Runs every minute. Sends notifications to vendors + buyers for bookings
+    starting in ~5 minutes and at the exact start time.
     """
     try:
         from orders.models import Booking
         from notifications.models import Notification
 
-        now = timezone.localtime(timezone.now())
-        today = now.date()
+        now_lagos = datetime.now(LAGOS_TZ)        # ✅ replaces datetime.now(lagos_tz)
+        now_date = now_lagos.date()
+        now_time = now_lagos.strftime("%H:%M")
 
-        # Get all paid/confirmed bookings scheduled for today
-        todays_bookings = Booking.objects.filter(
-            scheduled_date=today,
+        # ── 5-minute warning ───────────────────────────────────────────────
+        five_min_ahead = (now_lagos + timedelta(minutes=5)).strftime("%H:%M")
+
+        upcoming = Booking.objects.filter(
+            scheduled_date=now_date,
+            scheduled_time=five_min_ahead,
             status__in=["confirmed", "paid"],
         ).select_related("buyer", "listing", "listing__vendor")
 
-        for booking in todays_bookings:
-            # Parse the scheduled time — format is "2:00 PM", "3:30 PM" etc.
-            try:
-                from datetime import datetime
-                scheduled_dt = datetime.strptime(
-                    f"{booking.scheduled_date} {booking.scheduled_time}",
-                    "%Y-%m-%d %I:%M %p"
-                )
-                # Make timezone-aware
-                import pytz
-                from django.conf import settings as django_settings
-                tz = pytz.timezone(getattr(django_settings, 'TIME_ZONE', 'Africa/Lagos'))
-                scheduled_dt = tz.localize(scheduled_dt)
-            except Exception as e:
-                logger.warning(f"Could not parse booking time for booking {booking.id}: {e}")
-                continue
+        for booking in upcoming:
+            # Notify vendor
+            Notification.objects.get_or_create(
+                recipient=booking.listing.vendor,
+                notification_type="booking_reminder_5min",
+                title=f"⏰ Booking in 5 minutes — {booking.listing.title}",
+                message=(
+                    f"Your booking with {booking.buyer.username} for "
+                    f'"{booking.listing.title}" starts at {booking.scheduled_time}. '
+                    f"Get ready!"
+                ),
+                action_url="/vendor/dashboard",
+            )
+            # Notify buyer
+            Notification.objects.get_or_create(
+                recipient=booking.buyer,
+                notification_type="booking_reminder_5min",
+                title=f"⏰ Your booking starts in 5 minutes!",
+                message=(
+                    f'"{booking.listing.title}" with {booking.listing.vendor.username} '
+                    f"starts at {booking.scheduled_time}. Head over now!"
+                ),
+                action_url="/account/bookings",
+            )
 
-            diff_minutes = (scheduled_dt - timezone.now()).total_seconds() / 60
-            vendor = booking.listing.vendor
-            buyer = booking.buyer
+        # ── At booking time ────────────────────────────────────────────────
+        starting_now = Booking.objects.filter(
+            scheduled_date=now_date,
+            scheduled_time=now_time,
+            status__in=["confirmed", "paid"],
+        ).select_related("buyer", "listing", "listing__vendor")
 
-            # 5-minute warning to vendor
-            if 4 <= diff_minutes <= 6:
-                already_notified = Notification.objects.filter(
-                    recipient=vendor,
-                    notification_type="booking_reminder_5min",
-                    action_url=f"/vendor/dashboard?booking={booking.id}",
-                ).exists()
-                if not already_notified:
-                    Notification.objects.create(
-                        recipient=vendor,
-                        notification_type="booking_reminder_5min",
-                        title=f"⏰ 5 Minutes — {booking.listing.title}",
-                        message=(
-                            f"Your booking with {buyer.username} for "
-                            f'"{booking.listing.title}" starts in 5 minutes! '
-                            f"Get ready."
-                        ),
-                        action_url=f"/vendor/dashboard?booking={booking.id}",
-                    )
-                    logger.info(f"Sent 5-min reminder to vendor {vendor.username} for booking {booking.id}")
-
-            # On-time notification to vendor
-            elif -1 <= diff_minutes <= 1:
-                already_notified = Notification.objects.filter(
-                    recipient=vendor,
-                    notification_type="booking_time_now",
-                    action_url=f"/vendor/dashboard?booking={booking.id}",
-                ).exists()
-                if not already_notified:
-                    Notification.objects.create(
-                        recipient=vendor,
-                        notification_type="booking_time_now",
-                        title=f"🔔 It's Time — {booking.listing.title}",
-                        message=(
-                            f"It's time for your booking with {buyer.username} "
-                            f'for "{booking.listing.title}". '
-                            f"Scheduled: {booking.scheduled_time}."
-                        ),
-                        action_url=f"/vendor/dashboard?booking={booking.id}",
-                    )
-                    logger.info(f"Sent on-time reminder to vendor {vendor.username} for booking {booking.id}")
+        for booking in starting_now:
+            Notification.objects.get_or_create(
+                recipient=booking.listing.vendor,
+                notification_type="booking_time_now",
+                title=f"🟢 Booking starting now — {booking.listing.title}",
+                message=(
+                    f"{booking.buyer.username}'s appointment for "
+                    f'"{booking.listing.title}" is starting right now.'
+                ),
+                action_url="/vendor/dashboard",
+            )
+            Notification.objects.get_or_create(
+                recipient=booking.buyer,
+                notification_type="booking_time_now",
+                title="🟢 Your booking is starting now!",
+                message=(
+                    f'Your appointment for "{booking.listing.title}" '
+                    f"with {booking.listing.vendor.username} is starting now."
+                ),
+                action_url="/account/bookings",
+            )
 
     except Exception as e:
-        logger.error(f"Booking reminder job failed: {e}", exc_info=True)
+        logger.error(f"Booking reminder error: {e}", exc_info=True)
 
 
-def start():
-    scheduler = BackgroundScheduler()
-    scheduler.add_jobstore(DjangoJobStore(), "default")
-    scheduler.add_job(
-        send_booking_reminders,
-        "interval",
-        minutes=1,
-        id="booking_reminders",
-        replace_existing=True,
-        jobstore="default",
-    )
-    logger.info("Scheduler started — booking reminders active.")
-    scheduler.start()
+def start_scheduler():
+    """
+    Call this from your Django AppConfig.ready() to start the background scheduler.
+    It runs send_booking_reminders every 60 seconds.
+    """
+    try:
+        scheduler = BackgroundScheduler(timezone=LAGOS_TZ)
+        scheduler.add_jobstore(DjangoJobStore(), "default")
+        scheduler.add_job(
+            send_booking_reminders,
+            trigger=IntervalTrigger(seconds=60),
+            id="booking_reminders",
+            name="Send booking reminders",
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+        )
+        scheduler.start()
+        logger.info("Booking reminder scheduler started.")
+    except Exception as e:
+        logger.error(f"Failed to start scheduler: {e}", exc_info=True)

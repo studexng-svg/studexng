@@ -3,14 +3,14 @@
 import { Package, Heart, Settings, HelpCircle, LogOut, ChevronRight, Store, Clock, ArrowRight, Loader, Banknote, LayoutDashboard, Calendar, Gift, Bell, X, CheckCheck, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { motion } from "framer-motion";
 import Image from "next/image";
 import ThemeToggle from "@/components/ThemeToggle";
 import { useAuth, fetchWithAuth } from "@/lib/authStore";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
-const POLL_INTERVAL = 15000; // poll every 15 seconds
+const POLL_INTERVAL = 30_000;
 
 const isApprovedVendor = (u: { user_type?: string; is_verified_vendor?: boolean } | null) =>
   !!u?.is_verified_vendor;
@@ -31,7 +31,6 @@ export default function AccountPage() {
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [showNotifications, setShowNotifications] = useState(false);
 
-  // Track previous vendor status to detect changes
   const prevVendorStatus = useRef<boolean | null>(null);
   const pollTimer = useRef<NodeJS.Timeout | null>(null);
 
@@ -39,123 +38,76 @@ export default function AccountPage() {
     if (isHydrated && !isLoggedIn) router.push("/auth");
   }, [isHydrated, isLoggedIn, router]);
 
-  // ── Poll user status + notifications every 15s ──────────────────────────
-  const pollStatus = async () => {
+  // ── FIXED: single batched poll, useCallback prevents stale closure ────────
+  const pollStatus = useCallback(async () => {
     try {
-      const meRes = await fetchWithAuth(`${API_URL}/api/auth/me/`);
-      if (!meRes.ok) return;
-      const freshUser = await meRes.json();
-      useAuth.getState().updateUser(freshUser);
+      const res = await fetchWithAuth(`${API_URL}/api/notifications/status/`);
+      if (!res.ok) return;
+      const data = await res.json();
+
+      setNotifications(data.notifications || []);
+      setUnreadNotifications(data.unread_notifications || 0);
+      setUnreadMessages(data.unread_messages || 0);
+      setPendingBookings(data.pending_bookings || 0);
+      setPendingOrders(data.pending_orders || 0);
+
+      // FIXED: only update these two fields — never spread the whole user object
+      useAuth.getState().updateUser({
+        is_verified_vendor: data.is_verified_vendor,
+        user_type: data.user_type,
+      });
 
       const wasVendor = prevVendorStatus.current;
-      const isNowVendor = !!freshUser.is_verified_vendor;
+      const isNowVendor = !!data.is_verified_vendor;
 
-      // ✅ Just got approved — redirect to vendor page immediately
       if (wasVendor === false && isNowVendor) {
         router.push("/seller");
         return;
       }
-
-      // ✅ Just got revoked — stay on account page, it will re-render as student
       prevVendorStatus.current = isNowVendor;
-    } catch {}
-
-    // Also refresh notifications
-    try {
-      const notifRes = await fetchWithAuth(`${API_URL}/api/notifications/`);
-      if (notifRes.ok) {
-        const notifData = await notifRes.json();
-        setNotifications(notifData.notifications || []);
-        setUnreadNotifications(notifData.unread_count || 0);
-      }
-    } catch {}
-  };
+    } catch {
+      // Network blip — skip silently, retry next tick
+    }
+  }, [router]);
 
   useEffect(() => {
     if (!isHydrated || !isLoggedIn) return;
 
-    const fetchData = async () => {
+    let cancelled = false;
+
+    const init = async () => {
       try {
-        // Fetch fresh user on mount
-        try {
-          const meRes = await fetchWithAuth(`${API_URL}/api/auth/me/`);
-          if (meRes.ok) {
-            const freshUser = await meRes.json();
-            useAuth.getState().updateUser(freshUser);
-            prevVendorStatus.current = !!freshUser.is_verified_vendor;
-          }
-        } catch {}
+        await pollStatus();
 
-        const freshUser = useAuth.getState().user;
-        const isVendor = isApprovedVendor(freshUser);
+        if (cancelled) return;
 
-        if (isVendor) {
+        const currentUser = useAuth.getState().user;
+        if (isApprovedVendor(currentUser)) {
           try {
             const bankRes = await fetchWithAuth(`${API_URL}/api/payments/seller/bank-account/`);
-            if (bankRes.ok) {
+            if (bankRes.ok && !cancelled) {
               const bankData = await bankRes.json();
               setHasBankAccount(!!bankData?.account_number);
             }
           } catch {}
         }
 
-        try {
-          const bkRes = await fetchWithAuth(`${API_URL}/api/orders/bookings/`);
-          if (bkRes.ok) {
-            const bkData = await bkRes.json();
-            const bkList = Array.isArray(bkData) ? bkData : (bkData.results || []);
-            if (isVendor) {
-              const vendorBookings = bkList.filter((b: any) => b.vendor_username === freshUser?.username);
-              setPendingBookings(vendorBookings.filter((b: any) => b.status === "pending").length);
-            } else {
-              setPendingBookings(bkList.filter((b: any) => b.status === "confirmed").length);
-            }
-          }
-        } catch {}
-
-        try {
-          const msgRes = await fetchWithAuth(`${API_URL}/api/chat/conversations/`);
-          if (msgRes.ok) {
-            const msgData = await msgRes.json();
-            const convList = Array.isArray(msgData) ? msgData : (msgData.results || []);
-            setUnreadMessages(convList.filter((c: any) => c.unread_count > 0).length);
-          }
-        } catch {}
-
-        try {
-          const ordRes = await fetchWithAuth(`${API_URL}/api/orders/orders/`);
-          if (ordRes.ok) {
-            const ordData = await ordRes.json();
-            const ordList = Array.isArray(ordData) ? ordData : (ordData.results || []);
-            setPendingOrders(ordList.filter((o: any) => o.status === "seller_completed").length);
-          }
-        } catch {}
-
-        try {
-          const notifRes = await fetchWithAuth(`${API_URL}/api/notifications/`);
-          if (notifRes.ok) {
-            const notifData = await notifRes.json();
-            setNotifications(notifData.notifications || []);
-            setUnreadNotifications(notifData.unread_count || 0);
-          }
-        } catch {}
-
-      } catch (err) {
-        console.error("Failed to load account data:", err);
+        if (prevVendorStatus.current === null) {
+          prevVendorStatus.current = !!useAuth.getState().user?.is_verified_vendor;
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
-    fetchData();
-
-    // ✅ Start polling every 15 seconds
+    init();
     pollTimer.current = setInterval(pollStatus, POLL_INTERVAL);
 
     return () => {
+      cancelled = true;
       if (pollTimer.current) clearInterval(pollTimer.current);
     };
-  }, [isHydrated, isLoggedIn]);
+  }, [isHydrated, isLoggedIn, pollStatus]);
 
   const handleLogout = () => {
     if (pollTimer.current) clearInterval(pollTimer.current);
@@ -171,7 +123,6 @@ export default function AccountPage() {
     } catch {}
   };
 
-  // ✅ Mark single notification as read and navigate to action_url
   const handleNotificationClick = async (n: any) => {
     if (!n.is_read) {
       try {
@@ -186,7 +137,6 @@ export default function AccountPage() {
     }
   };
 
-  // ✅ Notification icon based on type
   const getNotifIcon = (type: string) => {
     switch (type) {
       case 'seller_approved': return '🎉';
@@ -240,7 +190,6 @@ export default function AccountPage() {
                 )}
               </button>
 
-              {/* ✅ Notifications Dropdown — now with click-to-navigate */}
               {showNotifications && (
                 <motion.div
                   initial={{ opacity: 0, y: -8, scale: 0.95 }}
@@ -276,7 +225,6 @@ export default function AccountPage() {
                           }`}
                         >
                           <div className="flex items-start gap-3">
-                            {/* Emoji icon based on type */}
                             <span className="text-lg flex-shrink-0 mt-0.5">
                               {getNotifIcon(n.type)}
                             </span>
