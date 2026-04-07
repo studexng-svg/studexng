@@ -19,134 +19,41 @@ FLW_BASE = "https://api.flutterwave.com/v3"
 FLW_HEADERS = {"Authorization": f"Bearer {FLW_SECRET}", "Content-Type": "application/json"}
 
 # ─────────────────────────────────────────
-# StudEx charges a flat ₦200 service fee per transaction.
-# Vendor receives their full listing price minus ₦200 only.
-# Flutterwave splits the money at payment time — no holding on our end.
+# ₦200 flat service fee per transaction.
+# Vendor receives listing price minus ₦200.
+# Flutterwave splits at payment time via subaccount (split_type=flat, split_value=200).
+#
+# HOW THE SPLIT WORKS ON FLUTTERWAVE:
+#   split_type = "flat"
+#   split_value = 200
+#   → Flutterwave sends ₦200 to StudEx (the main account)
+#   → Everything else goes to the vendor's subaccount immediately
+#
+# IMPORTANT: The subaccount's split_value=200 means StudEx gets ₦200 FLAT.
+# The vendor gets (amount - 200 - FLW_fees). NOT a percentage split.
 # ─────────────────────────────────────────
 SERVICE_FEE = Decimal("200")
 
 
-def _split_amounts(listing_price: Decimal):
-    """
-    Returns (vendor_amount, platform_amount).
-    Vendor gets the full listing price minus the flat ₦200 service fee.
-    """
-    platform_amount = SERVICE_FEE
-    vendor_amount = listing_price - platform_amount
+def _split_amounts(amount: Decimal):
+    """Returns (vendor_amount, platform_amount)."""
+    vendor_amount = amount - SERVICE_FEE
     if vendor_amount < Decimal("0"):
-        vendor_amount = Decimal("0")
-        platform_amount = listing_price
-    return vendor_amount, platform_amount
+        return Decimal("0"), amount
+    return vendor_amount, SERVICE_FEE
 
 
-def _create_order_from_flw_data(flw_data, buyer, listing_id, order_type, use_credits=False):
+def _normalize_order_type(raw_type: str) -> str:
     """
-    Core order creation logic. Called from both verify_payment and the webhook.
-    Returns (order_id, error_message).
+    Normalises the order type from metadata.
+    booking_payment, booking, service_booking all map to 'service'.
     """
-    from services.models import Listing
-
-    amount_paid = Decimal(str(flw_data["amount"]))
-    ref_key = flw_data.get("tx_ref", "")
-    flw_transaction_id = flw_data.get("id")
-    buyer_email = flw_data.get("customer", {}).get("email", buyer.email if buyer else "")
-
-    vendor_amount, platform_amount = _split_amounts(amount_paid)
-    seller = _get_seller_from_listing(listing_id)
-
-    txn, created = PaymentTransaction.objects.get_or_create(
-        reference=ref_key,
-        defaults={
-            "buyer": buyer,
-            "seller": seller,
-            "flw_transaction_id": flw_transaction_id,
-            "amount": amount_paid,
-            "seller_amount": vendor_amount,
-            "platform_amount": platform_amount,
-            "status": "success",
-            "order_type": order_type,
-            "buyer_email": buyer_email,
-            "buyer_name": buyer.get_full_name() or buyer.username if buyer else "",
-            "flw_response": flw_data,
-        }
-    )
-
-    if not created and txn.order_id:
-        return txn.order_id, None
-
-    order_id = None
-
-    try:
-        if order_type == "service" and listing_id:
-            listing = Listing.objects.get(id=listing_id)
-
-            order = Order.objects.create(
-                buyer=buyer,
-                listing=listing,
-                amount=amount_paid,
-                reference=ref_key,
-                status="paid",
-            )
-            order_id = order.id
-
-            # Update booking to paid
-            try:
-                from orders.models import Booking
-                Booking.objects.filter(
-                    buyer=buyer, listing=listing, status="confirmed"
-                ).update(status="paid")
-            except Exception as e:
-                logger.warning(f"Booking status update failed: {e}")
-
-            # Reduce stock
-            try:
-                listing.reduce_stock(1)
-            except Exception as e:
-                logger.warning(f"reduce_stock failed: {e}")
-
-            # Notify vendor — show their payout amount (no mention of commission)
-            try:
-                from accounts.utils import send_notification
-                send_notification(
-                    recipient=listing.vendor,
-                    notification_type='new_order',
-                    title=f'💰 Payment Received — {listing.title}',
-                    message=(
-                        f'{buyer.username} just paid for "{listing.title}". '
-                        f'Your payout of ₦{vendor_amount:,.0f} will be transferred '
-                        f'to your bank account by Flutterwave.'
-                    ),
-                    action_url='/vendor/dashboard',
-                )
-            except Exception as ne:
-                logger.warning(f"Vendor notification failed: {ne}")
-
-    except Exception as e:
-        logger.error(f"Order creation failed: {e}", exc_info=True)
-        return None, str(e)
-
-    txn.order_id = order_id
-    txn.status = "success"
-    txn.save()
-
-    # Handle loyalty credits
-    if use_credits and buyer:
-        try:
-            from loyalty.models import LoyaltyAccount, LoyaltyTransaction
-            loyalty_account = LoyaltyAccount.objects.filter(user=buyer).first()
-            if loyalty_account and loyalty_account.credit_balance > 0:
-                credits_used = min(loyalty_account.credit_balance, amount_paid)
-                loyalty_account.credit_balance -= credits_used
-                loyalty_account.save()
-                LoyaltyTransaction.objects.create(
-                    account=loyalty_account, transaction_type="redeemed",
-                    amount=credits_used,
-                    description=f"Credits used on order #{order_id}",
-                )
-        except Exception as e:
-            logger.warning(f"Loyalty deduction failed: {e}")
-
-    return order_id, None
+    t = (raw_type or "service").lower()
+    if "booking" in t or "service" in t:
+        return "service"
+    if "food" in t or "product" in t:
+        return t
+    return "service"
 
 
 # ─────────────────────────────────────────
@@ -207,9 +114,10 @@ def seller_bank_account(request):
                 "account_number": account.account_number,
                 "account_name": account.account_name,
                 "flw_subaccount_id": account.flw_subaccount_id,
+                "subaccount_ready": bool(account.flw_subaccount_id),
             })
         except SellerBankAccount.DoesNotExist:
-            return Response({}, status=200)
+            return Response({"subaccount_ready": False}, status=200)
 
     bank_code = request.data.get("bank_code")
     account_number = str(request.data.get("account_number", ""))
@@ -221,14 +129,25 @@ def seller_bank_account(request):
     if not all([bank_code, account_number, account_name]):
         return Response({"error": "bank_code, account_number, and account_name are required."}, status=400)
 
-    subaccount_id = _create_or_update_flw_subaccount(
+    subaccount_id, error_detail = _create_or_update_flw_subaccount(
         request.user, bank_code, account_number, account_name
     )
+
     if not subaccount_id:
-        return Response(
-            {"error": "Failed to register with Flutterwave. Check your bank details."},
-            status=400,
+        SellerBankAccount.objects.update_or_create(
+            user=request.user,
+            defaults={
+                "bank_code": bank_code,
+                "bank_name": bank_name,
+                "account_number": account_number,
+                "account_name": account_name,
+                "flw_subaccount_id": "",
+            }
         )
+        return Response({
+            "error": f"Bank details saved but Flutterwave subaccount setup failed: {error_detail}",
+            "subaccount_ready": False,
+        }, status=400)
 
     account, _ = SellerBankAccount.objects.update_or_create(
         user=request.user,
@@ -240,12 +159,134 @@ def seller_bank_account(request):
             "flw_subaccount_id": subaccount_id,
         }
     )
+    logger.info(f"Subaccount saved for {request.user.username}: {subaccount_id}")
     return Response({
-        "message": "Bank account saved successfully.",
+        "message": "Bank account saved and payout subaccount created successfully.",
         "account_name": account.account_name,
         "bank_name": account.bank_name,
         "flw_subaccount_id": subaccount_id,
+        "subaccount_ready": True,
     }, status=201)
+
+
+# ─────────────────────────────────────────
+# GET CHECKOUT CONFIG
+# Frontend calls this before opening Flutterwave modal.
+# Returns the subaccount split config — MUST be passed to FlutterwaveCheckout().
+# ─────────────────────────────────────────
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def get_checkout_config(request):
+    """GET /api/payments/checkout-config/?listing_id=<id>"""
+    listing_id = request.query_params.get("listing_id")
+    if not listing_id:
+        return Response({"error": "listing_id is required."}, status=400)
+
+    try:
+        from services.models import Listing
+        listing = Listing.objects.select_related("vendor").get(id=listing_id)
+    except Exception:
+        return Response({"error": "Listing not found."}, status=404)
+
+    vendor = listing.vendor
+    amount = Decimal(str(listing.price))
+
+    # Apply profile completion discount if eligible
+    discount_amount = Decimal("0")
+    try:
+        profile = request.user.profile
+        if profile.profile_bonus_eligible and not profile.profile_bonus_used:
+            discount_amount = (amount * Decimal("0.05")).quantize(Decimal("0.01"))
+    except Exception:
+        pass
+
+    final_amount = amount - discount_amount
+
+    # Total charged to customer = listing price + ₦200 service fee
+    # The service fee is baked into the checkout amount.
+    # Flutterwave then splits: ₦200 → StudEx, rest → vendor.
+    checkout_amount = final_amount + SERVICE_FEE
+
+    subaccount_id = None
+    try:
+        bank = SellerBankAccount.objects.get(user=vendor)
+        subaccount_id = bank.flw_subaccount_id or None
+    except SellerBankAccount.DoesNotExist:
+        pass
+
+    if not subaccount_id:
+        logger.warning(
+            f"No subaccount for vendor {vendor.username} on listing {listing_id}. "
+            f"Full payment will go to StudEx settlement account."
+        )
+
+    return Response({
+        "listing_id": listing.id,
+        "listing_title": listing.title,
+        "listing_price": float(amount),
+        "discount_amount": float(discount_amount),
+        "vendor_receives": float(final_amount),   # what vendor gets after ₦200 fee
+        "service_fee": float(SERVICE_FEE),
+        "checkout_amount": float(checkout_amount), # total customer pays
+        "currency": "NGN",
+        "vendor_username": vendor.username,
+        "subaccount_id": subaccount_id,
+        "subaccount_ready": bool(subaccount_id),
+        # Pass this directly into FlutterwaveCheckout({ subaccounts: [...] })
+        # split_type=flat means StudEx keeps ₦200 flat, vendor gets the rest.
+        "flw_subaccounts": [
+            {
+                "id": subaccount_id,
+                "transaction_split_ratio": 1,
+                "transaction_charge_type": "flat",
+                "transaction_charge": float(SERVICE_FEE),
+            }
+        ] if subaccount_id else [],
+    })
+
+
+# ─────────────────────────────────────────
+# RETRY SUBACCOUNT — for vendors with missing/wrong subaccount
+# Also force-updates existing subaccounts to the correct flat split
+# ─────────────────────────────────────────
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def retry_subaccount(request):
+    """
+    POST /api/payments/retry-subaccount/
+    Re-creates or force-updates the vendor's Flutterwave subaccount
+    to use split_type=flat, split_value=200.
+    Call this for any vendor whose split was wrong (percentage instead of flat).
+    """
+    try:
+        account = SellerBankAccount.objects.get(user=request.user)
+    except SellerBankAccount.DoesNotExist:
+        return Response({"error": "No bank account saved yet."}, status=404)
+
+    subaccount_id, error_detail = _create_or_update_flw_subaccount(
+        request.user,
+        account.bank_code,
+        account.account_number,
+        account.account_name,
+        force_update=True,  # always update even if subaccount_id already exists
+    )
+
+    if not subaccount_id:
+        return Response({
+            "error": f"Subaccount update failed: {error_detail}",
+            "subaccount_ready": False,
+        }, status=400)
+
+    account.flw_subaccount_id = subaccount_id
+    account.save(update_fields=["flw_subaccount_id"])
+
+    return Response({
+        "message": "Subaccount updated to flat ₦200 split. Vendor now receives full listing price.",
+        "flw_subaccount_id": subaccount_id,
+        "subaccount_ready": True,
+    })
 
 
 # ─────────────────────────────────────────
@@ -300,7 +341,7 @@ def verify_payment(request):
         flw_data=flw_data,
         buyer=request.user,
         listing_id=actual_listing_id,
-        order_type=order_type,
+        order_type=_normalize_order_type(order_type),
         use_credits=use_credits,
     )
 
@@ -320,7 +361,6 @@ def verify_payment(request):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def check_payment_status(request):
-    """GET /api/payments/check-status/?tx_ref=STUDEX-BKG-xxx"""
     tx_ref = request.query_params.get("tx_ref")
     if not tx_ref:
         return Response({"status": "not_found"}, status=400)
@@ -475,15 +515,13 @@ def flutterwave_webhook(request):
         if PaymentTransaction.objects.filter(reference=tx_ref, status="success").exists():
             existing = PaymentTransaction.objects.get(reference=tx_ref, status="success")
             if existing.order_id:
-                logger.info(f"Webhook: {tx_ref} already has order {existing.order_id}")
                 return HttpResponse(status=200)
 
         customer_email = data.get("customer", {}).get("email", "")
         meta = data.get("meta", {}) or {}
         listing_id = meta.get("listing_id")
-        order_type = meta.get("type", "service")
-        if "booking" in str(order_type):
-            order_type = "service"
+        raw_type = meta.get("type", "service")
+        order_type = _normalize_order_type(raw_type)
 
         try:
             from django.contrib.auth import get_user_model
@@ -502,7 +540,7 @@ def flutterwave_webhook(request):
             if error:
                 logger.error(f"Webhook order creation failed: {error}")
             else:
-                logger.info(f"Webhook created order {order_id} for tx_ref {tx_ref}")
+                logger.info(f"Webhook created order {order_id} for {tx_ref}")
         else:
             amount = Decimal(str(data.get("amount", 0)))
             vendor_amount, platform_amount = _split_amounts(amount)
@@ -526,45 +564,200 @@ def flutterwave_webhook(request):
 
 
 # ─────────────────────────────────────────
+# INTERNAL: create order
+# ─────────────────────────────────────────
+
+def _create_order_from_flw_data(flw_data, buyer, listing_id, order_type, use_credits=False):
+    from services.models import Listing
+
+    amount_paid = Decimal(str(flw_data["amount"]))
+    ref_key = flw_data.get("tx_ref", "")
+    flw_transaction_id = flw_data.get("id")
+    buyer_email = flw_data.get("customer", {}).get("email", buyer.email if buyer else "")
+
+    vendor_amount, platform_amount = _split_amounts(amount_paid)
+    seller = _get_seller_from_listing(listing_id)
+
+    txn, created = PaymentTransaction.objects.get_or_create(
+        reference=ref_key,
+        defaults={
+            "buyer": buyer,
+            "seller": seller,
+            "flw_transaction_id": flw_transaction_id,
+            "amount": amount_paid,
+            "seller_amount": vendor_amount,
+            "platform_amount": platform_amount,
+            "status": "success",
+            "order_type": order_type,
+            "buyer_email": buyer_email,
+            "buyer_name": buyer.get_full_name() or buyer.username if buyer else "",
+            "flw_response": flw_data,
+        }
+    )
+
+    if not created and txn.order_id:
+        return txn.order_id, None
+
+    order_id = None
+
+    try:
+        if listing_id:
+            listing = Listing.objects.get(id=listing_id)
+            order = Order.objects.create(
+                buyer=buyer,
+                listing=listing,
+                amount=amount_paid,
+                reference=ref_key,
+                status="paid",
+            )
+            order_id = order.id
+
+            try:
+                from orders.models import Booking
+                Booking.objects.filter(
+                    buyer=buyer, listing=listing, status="confirmed"
+                ).update(status="paid")
+            except Exception as e:
+                logger.warning(f"Booking status update failed: {e}")
+
+            try:
+                listing.reduce_stock(1)
+            except Exception as e:
+                logger.warning(f"reduce_stock failed: {e}")
+
+            try:
+                from accounts.utils import send_notification
+                send_notification(
+                    recipient=listing.vendor,
+                    notification_type='new_order',
+                    title=f'💰 Payment Received — {listing.title}',
+                    message=(
+                        f'{buyer.username} just paid ₦{amount_paid:,.0f} for "{listing.title}". '
+                        f'Your payout of ₦{vendor_amount:,.0f} will be transferred to your bank by Flutterwave.'
+                    ),
+                    action_url='/vendor/dashboard',
+                )
+            except Exception as ne:
+                logger.warning(f"Vendor notification failed: {ne}")
+
+    except Exception as e:
+        logger.error(f"Order creation failed: {e}", exc_info=True)
+        return None, str(e)
+
+    txn.order_id = order_id
+    txn.status = "success"
+    txn.save()
+
+    if use_credits and buyer:
+        try:
+            from loyalty.models import LoyaltyAccount, LoyaltyTransaction
+            loyalty_account = LoyaltyAccount.objects.filter(user=buyer).first()
+            if loyalty_account and loyalty_account.credit_balance > 0:
+                credits_used = min(loyalty_account.credit_balance, amount_paid)
+                loyalty_account.credit_balance -= credits_used
+                loyalty_account.save()
+                LoyaltyTransaction.objects.create(
+                    account=loyalty_account, transaction_type="redeemed",
+                    amount=credits_used,
+                    description=f"Credits used on order #{order_id}",
+                )
+        except Exception as e:
+            logger.warning(f"Loyalty deduction failed: {e}")
+
+    return order_id, None
+
+
+# ─────────────────────────────────────────
 # HELPERS
 # ─────────────────────────────────────────
 
-def _create_or_update_flw_subaccount(user, bank_code, account_number, account_name):
+def _create_or_update_flw_subaccount(user, bank_code, account_number, account_name, force_update=False):
     """
-    Creates or updates the vendor's Flutterwave subaccount.
-    split_type=flat, split_value=200 means Flutterwave takes ₦200 for StudEx
-    and immediately transfers everything else to the vendor's bank.
-    No holding period. No commission tiers. Vendor gets their full price minus ₦200.
+    Creates or updates a Flutterwave subaccount for the vendor.
+
+    CORRECT SPLIT CONFIG:
+      split_type  = "flat"
+      split_value = 200
+
+    This means:
+      - StudEx (main account) receives ₦200 flat per transaction
+      - The vendor's subaccount receives everything else immediately
+      - This is NOT a percentage split
+
+    If force_update=True, always calls the update endpoint even if subaccount_id exists.
+    Use this to fix existing vendors who were set up with the old percentage split.
+
+    Returns (subaccount_id, error_message).
     """
     try:
+        if not FLW_SECRET:
+            msg = "FLW_SECRET_KEY is not configured."
+            logger.error(msg)
+            return None, msg
+
         existing = SellerBankAccount.objects.filter(user=user).first()
+
         payload = {
-            "account_bank": bank_code,
-            "account_number": account_number,
+            "account_bank": str(bank_code),
+            "account_number": str(account_number),
             "business_name": getattr(user, "business_name", None) or user.username,
-            "business_email": user.email,
+            "business_email": user.email or f"{user.username}@studex.ng",
             "country": "NG",
-            "split_type": "flat",   # ← flat, not percentage
-            "split_value": 200,     # ← ₦200 to StudEx; rest to vendor immediately
+            "split_type": "flat",    # ← FLAT, not percentage
+            "split_value": 200,      # ← ₦200 to StudEx; rest to vendor
         }
+
+        logger.info(f"FLW subaccount for {user.username}: bank={bank_code}, acct={account_number[-4:]}****")
+
         if existing and existing.flw_subaccount_id:
+            # Update the existing subaccount — this fixes any wrong split config
             res = requests.put(
                 f"{FLW_BASE}/subaccounts/{existing.flw_subaccount_id}",
-                headers=FLW_HEADERS, json=payload, timeout=15,
+                headers=FLW_HEADERS,
+                json=payload,
+                timeout=15,
             )
+            action = "update"
         else:
+            # Create new subaccount
             res = requests.post(
                 f"{FLW_BASE}/subaccounts",
-                headers=FLW_HEADERS, json=payload, timeout=15,
+                headers=FLW_HEADERS,
+                json=payload,
+                timeout=15,
             )
+            action = "create"
+
+        logger.info(f"FLW subaccount {action} → {res.status_code}: {res.text[:300]}")
+
         if res.status_code in [200, 201]:
             data = res.json().get("data", {})
-            return data.get("subaccount_id") or str(data.get("id", ""))
-        logger.error(f"FLW subaccount error: {res.text[:300]}")
-        return None
+            sub_id = (
+                data.get("subaccount_id")
+                or data.get("id")
+                or str(data.get("subaccount_id", ""))
+            )
+            if sub_id:
+                logger.info(f"Subaccount {action}d: {sub_id} (flat ₦200 split)")
+                return str(sub_id), None
+            else:
+                msg = f"FLW returned success but no subaccount_id: {data}"
+                logger.error(msg)
+                return None, msg
+        else:
+            try:
+                error_body = res.json()
+            except Exception:
+                error_body = res.text
+            msg = f"FLW {action} failed ({res.status_code}): {error_body}"
+            logger.error(msg)
+            return None, str(msg)[:300]
+
+    except requests.exceptions.Timeout:
+        return None, "Flutterwave API timed out."
     except Exception as e:
-        logger.error(f"Subaccount creation failed: {e}")
-        return None
+        logger.error(f"Subaccount exception: {e}", exc_info=True)
+        return None, str(e)
 
 
 def _get_seller_from_listing(listing_id):
