@@ -1,14 +1,19 @@
 // src/hooks/useNotifications.ts
-// ─────────────────────────────────────────────────────────────────────────────
-// REPLACED: SSE (EventSource) → simple polling every 30 seconds
-//
-// WHY: SSE holds a Django worker thread open permanently per user.
-// With Render's ~4 gunicorn workers, 4 logged-in users = all workers frozen.
-//
-// HOW: Polls /api/notifications/status/ every 30 seconds.
-// Return signature is IDENTICAL to the old SSE version so layout.tsx,
-// NotificationToast, and any other consumer needs zero changes.
-// ─────────────────────────────────────────────────────────────────────────────
+/**
+ * useNotifications — polling-based notification system.
+ *
+ * SSE (stream endpoint) has been removed because it keeps a Django worker
+ * thread open permanently per user, which exhausts Render's free tier workers.
+ *
+ * This hook works with the account page's existing pollStatus() — it simply
+ * exposes the toast system for the NotificationToastContainer in layout.tsx.
+ * Toasts are shown when new unread notifications arrive compared to the last poll.
+ *
+ * If you're using the NotificationToastContainer in layout.tsx, import this hook
+ * there. If you're not using toast popups at all, you can delete this file and
+ * remove the NotificationToastContainer from layout.tsx — the bell icon in the
+ * account page handles everything via the status poll.
+ */
 
 "use client";
 
@@ -16,7 +21,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useAuth, getToken } from "@/lib/authStore";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
-const POLL_INTERVAL_MS = 30_000; // 30 seconds
+const POLL_INTERVAL = 30_000;
 
 export interface NotificationPayload {
   id: number;
@@ -37,12 +42,9 @@ export function useNotifications() {
   const { isLoggedIn, accessToken } = useAuth();
   const [unreadCount, setUnreadCount] = useState(0);
   const [toasts, setToasts] = useState<ToastItem[]>([]);
-
-  // Track which notification IDs we've already toasted so we don't
-  // show the same one again on the next poll
-  const seenIds = useRef<Set<number>>(new Set());
   const pollTimer = useRef<NodeJS.Timeout | null>(null);
   const mountedRef = useRef(true);
+  const lastSeenIds = useRef<Set<number>>(new Set());
 
   const dismissToast = useCallback((toastId: string) => {
     setToasts(prev =>
@@ -56,8 +58,8 @@ export function useNotifications() {
   const addToast = useCallback((n: NotificationPayload) => {
     const toastId = `${n.id}-${Date.now()}`;
     const item: ToastItem = { ...n, toastId, visible: true };
-    setToasts(prev => [item, ...prev].slice(0, 5)); // max 5 toasts at once
-    setTimeout(() => dismissToast(toastId), 6000);  // auto-dismiss after 6s
+    setToasts(prev => [item, ...prev].slice(0, 5));
+    setTimeout(() => dismissToast(toastId), 6000);
   }, [dismissToast]);
 
   const markRead = useCallback(async (notificationId: number) => {
@@ -84,7 +86,7 @@ export function useNotifications() {
     } catch {}
   }, []);
 
-  // ── Core poll function ──────────────────────────────────────────────────
+  // ── Poll /api/notifications/status/ instead of SSE ──────────────────────
   const poll = useCallback(async () => {
     const token = getToken();
     if (!token || !mountedRef.current) return;
@@ -96,46 +98,34 @@ export function useNotifications() {
       if (!res.ok || !mountedRef.current) return;
 
       const data = await res.json();
+      const notifications: NotificationPayload[] = data.notifications || [];
+      const unread = data.unread_notifications || 0;
 
-      // Update unread count
-      setUnreadCount(data.unread_notifications ?? 0);
+      setUnreadCount(unread);
 
-      // Show toasts for any NEW unread notifications we haven't seen before
-      const notifications: NotificationPayload[] = data.notifications ?? [];
-      for (const n of notifications) {
-        if (!n.is_read && !seenIds.current.has(n.id)) {
-          seenIds.current.add(n.id);
-          // Don't toast on the very first load — only on subsequent polls
-          // (seenIds starts empty, so first poll populates it without toasting)
-          if (seenIds.current.size > notifications.length) {
+      // Show toasts for notifications we haven't seen before
+      const isFirstPoll = lastSeenIds.current.size === 0;
+      notifications.forEach(n => {
+        if (!n.is_read && !lastSeenIds.current.has(n.id)) {
+          if (!isFirstPoll) {
+            // Only toast on subsequent polls, not on page load
             addToast(n);
           }
-        } else {
-          // Mark seen even if already read, so we track the baseline
-          seenIds.current.add(n.id);
+          lastSeenIds.current.add(n.id);
         }
-      }
-    } catch {
-      // Network error — silently skip, retry on next interval
-    }
+      });
+      // Also track read ones so we don't re-toast if they get marked unread somehow
+      notifications.forEach(n => lastSeenIds.current.add(n.id));
+
+    } catch {}
   }, [addToast]);
 
-  // ── Initialise on login, tear down on logout ───────────────────────────
   useEffect(() => {
     mountedRef.current = true;
+    if (!isLoggedIn || !accessToken) return;
 
-    if (!isLoggedIn || !accessToken) {
-      // Logged out — clear everything
-      if (pollTimer.current) clearInterval(pollTimer.current);
-      setUnreadCount(0);
-      setToasts([]);
-      seenIds.current.clear();
-      return;
-    }
-
-    // Run immediately on login, then every 30 seconds
-    poll();
-    pollTimer.current = setInterval(poll, POLL_INTERVAL_MS);
+    poll(); // initial fetch
+    pollTimer.current = setInterval(poll, POLL_INTERVAL);
 
     return () => {
       mountedRef.current = false;
@@ -143,6 +133,5 @@ export function useNotifications() {
     };
   }, [isLoggedIn, accessToken, poll]);
 
-  // ── Return same shape as the old SSE hook ─────────────────────────────
   return { unreadCount, toasts, dismissToast, markRead, markAllRead };
 }
