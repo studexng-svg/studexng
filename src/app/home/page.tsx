@@ -1,4 +1,6 @@
 // src/app/home/page.tsx
+export const dynamic = 'force-dynamic';
+
 import { cookies } from 'next/headers';
 import HomePageClient from "./HomePageClient";
 
@@ -13,7 +15,7 @@ export default async function HomePage() {
 
   try {
     const res = await fetch(`${API_URL}/api/auth/vendors/?campus=${campus}`, {
-      next: { revalidate: 60 },
+      cache: 'no-store',
       headers: { "Content-Type": "application/json" },
     });
     if (res.ok) {
@@ -24,7 +26,7 @@ export default async function HomePage() {
 
   try {
     const res = await fetch(`${API_URL}/api/services/listings/?campus=${campus}`, {
-      next: { revalidate: 60 },
+      cache: 'no-store',
       headers: { "Content-Type": "application/json" },
     });
     if (res.ok) {

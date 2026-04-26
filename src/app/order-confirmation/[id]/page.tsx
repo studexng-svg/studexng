@@ -141,7 +141,7 @@ export default function OrderConfirmationPage() {
         </div>
       </div>
 
-      <div className="px-4 pt-6 pb-40 max-w-2xl mx-auto space-y-5">
+      <div className="px-4 pt-6 pb-56 md:pb-16 max-w-2xl mx-auto space-y-5">
 
         {/* SUCCESS ICON */}
         <motion.div
@@ -359,7 +359,7 @@ export default function OrderConfirmationPage() {
                 whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
                 onClick={submitFeedback}
                 disabled={feedbackSubmitting || !feedbackRating}
-                className="w-full py-3 rounded-full font-semibold text-white text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                className="w-full py-3 rounded-full font-semibold text-white text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all mb-4"
                 style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
                 {feedbackSubmitting ? "Submitting..." : "Submit Feedback"}
               </motion.button>

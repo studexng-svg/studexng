@@ -106,25 +106,15 @@ export default function HomePageClient({ initialVendors, initialListings }: Prop
   useEffect(() => {
     if (!isHydrated || !isLoggedIn || !user) return;
     const campus = ((user as any).school || 'pau').toLowerCase();
-    // Skip refetch if SSR already fetched the correct campus via the cookie
-    const cookieCampus = document.cookie.split(';').find(c => c.trim().startsWith('studex_campus='))?.split('=')?.[1] || 'pau';
-    if (cookieCampus === campus && initialListings.length > 0) return;
-
+    const cookieCampus = document.cookie.split(';').find(c => c.trim().startsWith('studex_campus='))?.split('=')?.[1]?.toLowerCase() || 'pau';
+    if (cookieCampus === campus) return;
+    document.cookie = `studex_campus=${campus}; path=/; max-age=31536000`;
     Promise.all([
       fetchWithAuth(`${API_URL}/api/services/listings/`),
       fetchWithAuth(`${API_URL}/api/auth/vendors/`),
     ]).then(async ([listRes, vendorRes]) => {
-      if (listRes.ok) {
-        const listData = await listRes.json();
-        const fresh = listData.results || listData || [];
-        setAllListings(fresh);
-        setListings(fresh);
-        setActiveFilter("All");
-      }
-      if (vendorRes.ok) {
-        const vendorData = await vendorRes.json();
-        setVendors(vendorData.results || vendorData || []);
-      }
+      if (listRes.ok) { const d = await listRes.json(); const f = d.results||d||[]; setAllListings(f); setListings(f); setActiveFilter("All"); }
+      if (vendorRes.ok) { const d = await vendorRes.json(); setVendors(d.results||d||[]); }
     }).catch(() => {});
   }, [isHydrated, isLoggedIn, (user as any)?.school]);
 
