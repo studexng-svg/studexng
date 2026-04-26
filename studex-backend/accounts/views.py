@@ -518,7 +518,8 @@ class VendorListView(ListAPIView):
         if user.is_authenticated:
             campus = (getattr(user, 'school', '') or 'pau').lower()
         else:
-            campus = 'pau'
+            campus_param = self.request.query_params.get('campus', '').lower()
+            campus = campus_param if campus_param in ('pau', 'futo') else 'pau'
 
         qs = User.objects.filter(is_verified_vendor=True, seller_application__status='approved')
         # Treat null/blank school as PAU (existing vendors pre-dating the school field)

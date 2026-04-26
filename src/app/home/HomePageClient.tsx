@@ -105,9 +105,10 @@ export default function HomePageClient({ initialVendors, initialListings }: Prop
   // SSR fetched anonymously (defaulting to PAU), so FUTO users need a client-side refetch.
   useEffect(() => {
     if (!isHydrated || !isLoggedIn || !user) return;
-    const campus = (user.school || 'pau').toLowerCase();
-    // PAU is already correct from SSR — skip unless the user is on a different campus
-    if (campus === 'pau') return;
+    const campus = ((user as any).school || 'pau').toLowerCase();
+    // Skip refetch if SSR already fetched the correct campus via the cookie
+    const cookieCampus = document.cookie.split(';').find(c => c.trim().startsWith('studex_campus='))?.split('=')?.[1] || 'pau';
+    if (cookieCampus === campus && initialListings.length > 0) return;
 
     Promise.all([
       fetchWithAuth(`${API_URL}/api/services/listings/`),
@@ -125,7 +126,7 @@ export default function HomePageClient({ initialVendors, initialListings }: Prop
         setVendors(vendorData.results || vendorData || []);
       }
     }).catch(() => {});
-  }, [isHydrated, isLoggedIn, user?.school]);
+  }, [isHydrated, isLoggedIn, (user as any)?.school]);
 
   const filters = ["All", "Services", "Products", "Food", "Beauty"];
   const handleFilter = (filter: string) => {

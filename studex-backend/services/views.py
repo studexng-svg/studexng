@@ -92,6 +92,10 @@ class ListingViewSet(viewsets.ModelViewSet):
         campus = 'pau'
         if user.is_authenticated:
             campus = (getattr(user, 'school', '') or 'pau').lower()
+        else:
+            campus_param = self.request.query_params.get('campus', '').lower()
+            if campus_param in ('pau', 'futo'):
+                campus = campus_param
 
         qs = Listing.objects.filter(campus=campus, is_available=True)
 

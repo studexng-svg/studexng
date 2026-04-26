@@ -47,6 +47,10 @@ export const useAuth = create<AuthState>()(
 
       login: (userData, accessToken, refreshToken) => {
         set({ user: userData, isLoggedIn: true, accessToken, refreshToken, isAuthReady: true });
+        // Persist campus to cookie so SSR fetches the right campus on next page load
+        if (typeof document !== 'undefined') {
+          document.cookie = `studex_campus=${((userData as any).school || 'pau').toLowerCase()}; path=/; max-age=31536000`;
+        }
         // Load this user's cart from localStorage
         try {
           const { useCart } = require("@/lib/cartStore");

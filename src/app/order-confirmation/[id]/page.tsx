@@ -141,7 +141,7 @@ export default function OrderConfirmationPage() {
         </div>
       </div>
 
-      <div className="px-4 pt-6 pb-28 max-w-2xl mx-auto space-y-5">
+      <div className="px-4 pt-6 pb-40 max-w-2xl mx-auto space-y-5">
 
         {/* SUCCESS ICON */}
         <motion.div
