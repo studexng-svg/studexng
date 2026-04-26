@@ -83,7 +83,12 @@ class ListingViewSet(viewsets.ModelViewSet):
         if user.is_authenticated and user.user_type == 'vendor':
             return Listing.objects.filter(vendor=user).select_related('vendor', 'category')
 
-        # Public / student view — campus-scoped available listings
+        # For retrieve/update/delete — no campus filter so any listing is accessible
+        # by ID regardless of which campus the requester is on (fixes SSR 404 for FUTO listings)
+        if self.action != 'list':
+            return Listing.objects.all().select_related('vendor', 'category')
+
+        # List action only — campus-scoped available listings
         campus = 'pau'
         if user.is_authenticated:
             campus = (getattr(user, 'school', '') or 'pau').lower()
