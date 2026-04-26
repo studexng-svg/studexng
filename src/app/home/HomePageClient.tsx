@@ -408,81 +408,97 @@ export default function HomePageClient({ initialVendors, initialListings }: Prop
               </motion.div>
             ) : (
               <>
-                {/* ── Horizontal scroll row ── */}
-                <div className="flex gap-3 overflow-x-auto pb-2" style={{ scrollbarWidth: "none" }}>
+                {/* ── Vertical card list ── */}
+                <div className="space-y-4">
                   {featuredListings.map((listing, i) => {
                     const badge = listing.vendor?.profile?.vendor_badge;
                     const rating = listing.vendor?.profile?.rating;
                     const totalReviews = listing.vendor?.profile?.total_reviews;
+                    const wishlisted = mounted && isInWishlist(listing.id);
 
                     return (
                       <motion.div
                         key={listing.id}
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        whileInView={{ opacity: 1, scale: 1 }}
+                        initial={{ opacity: 0, y: 16 }}
+                        whileInView={{ opacity: 1, y: 0 }}
                         viewport={{ once: true }}
-                        transition={{ delay: Math.min(i * 0.06, 0.3) }}
-                        className="flex-shrink-0 w-[155px] bg-white border border-stone-200 hover:border-teal-300 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all relative">
+                        transition={{ delay: Math.min(i * 0.05, 0.25) }}
+                        className="bg-white rounded-2xl shadow-sm border border-stone-100 overflow-hidden">
 
-                        <Link href={`/listing/${listing.id}`}>
-                          <div className="relative w-full h-28 overflow-hidden">
-                            <SafeImage
-                              src={listing.image?.startsWith("http") ? listing.image : null}
-                              alt={listing.title}
-                              className="object-cover"
-                            />
-                            {!listing.is_available && (
-                              <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                                <span className="text-white font-bold bg-red-500 px-2 py-1 rounded-full text-[10px]">Unavailable</span>
-                              </div>
-                            )}
-                            {badge && badge !== "none" && (
-                              <div className="absolute top-2 left-2">
-                                <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${BADGE_STYLES[badge]}`}>
-                                  {BADGE_LABELS[badge]}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        </Link>
+                        {/* ── Image with overlays ── */}
+                        <div className="relative w-full h-48 overflow-hidden">
+                          <SafeImage
+                            src={listing.image?.startsWith("http") ? listing.image : null}
+                            alt={listing.title}
+                            className="object-cover"
+                          />
 
-                        {/* Wishlist button */}
-                        <motion.button
-                          onClick={(e) => {
-                            e.preventDefault(); e.stopPropagation();
-                            const item = { id: listing.id, title: listing.title, price: listing.price, img: listing.image };
-                            if (mounted && isInWishlist(listing.id)) { removeFromWishlist(listing.id); showToast("Removed from Wishlist"); }
-                            else { addToWishlist(item); showToast("Added to Wishlist ❤️"); }
-                          }}
-                          whileTap={{ scale: 0.9 }}
-                          className="absolute top-2 right-2 w-7 h-7 bg-white/90 backdrop-blur-sm rounded-full shadow flex items-center justify-center z-10">
-                          <Heart className={`w-3.5 h-3.5 ${mounted && isInWishlist(listing.id) ? "fill-red-500 text-red-500" : "text-stone-400"}`} />
-                        </motion.button>
-
-                        {/* Card body */}
-                        <div className="p-3">
-                          <Link href={`/listing/${listing.id}`}>
-                            <p className="text-sm font-bold text-stone-900 line-clamp-1">{listing.title}</p>
-                            <p className="text-xs text-stone-400 mt-0.5 mb-1">
-                              @{listing.vendor?.username || listing.vendor}
-                            </p>
-                          </Link>
-
-                          {totalReviews > 0 && (
-                            <div className="flex items-center gap-0.5 mb-1">
-                              <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
-                              <span className="text-[10px] text-stone-400">{rating}</span>
+                          {/* Unavailable overlay */}
+                          {!listing.is_available && (
+                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                              <span className="text-white font-bold bg-red-500 px-3 py-1 rounded-full text-xs">Unavailable</span>
                             </div>
                           )}
 
-                          <p className="text-base font-bold" style={{
-                            background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)",
-                            WebkitBackgroundClip: "text",
-                            WebkitTextFillColor: "transparent",
-                            backgroundClip: "text",
-                          }}>
-                            ₦{Number(listing.price).toLocaleString()}
+                          {/* Badge pill — top-left */}
+                          {badge && badge !== "none" && (
+                            <div className="absolute top-3 left-3">
+                              <span className={`text-[9px] font-semibold px-2 py-0.5 rounded-full backdrop-blur-sm ${BADGE_STYLES[badge]}`}>
+                                {BADGE_LABELS[badge]}
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Heart — top-right */}
+                          <motion.button
+                            onClick={(e) => {
+                              e.preventDefault(); e.stopPropagation();
+                              const item = { id: listing.id, title: listing.title, price: listing.price, img: listing.image };
+                              if (wishlisted) { removeFromWishlist(listing.id); showToast("Removed from Wishlist"); }
+                              else { addToWishlist(item); showToast("Added to Wishlist ❤️"); }
+                            }}
+                            whileTap={{ scale: 0.85 }}
+                            className="absolute top-3 right-3 w-8 h-8 bg-white/90 backdrop-blur-sm rounded-full shadow flex items-center justify-center z-10">
+                            <Heart className={`w-4 h-4 transition-colors ${wishlisted ? "fill-red-500 text-red-500" : "text-stone-400"}`} />
+                          </motion.button>
+
+                          {/* Title + vendor gradient overlay — bottom of image */}
+                          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent pt-8 pb-3 px-4">
+                            <p className="text-white font-bold text-base leading-tight line-clamp-1">{listing.title}</p>
+                            <p className="text-white/75 text-xs mt-0.5">@{listing.vendor?.username || listing.vendor}</p>
+                          </div>
+                        </div>
+
+                        {/* ── Description ── */}
+                        <div className="px-4 pt-3 pb-1">
+                          {totalReviews > 0 && (
+                            <div className="flex items-center gap-1 mb-1.5">
+                              <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                              <span className="text-xs text-stone-500 font-medium">{rating}</span>
+                              <span className="text-xs text-stone-400">({totalReviews})</span>
+                            </div>
+                          )}
+                          <p className="text-sm text-stone-500 line-clamp-2 leading-relaxed">
+                            {listing.description || "Tap to view details and book this service."}
                           </p>
+                        </div>
+
+                        {/* ── Price + Book ── */}
+                        <div className="px-4 py-3 flex items-center justify-between">
+                          <div>
+                            <p className="text-xs text-stone-400 font-medium">Price</p>
+                            <p className="text-xl font-bold text-stone-900">
+                              ₦{Number(listing.price).toLocaleString()}
+                            </p>
+                          </div>
+                          <Link href={`/listing/${listing.id}`}>
+                            <motion.button
+                              whileHover={{ scale: 1.04 }}
+                              whileTap={{ scale: 0.96 }}
+                              className="px-6 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-full font-semibold text-sm shadow-sm transition-colors">
+                              Book
+                            </motion.button>
+                          </Link>
                         </div>
                       </motion.div>
                     );
