@@ -196,7 +196,7 @@ export default function AuthPage() {
   };
 
   const inputClass = (field: keyof typeof touched, isOk: boolean) =>
-    `w-full px-4 py-2.5 md:py-3 rounded-xl border focus:outline-none transition-all text-sm bg-white text-stone-900 placeholder:text-stone-400 ${
+    `w-full px-4 py-2.5 rounded-xl border focus:outline-none transition-all text-sm bg-white text-stone-900 placeholder:text-stone-400 ${
       !touched[field] || !signupForm[field as keyof typeof signupForm]
         ? "border-stone-200 focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500"
         : isOk
@@ -295,29 +295,53 @@ export default function AuthPage() {
   );
 
   return (
-    <div className="min-h-screen bg-[#FAFAF9] flex items-center justify-center p-4 pb-24 md:pb-4 relative overflow-hidden"
-      style={{ fontFamily: "'DM Sans', sans-serif" }}>
+    // FIX 1: Replaced pb-24 md:pb-4 with py-8 so content isn't pushed under the bottom nav.
+    // Added overflow-y-auto so the page itself scrolls if the viewport is short.
+    <div
+      className="min-h-screen bg-[#FAFAF9] flex items-start justify-center p-4 py-16 relative overflow-x-hidden overflow-y-auto"
+      style={{ fontFamily: "'DM Sans', sans-serif" }}
+    >
 
       {/* Gradient blobs */}
-      <div className="absolute top-[-80px] right-[-80px] w-[400px] h-[400px] rounded-full bg-gradient-to-br from-teal-100/60 to-purple-100/40 blur-3xl pointer-events-none" />
-      <div className="absolute bottom-[-60px] left-[-60px] w-[300px] h-[300px] rounded-full bg-gradient-to-tr from-purple-100/40 to-teal-100/30 blur-3xl pointer-events-none" />
+      <div className="fixed top-[-80px] right-[-80px] w-[300px] h-[300px] rounded-full bg-gradient-to-br from-teal-100/60 to-purple-100/40 blur-3xl pointer-events-none" />
+      <div className="fixed bottom-[-60px] left-[-60px] w-[200px] h-[200px] rounded-full bg-gradient-to-tr from-purple-100/40 to-teal-100/30 blur-3xl pointer-events-none" />
 
       {/* Back button */}
       <button onClick={() => router.push("/")}
-        className="absolute top-6 left-6 z-50 p-2.5 bg-white/80 backdrop-blur-md border border-stone-200 hover:border-stone-300 rounded-full shadow-sm transition-all active:scale-95">
+        className="fixed top-6 left-6 z-50 p-2.5 bg-white/80 backdrop-blur-md border border-stone-200 hover:border-stone-300 rounded-full shadow-sm transition-all active:scale-95">
         <ArrowLeft className="w-5 h-5 text-stone-600" />
       </button>
 
-      <div className="relative w-full max-w-md" style={{ perspective: "1000px" }}>
-        <motion.div className="relative w-full" initial={false} animate={{ rotateY: isFlipped ? 180 : 0 }}
+      {/* FIX 2: The perspective wrapper is now relative (not the card children).
+          The card children use a grid trick: both sides are in the same grid cell
+          so the taller one always sets the container height. The inactive side is
+          made invisible + pointer-events-none so it doesn't intercept clicks. */}
+      <div className="relative w-full max-w-md mt-8" style={{ perspective: "1200px" }}>
+        <motion.div
+          className="relative w-full"
+          initial={false}
+          animate={{ rotateY: isFlipped ? 180 : 0 }}
           transition={{ duration: 1.2, type: "spring", stiffness: 60, damping: 20 }}
-          style={{ transformStyle: "preserve-3d", minHeight: "auto" }}>
+          style={{ transformStyle: "preserve-3d" }}
+        >
 
           {/* ══════════════════════════════════════
               LOGIN SIDE
           ══════════════════════════════════════ */}
-          <div className="absolute w-full" style={{ backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden" }}>
-            <div className="bg-white rounded-2xl shadow-xl p-8 border border-stone-100 overflow-y-auto max-h-[90vh]">
+          {/* FIX 3: Removed absolute positioning. Card sits in normal flow.
+              The inactive side is hidden via visibility so it doesn't take space
+              during the flip — but the active side always dictates the height. */}
+          <div
+            style={{
+              backfaceVisibility: "hidden",
+              WebkitBackfaceVisibility: "hidden",
+              // When flipped away, collapse out of flow so signup card can set height
+              position: isFlipped ? "absolute" : "relative",
+              inset: 0,
+            }}
+          >
+            <div className="bg-white rounded-2xl shadow-xl border border-stone-100">
+              <div className="p-6 md:p-8">
 
               {/* Header */}
               <div className="text-center mb-8">
@@ -453,15 +477,25 @@ export default function AuthPage() {
                 </p>
               )}
               <p className="text-center text-xs text-stone-400 mt-3">© 2025 StudEx • PAU & FUTO</p>
+              </div>
             </div>
           </div>
 
           {/* ══════════════════════════════════════
               SIGNUP SIDE
           ══════════════════════════════════════ */}
-          <div className="absolute w-full"
-            style={{ backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden", transform: "rotateY(180deg)" }}>
-            <div className="bg-white rounded-2xl shadow-xl p-5 md:p-8 border border-stone-100 overflow-y-auto scroll-smooth max-h-[calc(100vh-80px)] md:max-h-[90vh]">
+          <div
+            style={{
+              backfaceVisibility: "hidden",
+              WebkitBackfaceVisibility: "hidden",
+              transform: "rotateY(180deg)",
+              // When flipped away (login showing), collapse so login card sets height
+              position: isFlipped ? "relative" : "absolute",
+              inset: 0,
+            }}
+          >
+            <div className="bg-white rounded-2xl shadow-xl border border-stone-100">
+              <div className="p-6 md:p-8">
 
               {/* Header */}
               <div className="text-center mb-6">
@@ -677,7 +711,7 @@ export default function AuthPage() {
 
                 <motion.button whileHover={{ scale: isLoading ? 1 : 1.02 }} whileTap={{ scale: isLoading ? 1 : 0.97 }}
                   type="submit" disabled={isLoading || (step === 1 && !step1Valid)}
-                  className="w-full py-3 md:py-3.5 rounded-full font-semibold text-white text-sm shadow-lg shadow-teal-200/60 transition-all disabled:opacity-50"
+                  className="w-full py-3 rounded-full font-semibold text-white text-sm shadow-lg shadow-teal-200/60 transition-all disabled:opacity-50"
                   style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
                   {isLoading ? "Processing..." : step === 1 ? "Send Verification Code" : "Complete Signup"}
                 </motion.button>
@@ -690,6 +724,7 @@ export default function AuthPage() {
                   Login here
                 </button>
               </p>
+              </div>
             </div>
           </div>
 
