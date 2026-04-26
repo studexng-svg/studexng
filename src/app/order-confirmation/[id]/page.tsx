@@ -10,13 +10,14 @@ import {
   Package,
   Calendar,
   Clock,
-  ArrowRight,
   Home,
   MessageCircle,
-  Loader,
+  Star,
+  ChevronLeft,
+  Shield,
 } from "lucide-react";
 
-import { auth } from "@/lib/firebase"; // ✅ IMPORTANT (Firebase auth)
+import { fetchWithAuth } from "@/lib/authStore";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -45,46 +46,39 @@ export default function OrderConfirmationPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  const [feedbackRating, setFeedbackRating] = useState(0);
+  const [feedbackHovered, setFeedbackHovered] = useState(0);
+  const [feedbackComment, setFeedbackComment] = useState("");
+  const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
+  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
+  const [feedbackError, setFeedbackError] = useState("");
+
+  const submitFeedback = async () => {
+    if (!feedbackRating) { setFeedbackError("Please select a rating."); return; }
+    setFeedbackSubmitting(true); setFeedbackError("");
+    try {
+      const res = await fetchWithAuth(`${API_URL}/api/reviews/submit-app-feedback/`, {
+        method: "POST",
+        body: JSON.stringify({ feedback_type: "buyer", rating: feedbackRating, comment: feedbackComment }),
+      });
+      if (res.ok) { setFeedbackSubmitted(true); }
+      else {
+        const d = await res.json();
+        setFeedbackError(d?.error || d?.detail || "Failed to submit feedback.");
+      }
+    } catch { setFeedbackError("Network error. Please try again."); }
+    finally { setFeedbackSubmitting(false); }
+  };
+
   useEffect(() => {
     const fetchOrder = async () => {
       try {
         setLoading(true);
-
-        /* =====================================
-           ✅ GET FIREBASE TOKEN (NOT JWT)
-        ===================================== */
-        const user = auth.currentUser;
-
-        if (!user) {
-          router.push("/login");
-          return;
-        }
-
-        const token = await user.getIdToken();
-
-        /* =====================================
-           FETCH ORDER
-        ===================================== */
-        const res = await fetch(
-          `${API_URL}/api/orders/orders/${orderId}/`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`, // ✅ Firebase token only
-              "Content-Type": "application/json",
-            },
-          }
-        );
-
-        if (!res.ok) {
-          const text = await res.text();
-          console.error("Backend error:", text);
-          throw new Error("Failed to fetch order");
-        }
-
+        const res = await fetchWithAuth(`${API_URL}/api/orders/orders/${orderId}/`);
+        if (!res.ok) throw new Error("Failed to fetch order");
         const data = await res.json();
         setOrder(data);
       } catch (err: any) {
-        console.error("Failed to load order:", err);
         setError(err.message || "Could not load order details");
       } finally {
         setLoading(false);
@@ -92,28 +86,35 @@ export default function OrderConfirmationPage() {
     };
 
     if (orderId) fetchOrder();
-  }, [orderId, router]);
-
-  /* =====================================
-     UI (unchanged)
-  ===================================== */
+  }, [orderId]);
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader className="w-12 h-12 animate-spin" />
+      <div className="min-h-screen bg-[#FAFAF9] flex items-center justify-center">
+        <div className="w-10 h-10 border-2 border-teal-600 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   if (error || !order) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-center">
-        <div>
-          <h2 className="text-xl font-bold mb-4">Order Not Found</h2>
-          <p>{error}</p>
-          <Link href="/home">Go Home</Link>
+      <div className="min-h-screen bg-[#FAFAF9] flex flex-col items-center justify-center px-6 text-center"
+        style={{ fontFamily: "'DM Sans', sans-serif" }}>
+        <div className="w-16 h-16 bg-stone-100 rounded-full flex items-center justify-center mb-4">
+          <Package className="w-8 h-8 text-stone-400" />
         </div>
+        <h2 className="text-lg font-bold text-stone-900 mb-1"
+          style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+          Order Not Found
+        </h2>
+        <p className="text-sm text-stone-400 mb-6">{error || "We couldn't load this order."}</p>
+        <Link href="/home">
+          <motion.button whileTap={{ scale: 0.97 }}
+            className="px-6 py-3 rounded-full font-semibold text-white text-sm"
+            style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+            Back to Home
+          </motion.button>
+        </Link>
       </div>
     );
   }
@@ -121,157 +122,252 @@ export default function OrderConfirmationPage() {
   const vendorName = order.listing.vendor.business_name || order.listing.vendor.username;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-teal-50 flex items-center justify-center p-6">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="w-full max-w-2xl"
-      >
-        {/* Success Animation */}
+    <div className="min-h-screen bg-[#FAFAF9]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+
+      {/* STICKY HEADER */}
+      <div className="sticky top-0 bg-white/80 backdrop-blur-md z-40 border-b border-stone-100 shadow-sm">
+        <div className="flex items-center justify-between px-4 py-3 max-w-2xl mx-auto">
+          <button
+            onClick={() => router.push("/home")}
+            className="p-2.5 bg-white border border-stone-200 rounded-full shadow-sm active:scale-95 transition-all"
+          >
+            <ChevronLeft className="w-5 h-5 text-stone-600" />
+          </button>
+          <h1 className="text-base font-bold text-stone-900"
+            style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+            Order Confirmed
+          </h1>
+          <div className="w-10" />
+        </div>
+      </div>
+
+      <div className="px-4 pt-6 pb-28 max-w-2xl mx-auto space-y-5">
+
+        {/* SUCCESS ICON */}
         <motion.div
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
-          transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
-          className="flex justify-center mb-8"
+          transition={{ type: "spring", stiffness: 200, delay: 0.1 }}
+          className="flex justify-center pt-2"
         >
-          <div className="w-32 h-32 bg-gradient-to-br from-green-400 to-teal-500 rounded-full flex items-center justify-center shadow-2xl">
-            <CheckCircle className="w-20 h-20 text-white" />
+          <div
+            className="w-20 h-20 rounded-full flex items-center justify-center shadow-lg"
+            style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}
+          >
+            <CheckCircle className="w-10 h-10 text-white" />
           </div>
         </motion.div>
 
-        {/* Main Card */}
+        {/* HEADING */}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="text-center"
+        >
+          <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold">Payment Successful</p>
+          <h2 className="text-2xl font-bold text-stone-900 mt-0.5"
+            style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+            Order Confirmed!
+          </h2>
+          <p className="text-sm text-stone-400 mt-1">
+            Your order is in escrow and the seller has been notified.
+          </p>
+        </motion.div>
+
+        {/* ORDER DETAILS CARD */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.25 }}
+          className="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm space-y-4"
+        >
+          {/* Reference */}
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-teal-50 rounded-full flex items-center justify-center flex-shrink-0">
+              <Package className="w-5 h-5 text-teal-600" />
+            </div>
+            <div>
+              <p className="text-xs text-stone-400">Order Reference</p>
+              <p className="font-bold text-stone-900 text-sm">{order.reference}</p>
+            </div>
+          </div>
+
+          <div className="border-t border-stone-100" />
+
+          {/* Date + Status */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex items-start gap-2.5">
+              <Calendar className="w-4 h-4 text-teal-500 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-xs text-stone-400">Order Date</p>
+                <p className="font-semibold text-stone-900 text-sm">
+                  {new Date(order.created_at).toLocaleDateString()}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start gap-2.5">
+              <Clock className="w-4 h-4 text-teal-500 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-xs text-stone-400">Status</p>
+                <p className="font-semibold text-teal-600 text-sm capitalize">
+                  {order.status.replace("_", " ")}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t border-stone-100" />
+
+          {/* Item + Amount */}
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="text-xs text-stone-400">Item</p>
+              <p className="font-bold text-stone-900 text-sm mt-0.5">{order.listing.title}</p>
+              <p className="text-xs text-stone-400 mt-0.5">from {vendorName}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-xs text-stone-400">Amount</p>
+              <p className="text-xl font-bold text-stone-900 mt-0.5">₦{order.amount.toLocaleString()}</p>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* ESCROW INFO */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
-          className="bg-white/90 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-white mb-6"
+          className="bg-teal-50 border border-teal-100 rounded-2xl p-4 flex items-start gap-3"
         >
-          <h1 className="text-4xl font-black text-center bg-gradient-to-r from-purple-600 to-teal-600 bg-clip-text text-transparent mb-2">
-            Order Confirmed!
-          </h1>
-          <p className="text-center text-gray-600 mb-8">
-            Your order has been placed successfully and is now in escrow
-          </p>
-
-          {/* Order Details */}
-          <div className="space-y-6">
-            <div className="flex items-start gap-4 p-4 bg-gradient-to-r from-purple-50 to-teal-50 rounded-2xl">
-              <div className="w-12 h-12 bg-purple-200 rounded-full flex items-center justify-center flex-shrink-0">
-                <Package className="w-6 h-6 text-purple-600" />
-              </div>
-              <div className="flex-1">
-                <p className="text-sm text-gray-600">Order Reference</p>
-                <p className="text-xl font-black text-gray-900">{order.reference}</p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="flex items-start gap-3">
-                <Calendar className="w-5 h-5 text-purple-600 mt-1" />
-                <div>
-                  <p className="text-sm text-gray-600">Order Date</p>
-                  <p className="font-bold text-gray-900">
-                    {new Date(order.created_at).toLocaleDateString()}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3">
-                <Clock className="w-5 h-5 text-purple-600 mt-1" />
-                <div>
-                  <p className="text-sm text-gray-600">Status</p>
-                  <p className="font-bold text-purple-600 capitalize">
-                    {order.status.replace('_', ' ')}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="border-t-2 border-purple-100 pt-6">
-              <div className="flex justify-between items-center mb-4">
-                <div>
-                  <p className="text-sm text-gray-600">Item</p>
-                  <p className="font-bold text-gray-900 text-lg">{order.listing.title}</p>
-                  <p className="text-sm text-gray-600">from {vendorName}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-3xl font-black bg-gradient-to-r from-purple-600 to-teal-600 bg-clip-text text-transparent">
-                    ₦{order.amount.toLocaleString()}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Escrow Info */}
-            <div className="bg-gradient-to-r from-purple-100 to-teal-100 rounded-2xl p-6 border-2 border-purple-200">
-              <div className="flex items-start gap-3 mb-3">
-                <div className="w-10 h-10 bg-purple-500 rounded-full flex items-center justify-center flex-shrink-0">
-                  <CheckCircle className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <p className="font-black text-gray-900 text-lg">Protected by Escrow</p>
-                  <p className="text-sm text-gray-700 mt-1">
-                    Your payment is safely held by StudEx. Funds will only be released to the seller after you confirm receipt.
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2 text-sm text-purple-700 font-bold">
-                <Clock className="w-4 h-4" />
-                <span>You have 7 days to confirm or dispute this order</span>
-              </div>
+          <div className="w-9 h-9 bg-teal-600 rounded-full flex items-center justify-center flex-shrink-0">
+            <Shield className="w-4 h-4 text-white" />
+          </div>
+          <div>
+            <p className="font-semibold text-teal-900 text-sm">Protected by Escrow</p>
+            <p className="text-xs text-teal-700 mt-0.5 leading-relaxed">
+              Your payment is safely held by StudEx. Funds are released to the seller only after you confirm receipt.
+            </p>
+            <div className="flex items-center gap-1.5 mt-2 text-xs text-teal-700 font-semibold">
+              <Clock className="w-3 h-3" />
+              <span>You have 7 days to confirm or dispute</span>
             </div>
           </div>
         </motion.div>
 
-        {/* Action Buttons */}
+        {/* ACTION BUTTONS */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-          className="grid grid-cols-1 md:grid-cols-3 gap-4"
+          transition={{ delay: 0.35 }}
+          className="grid grid-cols-2 gap-3"
         >
           <Link href="/home" className="w-full">
             <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="w-full py-4 bg-white text-purple-600 font-bold rounded-2xl shadow-lg flex items-center justify-center gap-2 hover:shadow-xl transition"
+              whileTap={{ scale: 0.97 }}
+              className="w-full py-3 rounded-full font-semibold text-stone-600 bg-white border border-stone-200 text-sm flex items-center justify-center gap-2 shadow-sm transition-all"
             >
-              <Home className="w-5 h-5" />
+              <Home className="w-4 h-4" />
               Back to Home
             </motion.button>
           </Link>
 
-          <Link href={`/orders/${order.id}`} className="w-full">
+          <Link href={`/account/orders/${order.id}`} className="w-full">
             <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="w-full py-4 bg-white text-purple-600 font-bold rounded-2xl shadow-lg flex items-center justify-center gap-2 hover:shadow-xl transition"
+              whileTap={{ scale: 0.97 }}
+              className="w-full py-3 rounded-full font-semibold text-white text-sm flex items-center justify-center gap-2 transition-all"
+              style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}
             >
-              <Package className="w-5 h-5" />
+              <Package className="w-4 h-4" />
               View Order
             </motion.button>
           </Link>
+        </motion.div>
 
+        {/* CONTACT SELLER */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+        >
           <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            className="w-full py-4 bg-gradient-to-r from-purple-600 to-teal-600 text-white font-bold rounded-2xl shadow-xl flex items-center justify-center gap-2"
+            whileTap={{ scale: 0.97 }}
+            className="w-full py-3 rounded-full font-semibold text-stone-600 bg-white border border-stone-200 text-sm flex items-center justify-center gap-2 shadow-sm transition-all"
           >
-            <MessageCircle className="w-5 h-5" />
+            <MessageCircle className="w-4 h-4" />
             Contact Seller
           </motion.button>
         </motion.div>
 
-        {/* Next Steps */}
+        {/* NOTE */}
+        <p className="text-center text-xs text-stone-400">
+          Check your email for order confirmation and tracking updates
+        </p>
+
+        {/* APP FEEDBACK */}
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.5 }}
-          className="mt-6 text-center text-sm text-gray-600"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.45 }}
         >
-          <p>Check your email for order confirmation and tracking updates</p>
+          {feedbackSubmitted ? (
+            <div className="bg-teal-50 border border-teal-200 rounded-2xl p-5 text-center">
+              <p className="font-bold text-teal-800">Thanks for your feedback!</p>
+              <p className="text-sm text-teal-700 mt-1">We use it to improve StudEx for everyone.</p>
+            </div>
+          ) : (
+            <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm space-y-4">
+              <div>
+                <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold">Quick Feedback</p>
+                <h3 className="text-lg font-bold text-stone-900 mt-0.5"
+                  style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+                  How was your experience?
+                </h3>
+                <p className="text-sm text-stone-400 mt-0.5">Rate the StudEx checkout experience</p>
+              </div>
+
+              <div className="flex gap-2">
+                {[1, 2, 3, 4, 5].map(star => (
+                  <motion.button key={star} whileTap={{ scale: 0.8 }}
+                    onClick={() => setFeedbackRating(star)}
+                    onMouseEnter={() => setFeedbackHovered(star)}
+                    onMouseLeave={() => setFeedbackHovered(0)}>
+                    <Star className={`w-9 h-9 transition-all ${
+                      star <= (feedbackHovered || feedbackRating) ? "fill-amber-400 text-amber-400" : "text-stone-200"
+                    }`} />
+                  </motion.button>
+                ))}
+              </div>
+
+              {feedbackRating > 0 && (
+                <p className="text-sm font-semibold text-teal-600 -mt-1">
+                  {["", "Poor", "Fair", "Good", "Great", "Excellent!"][feedbackRating]}
+                </p>
+              )}
+
+              <textarea
+                value={feedbackComment}
+                onChange={e => setFeedbackComment(e.target.value)}
+                placeholder="Any thoughts? (optional)"
+                rows={2}
+                className="w-full px-4 py-3 rounded-xl border border-stone-200 text-stone-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 bg-white placeholder:text-stone-400 resize-none transition"
+              />
+
+              {feedbackError && <p className="text-red-500 text-sm">{feedbackError}</p>}
+
+              <motion.button
+                whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
+                onClick={submitFeedback}
+                disabled={feedbackSubmitting || !feedbackRating}
+                className="w-full py-3 rounded-full font-semibold text-white text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+                {feedbackSubmitting ? "Submitting..." : "Submit Feedback"}
+              </motion.button>
+            </div>
+          )}
         </motion.div>
-      </motion.div>
+
+      </div>
     </div>
   );
 }

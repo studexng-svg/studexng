@@ -136,6 +136,21 @@ class ConversationViewSet(viewsets.ModelViewSet):
         conversation.last_message_at = timezone.now()
         conversation.save()
 
+        # Notify the other participant
+        recipient = conversation.seller if request.user == conversation.buyer else conversation.buyer
+        try:
+            from notifications.models import Notification
+            preview = '📷 Image' if image else (content[:60] + ('...' if len(content) > 60 else ''))
+            Notification.objects.create(
+                recipient=recipient,
+                notification_type='message',
+                title=f'New message from {request.user.username}',
+                message=preview,
+                action_url=f'/chat/{conversation.id}',
+            )
+        except Exception:
+            pass
+
         serializer = MessageSerializer(message, context={'request': request})
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 

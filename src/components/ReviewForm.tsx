@@ -35,42 +35,57 @@ export default function ReviewForm({ orderId, vendorName, onSuccess }: {
 
   if (submitted) return (
     <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
-      className="bg-green-50 dark:bg-green-900/20 border border-green-200 rounded-2xl p-5 text-center">
-      <p className="text-2xl mb-1">🎉</p>
-      <p className="font-black text-green-800 dark:text-green-300">Review submitted!</p>
-      <p className="text-sm text-green-700 mt-1">Thanks for rating {vendorName}.</p>
+      className="bg-teal-50 border border-teal-200 rounded-2xl p-5 text-center">
+      <p className="font-bold text-teal-800">Review submitted! ⭐</p>
+      <p className="text-sm text-teal-700 mt-1">Thanks for rating {vendorName}.</p>
     </motion.div>
   );
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-gray-700 space-y-4">
-      <h3 className="font-black text-gray-800 dark:text-gray-200">Rate your experience</h3>
-      <p className="text-sm text-gray-500 -mt-2">How was {vendorName}?</p>
+    <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm space-y-4">
+      <div>
+        <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold">Leave a Review</p>
+        <h3 className="text-lg font-bold text-stone-900 mt-0.5" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+          Rate your experience
+        </h3>
+        <p className="text-sm text-stone-400 mt-0.5">How was {vendorName}?</p>
+      </div>
+
       <div className="flex gap-2">
-        {[1,2,3,4,5].map(star => (
+        {[1, 2, 3, 4, 5].map(star => (
           <motion.button key={star} whileTap={{ scale: 0.8 }}
             onClick={() => setRating(star)}
-            onMouseEnter={() => setHovered(star)} onMouseLeave={() => setHovered(0)}>
+            onMouseEnter={() => setHovered(star)}
+            onMouseLeave={() => setHovered(0)}>
             <Star className={`w-9 h-9 transition-all ${
-              star <= (hovered || rating) ? "fill-amber-400 text-amber-400" : "text-gray-300 dark:text-gray-600"
+              star <= (hovered || rating) ? "fill-amber-400 text-amber-400" : "text-stone-200"
             }`} />
           </motion.button>
         ))}
       </div>
+
       {rating > 0 && (
-        <p className="text-sm font-bold text-purple-600 dark:text-purple-400 -mt-1">
-          {["","Poor 😕","Fair 😐","Good 👍","Great 😊","Excellent! 🌟"][rating]}
+        <p className="text-sm font-semibold text-teal-600 -mt-1">
+          {["", "Poor", "Fair", "Good", "Great", "Excellent!"][rating]}
         </p>
       )}
-      <textarea value={comment} onChange={e => setComment(e.target.value)}
-        placeholder="Share your experience (optional)..." rows={3}
-        className="w-full p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm text-gray-800 dark:text-gray-200 focus:outline-none focus:border-purple-400 resize-none" />
+
+      <textarea
+        value={comment}
+        onChange={e => setComment(e.target.value)}
+        placeholder="Share your experience (optional)..."
+        rows={3}
+        className="w-full px-4 py-3 rounded-xl border border-stone-200 text-stone-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 bg-white placeholder:text-stone-400 resize-none transition"
+      />
+
       {error && <p className="text-red-500 text-sm">{error}</p>}
-      <motion.button whileTap={{ scale: 0.97 }} onClick={handleSubmit}
+
+      <motion.button
+        whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
+        onClick={handleSubmit}
         disabled={submitting || !rating}
-        className={`w-full py-3 rounded-xl font-bold text-white text-sm transition-all ${
-          rating ? "bg-gradient-to-r from-purple-600 to-teal-500" : "bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed"
-        }`}>
+        className="w-full py-3 rounded-full font-semibold text-white text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+        style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
         {submitting ? "Submitting..." : "Submit Review"}
       </motion.button>
     </div>

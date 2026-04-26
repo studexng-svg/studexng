@@ -13,7 +13,7 @@ class CategoryImageForm(forms.ModelForm):
 
     class Meta:
         model = Category
-        fields = ['title', 'slug', 'image_file']
+        fields = ['title', 'slug', 'image_file', 'campus']
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -37,7 +37,8 @@ class ListingImageForm(forms.ModelForm):
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):
     form = CategoryImageForm
-    list_display = ('title', 'slug', 'image_preview', 'listing_count', 'active_listing_count')
+    list_display = ('title', 'slug', 'campus', 'image_preview', 'listing_count', 'active_listing_count')
+    list_filter = ('campus',)
     search_fields = ('title',)
     prepopulated_fields = {"slug": ("title",)}
     ordering = ('title',)
@@ -94,12 +95,12 @@ class CategoryAdmin(admin.ModelAdmin):
 @admin.register(Listing)
 class ListingAdmin(admin.ModelAdmin):
     list_display = (
-        'title', 'vendor', 'vendor_status', 'category',
+        'title', 'vendor', 'campus', 'vendor_status', 'category',
         'price_display', 'availability_badge', 'order_count', 'created_at'
     )
-    list_filter = ('category', 'is_available', 'vendor__is_verified_vendor', 'vendor__user_type', 'created_at')
+    list_filter = ('campus', 'is_available', 'listing_type', 'category', 'vendor__is_verified_vendor', 'vendor__user_type', 'created_at')
     search_fields = ('title', 'description', 'vendor__username', 'vendor__business_name')
-    readonly_fields = ('created_at', 'updated_at', 'get_total_orders', 'get_total_revenue')
+    readonly_fields = ('campus', 'created_at', 'updated_at', 'get_total_orders', 'get_total_revenue')
     raw_id_fields = ('vendor',)
     date_hierarchy = 'created_at'
     list_per_page = 50
@@ -109,7 +110,7 @@ class ListingAdmin(admin.ModelAdmin):
             'fields': ('title', 'description', 'price', 'image', 'category')
         }),
         ('Vendor & Availability', {
-            'fields': ('vendor', 'is_available')
+            'fields': ('vendor', 'campus', 'is_available')
         }),
         ('Statistics', {
             'fields': ('get_total_orders', 'get_total_revenue'),

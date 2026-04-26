@@ -10,7 +10,7 @@ const faqs = [
     category: "Payments & Escrow",
     icon: CreditCard,
     color: "text-purple-600",
-    bg: "bg-purple-50 dark:bg-purple-900/20",
+    bg: "bg-purple-50",
     questions: [
       {
         q: "How does payment work on StudEx?",
@@ -34,7 +34,7 @@ const faqs = [
     category: "Bookings",
     icon: Calendar,
     color: "text-teal-600",
-    bg: "bg-teal-50 dark:bg-teal-900/20",
+    bg: "bg-teal-50",
     questions: [
       {
         q: "How do I book a service?",
@@ -58,7 +58,7 @@ const faqs = [
     category: "Orders",
     icon: Package,
     color: "text-indigo-600",
-    bg: "bg-indigo-50 dark:bg-indigo-900/20",
+    bg: "bg-indigo-50",
     questions: [
       {
         q: "Where can I see my orders?",
@@ -78,7 +78,7 @@ const faqs = [
     category: "Reviews & Loyalty",
     icon: Star,
     color: "text-amber-600",
-    bg: "bg-amber-50 dark:bg-amber-900/20",
+    bg: "bg-amber-50",
     questions: [
       {
         q: "How do I leave a review?",
@@ -98,7 +98,7 @@ const faqs = [
     category: "Safety & Trust",
     icon: Shield,
     color: "text-green-600",
-    bg: "bg-green-50 dark:bg-green-900/20",
+    bg: "bg-green-50",
     questions: [
       {
         q: "Is StudEx safe to use?",
@@ -123,25 +123,32 @@ export default function FAQPage() {
   const toggle = (key: string) => setOpenItem(prev => prev === key ? null : key);
 
   return (
-    <>
-      {/* HEADER */}
-      <div className="sticky top-0 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 z-40 flex items-center justify-between p-4">
-        <button onClick={() => router.back()} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition">
-          <ChevronLeft className="w-5 h-5 text-gray-700 dark:text-gray-300" />
-        </button>
-        <h1 className="text-xl font-black bg-gradient-to-r from-purple-600 to-teal-500 bg-clip-text text-transparent">
-          Help & FAQ
-        </h1>
-        <div className="w-9" />
+    <div className="min-h-screen bg-[#FAFAF9]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+      {/* STICKY HEADER */}
+      <div className="sticky top-0 bg-white/80 backdrop-blur-md z-40 border-b border-stone-100 shadow-sm">
+        <div className="flex items-center justify-between px-4 py-3">
+          <button
+            onClick={() => router.back()}
+            className="p-2.5 bg-white border border-stone-200 hover:border-stone-300 rounded-full shadow-sm transition-all active:scale-95">
+            <ChevronLeft className="w-5 h-5 text-stone-600" />
+          </button>
+          <h1 className="text-base font-bold text-stone-900" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+            Help & FAQ
+          </h1>
+          <div className="w-10" />
+        </div>
       </div>
 
-      <div className="min-h-screen bg-[#FFF8F0] dark:bg-gray-950 pb-28 p-4 space-y-5">
+      <div className="pb-28 p-4 space-y-5 max-w-2xl mx-auto">
 
         {/* HERO */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-          className="bg-gradient-to-r from-purple-600 to-teal-500 rounded-3xl p-6 text-white text-center shadow-xl">
+          className="rounded-2xl p-6 text-white text-center shadow-md"
+          style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
           <HelpCircle className="w-12 h-12 mx-auto mb-3 opacity-90" />
-          <h2 className="text-2xl font-black mb-1">How can we help?</h2>
+          <h2 className="text-xl font-bold mb-1" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+            How can we help?
+          </h2>
           <p className="text-sm opacity-80">Find answers to common questions about StudEx</p>
         </motion.div>
 
@@ -152,16 +159,16 @@ export default function FAQPage() {
             <motion.div key={section.category}
               initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
               transition={{ delay: si * 0.05 }}
-              className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden">
+              className="bg-white rounded-2xl shadow-sm border border-stone-200 overflow-hidden">
 
               {/* Section header */}
               <div className={`flex items-center gap-3 p-4 ${section.bg}`}>
                 <SectionIcon className={`w-5 h-5 ${section.color}`} />
-                <h3 className={`font-black text-sm ${section.color}`}>{section.category}</h3>
+                <h3 className={`font-semibold text-sm ${section.color}`}>{section.category}</h3>
               </div>
 
               {/* Questions */}
-              <div className="divide-y divide-gray-50 dark:divide-gray-800">
+              <div className="divide-y divide-stone-100">
                 {section.questions.map((item, qi) => {
                   const key = `${si}-${qi}`;
                   const isOpen = openItem === key;
@@ -169,10 +176,10 @@ export default function FAQPage() {
                     <div key={key}>
                       <button onClick={() => toggle(key)}
                         className="w-full flex items-center justify-between p-4 text-left gap-3">
-                        <span className="font-semibold text-gray-800 dark:text-gray-200 text-sm leading-snug">{item.q}</span>
+                        <span className="font-semibold text-stone-900 text-sm leading-snug">{item.q}</span>
                         {isOpen
-                          ? <ChevronUp className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                          : <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" />}
+                          ? <ChevronUp className="w-4 h-4 text-stone-400 flex-shrink-0" />
+                          : <ChevronDown className="w-4 h-4 text-stone-400 flex-shrink-0" />}
                       </button>
                       <AnimatePresence>
                         {isOpen && (
@@ -182,7 +189,7 @@ export default function FAQPage() {
                             exit={{ height: 0, opacity: 0 }}
                             transition={{ duration: 0.2 }}
                             className="overflow-hidden">
-                            <p className="px-4 pb-4 text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
+                            <p className="px-4 pb-4 text-sm text-stone-500 leading-relaxed">
                               {item.a}
                             </p>
                           </motion.div>
@@ -198,19 +205,22 @@ export default function FAQPage() {
 
         {/* CONTACT SUPPORT */}
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}
-          className="bg-white dark:bg-gray-900 rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-gray-800 text-center">
-          <MessageCircle className="w-8 h-8 text-purple-600 mx-auto mb-2" />
-          <p className="font-black text-gray-800 dark:text-white mb-1">Still need help?</p>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+          className="bg-white rounded-2xl p-5 shadow-sm border border-stone-200 text-center">
+          <MessageCircle className="w-8 h-8 text-teal-600 mx-auto mb-2" />
+          <p className="font-bold text-stone-900 mb-1" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+            Still need help?
+          </p>
+          <p className="text-sm text-stone-500 mb-4">
             Chat with a vendor directly from any order or listing page, or reach us at support@studex.ng
           </p>
           <a href="mailto:support@studex.ng"
-            className="inline-block px-6 py-3 bg-gradient-to-r from-purple-600 to-teal-500 text-white font-bold rounded-xl text-sm shadow-md">
+            className="inline-block px-6 py-3 text-white font-semibold rounded-full text-sm shadow-lg shadow-teal-200/60"
+            style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
             Email Support
           </a>
         </motion.div>
 
       </div>
-    </>
+    </div>
   );
 }

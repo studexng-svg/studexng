@@ -15,6 +15,7 @@ interface UserProfile {
   business_name?: string | null;
   is_verified_vendor: boolean;
   wallet_balance: string;
+  profile_image?: string | null;
 }
 
 interface AuthState {

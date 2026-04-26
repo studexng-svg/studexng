@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s http://127.0.0.1:8000/api/auth/vendors/)",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d['results'][0] if d.get\\('results'\\) else d, indent=2\\)\\)\")",
+      "Bash(curl -s \"http://127.0.0.1:8000/api/auth/vendors/?debug=1\" -w \"\\\\nHTTP %{http_code}\")",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); [print\\(v['profile_picture']\\) for v in d.get\\('results',[]\\)]\")",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); r=d.get\\('results',[]\\); print\\(r[0].get\\('profile_picture','NO VENDORS'\\) if r else 'empty'\\)\")",
+      "Bash(npx tsc *)",
+      "Bash(python manage.py shell -c \"from services.models import Category; print\\(list\\(Category.objects.values\\('title','slug'\\)\\)\\)\")",
+      "Bash(venv/Scripts/python.exe manage.py migrate services 0008_seed_categories)",
+      "Bash(python3 *)",
+      "Bash(python manage.py shell -c ' *)",
+      "WebFetch(domain:www.pexels.com)",
+      "Bash(curl -L https://videos.pexels.com/video-files/7683405/7683405-hd_1920_1080_30fps.mp4 -H 'Referer: https://www.pexels.com/' -o /c/Users/HomePC/Documents/studexng/public/videos/hero.mp4 --progress-bar)",
+      "Bash(echo \"Exit code: $?\")"
+    ]
+  }
+}

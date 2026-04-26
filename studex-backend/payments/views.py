@@ -1,30 +1,106 @@
 # payments/views.py
+import hmac
+import hashlib
 import requests
 import logging
+import json
 from decimal import Decimal
 from django.conf import settings
+from django.views.decorators.csrf import csrf_exempt
+from django.http import HttpResponse
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from orders.models import Order
 from .models import SellerBankAccount, PaymentTransaction
 
 logger = logging.getLogger(__name__)
 
-FLW_SECRET = settings.FLW_SECRET_KEY
-FLW_BASE = "https://api.flutterwave.com/v3"
-FLW_HEADERS = {"Authorization": f"Bearer {FLW_SECRET}", "Content-Type": "application/json"}
+PAYSTACK_BASE = "https://api.paystack.co"
+
+# ─────────────────────────────────────────
+# ₦200 flat service fee per transaction.
+# Paystack splits at payment time via subaccount:
+#   subaccount = vendor's ACCT_xxx code
+#   transaction_charge = 20000 kobo (₦200) → goes to StudEx (main account)
+#   bearer = "account" → StudEx bears Paystack's processing fee
+#   vendor receives: (amount_in_kobo - 20000) kobo
+# ─────────────────────────────────────────
+SERVICE_FEE = Decimal("200")
 
 
-def get_commission_split(amount: Decimal):
-    if amount < Decimal("5000"):
-        platform_rate = Decimal("0.30")
-    elif amount <= Decimal("20000"):
-        platform_rate = Decimal("0.20")
-    else:
-        platform_rate = Decimal("0.15")
-    seller_rate = Decimal("1") - platform_rate
-    return seller_rate, platform_rate
+def _split_amounts(amount: Decimal):
+    """Returns (vendor_amount, platform_amount) in naira."""
+    vendor_amount = amount - SERVICE_FEE
+    if vendor_amount < Decimal("0"):
+        return Decimal("0"), amount
+    return vendor_amount, SERVICE_FEE
+
+
+def _normalize_order_type(raw_type: str) -> str:
+    t = (raw_type or "service").lower()
+    if "booking" in t or "service" in t:
+        return "service"
+    if "food" in t or "product" in t:
+        return t
+    return "service"
+
+
+# ─────────────────────────────────────────
+# GET BANKS
+# ─────────────────────────────────────────
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def get_banks(request):
+    try:
+        secret_key = (getattr(settings, "PAYSTACK_SECRET_KEY", "") or "").strip()
+        headers = {"Authorization": f"Bearer {secret_key}", "Content-Type": "application/json"}
+        res = requests.get(f"{PAYSTACK_BASE}/bank?country=NG&perPage=100", headers=headers, timeout=10)
+        if res.status_code == 200:
+            data = res.json()
+            # Paystack returns { status: true, data: [...] }
+            return Response({"data": data.get("data", [])}, status=200)
+        return Response({"data": []}, status=200)
+    except Exception as e:
+        logger.error(f"get_banks error: {e}")
+        return Response({"data": []}, status=200)
+
+
+# ─────────────────────────────────────────
+# VERIFY BANK ACCOUNT
+# ─────────────────────────────────────────
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def verify_bank_account(request):
+    account_number = request.data.get("account_number")
+    bank_code = request.data.get("bank_code")
+    if not account_number or not bank_code:
+        return Response({"error": "account_number and bank_code required."}, status=400)
+    # Read the key fresh every request — avoids the module-level constant being stale
+    # if the server was started before .env was populated with a real key.
+    secret_key = (getattr(settings, "PAYSTACK_SECRET_KEY", "") or "").strip()
+    if not secret_key:
+        logger.error("verify_bank_account: PAYSTACK_SECRET_KEY is not set")
+        return Response({"error": "Payment gateway not configured."}, status=503)
+    headers = {"Authorization": f"Bearer {secret_key}", "Content-Type": "application/json"}
+    try:
+        res = requests.get(
+            f"{PAYSTACK_BASE}/bank/resolve",
+            headers=headers,
+            params={"account_number": str(account_number), "bank_code": str(bank_code)},
+            timeout=15,
+        )
+        data = res.json()
+        if res.status_code == 200 and data.get("status"):
+            return Response({"account_name": data.get("data", {}).get("account_name", "")})
+        paystack_msg = (data.get("message") or "").lower()
+        if "invalid account" in paystack_msg or "could not resolve" in paystack_msg:
+            return Response({"error": "Invalid account number — please check and try again"}, status=400)
+        return Response({"error": data.get("message") or "Could not verify account"}, status=400)
+    except Exception:
+        return Response({"error": "Verification unavailable. Enter account name manually."}, status=400)
 
 
 # ─────────────────────────────────────────
@@ -42,10 +118,11 @@ def seller_bank_account(request):
                 "bank_name": account.bank_name,
                 "account_number": account.account_number,
                 "account_name": account.account_name,
-                "flw_subaccount_id": account.paystack_subaccount_code,
+                "paystack_subaccount_code": account.paystack_subaccount_code,
+                "subaccount_ready": bool(account.paystack_subaccount_code),
             })
         except SellerBankAccount.DoesNotExist:
-            return Response({}, status=200)
+            return Response({"subaccount_ready": False}, status=200)
 
     bank_code = request.data.get("bank_code")
     account_number = str(request.data.get("account_number", ""))
@@ -57,9 +134,25 @@ def seller_bank_account(request):
     if not all([bank_code, account_number, account_name]):
         return Response({"error": "bank_code, account_number, and account_name are required."}, status=400)
 
-    subaccount_id = _create_or_update_flw_subaccount(request.user, bank_code, account_number, account_name)
-    if not subaccount_id:
-        return Response({"error": "Failed to register with Flutterwave. Check your bank details."}, status=400)
+    subaccount_code, error_detail = _create_or_update_paystack_subaccount(
+        request.user, bank_code, account_number, account_name
+    )
+
+    if not subaccount_code:
+        SellerBankAccount.objects.update_or_create(
+            user=request.user,
+            defaults={
+                "bank_code": bank_code,
+                "bank_name": bank_name,
+                "account_number": account_number,
+                "account_name": account_name,
+                "paystack_subaccount_code": "",
+            }
+        )
+        return Response({
+            "error": f"Bank details saved but Paystack subaccount setup failed: {error_detail}",
+            "subaccount_ready": False,
+        }, status=400)
 
     account, _ = SellerBankAccount.objects.update_or_create(
         user=request.user,
@@ -68,54 +161,140 @@ def seller_bank_account(request):
             "bank_name": bank_name,
             "account_number": account_number,
             "account_name": account_name,
-            "paystack_subaccount_code": subaccount_id,
+            "paystack_subaccount_code": subaccount_code,
         }
     )
-
+    logger.info(f"Paystack subaccount saved for {request.user.username}: {subaccount_code}")
     return Response({
-        "message": "Bank account saved successfully.",
+        "message": "Bank account saved and payout subaccount created successfully.",
         "account_name": account.account_name,
         "bank_name": account.bank_name,
-        "flw_subaccount_id": subaccount_id,
+        "paystack_subaccount_code": subaccount_code,
+        "subaccount_ready": True,
     }, status=201)
 
 
 # ─────────────────────────────────────────
-# VERIFY BANK ACCOUNT
+# GET CHECKOUT CONFIG
+# Frontend can call this before opening Paystack modal.
+# Returns subaccount split config.
+# ─────────────────────────────────────────
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def get_checkout_config(request):
+    """GET /api/payments/checkout-config/?listing_id=<id>"""
+    listing_id = request.query_params.get("listing_id")
+    if not listing_id:
+        return Response({"error": "listing_id is required."}, status=400)
+
+    try:
+        from services.models import Listing
+        listing = Listing.objects.select_related("vendor").get(id=listing_id)
+    except Exception:
+        return Response({"error": "Listing not found."}, status=404)
+
+    vendor = listing.vendor
+    amount = Decimal(str(listing.price))
+
+    discount_amount = Decimal("0")
+    try:
+        profile = request.user.profile
+        if profile.profile_bonus_eligible and not profile.profile_bonus_used:
+            discount_amount = (amount * Decimal("0.05")).quantize(Decimal("0.01"))
+    except Exception:
+        pass
+
+    final_amount = amount - discount_amount
+    checkout_amount = final_amount + SERVICE_FEE
+
+    subaccount_code = None
+    try:
+        bank = SellerBankAccount.objects.get(user=vendor)
+        subaccount_code = bank.paystack_subaccount_code or None
+    except SellerBankAccount.DoesNotExist:
+        pass
+
+    if not subaccount_code:
+        logger.warning(
+            f"No Paystack subaccount for vendor {vendor.username} on listing {listing_id}. "
+            f"Full payment will go to StudEx settlement account."
+        )
+
+    return Response({
+        "listing_id": listing.id,
+        "listing_title": listing.title,
+        "listing_price": float(amount),
+        "discount_amount": float(discount_amount),
+        "vendor_receives": float(final_amount),
+        "service_fee": float(SERVICE_FEE),
+        "checkout_amount": float(checkout_amount),
+        # Paystack amounts in kobo for inline JS
+        "checkout_amount_kobo": int(checkout_amount * 100),
+        "currency": "NGN",
+        "vendor_username": vendor.username,
+        "paystack_subaccount_code": subaccount_code,
+        "subaccount_ready": bool(subaccount_code),
+        # Pass subaccount and transaction_charge into PaystackPop.setup()
+        # transaction_charge = 20000 kobo → StudEx gets ₦200, vendor gets the rest
+        "paystack_split": {
+            "subaccount": subaccount_code,
+            "transaction_charge": 20000,
+            "bearer": "account",
+        } if subaccount_code else None,
+    })
+
+
+# ─────────────────────────────────────────
+# RETRY SUBACCOUNT
 # ─────────────────────────────────────────
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
-def verify_bank_account(request):
-    account_number = request.data.get("account_number")
-    bank_code = request.data.get("bank_code")
+def retry_subaccount(request):
+    """
+    POST /api/payments/retry-subaccount/
+    Re-creates or force-updates the vendor's Paystack subaccount.
+    """
+    try:
+        account = SellerBankAccount.objects.get(user=request.user)
+    except SellerBankAccount.DoesNotExist:
+        return Response({"error": "No bank account saved yet."}, status=404)
 
-    if not account_number or not bank_code:
-        return Response({"error": "account_number and bank_code required."}, status=400)
-
-    res = requests.post(
-        f"{FLW_BASE}/accounts/resolve",
-        headers=FLW_HEADERS,
-        json={"account_number": account_number, "account_bank": bank_code},
+    subaccount_code, error_detail = _create_or_update_paystack_subaccount(
+        request.user,
+        account.bank_code,
+        account.account_number,
+        account.account_name,
+        force_update=True,
     )
 
-    if res.status_code == 200 and res.json().get("status") == "success":
-        data = res.json().get("data", {})
-        return Response({"account_name": data.get("account_name", "")})
+    if not subaccount_code:
+        return Response({
+            "error": f"Subaccount update failed: {error_detail}",
+            "subaccount_ready": False,
+        }, status=400)
 
-    return Response({"error": "Could not verify account. Please check the details."}, status=400)
+    account.paystack_subaccount_code = subaccount_code
+    account.save(update_fields=["paystack_subaccount_code"])
+
+    return Response({
+        "message": "Paystack subaccount updated. Vendor now receives full listing price.",
+        "paystack_subaccount_code": subaccount_code,
+        "subaccount_ready": True,
+    })
 
 
 # ─────────────────────────────────────────
-# VERIFY PAYMENT + CREATE ORDER
+# VERIFY PAYMENT
 # ─────────────────────────────────────────
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def verify_payment(request):
-    reference = request.data.get("reference")  # Flutterwave tx_ref
-    transaction_id = request.data.get("transaction_id")  # Flutterwave transaction_id
-    order_type = request.data.get("order_type", "product")
+    reference = request.data.get("reference")
+    transaction_id = request.data.get("transaction_id")
+    order_type = request.data.get("order_type", "service")
     listing_id = request.data.get("listing_id")
     items = request.data.get("items", [])
     use_credits = request.data.get("use_credits", False)
@@ -123,184 +302,65 @@ def verify_payment(request):
     if not reference and not transaction_id:
         return Response({"error": "Payment reference is required."}, status=400)
 
-    # Prevent duplicate processing
     ref_key = reference or str(transaction_id)
-    if PaymentTransaction.objects.filter(reference=ref_key, status="success").exists():
-        existing = PaymentTransaction.objects.get(reference=ref_key, status="success")
+
+    existing = PaymentTransaction.objects.filter(reference=ref_key, status="success").first()
+    if existing and existing.order_id:
         return Response({"order_id": existing.order_id, "message": "Already processed."})
 
-    # Verify with Flutterwave
-    if transaction_id:
+    try:
+        secret_key = (getattr(settings, "PAYSTACK_SECRET_KEY", "") or "").strip()
+        headers = {"Authorization": f"Bearer {secret_key}", "Content-Type": "application/json"}
         verify_res = requests.get(
-            f"{FLW_BASE}/transactions/{transaction_id}/verify",
-            headers=FLW_HEADERS,
+            f"{PAYSTACK_BASE}/transaction/verify/{ref_key}",
+            headers=headers,
+            timeout=15,
         )
-    else:
-        verify_res = requests.get(
-            f"{FLW_BASE}/transactions/verify_by_reference?tx_ref={reference}",
-            headers=FLW_HEADERS,
-        )
+    except Exception as e:
+        logger.error(f"Paystack verify request failed: {e}")
+        return Response({"error": "Payment verification failed. Contact support."}, status=400)
 
     if verify_res.status_code != 200:
-        logger.error(f"Flutterwave verification HTTP error: {verify_res.status_code}")
         return Response({"error": "Payment verification failed."}, status=400)
 
     verify_data = verify_res.json()
-
-    if verify_data.get("status") != "success" or verify_data.get("data", {}).get("status") != "successful":
-        logger.error(f"Payment not successful: {verify_data}")
+    if not verify_data.get("status") or verify_data.get("data", {}).get("status") != "success":
         return Response({"error": "Payment was not completed successfully."}, status=400)
 
-    flw_data = verify_data["data"]
-    amount_paid = Decimal(str(flw_data["amount"]))
-    buyer_email = flw_data.get("customer", {}).get("email", request.user.email)
-    ref_key = flw_data.get("tx_ref", ref_key)
+    paystack_data = verify_data["data"]
+    actual_listing_id = listing_id or (items[0]["listing_id"] if items else None)
 
-    seller_rate, platform_rate = get_commission_split(amount_paid)
-    seller_amount = (amount_paid * seller_rate).quantize(Decimal("0.01"))
-    platform_amount = (amount_paid * platform_rate).quantize(Decimal("0.01"))
-
-    seller = _get_seller_from_listing(listing_id or (items[0]["listing_id"] if items else None))
-
-    txn = PaymentTransaction.objects.create(
+    order_id, error = _create_order_from_paystack_data(
+        paystack_data=paystack_data,
         buyer=request.user,
-        seller=seller,
-        reference=ref_key,
-        amount=amount_paid,
-        seller_amount=seller_amount,
-        platform_amount=platform_amount,
-        status="success",
-        order_type=order_type,
-        buyer_email=buyer_email,
-        buyer_name=request.user.get_full_name() or request.user.username,
-        paystack_response=flw_data,
+        listing_id=actual_listing_id,
+        order_type=_normalize_order_type(order_type),
+        use_credits=use_credits,
     )
 
-    try:
-        from services.models import Listing
-        order_id = None
+    if error:
+        return Response(
+            {"error": f"Payment received but order failed: {error}", "reference": ref_key},
+            status=500,
+        )
 
-        if order_type == "service" and listing_id:
-            listing = Listing.objects.get(id=listing_id)
-            qty = int(request.data.get("quantity", 1))
-            if listing.track_inventory:
-                if listing.stock_quantity <= 0:
-                    return Response({"error": f'"{listing.title}" is out of stock.'}, status=400)
-                if listing.stock_quantity < qty:
-                    return Response({"error": f'Only {listing.stock_quantity} of "{listing.title}" available. Stock limit exceeded.'}, status=400)
+    return Response({"order_id": order_id, "message": "Payment verified. Order created."})
 
-            order = Order.objects.create(
-                buyer=request.user, listing=listing,
-                amount=amount_paid, reference=ref_key, status="paid",
-            )
-            order_id = order.id
 
-            try:
-                listing.reduce_stock(1)
-            except Exception as e:
-                logger.warning(f"reduce_stock failed: {e}")
+# ─────────────────────────────────────────
+# CHECK PAYMENT STATUS
+# ─────────────────────────────────────────
 
-            try:
-                from orders.models import Booking
-                Booking.objects.filter(
-                    buyer=request.user, listing=listing, status="confirmed"
-                ).update(status="paid")
-            except Exception as e:
-                logger.warning(f"Could not update booking status to paid: {e}")
-
-            # Notify vendor
-            try:
-                from notifications.models import Notification
-                Notification.objects.create(
-                    recipient=listing.vendor,
-                    notification_type='vendor_approved',
-                    title=f'💰 Payment Received — {listing.title}',
-                    message=(
-                        f'{request.user.username} has paid ₦{amount_paid:,.0f} for '
-                        f'"{listing.title}". Funds are held in escrow.'
-                    ),
-                    action_url='/vendor/dashboard',
-                )
-                logger.info(f"[StudEx] Payment notification sent to {listing.vendor.username}")
-            except Exception as ne:
-                logger.warning(f"Payment notification failed: {ne}")
-
-        elif order_type == "product" and items:
-            for i, item_data in enumerate(items):
-                listing = Listing.objects.get(id=item_data["listing_id"])
-                qty = item_data.get("quantity", 1)
-
-                if listing.track_inventory:
-                    if listing.stock_quantity <= 0:
-                        return Response({"error": f'"{listing.title}" is out of stock.'}, status=400)
-                    if listing.stock_quantity < qty:
-                        return Response({"error": f'Only {listing.stock_quantity} of "{listing.title}" available. You requested {qty}. Stock limit exceeded.'}, status=400)
-
-                order = Order.objects.create(
-                    buyer=request.user, listing=listing,
-                    amount=listing.price * qty,
-                    reference=f"{ref_key}-{item_data['listing_id']}-{i}",
-                    status="paid",
-                )
-
-                try:
-                    listing.reduce_stock(qty)
-                except Exception as e:
-                    logger.warning(f"reduce_stock failed: {e}")
-
-                # Notify vendor
-                try:
-                    from notifications.models import Notification
-                    Notification.objects.create(
-                        recipient=listing.vendor,
-                        notification_type='vendor_approved',
-                        title=f'💰 Payment Received — {listing.title}',
-                        message=(
-                            f'{request.user.username} has paid ₦{listing.price * qty:,.0f} for '
-                            f'"{listing.title}" (qty: {qty}). Funds are held in escrow.'
-                        ),
-                        action_url='/vendor/dashboard',
-                    )
-                except Exception as ne:
-                    logger.warning(f"Product payment notification failed: {ne}")
-
-                if order_id is None:
-                    order_id = order.id
-
-        txn.order_id = order_id
-        txn.save()
-
-        # Deduct loyalty credits
-        credits_used = Decimal("0")
-        if use_credits:
-            try:
-                import importlib.util
-                if importlib.util.find_spec("loyalty"):
-                    from loyalty.models import LoyaltyAccount, LoyaltyTransaction
-                    loyalty_account = LoyaltyAccount.objects.filter(user=request.user).first()
-                    if loyalty_account and loyalty_account.credit_balance > 0:
-                        credits_used = min(loyalty_account.credit_balance, amount_paid)
-                        loyalty_account.credit_balance -= credits_used
-                        loyalty_account.save()
-                        LoyaltyTransaction.objects.create(
-                            account=loyalty_account, transaction_type="redeemed",
-                            amount=credits_used, description=f"Credits used on order #{order_id}",
-                        )
-            except Exception as e:
-                logger.warning(f"Loyalty deduction failed: {e}")
-
-        return Response({
-            "order_id": order_id,
-            "message": "Payment verified. Order created.",
-            "credits_used": float(credits_used),
-        })
-
-    except Exception as e:
-        logger.error(f"Order creation failed after payment: {e}", exc_info=True)
-        return Response({
-            "error": f"Payment received but order creation failed: {str(e)}",
-            "reference": ref_key,
-        }, status=500)
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def check_payment_status(request):
+    tx_ref = request.query_params.get("tx_ref")
+    if not tx_ref:
+        return Response({"status": "not_found"}, status=400)
+    txn = PaymentTransaction.objects.filter(reference=tx_ref, status="success").first()
+    if txn and txn.order_id:
+        return Response({"status": "paid", "order_id": txn.order_id})
+    return Response({"status": "pending"})
 
 
 # ─────────────────────────────────────────
@@ -313,61 +373,18 @@ def seller_transactions(request):
     txns = PaymentTransaction.objects.filter(
         seller=request.user, status="success"
     ).order_by("-created_at")[:50]
-
-    data = []
-    for t in txns:
-        data.append({
-            "id": t.id, "reference": t.reference,
-            "amount": float(t.amount), "seller_amount": float(t.seller_amount),
-            "platform_amount": float(t.platform_amount), "order_type": t.order_type,
-            "buyer_name": t.buyer_name, "buyer_email": t.buyer_email,
-            "order_id": t.order_id, "created_at": t.created_at.isoformat(),
-        })
-    return Response(data)
-
-
-# ─────────────────────────────────────────
-# REFUND
-# ─────────────────────────────────────────
-
-@api_view(["POST"])
-@permission_classes([IsAuthenticated])
-def refund_payment(request):
-    reference = request.data.get("reference")
-    reason = request.data.get("reason", "Customer requested refund")
-
-    if not reference:
-        return Response({"error": "reference is required."}, status=400)
-
-    try:
-        txn = PaymentTransaction.objects.get(reference=reference)
-    except PaymentTransaction.DoesNotExist:
-        return Response({"error": "Transaction not found."}, status=404)
-
-    if txn.buyer != request.user and not request.user.is_staff:
-        return Response({"error": "Not authorized to refund this transaction."}, status=403)
-
-    if txn.status == "refunded":
-        return Response({"error": "This transaction has already been refunded."}, status=400)
-
-    # Flutterwave refund
-    refund_res = requests.post(
-        f"{FLW_BASE}/transactions/{reference}/refund",
-        headers=FLW_HEADERS,
-        json={"amount": float(txn.amount), "comments": reason},
-    )
-
-    if refund_res.status_code in [200, 201]:
-        txn.status = "refunded"
-        txn.save()
-        return Response({
-            "message": "Refund initiated. Amount returns to original payment method within 3-5 business days.",
-            "reference": reference, "amount": float(txn.amount),
-        })
-
-    error_data = refund_res.json()
-    logger.error(f"Flutterwave refund failed: {error_data}")
-    return Response({"error": error_data.get("message", "Refund failed. Please contact support.")}, status=400)
+    return Response([{
+        "id": t.id,
+        "reference": t.reference,
+        "amount": float(t.amount),
+        "seller_amount": float(t.seller_amount),
+        "platform_amount": float(t.platform_amount),
+        "order_type": t.order_type,
+        "buyer_name": t.buyer_name,
+        "buyer_email": t.buyer_email,
+        "order_id": t.order_id,
+        "created_at": t.created_at.isoformat(),
+    } for t in txns])
 
 
 # ─────────────────────────────────────────
@@ -377,28 +394,17 @@ def refund_payment(request):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def seller_earnings(request):
-    user = request.user
     from django.db.models import Sum
-
+    user = request.user
     total_orders = Order.objects.filter(listing__vendor=user).count()
-
-    try:
-        from wallet.models import EscrowTransaction
-        escrows = EscrowTransaction.objects.filter(seller=user)
-        total_earned = escrows.filter(status="released").aggregate(Sum("seller_amount"))["seller_amount__sum"] or 0
-        pending = escrows.filter(status="held").aggregate(Sum("seller_amount"))["seller_amount__sum"] or 0
-    except Exception:
-        txns = PaymentTransaction.objects.filter(seller=user, status="success")
-        total_earned = txns.aggregate(Sum("seller_amount"))["seller_amount__sum"] or 0
-        pending = 0
-
-    commission_rate = 30 if total_orders < 10 else (20 if total_orders < 50 else 15)
-
+    txns = PaymentTransaction.objects.filter(seller=user, status="success")
+    total_earned = txns.aggregate(Sum("seller_amount"))["seller_amount__sum"] or 0
     return Response({
-        "total_earned": float(total_earned), "pending": float(pending),
-        "available": float(total_earned), "total_orders": total_orders,
-        "commission_rate": commission_rate,
+        "total_earned": float(total_earned),
+        "total_orders": total_orders,
+        "service_fee": float(SERVICE_FEE),
     })
+
 
 # ─────────────────────────────────────────
 # PRICE PREVIEW
@@ -410,11 +416,9 @@ def preview_price(request):
     amount = request.data.get("amount")
     if not amount:
         return Response({"error": "amount is required."}, status=400)
-
     original = Decimal(str(amount))
     discount_amount = Decimal("0")
     has_discount = False
-
     try:
         profile = request.user.profile
         if profile.profile_bonus_eligible and not profile.profile_bonus_used:
@@ -422,9 +426,7 @@ def preview_price(request):
             discount_amount = (original * Decimal("0.05")).quantize(Decimal("0.01"))
     except Exception:
         pass
-
     final_amount = original - discount_amount
-
     return Response({
         "original_amount": str(original),
         "discount_eligible": has_discount,
@@ -432,49 +434,329 @@ def preview_price(request):
         "discount_amount": str(discount_amount),
         "final_amount": str(final_amount),
         "discount_message": (
-            f"🎉 5% profile completion discount applied — you save ₦{discount_amount:,.2f}!"
+            f"🎉 5% discount applied — you save ₦{discount_amount:,.2f}!"
             if has_discount else None
         ),
     })
+
+
+# ─────────────────────────────────────────
+# REFUND
+# ─────────────────────────────────────────
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def refund_payment(request):
+    reference = request.data.get("reference")
+    reason = request.data.get("reason", "Customer requested refund")
+    if not reference:
+        return Response({"error": "reference is required."}, status=400)
+    try:
+        txn = PaymentTransaction.objects.get(reference=reference)
+    except PaymentTransaction.DoesNotExist:
+        return Response({"error": "Transaction not found."}, status=404)
+    if txn.buyer != request.user and not request.user.is_staff:
+        return Response({"error": "Not authorized."}, status=403)
+    if txn.status == "refunded":
+        return Response({"error": "Already refunded."}, status=400)
+    try:
+        # Paystack refund: POST /refund with transaction reference
+        # Amount in kobo (naira × 100)
+        secret_key = (getattr(settings, "PAYSTACK_SECRET_KEY", "") or "").strip()
+        headers = {"Authorization": f"Bearer {secret_key}", "Content-Type": "application/json"}
+        refund_res = requests.post(
+            f"{PAYSTACK_BASE}/refund",
+            headers=headers,
+            json={
+                "transaction": reference,
+                "amount": int(txn.amount * 100),
+                "merchant_note": reason,
+            },
+            timeout=15,
+        )
+        if refund_res.status_code in [200, 201] and refund_res.json().get("status"):
+            txn.status = "refunded"
+            txn.save()
+            return Response({
+                "message": "Refund initiated. Returns within 3-5 business days.",
+                "amount": float(txn.amount),
+            })
+        return Response({"error": refund_res.json().get("message", "Refund failed.")}, status=400)
+    except Exception:
+        return Response({"error": "Refund request failed. Contact support."}, status=400)
+
+
+# ─────────────────────────────────────────
+# PAYSTACK WEBHOOK
+# ─────────────────────────────────────────
+
+@csrf_exempt
+def paystack_webhook(request):
+    if request.method != "POST":
+        return HttpResponse(status=405)
+
+    # Verify HMAC-SHA512 signature
+    webhook_secret = getattr(settings, "PAYSTACK_WEBHOOK_SECRET", "")
+    if webhook_secret:
+        signature = request.headers.get("x-paystack-signature", "")
+        computed = hmac.new(
+            webhook_secret.encode("utf-8"),
+            request.body,
+            hashlib.sha512,
+        ).hexdigest()
+        if signature != computed:
+            logger.warning("Paystack webhook: invalid signature")
+            return HttpResponse(status=400)
+
+    try:
+        payload = json.loads(request.body)
+    except Exception:
+        return HttpResponse(status=400)
+
+    event = payload.get("event")
+    data = payload.get("data", {})
+    logger.info(f"Paystack webhook: {event}")
+
+    if event == "charge.success" and data.get("status") == "success":
+        reference = data.get("reference", "")
+
+        if PaymentTransaction.objects.filter(reference=reference, status="success").exists():
+            existing = PaymentTransaction.objects.get(reference=reference, status="success")
+            if existing.order_id:
+                return HttpResponse(status=200)
+
+        customer_email = data.get("customer", {}).get("email", "")
+        meta = data.get("metadata", {}) or {}
+        listing_id = meta.get("listing_id")
+        raw_type = meta.get("type", "service")
+        order_type = _normalize_order_type(raw_type)
+
+        try:
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            buyer = User.objects.filter(email=customer_email).first()
+        except Exception:
+            buyer = None
+
+        if buyer and listing_id:
+            order_id, error = _create_order_from_paystack_data(
+                paystack_data=data,
+                buyer=buyer,
+                listing_id=listing_id,
+                order_type=order_type,
+            )
+            if error:
+                logger.error(f"Webhook order creation failed: {error}")
+            else:
+                logger.info(f"Webhook created order {order_id} for {reference}")
+        else:
+            # Paystack amount is in kobo — convert to naira
+            amount = Decimal(str(data.get("amount", 0))) / 100
+            vendor_amount, platform_amount = _split_amounts(amount)
+            seller = _get_seller_from_listing(listing_id)
+            PaymentTransaction.objects.get_or_create(
+                reference=reference,
+                defaults={
+                    "buyer": buyer,
+                    "seller": seller,
+                    "amount": amount,
+                    "seller_amount": vendor_amount,
+                    "platform_amount": platform_amount,
+                    "status": "success",
+                    "order_type": order_type,
+                    "buyer_email": customer_email,
+                    "paystack_response": data,
+                }
+            )
+
+    return HttpResponse(status=200)
+
+
+# ─────────────────────────────────────────
+# INTERNAL: create order from Paystack data
+# ─────────────────────────────────────────
+
+def _create_order_from_paystack_data(paystack_data, buyer, listing_id, order_type, use_credits=False):
+    from services.models import Listing
+
+    # Paystack amounts are in kobo — divide by 100 to get naira
+    amount_paid = Decimal(str(paystack_data["amount"])) / 100
+    ref_key = paystack_data.get("reference", "")
+    paystack_transaction_id = paystack_data.get("id")
+    buyer_email = paystack_data.get("customer", {}).get("email", buyer.email if buyer else "")
+
+    vendor_amount, platform_amount = _split_amounts(amount_paid)
+    seller = _get_seller_from_listing(listing_id)
+
+    txn, created = PaymentTransaction.objects.get_or_create(
+        reference=ref_key,
+        defaults={
+            "buyer": buyer,
+            "seller": seller,
+            "paystack_transaction_id": paystack_transaction_id,
+            "amount": amount_paid,
+            "seller_amount": vendor_amount,
+            "platform_amount": platform_amount,
+            "status": "success",
+            "order_type": order_type,
+            "buyer_email": buyer_email,
+            "buyer_name": buyer.get_full_name() or buyer.username if buyer else "",
+            "paystack_response": paystack_data,
+        }
+    )
+
+    if not created and txn.order_id:
+        return txn.order_id, None
+
+    order_id = None
+
+    try:
+        if listing_id:
+            listing = Listing.objects.get(id=listing_id)
+            order = Order.objects.create(
+                buyer=buyer,
+                listing=listing,
+                amount=amount_paid,
+                reference=ref_key,
+                status="paid",
+            )
+            order_id = order.id
+
+            try:
+                from orders.models import Booking
+                Booking.objects.filter(
+                    buyer=buyer, listing=listing, status="confirmed"
+                ).update(status="paid")
+            except Exception as e:
+                logger.warning(f"Booking status update failed: {e}")
+
+            try:
+                listing.reduce_stock(1)
+            except Exception as e:
+                logger.warning(f"reduce_stock failed: {e}")
+
+            try:
+                from accounts.utils import send_notification
+                send_notification(
+                    recipient=listing.vendor,
+                    notification_type='new_order',
+                    title=f'💰 Payment Received — {listing.title}',
+                    message=(
+                        f'{buyer.username} just paid ₦{amount_paid:,.0f} for "{listing.title}". '
+                        f'Your payout of ₦{vendor_amount:,.0f} will be transferred to your bank by Paystack.'
+                    ),
+                    action_url='/vendor/dashboard',
+                )
+            except Exception as ne:
+                logger.warning(f"Vendor notification failed: {ne}")
+
+    except Exception as e:
+        logger.error(f"Order creation failed: {e}", exc_info=True)
+        return None, str(e)
+
+    txn.order_id = order_id
+    txn.status = "success"
+    txn.save()
+
+    if use_credits and buyer:
+        try:
+            from loyalty.models import LoyaltyAccount, LoyaltyTransaction
+            loyalty_account = LoyaltyAccount.objects.filter(user=buyer).first()
+            if loyalty_account and loyalty_account.credit_balance > 0:
+                credits_used = min(loyalty_account.credit_balance, amount_paid)
+                loyalty_account.credit_balance -= credits_used
+                loyalty_account.save()
+                LoyaltyTransaction.objects.create(
+                    account=loyalty_account, transaction_type="redeemed",
+                    amount=credits_used,
+                    description=f"Credits used on order #{order_id}",
+                )
+        except Exception as e:
+            logger.warning(f"Loyalty deduction failed: {e}")
+
+    return order_id, None
+
 
 # ─────────────────────────────────────────
 # HELPERS
 # ─────────────────────────────────────────
 
-def _create_or_update_flw_subaccount(user, bank_code, account_number, account_name):
+def _create_or_update_paystack_subaccount(user, bank_code, account_number, account_name, force_update=False):
+    """
+    Creates or updates a Paystack subaccount for the vendor.
+
+    Paystack subaccount split config (set at payment time via PaystackPop.setup):
+      subaccount = ACCT_xxx  (the subaccount code returned here)
+      transaction_charge = 20000 kobo (₦200) → goes to StudEx
+      bearer = "account"    → StudEx bears Paystack's processing fee
+
+    Returns (subaccount_code, error_message).
+    """
     try:
+        secret_key = (getattr(settings, "PAYSTACK_SECRET_KEY", "") or "").strip()
+        if not secret_key:
+            msg = "PAYSTACK_SECRET_KEY is not configured."
+            logger.error(msg)
+            return None, msg
+
+        headers = {"Authorization": f"Bearer {secret_key}", "Content-Type": "application/json"}
+
         existing = SellerBankAccount.objects.filter(user=user).first()
 
         payload = {
-            "account_bank": bank_code,
-            "account_number": account_number,
             "business_name": getattr(user, "business_name", None) or user.username,
-            "business_email": user.email,
-            "country": "NG",
-            "split_type": "percentage",
-            "split_value": 0.7,  # vendor gets 70%
+            "settlement_bank": str(bank_code),
+            "account_number": str(account_number),
+            "percentage_charge": 0,  # Split is handled at transaction time, not subaccount level
         }
 
-        if existing and existing.paystack_subaccount_code:
+        logger.info(f"Paystack subaccount for {user.username}: bank={bank_code}, acct={account_number[-4:]}****")
+
+        if existing and existing.paystack_subaccount_code and not force_update:
+            # Update the existing subaccount
             res = requests.put(
-                f"{FLW_BASE}/subaccounts/{existing.paystack_subaccount_code}",
-                headers=FLW_HEADERS, json=payload,
+                f"{PAYSTACK_BASE}/subaccount/{existing.paystack_subaccount_code}",
+                headers=headers,
+                json=payload,
+                timeout=15,
             )
+            action = "update"
         else:
+            # Create new subaccount
             res = requests.post(
-                f"{FLW_BASE}/subaccounts",
-                headers=FLW_HEADERS, json=payload,
+                f"{PAYSTACK_BASE}/subaccount",
+                headers=headers,
+                json=payload,
+                timeout=15,
             )
+            action = "create"
+
+        logger.info(f"Paystack subaccount {action} → {res.status_code}: {res.text[:300]}")
 
         if res.status_code in [200, 201]:
-            return res.json()["data"]["id"]
+            data = res.json().get("data", {})
+            sub_code = data.get("subaccount_code") or data.get("id")
+            if sub_code:
+                logger.info(f"Paystack subaccount {action}d: {sub_code}")
+                return str(sub_code), None
+            else:
+                msg = f"Paystack returned success but no subaccount_code: {data}"
+                logger.error(msg)
+                return None, msg
+        else:
+            try:
+                error_body = res.json()
+            except Exception:
+                error_body = res.text
+            msg = f"Paystack {action} failed ({res.status_code}): {error_body}"
+            logger.error(msg)
+            return None, str(msg)[:300]
 
-        logger.error(f"Flutterwave subaccount error: {res.text}")
-        return None
-
+    except requests.exceptions.Timeout:
+        return None, "Paystack API timed out."
     except Exception as e:
-        logger.error(f"Subaccount creation failed: {e}", exc_info=True)
-        return None
+        logger.error(f"Subaccount exception: {e}", exc_info=True)
+        return None, str(e)
 
 
 def _get_seller_from_listing(listing_id):
@@ -489,87 +771,12 @@ def _get_seller_from_listing(listing_id):
 
 def _get_bank_name(bank_code):
     BANKS = {
-        "044": "Access Bank", "023": "Citibank", "050": "Ecobank Nigeria",
-        "070": "Fidelity Bank", "011": "First Bank of Nigeria", "214": "FCMB",
-        "058": "Guaranty Trust Bank", "030": "Heritage Bank", "082": "Keystone Bank",
-        "526": "OPay", "999991": "PalmPay", "076": "Polaris Bank",
-        "101": "Providus Bank", "221": "Stanbic IBTC", "068": "Standard Chartered",
-        "232": "Sterling Bank", "032": "Union Bank", "033": "UBA",
-        "215": "Unity Bank", "035": "Wema Bank", "057": "Zenith Bank",
+        "044": "Access Bank", "050": "Ecobank Nigeria", "070": "Fidelity Bank",
+        "011": "First Bank of Nigeria", "214": "FCMB", "058": "Guaranty Trust Bank",
+        "030": "Heritage Bank", "082": "Keystone Bank", "526": "OPay",
+        "999991": "PalmPay", "076": "Polaris Bank", "101": "Providus Bank",
+        "221": "Stanbic IBTC", "232": "Sterling Bank", "032": "Union Bank",
+        "033": "UBA", "215": "Unity Bank", "035": "Wema Bank", "057": "Zenith Bank",
         "090405": "Moniepoint MFB", "999992": "Kuda Bank",
     }
     return BANKS.get(str(bank_code), "Unknown Bank")
-
-
-# ─────────────────────────────────────────
-# FLUTTERWAVE WEBHOOK
-# ─────────────────────────────────────────
-
-import hashlib
-import hmac
-import json
-from django.views.decorators.csrf import csrf_exempt
-from django.http import HttpResponse
-
-@csrf_exempt
-def flutterwave_webhook(request):
-    if request.method != "POST":
-        return HttpResponse(status=405)
-
-    # Verify Flutterwave signature
-    flw_signature = request.headers.get("verif-hash", "")
-    secret_hash = settings.FLW_WEBHOOK_HASH
-
-    if flw_signature != secret_hash:
-        logger.warning("Flutterwave webhook: invalid signature")
-        return HttpResponse(status=401)
-
-    try:
-        payload = json.loads(request.body)
-    except Exception:
-        return HttpResponse(status=400)
-
-    event = payload.get("event")
-    data = payload.get("data", {})
-
-    logger.info(f"Flutterwave webhook received: {event}")
-
-    if event == "charge.completed":
-        if data.get("status") == "successful":
-            tx_ref = data.get("tx_ref")
-            transaction_id = data.get("id")
-            amount = Decimal(str(data.get("amount", 0)))
-
-            if PaymentTransaction.objects.filter(reference=tx_ref, status="success").exists():
-                logger.info(f"Webhook: {tx_ref} already processed")
-                return HttpResponse(status=200)
-
-            customer_email = data.get("customer", {}).get("email")
-            try:
-                from django.contrib.auth import get_user_model
-                User = get_user_model()
-                buyer = User.objects.filter(email=customer_email).first()
-            except Exception:
-                buyer = None
-
-            if buyer:
-                meta = data.get("meta", {})
-                listing_id = meta.get("listing_id")
-                seller = _get_seller_from_listing(listing_id)
-                seller_rate, platform_rate = get_commission_split(amount)
-                seller_amount = (amount * seller_rate).quantize(Decimal("0.01"))
-                platform_amount = (amount * platform_rate).quantize(Decimal("0.01"))
-
-                PaymentTransaction.objects.get_or_create(
-                    reference=tx_ref,
-                    defaults={
-                        "buyer": buyer, "seller": seller, "amount": amount,
-                        "seller_amount": seller_amount, "platform_amount": platform_amount,
-                        "status": "success", "order_type": meta.get("type", "product"),
-                        "buyer_email": customer_email,
-                        "buyer_name": buyer.get_full_name() or buyer.username,
-                        "paystack_response": data,
-                    }
-                )
-
-    return HttpResponse(status=200)

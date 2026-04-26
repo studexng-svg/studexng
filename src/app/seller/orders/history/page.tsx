@@ -1,11 +1,13 @@
 // src/app/seller/orders/history/page.tsx
 "use client";
 
-import { ChevronLeft, TrendingUp, DollarSign, Calendar, User, Package, Download, Filter } from "lucide-react";
+import { ChevronLeft, TrendingUp, DollarSign, Calendar, User, Package, Download } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 interface Order {
   id: number;
@@ -44,7 +46,6 @@ export default function SellerOrderHistoryPage() {
     }
 
     const fetchOrders = async () => {
-
       if (!accessToken) {
         setError("Please log in to view order history");
         setLoading(false);
@@ -52,10 +53,8 @@ export default function SellerOrderHistoryPage() {
       }
 
       try {
-        const res = await fetch("http://127.0.0.1:8000/api/orders/", {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
+        const res = await fetch(`${API_URL}/api/orders/`, {
+          headers: { Authorization: `Bearer ${accessToken}` },
         });
 
         if (!res.ok) {
@@ -68,22 +67,15 @@ export default function SellerOrderHistoryPage() {
         }
 
         const data = await res.json();
-        
-        // Handle both array and paginated responses
         const allOrders = Array.isArray(data) ? data : data.results || [];
-        
-        // Filter only completed orders
         const completedOrders = allOrders.filter((o: Order) => o.status === "completed");
         setOrders(completedOrders);
 
-        // Calculate total revenue
         const revenue = completedOrders.reduce((sum: number, o: Order) => sum + parseFloat(String(o.amount)), 0);
         setTotalRevenue(revenue);
 
-        // Apply initial filters
         applyFilters(completedOrders, dateFilter, searchQuery);
       } catch (err) {
-        console.error("Orders fetch error:", err);
         setError("Failed to load order history. Try again.");
       } finally {
         setLoading(false);
@@ -95,14 +87,9 @@ export default function SellerOrderHistoryPage() {
 
   const applyFilters = (orderList: Order[], date: string, search: string) => {
     let filtered = [...orderList];
-
-    // Date filter
     const now = new Date();
     if (date === "today") {
-      filtered = filtered.filter((o) => {
-        const orderDate = new Date(o.created_at);
-        return orderDate.toDateString() === now.toDateString();
-      });
+      filtered = filtered.filter((o) => new Date(o.created_at).toDateString() === now.toDateString());
     } else if (date === "week") {
       const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
       filtered = filtered.filter((o) => new Date(o.created_at) >= weekAgo);
@@ -110,8 +97,6 @@ export default function SellerOrderHistoryPage() {
       const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
       filtered = filtered.filter((o) => new Date(o.created_at) >= monthAgo);
     }
-
-    // Search filter
     if (search) {
       filtered = filtered.filter((o) =>
         o.buyer.username.toLowerCase().includes(search.toLowerCase()) ||
@@ -119,7 +104,6 @@ export default function SellerOrderHistoryPage() {
         o.listing.title.toLowerCase().includes(search.toLowerCase())
       );
     }
-
     setFilteredOrders(filtered);
   };
 
@@ -157,178 +141,135 @@ export default function SellerOrderHistoryPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-teal-50">
+      <div className="min-h-screen flex items-center justify-center bg-[#FAFAF9]">
         <motion.div animate={{ rotate: 360 }} transition={{ duration: 2, repeat: Infinity, ease: "linear" }}>
-          <Package className="w-16 h-16 text-purple-600" />
+          <Package className="w-10 h-10 text-teal-600" />
         </motion.div>
       </div>
     );
   }
 
-  const fadeInUp = {
-    initial: { opacity: 0, y: 20 },
-    animate: { opacity: 1, y: 0 },
-    transition: { duration: 0.5 },
-  };
-
   return (
-    <>
-      {/* TOP BAR */}
-      <motion.div
-        initial={{ y: -20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        className="sticky top-0 bg-white/90 backdrop-blur-xl z-40 border-b border-purple-100 shadow-sm"
-      >
-        <div className="flex items-center justify-between p-4 max-w-5xl mx-auto">
-          <Link href="/seller/orders">
-            <motion.button
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
-              className="p-2 hover:bg-purple-100 rounded-full transition"
-            >
-              <ChevronLeft className="w-6 h-6 text-purple-600" />
-            </motion.button>
-          </Link>
-          <h1 className="text-xl font-black bg-gradient-to-r from-purple-600 to-teal-500 bg-clip-text text-transparent">
+    <div className="min-h-screen bg-[#FAFAF9]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+      {/* HEADER */}
+      <div className="sticky top-0 bg-white/80 backdrop-blur-md z-40 border-b border-stone-100 shadow-sm">
+        <div className="flex items-center justify-between px-4 py-3">
+          <button onClick={() => router.back()} className="p-2.5 bg-white border border-stone-200 rounded-full shadow-sm active:scale-95 transition-all">
+            <ChevronLeft className="w-5 h-5 text-stone-600" />
+          </button>
+          <h1 className="text-base font-bold text-stone-900" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
             Order History
           </h1>
           <div className="w-10" />
         </div>
-      </motion.div>
+      </div>
 
-      <div className="p-4 pb-32 space-y-6 max-w-4xl mx-auto">
+      <div className="px-4 pt-6 pb-32 space-y-5 max-w-2xl mx-auto">
         {/* REVENUE SUMMARY */}
-        <motion.div
-          {...fadeInUp}
-          className="bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-500 rounded-2xl p-6 text-white shadow-2xl"
+        <div
+          className="rounded-2xl p-5 text-white shadow-md"
+          style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}
         >
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <TrendingUp className="w-6 h-6" />
-              <span className="font-bold text-sm opacity-90">Total Revenue (All Time)</span>
+              <TrendingUp className="w-5 h-5" />
+              <span className="font-semibold text-sm opacity-90">Total Revenue (All Time)</span>
             </div>
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
+            <button
               onClick={handleDownloadCSV}
               className="bg-white/20 hover:bg-white/30 p-2 rounded-full transition"
               title="Download as CSV"
             >
-              <Download className="w-5 h-5" />
-            </motion.button>
+              <Download className="w-4 h-4" />
+            </button>
           </div>
-
-          <div>
-            <p className="text-4xl font-black">₦{totalRevenue.toLocaleString()}</p>
-            <p className="text-sm opacity-80 mt-2">From {orders.length} completed order{orders.length !== 1 ? "s" : ""}</p>
-          </div>
-        </motion.div>
+          <p className="text-3xl font-bold">₦{totalRevenue.toLocaleString()}</p>
+          <p className="text-sm opacity-75 mt-1">
+            From {orders.length} completed order{orders.length !== 1 ? "s" : ""}
+          </p>
+        </div>
 
         {/* FILTERS */}
-        <motion.div {...fadeInUp} className="space-y-4">
-          {/* Search */}
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="Search by buyer name, order ID, or service..."
-              value={searchQuery}
-              onChange={(e) => handleSearchChange(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:border-purple-600 focus:ring-1 focus:ring-purple-600"
-            />
-          </div>
-
-          {/* Date Filter Buttons */}
-          <div className="flex gap-2 overflow-x-auto pb-2">
+        <div className="space-y-3">
+          <input
+            type="text"
+            placeholder="Search by buyer name, order ID, or service..."
+            value={searchQuery}
+            onChange={(e) => handleSearchChange(e.target.value)}
+            className="w-full px-4 py-3 bg-white border border-stone-200 rounded-xl text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 transition placeholder:text-stone-400"
+          />
+          <div className="flex gap-2 overflow-x-auto pb-1">
             {(["all", "today", "week", "month"] as const).map((period) => (
-              <motion.button
+              <button
                 key={period}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
                 onClick={() => handleDateFilterChange(period)}
-                className={`px-4 py-2 rounded-full font-bold text-sm whitespace-nowrap transition-all ${
+                className={`px-4 py-2 rounded-full font-medium text-sm whitespace-nowrap transition-all ${
                   dateFilter === period
-                    ? "bg-gradient-to-r from-purple-600 to-teal-500 text-white shadow-lg"
-                    : "bg-gray-100 text-gray-800 hover:bg-gray-200"
+                    ? "text-white shadow-md"
+                    : "bg-white border border-stone-200 text-stone-600 hover:border-stone-300"
                 }`}
+                style={dateFilter === period ? { background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" } : {}}
               >
                 {period === "all" && "All Time"}
                 {period === "today" && "Today"}
                 {period === "week" && "This Week"}
                 {period === "month" && "This Month"}
-              </motion.button>
+              </button>
             ))}
           </div>
-        </motion.div>
+        </div>
 
         {error && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="text-center text-red-600 font-medium bg-red-50 p-4 rounded-lg"
-          >
+          <div className="text-center text-red-600 text-sm font-medium bg-red-50 border border-red-100 p-4 rounded-2xl">
             {error}
-          </motion.div>
+          </div>
         )}
 
         {/* ORDERS LIST */}
         {filteredOrders.length === 0 ? (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="text-center py-20"
-          >
-            <Package className="w-20 h-20 text-gray-300 mx-auto mb-4" />
-            <p className="text-gray-600 font-semibold text-lg">No completed orders yet</p>
-            <p className="text-gray-500 text-sm mt-2">Your completed orders will appear here</p>
+          <div className="text-center py-16 space-y-3">
+            <Package className="w-16 h-16 text-stone-200 mx-auto" />
+            <p className="text-stone-600 font-semibold">No completed orders yet</p>
+            <p className="text-stone-400 text-sm">Your completed orders will appear here</p>
             <Link href="/seller/orders">
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="mt-6 px-8 py-3 bg-gradient-to-r from-purple-600 to-teal-500 text-white font-bold rounded-xl"
+              <button
+                className="mt-3 px-8 py-3 text-white font-semibold rounded-full shadow-md text-sm"
+                style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}
               >
                 View Pending Orders
-              </motion.button>
+              </button>
             </Link>
-          </motion.div>
+          </div>
         ) : (
           <div className="space-y-3">
             {filteredOrders.map((order, index) => (
               <motion.div
                 key={order.id}
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.05 }}
-                className="bg-white rounded-xl border border-gray-200 p-4 hover:shadow-lg transition-all"
+                transition={{ delay: index * 0.04 }}
+                className="bg-white border border-stone-200 rounded-2xl p-4 shadow-sm hover:border-teal-300 hover:shadow-md transition-all"
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
-                    {/* Order ID & Date */}
-                    <div className="mb-3">
-                      <p className="font-black text-gray-900">#{order.reference}</p>
-                      <p className="text-xs text-gray-600 flex items-center gap-1 mt-1">
-                        <Calendar className="w-3 h-3" />
-                        {new Date(order.created_at).toLocaleDateString("en-GB")}
-                      </p>
-                    </div>
-
-                    {/* Service & Buyer */}
-                    <div className="space-y-2">
-                      <p className="text-sm font-bold text-gray-900">{order.listing.title}</p>
-                      <p className="text-xs text-gray-600 flex items-center gap-1">
-                        <User className="w-3 h-3" />
-                        {order.buyer.username}
-                      </p>
-                    </div>
+                    <p className="font-semibold text-stone-900 text-sm">#{order.reference}</p>
+                    <p className="text-xs text-stone-400 flex items-center gap-1 mt-0.5">
+                      <Calendar className="w-3 h-3" />
+                      {new Date(order.created_at).toLocaleDateString("en-GB")}
+                    </p>
+                    <p className="text-sm font-medium text-stone-800 mt-2">{order.listing.title}</p>
+                    <p className="text-xs text-stone-500 flex items-center gap-1 mt-0.5">
+                      <User className="w-3 h-3" />
+                      {order.buyer.username}
+                    </p>
                   </div>
-
-                  {/* Amount & Status */}
-                  <div className="text-right">
-                    <p className="text-2xl font-black text-emerald-600">
+                  <div className="text-right flex-shrink-0 ml-4">
+                    <p className="text-xl font-bold text-emerald-600">
                       ₦{parseFloat(String(order.amount)).toLocaleString()}
                     </p>
-                    <div className="mt-2 px-3 py-1 bg-emerald-100 rounded-full text-xs font-bold text-emerald-800 inline-block">
+                    <span className="mt-1.5 px-2.5 py-0.5 bg-emerald-50 rounded-full text-xs font-medium text-emerald-700 inline-block">
                       ✓ Completed
-                    </div>
+                    </span>
                   </div>
                 </div>
               </motion.div>
@@ -336,45 +277,18 @@ export default function SellerOrderHistoryPage() {
           </div>
         )}
 
-        {/* SUMMARY STATS */}
         {filteredOrders.length > 0 && (
-          <motion.div
-            {...fadeInUp}
-            className="bg-gradient-to-r from-purple-50 to-teal-50 rounded-xl p-4 border border-purple-200"
-          >
-            <p className="text-sm text-gray-700">
-              <span className="font-bold">Total for this period:</span> ₦
-              {filteredOrders
-                .reduce((sum, o) => sum + parseFloat(String(o.amount)), 0)
-                .toLocaleString()}
-              {" "}({filteredOrders.length} order{filteredOrders.length !== 1 ? "s" : ""})
+          <div className="bg-white border border-stone-200 rounded-2xl p-4 shadow-sm">
+            <p className="text-sm text-stone-700">
+              <span className="font-semibold">Total for this period:</span>{" "}
+              <span className="text-teal-600 font-bold">
+                ₦{filteredOrders.reduce((sum, o) => sum + parseFloat(String(o.amount)), 0).toLocaleString()}
+              </span>{" "}
+              ({filteredOrders.length} order{filteredOrders.length !== 1 ? "s" : ""})
             </p>
-          </motion.div>
+          </div>
         )}
       </div>
-
-      {/* BOTTOM NAV */}
-      <motion.div
-        initial={{ y: 100 }}
-        animate={{ y: 0 }}
-        transition={{ type: "spring", stiffness: 300, damping: 30 }}
-        className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-xl border-t border-gray-200 z-50 shadow-2xl"
-      >
-        <div className="flex justify-around py-3 max-w-5xl mx-auto w-full">
-          <Link href="/" className="text-gray-500 hover:text-purple-600 transition">
-            <span className="text-xs font-semibold">Home</span>
-          </Link>
-          <Link href="/categories" className="text-gray-500 hover:text-purple-600 transition">
-            <span className="text-xs font-semibold">Services</span>
-          </Link>
-          <Link href="/cart" className="text-gray-500 hover:text-purple-600 transition">
-            <span className="text-xs font-semibold">Cart</span>
-          </Link>
-          <Link href="/seller" className="text-purple-600 font-bold transition">
-            <span className="text-xs">Seller</span>
-          </Link>
-        </div>
-      </motion.div>
-    </>
+    </div>
   );
 }

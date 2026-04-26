@@ -10,8 +10,12 @@ from django.contrib.auth.tokens import default_token_generator
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.encoding import force_bytes
 from django.core.mail import send_mail
+from django.core.cache import cache
 from django.conf import settings
 from django.utils import timezone
+import resend
+import random
+import string
 from .serializers import (
     UserRegistrationSerializer,
     UserLoginSerializer,
@@ -20,6 +24,68 @@ from .serializers import (
 )
 from .models import User, SellerApplication, Profile
 from .utils import send_notification
+import re
+
+
+# ─── OTP helpers ─────────────────────────────────────────────────────────────
+
+def generate_otp():
+    return ''.join(random.choices(string.digits, k=6))
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def send_otp(request):
+    email = request.data.get('email', '').strip().lower()
+    if not email:
+        return Response({'error': 'Email is required'}, status=400)
+
+    otp = generate_otp()
+    cache.set(f'otp_{email}', otp, timeout=600)
+
+    try:
+        resend.api_key = settings.RESEND_API_KEY
+        resend.Emails.send({
+            'from': 'StudEx <noreply@studex.com.ng>',
+            'to': [email],
+            'subject': 'Your StudEx Verification Code',
+            'html': f'''
+                <div style="font-family: DM Sans, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
+                    <h1 style="font-size: 24px; color: #1C1917;">Welcome to StudEx 🎓</h1>
+                    <p style="color: #78716C;">Your verification code is:</p>
+                    <div style="background: linear-gradient(135deg, #0D9488, #7C3AED); border-radius: 12px; padding: 24px; text-align: center; margin: 24px 0;">
+                        <span style="font-size: 48px; font-weight: bold; color: white; letter-spacing: 12px;">{otp}</span>
+                    </div>
+                    <p style="color: #78716C;">This code expires in <strong>10 minutes</strong>.</p>
+                    <p style="color: #A8A29E; font-size: 12px;">If you didn&apos;t request this, ignore this email.</p>
+                </div>
+            ''',
+        })
+        return Response({'message': 'OTP sent successfully'})
+    except Exception as e:
+        print(f"Resend error: {e}")
+        return Response({'error': 'Failed to send OTP. Please try again.'}, status=500)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def verify_otp(request):
+    email = request.data.get('email', '').strip().lower()
+    otp = request.data.get('otp', '').strip()
+
+    if not email or not otp:
+        return Response({'error': 'Email and OTP are required'}, status=400)
+
+    stored_otp = cache.get(f'otp_{email}')
+
+    if not stored_otp:
+        return Response({'error': 'OTP expired. Please request a new one.'}, status=400)
+
+    if otp != stored_otp:
+        return Response({'error': 'Incorrect code. Please try again.'}, status=400)
+
+    cache.delete(f'otp_{email}')
+    return Response({'message': 'OTP verified successfully'})
 
 
 # ─── Username availability check ─────────────────────────────────────────────
@@ -27,11 +93,6 @@ from .utils import send_notification
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def check_username(request):
-    """
-    GET /api/auth/check-username/?username=chinedu_tech
-    Returns {"available": true/false}
-    Used by signup form for real-time username availability check.
-    """
     username = request.query_params.get('username', '').strip()
     if not username:
         return Response({'available': False, 'error': 'No username provided'}, status=400)
@@ -48,19 +109,21 @@ def register_user(request):
     if serializer.is_valid():
         user = serializer.save()
 
-        # ✅ Send welcome notification immediately on signup
+        campus = getattr(user, 'school', 'pau') or 'pau'
+        campus_name = 'FUTO' if campus.lower() == 'futo' else 'PAU'
+
         send_notification(
             recipient=user,
             notification_type='welcome',
             title='🎉 Welcome to StudEx!',
-            message='Your account has been created successfully. Browse services, book vendors, and enjoy the PAU marketplace!',
+            message=f'Your account has been created successfully. Browse services, book vendors, and enjoy the {campus_name} marketplace!',
             action_url='/home',
         )
 
         refresh = RefreshToken.for_user(user)
         return Response({
             'message': 'User registered successfully',
-            'user': UserProfileSerializer(user).data,
+            'user': UserProfileSerializer(user, context={'request': request}).data,
             'tokens': {
                 'refresh': str(refresh),
                 'access': str(refresh.access_token),
@@ -79,7 +142,7 @@ def login_user(request):
     refresh = RefreshToken.for_user(user)
     return Response({
         'message': 'Login successful',
-        'user': UserProfileSerializer(user).data,
+        'user': UserProfileSerializer(user, context={'request': request}).data,
         'tokens': {
             'refresh': str(refresh),
             'access': str(refresh.access_token),
@@ -90,19 +153,62 @@ def login_user(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_user_profile(request):
-    return Response(UserProfileSerializer(request.user).data)
+    return Response(UserProfileSerializer(request.user, context={'request': request}).data)
 
 
 @api_view(['PUT', 'PATCH'])
 @permission_classes([IsAuthenticated])
 def update_user_profile(request):
-    serializer = UserProfileSerializer(request.user, data=request.data, partial=True)
+    """
+    Updates user profile fields.
+    Now supports username changes with uniqueness validation.
+    """
+    user = request.user
+    data = request.data
+
+    # ── Username update ────────────────────────────────────────────────────
+    new_username = data.get('username', '').strip()
+    if new_username and new_username != user.username:
+        # Validate format: letters, numbers, underscores only
+        if not re.match(r'^[a-zA-Z0-9_]+$', new_username):
+            return Response(
+                {'username': ['Username can only contain letters, numbers, and underscores. No spaces.']},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        # Validate length
+        if len(new_username) < 3:
+            return Response(
+                {'username': ['Username must be at least 3 characters.']},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        if len(new_username) > 30:
+            return Response(
+                {'username': ['Username cannot exceed 30 characters.']},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        # Check uniqueness (case-insensitive)
+        if User.objects.filter(username__iexact=new_username).exclude(pk=user.pk).exists():
+            return Response(
+                {'username': ['A user with that username already exists.']},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        user.username = new_username
+
+    # ── Other fields handled by serializer ────────────────────────────────
+    # Pass remaining data to the serializer but exclude username
+    # (we've already handled it above)
+    serializer_data = {k: v for k, v in data.items() if k != 'username'}
+    serializer = UserProfileSerializer(user, data=serializer_data, partial=True)
+
     if serializer.is_valid():
         serializer.save()
+        # Re-fetch fresh data after save
+        user.refresh_from_db()
         return Response({
             'message': 'Profile updated successfully',
-            'user': UserProfileSerializer(request.user).data,
+            'user': UserProfileSerializer(user, context={'request': request}).data,
         }, status=status.HTTP_200_OK)
+
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -153,7 +259,6 @@ def logout_user(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def me(request):
-    """Returns fresh user data — called on account page load."""
     user = request.user
     unread_notifications = 0
     try:
@@ -188,6 +293,7 @@ def me(request):
         'business_name': user.business_name or '',
         'hostel': user.hostel or '',
         'matric_number': user.matric_number or '',
+        'school': user.school or '',
         'unread_notifications': unread_notifications,
         **profile_data,
     })
@@ -217,7 +323,6 @@ class SellerApplicationViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         application = serializer.save(user=self.request.user)
 
-        # ✅ Notify the applicant that their application was received
         send_notification(
             recipient=self.request.user,
             notification_type='vendor_application',
@@ -381,3 +486,50 @@ class ResetPasswordView(APIView):
         user.set_password(password)
         user.save()
         return Response({'detail': 'Password reset successful'})
+
+
+# ─── Public Vendor List ───────────────────────────────────────────────────────
+
+from rest_framework.generics import ListAPIView
+from rest_framework.pagination import PageNumberPagination
+from django.db.models import Case, When, Value, IntegerField
+from .serializers import VendorListSerializer
+
+
+class VendorPagination(PageNumberPagination):
+    page_size = 20
+
+
+class VendorListView(ListAPIView):
+    permission_classes = [AllowAny]
+    serializer_class = VendorListSerializer
+    pagination_class = VendorPagination
+
+    def get_queryset(self):
+        from django.db.models import Q
+        badge_order = Case(
+            When(profile__vendor_badge='top', then=Value(0)),
+            When(profile__vendor_badge='trusted', then=Value(1)),
+            When(profile__vendor_badge='rising', then=Value(2)),
+            default=Value(3),
+            output_field=IntegerField(),
+        )
+        user = self.request.user
+        if user.is_authenticated:
+            campus = (getattr(user, 'school', '') or 'pau').lower()
+        else:
+            campus = 'pau'
+
+        qs = User.objects.filter(is_verified_vendor=True, seller_application__status='approved')
+        # Treat null/blank school as PAU (existing vendors pre-dating the school field)
+        if campus == 'pau':
+            qs = qs.filter(Q(school__iexact='pau') | Q(school='') | Q(school__isnull=True))
+        else:
+            qs = qs.filter(school__iexact=campus)
+
+        return (
+            qs
+            .select_related('profile')
+            .annotate(badge_order=badge_order)
+            .order_by('badge_order', '-profile__rating')
+        )

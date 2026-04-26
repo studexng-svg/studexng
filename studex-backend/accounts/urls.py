@@ -3,7 +3,7 @@ from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenRefreshView
 from . import views
 from .views import SellerApplicationViewSet, ForgotPasswordView, ResetPasswordView
-from .views import check_profile_completion, check_username
+from .views import check_profile_completion, check_username, send_otp, verify_otp
 
 # Router for Seller Application endpoints
 router = DefaultRouter()
@@ -18,6 +18,10 @@ urlpatterns = [
 
     # ✅ Username availability check — used by signup form
     path('check-username/', check_username, name='check-username'),
+
+    # OTP email verification — used by signup flow
+    path('send-otp/', send_otp, name='send-otp'),
+    path('verify-otp/', verify_otp, name='verify-otp'),
 
     # Profile endpoints
     path('profile/', views.get_user_profile, name='profile'),
@@ -35,4 +39,7 @@ urlpatterns = [
     #   POST       /api/auth/seller/applications/{id}/reject/
     #   POST       /api/auth/seller/applications/revoke/{user_id}/
     path('', include(router.urls)),
+
+    # Public vendor list
+    path('vendors/', views.VendorListView.as_view(), name='vendor-list'),
 ]

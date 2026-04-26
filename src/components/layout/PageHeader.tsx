@@ -46,10 +46,10 @@ export default function PageHeader({
       initial={{ opacity: 0, y: -20 }}
       animate={{ opacity: 1, y: 0 }}
       className={`
-        sticky top-0 z-30
-        bg-white/95 dark:bg-gray-900/95
-        backdrop-blur-lg
-        border-b border-gray-200 dark:border-gray-800
+        sticky top-0 z-40
+        bg-white/80
+        backdrop-blur-md
+        border-b border-stone-100
         shadow-sm
         ${className}
       `}
@@ -77,11 +77,11 @@ export default function PageHeader({
 
         {/* Title Row */}
         <div>
-          <h1 className="text-2xl md:text-3xl font-black text-gray-900 dark:text-white">
+          <h1 className="text-base font-bold text-stone-900" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
             {title}
           </h1>
           {subtitle && (
-            <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+            <p className="mt-1 text-sm text-stone-400">
               {subtitle}
             </p>
           )}

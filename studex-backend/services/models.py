@@ -9,6 +9,11 @@ class Category(models.Model):
     title = models.CharField(max_length=100, unique=True)
     slug = models.SlugField(max_length=100, unique=True)
     image = models.URLField(max_length=500, blank=True, null=True)
+    campus = models.CharField(
+        max_length=20,
+        default='pau',
+        choices=[('pau', 'PAU'), ('futo', 'FUTO'), ('all', 'All Campuses')],
+    )
 
     def __str__(self):
         return self.title
@@ -39,6 +44,12 @@ class Listing(models.Model):
         help_text="Type of listing — affects inventory tracking"
     )
     image = models.URLField(max_length=500, blank=True, null=True)
+    campus = models.CharField(
+        max_length=20,
+        default='pau',
+        choices=[('pau', 'PAU'), ('futo', 'FUTO')],
+        help_text="Set automatically from vendor's school on creation",
+    )
     is_available = models.BooleanField(
         default=False,
         help_text="Admin must tick this to make listing visible in shop"
@@ -106,6 +117,8 @@ class Listing(models.Model):
             models.Index(fields=['is_available']),
             models.Index(fields=['vendor']),
             models.Index(fields=['listing_type']),
+            models.Index(fields=['campus']),
+            models.Index(fields=['campus', 'is_available']),
         ]
 
 

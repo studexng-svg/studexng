@@ -9,10 +9,11 @@ urlpatterns = [
     path("verify/", views.verify_payment, name="verify-payment"),
     path("refund/", views.refund_payment, name="refund-payment"),
     path("seller/earnings/", views.seller_earnings, name="seller-earnings"),
-    path("preview/", views.preview_price, name="preview-price"),   # ← NEW
-
 
     # Paystack webhook — register this URL in Paystack Dashboard → Settings → Webhooks
-    # Full URL to enter: https://yourdomain.com/api/payments/webhook/
-    path("webhook/", views.flutterwave_webhook, name="flutterwave-webhook"),
+    # Full URL to enter: https://studex-backend-v2.onrender.com/api/payments/webhook/
+    path("webhook/", views.paystack_webhook, name="paystack-webhook"),
+    path("check-status/", views.check_payment_status, name="check-payment-status"),
+    path("banks/", views.get_banks, name="get-banks"),
+    path("preview-price/", views.preview_price, name="preview-price"),
 ]

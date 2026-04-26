@@ -1,12 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import {
-  Package, CreditCard, ArrowLeft, Shield, Lock, Sparkles, Check,
-  Calendar, MapPin, Clock, Building2, Loader
+  Package, CreditCard, ChevronLeft, Shield, Lock, Check,
+  Calendar, MapPin, Clock, Loader, Sparkles, ArrowRight
 } from "lucide-react";
 import { useCartStore } from "@/lib/cartStore";
 import { useBookingStore } from "@/lib/bookingStore";
@@ -14,11 +13,10 @@ import { useRouter } from "next/navigation";
 import { useAuth, fetchWithAuth } from "@/lib/authStore";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
-const FLW_PUBLIC_KEY = process.env.NEXT_PUBLIC_FLW_PUBLIC_KEY!;
 
 declare global {
   interface Window {
-    FlutterwaveCheckout: (config: any) => void;
+    PaystackPop: { setup: (config: any) => { openIframe: () => void } };
   }
 }
 
@@ -31,23 +29,45 @@ export default function CheckoutPage() {
   const isServiceBooking = !!booking && cart.length === 0;
   const isFoodOrder = cart.length > 0;
 
+  const SERVICE_FEE = 200;
   const foodTotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const serviceTotal = booking?.total || 0;
-  const finalTotal = isServiceBooking ? serviceTotal : foodTotal;
+  const finalTotal = (isServiceBooking ? serviceTotal : foodTotal) + SERVICE_FEE;
 
   const [isProcessing, setIsProcessing] = useState(false);
-  const [flwLoaded, setFlwLoaded] = useState(false);
+  const [paystackLoaded, setPaystackLoaded] = useState(false);
+  const [subaccountCode, setSubaccountCode] = useState<string | null>(null);
 
-  const txRef = useRef(`STUDEX-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`);
-
-  // Load Flutterwave script
+  // Prefetch subaccount on page load so handlePayment stays synchronous
   useEffect(() => {
-    if (document.getElementById("flw-script")) { setFlwLoaded(true); return; }
-    const script = document.createElement("script");
-    script.id = "flw-script";
-    script.src = "https://checkout.flutterwave.com/v3.js";
-    script.onload = () => setFlwLoaded(true);
-    document.head.appendChild(script);
+    if (!isServiceBooking || !booking?.providerId) return;
+    fetchWithAuth(`${API_URL}/api/payments/seller-bank-account/`)
+      .then(r => r.json())
+      .then(data => setSubaccountCode(data.paystack_subaccount_code || null))
+      .catch(() => setSubaccountCode(null));
+  }, [isServiceBooking, booking?.providerId]);
+
+  // Poll for Paystack script loaded by layout.tsx; inject fallback if needed
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if ((window as any).PaystackPop) { setPaystackLoaded(true); return; }
+
+    const interval = setInterval(() => {
+      if ((window as any).PaystackPop) { setPaystackLoaded(true); clearInterval(interval); }
+    }, 100);
+
+    const fallbackTimeout = setTimeout(() => {
+      if ((window as any).PaystackPop) return;
+      const script = document.createElement("script");
+      script.src = "https://js.paystack.co/v1/inline.js";
+      script.onload = () => setPaystackLoaded(true);
+      document.head.appendChild(script);
+    }, 2000);
+
+    return () => {
+      clearInterval(interval);
+      clearTimeout(fallbackTimeout);
+    };
   }, []);
 
   const createOrder = async (txRef: string, transactionId: string) => {
@@ -65,7 +85,6 @@ export default function CheckoutPage() {
       if (!res.ok) throw new Error(data.error || "Order creation failed");
       return data.order_id;
     }
-
     const res = await fetchWithAuth(`${API_URL}/api/payments/verify/`, {
       method: "POST",
       body: JSON.stringify({
@@ -81,83 +100,88 @@ export default function CheckoutPage() {
   };
 
   const handlePayment = useCallback(() => {
-    if (!FLW_PUBLIC_KEY) { alert("Flutterwave key missing. Check your .env file."); return; }
-    if (finalTotal <= 0) { alert("Cannot process zero payment."); return; }
-    if (!flwLoaded || !window.FlutterwaveCheckout) { alert("Payment system loading. Please try again."); return; }
+    const paystackKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || "";
+
+    if (!paystackKey || paystackKey.includes("your_key")) {
+      alert("Payment key not configured.");
+      return;
+    }
+    if (finalTotal <= 0) { alert("Invalid amount."); return; }
+    if (!window.PaystackPop) { alert("Payment system not ready. Please refresh."); return; }
 
     setIsProcessing(true);
+    const ref = `STUDEX-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
 
-    // Get vendor subaccount if available
-    const getSubaccount = async () => {
-      if (isServiceBooking && booking?.providerId) {
-        try {
-          const res = await fetchWithAuth(`${API_URL}/api/payments/seller-bank-account/`);
-          const data = await res.json();
-          return data.flw_subaccount_id || null;
-        } catch { return null; }
-      }
-      return null;
-    };
-
-    getSubaccount().then(subaccountId => {
-      window.FlutterwaveCheckout({
-        public_key: FLW_PUBLIC_KEY,
-        tx_ref: txRef.current,
-        amount: finalTotal,
-        currency: "NGN",
-        payment_options: "card,banktransfer,ussd,opay",
-        customer: {
-          email: user?.email || "user@studex.com",
-          name: user?.username || "StudEx User",
-        },
-        ...(subaccountId ? {
-          subaccounts: [{
-            id: subaccountId,
-            transaction_split_ratio: 70,
-          }]
-        } : {}),
-        meta: {
-          listing_id: isServiceBooking ? booking?.providerId : null,
-          type: isServiceBooking ? "service_booking" : "product_order",
-          customer: user?.username || "",
-        },
-        customizations: {
-          title: "StudEx",
-          description: isServiceBooking ? "Service Booking" : "Product Order",
-          logo: "https://studexng.vercel.app/images/logo-1.jpg",
-        },
-        callback: async (response: any) => {
-          if (response.status === "successful" || response.status === "completed") {
-            try {
-              const orderId = await createOrder(response.tx_ref, String(response.transaction_id));
+    const config: Record<string, any> = {
+      key: paystackKey,
+      email: user?.email || "user@studex.ng",
+      amount: Math.round(finalTotal * 100),
+      currency: "NGN",
+      ref,
+      metadata: {
+        custom_fields: [],
+        listing_id: isServiceBooking ? booking?.providerId : null,
+        type: isServiceBooking ? "service_booking" : "product_order",
+        customer: user?.username || "",
+      },
+      callback: function(response: any) {
+        if (response.status === "success") {
+          createOrder(response.reference, response.reference)
+            .then(orderId => {
               if (isFoodOrder) clearCart();
               if (isServiceBooking) clearBooking();
               router.push(`/order-confirmation/${orderId}`);
-            } catch (error: any) {
-              console.error("Order creation failed:", error.message);
-              alert(`Payment received but order failed. Contact support with ref: ${response.tx_ref}`);
+            })
+            .catch(() => {
+              alert(`Payment received but order failed. Contact support with ref: ${response.reference}`);
               setIsProcessing(false);
-            }
-          } else {
-            setIsProcessing(false);
-          }
-        },
-        onclose: () => { setIsProcessing(false); },
-      });
-    });
-  }, [finalTotal, isLoggedIn, flwLoaded, isFoodOrder, isServiceBooking, user]);
+            });
+        } else {
+          setIsProcessing(false);
+        }
+      },
+      onClose: function() {
+        setIsProcessing(false);
+      },
+    };
 
+    if (subaccountCode && subaccountCode.startsWith("ACCT_")) {
+      config.subaccount = subaccountCode;
+      config.transaction_charge = 20000;
+      config.bearer = "account";
+    }
+
+    try {
+      const handler = window.PaystackPop.setup(config);
+      handler.openIframe();
+    } catch (err: any) {
+      console.error("Paystack error:", err);
+      alert("Could not open payment. Please refresh and try again.");
+      setIsProcessing(false);
+    }
+  }, [finalTotal, user, isFoodOrder, isServiceBooking, subaccountCode, paystackLoaded]);
+
+  // ── EMPTY STATE ──────────────────────────────────────────────────────────
   if (!isFoodOrder && !isServiceBooking) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-teal-50 flex items-center justify-center p-6">
-        <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="text-center">
-          <Package className="w-32 h-32 text-purple-300 mx-auto mb-8" />
-          <h2 className="text-4xl font-black bg-gradient-to-r from-purple-600 to-teal-600 bg-clip-text text-transparent mb-4">Nothing to checkout</h2>
-          <p className="text-gray-600 mb-8">Go book a service or add items to cart!</p>
+      <div className="min-h-screen bg-[#FAFAF9] flex flex-col items-center justify-center px-6 pb-28"
+        style={{ fontFamily: "'DM Sans', sans-serif" }}>
+        <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} className="text-center">
+          <div className="w-24 h-24 mx-auto mb-6 rounded-2xl flex items-center justify-center"
+            style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+            <Package className="w-12 h-12 text-white" strokeWidth={1.5} />
+          </div>
+          <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold mb-2">Empty</p>
+          <h2 className="text-2xl font-bold text-stone-900 mb-2"
+            style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+            Nothing to checkout
+          </h2>
+          <p className="text-stone-400 text-sm mb-8">Go book a service or add items to your cart first.</p>
           <Link href="/home">
-            <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-              className="px-12 py-5 bg-gradient-to-r from-purple-600 to-teal-600 text-white font-black text-xl rounded-full shadow-2xl">
-              Explore StudEx
+            <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+              className="px-8 py-3 text-white font-semibold rounded-full shadow-lg shadow-teal-200/60 inline-flex items-center gap-2 text-sm"
+              style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+              Explore StudEx <ArrowRight className="w-4 h-4" />
             </motion.button>
           </Link>
         </motion.div>
@@ -166,124 +190,203 @@ export default function CheckoutPage() {
   }
 
   return (
-    <>
-      <motion.div initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
-        className="sticky top-0 bg-white/95 backdrop-blur-xl z-50 border-b border-purple-100 shadow-lg">
-        <div className="flex items-center justify-between px-6 py-5 max-w-4xl mx-auto">
+    <div className="min-h-screen bg-[#FAFAF9]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+
+      {/* ── STICKY HEADER ── */}
+      <div className="sticky top-0 bg-white/80 backdrop-blur-md z-40 border-b border-stone-100 shadow-sm">
+        <div className="flex items-center justify-between px-4 py-3">
           <Link href={isServiceBooking ? `/listing/${booking?.providerId}` : "/cart"}>
-            <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} className="p-2 hover:bg-purple-100 rounded-full transition">
-              <ArrowLeft className="w-7 h-7 text-purple-600" />
-            </motion.div>
+            <button className="p-2.5 bg-white border border-stone-200 hover:border-stone-300 rounded-full shadow-sm transition-all active:scale-95">
+              <ChevronLeft className="w-5 h-5 text-stone-600" />
+            </button>
           </Link>
           <div className="text-center">
-            <h1 className="text-2xl font-black bg-gradient-to-r from-purple-600 to-teal-600 bg-clip-text text-transparent">Secure Checkout</h1>
-            <p className="text-xs text-gray-500 flex items-center gap-1 justify-center"><Shield className="w-3 h-3" /> Powered by Flutterwave</p>
+            <h1 className="text-base font-bold text-stone-900"
+              style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+              Secure Checkout
+            </h1>
+            <p className="text-xs text-stone-400 flex items-center gap-1 justify-center mt-0.5">
+              <Shield className="w-3 h-3" /> Powered by Paystack
+            </p>
           </div>
           <div className="w-10" />
         </div>
-      </motion.div>
+      </div>
 
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-teal-50 px-6 pt-8 pb-32 max-w-4xl mx-auto">
+      <div className="px-4 pt-6 pb-28 max-w-2xl mx-auto space-y-4">
 
-        {/* ORDER SUMMARY */}
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-          className="bg-white/90 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-white mb-6">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-black text-gray-900 flex items-center gap-3">
-              {isServiceBooking ? <Calendar className="w-7 h-7 text-purple-600" /> : <Package className="w-7 h-7 text-purple-600" />}
-              {isServiceBooking ? "Your Appointment" : "Your Order"}
-            </h2>
-            <Sparkles className="w-6 h-6 text-teal-500" />
-          </div>
+        {/* ── SECTION HEADER ── */}
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}>
+          <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold">
+            {isServiceBooking ? "Service Booking" : "Product Order"}
+          </p>
+          <h2 className="text-xl font-bold text-stone-900 mt-0.5"
+            style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+            Review your order
+          </h2>
+        </motion.div>
 
-          <div className="space-y-5">
-            {isServiceBooking && booking && (
-              <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
-                className="bg-gradient-to-r from-purple-100 to-teal-100 rounded-3xl p-8">
-                <div className="flex items-center gap-5 mb-6">
-                  <div className="relative w-24 h-24 rounded-3xl overflow-hidden ring-4 ring-purple-200">
-                    <Image src={`/images/${booking.providerImg}`} alt={booking.providerName} fill className="object-cover" />
-                  </div>
-                  <div>
-                    <h3 className="text-2xl font-black">{booking.providerName}</h3>
-                    <p className="text-purple-700 font-bold">Service Booking</p>
-                  </div>
+        {/* ── SERVICE BOOKING DETAILS ── */}
+        {isServiceBooking && booking && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+            className="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+                style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+                <Calendar className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <p className="font-semibold text-stone-900 text-sm">{booking.providerName}</p>
+                <p className="text-xs text-teal-600 font-medium">Service Booking</p>
+              </div>
+            </div>
+            <div className="space-y-2.5 bg-stone-50 rounded-xl p-4">
+              <div className="flex items-center gap-2.5 text-sm text-stone-600">
+                <Calendar className="w-4 h-4 text-teal-500 flex-shrink-0" />
+                <span>{booking.date}</span>
+              </div>
+              <div className="flex items-center gap-2.5 text-sm text-stone-600">
+                <Clock className="w-4 h-4 text-teal-500 flex-shrink-0" />
+                <span>{booking.time}</span>
+              </div>
+              <div className="flex items-center gap-2.5 text-sm text-stone-600">
+                <MapPin className="w-4 h-4 text-teal-500 flex-shrink-0" />
+                <span>{booking.location}</span>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* ── CART ITEMS ── */}
+        {isFoodOrder && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+            className="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm space-y-3">
+            <div className="flex items-center gap-2 mb-1">
+              <Package className="w-4 h-4 text-teal-600" />
+              <p className="font-semibold text-stone-900 text-sm">Order Items</p>
+            </div>
+            {cart.map((item, i) => (
+              <motion.div key={item.id}
+                initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: i * 0.07 }}
+                className="flex justify-between items-center py-2.5 border-b border-stone-100 last:border-0">
+                <div>
+                  <p className="font-medium text-stone-900 text-sm">{item.title}</p>
+                  <p className="text-xs text-stone-400 mt-0.5">× {item.quantity}</p>
                 </div>
-                <div className="grid grid-cols-2 gap-4 text-lg">
-                  <div className="flex items-center gap-3"><Calendar className="w-5 h-5" /><span className="font-medium">{booking.date}</span></div>
-                  <div className="flex items-center gap-3"><Clock className="w-5 h-5" /><span className="font-medium">{booking.time}</span></div>
-                  <div className="flex items-center gap-3 col-span-2"><MapPin className="w-5 h-5" /><span className="font-medium">{booking.location}</span></div>
-                </div>
-              </motion.div>
-            )}
-
-            {isFoodOrder && cart.map((item, i) => (
-              <motion.div key={item.id} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.1 }}
-                className="flex justify-between items-center p-4 bg-gradient-to-r from-purple-50 to-teal-50 rounded-2xl">
-                <div className="flex-1">
-                  <p className="font-bold text-gray-900 text-lg">{item.title}</p>
-                  <p className="text-sm text-purple-600 font-medium">×{item.quantity}</p>
-                </div>
-                <p className="font-black text-xl text-purple-600">₦{(item.price * item.quantity).toLocaleString()}</p>
+                <p className="font-semibold text-sm" style={{
+                  background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)",
+                  WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text",
+                }}>
+                  ₦{(item.price * item.quantity).toLocaleString()}
+                </p>
               </motion.div>
             ))}
+          </motion.div>
+        )}
 
-            <div className="border-t-2 border-purple-200 pt-6 mt-6">
-              <div className="flex justify-between items-center mb-4">
-                <span className="text-gray-600 font-medium">Platform Fee</span>
-                <span className="text-green-600 font-bold">Included</span>
-              </div>
-              <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }}
-                className="bg-gradient-to-r from-purple-600 to-teal-600 rounded-2xl p-6 text-white">
-                <div className="flex justify-between items-center">
-                  <span className="text-xl font-bold">Total Amount</span>
-                  <span className="text-4xl font-black">₦{finalTotal.toLocaleString()}</span>
-                </div>
-              </motion.div>
+        {/* ── ORDER SUMMARY ── */}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
+          className="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm">
+          <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold mb-4">Order Summary</p>
+          <div className="space-y-3">
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-stone-500">
+                {isServiceBooking ? "Service price" : "Items total"}
+              </span>
+              <span className="text-stone-700 font-medium">
+                ₦{(finalTotal - SERVICE_FEE).toLocaleString()}
+              </span>
+            </div>
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-stone-500">Service fee</span>
+              <span className="text-stone-700 font-medium">₦{SERVICE_FEE.toLocaleString()}</span>
+            </div>
+            <div className="border-t border-stone-100 pt-3 flex justify-between items-center">
+              <span className="font-bold text-stone-900"
+                style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+                Total
+              </span>
+              <span className="text-2xl font-bold" style={{
+                background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)",
+                WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text",
+              }}>
+                ₦{finalTotal.toLocaleString()}
+              </span>
             </div>
           </div>
         </motion.div>
 
-        {/* SECURITY BADGES */}
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
-          className="bg-white/90 backdrop-blur-xl rounded-3xl p-6 shadow-xl border border-white mb-6">
-          <div className="flex items-center justify-center gap-8 text-center">
-            <div className="flex flex-col items-center"><Shield className="w-10 h-10 text-green-600 mb-2" /><p className="text-xs font-bold text-gray-700">Secure</p></div>
-            <div className="flex flex-col items-center"><Lock className="w-10 h-10 text-blue-600 mb-2" /><p className="text-xs font-bold text-gray-700">Encrypted</p></div>
-            <div className="flex flex-col items-center"><Check className="w-10 h-10 text-purple-600 mb-2" /><p className="text-xs font-bold text-gray-700">Protected</p></div>
+        {/* ── SECURITY BADGES ── */}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
+          className="bg-white border border-stone-200 rounded-2xl p-4 shadow-sm">
+          <div className="flex items-center justify-around text-center">
+            <div className="flex flex-col items-center gap-1.5">
+              <div className="w-9 h-9 rounded-xl bg-teal-50 flex items-center justify-center">
+                <Shield className="w-4 h-4 text-teal-600" />
+              </div>
+              <p className="text-xs font-medium text-stone-500">Secure</p>
+            </div>
+            <div className="w-px h-8 bg-stone-100" />
+            <div className="flex flex-col items-center gap-1.5">
+              <div className="w-9 h-9 rounded-xl bg-purple-50 flex items-center justify-center">
+                <Lock className="w-4 h-4 text-purple-600" />
+              </div>
+              <p className="text-xs font-medium text-stone-500">Encrypted</p>
+            </div>
+            <div className="w-px h-8 bg-stone-100" />
+            <div className="flex flex-col items-center gap-1.5">
+              <div className="w-9 h-9 rounded-xl bg-teal-50 flex items-center justify-center">
+                <Check className="w-4 h-4 text-teal-600" />
+              </div>
+              <p className="text-xs font-medium text-stone-500">Protected</p>
+            </div>
           </div>
         </motion.div>
 
-        {/* SPLIT PAYMENT INFO */}
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
-          className="bg-purple-50 border-2 border-purple-200 rounded-2xl p-6 mb-8 text-center">
-          <Shield className="w-12 h-12 text-purple-600 mx-auto mb-3" />
-          <p className="font-black text-lg text-gray-900">Automatic Split Payment</p>
-          <p className="text-sm text-gray-700 mt-2">
-            Your payment is split automatically by Flutterwave — 70% goes directly to the seller, 30% to StudEx.
-            Refunds are processed back to your original payment method.
-          </p>
+        {/* ── SERVICE FEE INFO ── */}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
+          className="bg-teal-50 border border-teal-200 rounded-2xl p-4">
+          <div className="flex items-start gap-3">
+            <Sparkles className="w-4 h-4 text-teal-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold text-teal-800 text-sm">Transparent Pricing</p>
+              <p className="text-xs text-teal-600 mt-0.5 leading-relaxed">
+                A flat <strong>₦200 service fee</strong> is included in your total.
+                The vendor receives their full listed price.
+                Refunds are processed back to your original payment method.
+              </p>
+            </div>
+          </div>
         </motion.div>
 
-        {/* PAY BUTTON */}
-        <motion.button
-          whileHover={{ scale: isProcessing ? 1 : 1.02 }}
-          whileTap={{ scale: isProcessing ? 1 : 0.98 }}
-          onClick={handlePayment}
-          disabled={isProcessing || !isLoggedIn || !flwLoaded}
-          className={`w-full py-8 rounded-3xl font-black text-3xl shadow-2xl bg-gradient-to-r from-purple-600 to-teal-600 text-white flex items-center justify-center gap-4 ${(isProcessing || !isAuthReady || !isHydrated) ? "opacity-70 cursor-not-allowed" : ""}`}>
-          {isProcessing ? (
-            <><Loader className="w-8 h-8 animate-spin" /> Processing...</>
-          ) : (
-            <><CreditCard className="w-10 h-10" /> Pay ₦{finalTotal.toLocaleString()} Now</>
-          )}
-        </motion.button>
+        {/* ── PAY BUTTON ── */}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>
+          <form onSubmit={e => { e.preventDefault(); handlePayment(); }}>
+            <motion.button
+              type="submit"
+              whileHover={{ scale: isProcessing ? 1 : 1.02 }}
+              whileTap={{ scale: isProcessing ? 1 : 0.97 }}
+              disabled={isProcessing || !isLoggedIn || !paystackLoaded}
+              className="w-full py-4 rounded-full font-semibold text-white text-base shadow-lg shadow-teal-200/60 flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+              {isProcessing ? (
+                <><Loader className="w-5 h-5 animate-spin" /> Processing...</>
+              ) : (
+                <><CreditCard className="w-5 h-5" /> Pay ₦{finalTotal.toLocaleString()} Now</>
+              )}
+            </motion.button>
+          </form>
+        </motion.div>
 
-        <p className="text-center text-xs text-gray-600 mt-6">
+        <p className="text-center text-xs text-stone-400 pb-4">
           By completing this purchase you agree to StudEx{" "}
-          <Link href="/terms" className="text-purple-600 underline font-bold">Terms & Conditions</Link>
+          <Link href="/terms" className="text-teal-600 hover:underline font-medium">
+            Terms & Conditions
+          </Link>
         </p>
+
       </div>
-    </>
+    </div>
   );
 }

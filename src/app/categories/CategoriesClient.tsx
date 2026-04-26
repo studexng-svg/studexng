@@ -1,0 +1,146 @@
+"use client";
+
+import { motion } from "framer-motion";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { ChevronLeft, Sparkles } from "lucide-react";
+
+interface Category {
+  id: number;
+  title: string;
+  slug: string;
+  image: string;
+}
+
+export default function CategoriesClient({ categories }: { categories: Category[] }) {
+  const router = useRouter();
+
+  return (
+    <div className="min-h-screen bg-[#FAFAF9]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+
+      {/* ── STICKY HEADER ── */}
+      <div className="sticky top-0 bg-white/80 backdrop-blur-md z-40 border-b border-stone-100 shadow-sm">
+        <div className="flex items-center justify-between px-4 py-3">
+          <button
+            onClick={() => router.push("/home")}
+            className="p-2.5 bg-white border border-stone-200 hover:border-stone-300 rounded-full shadow-sm transition-all active:scale-95">
+            <ChevronLeft className="w-5 h-5 text-stone-600" />
+          </button>
+
+          <div className="text-center">
+            <h1 className="text-base font-bold text-stone-900" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+              Categories
+            </h1>
+          </div>
+
+          <div className="w-10" />
+        </div>
+      </div>
+
+      <div className="px-4 pt-6 pb-28 max-w-2xl mx-auto space-y-6">
+
+        {/* ── SECTION HEADER ── */}
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}>
+          <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold">Browse</p>
+          <h2 className="text-2xl font-bold text-stone-900 mt-1" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+            What do you need today?
+          </h2>
+          <p className="text-stone-400 text-sm mt-0.5">All services available on campus.</p>
+        </motion.div>
+
+        {categories.length === 0 ? (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+            className="bg-white rounded-2xl p-12 text-center border border-stone-100 shadow-sm">
+            <Sparkles className="w-12 h-12 text-stone-200 mx-auto mb-3" />
+            <h3 className="text-lg font-bold text-stone-400" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+              No categories yet
+            </h3>
+            <p className="text-stone-400 text-sm mt-1">Check back soon!</p>
+          </motion.div>
+        ) : (
+          /* ── CATEGORIES GRID ── */
+          <div className="grid grid-cols-2 gap-4">
+            {categories.map((cat, i) => (
+              <motion.div
+                key={cat.id}
+                initial={{ opacity: 0, y: 24 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.07, type: "spring", stiffness: 120 }}>
+                <Link href={`/category/${cat.slug}`}>
+                  <motion.div
+                    whileHover={{ y: -4 }}
+                    whileTap={{ scale: 0.97 }}
+                    className="relative aspect-square rounded-2xl overflow-hidden shadow-sm border border-stone-200 hover:border-teal-300 hover:shadow-md transition-all cursor-pointer group">
+
+                    {/* Image */}
+                    {cat.image?.startsWith("http") ? (
+                      <img
+                        src={cat.image}
+                        alt={cat.title}
+                        loading="lazy"
+                        decoding="async"
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-br from-teal-100 to-purple-100 flex items-center justify-center">
+                        <Sparkles className="w-10 h-10 text-stone-300" />
+                      </div>
+                    )}
+
+                    {/* Gradient overlay */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+
+                    {/* Title */}
+                    <div className="absolute bottom-0 left-0 right-0 p-3">
+                      <p className="text-white font-bold text-sm leading-tight drop-shadow">
+                        {cat.title}
+                      </p>
+                      <div
+                        className="h-0.5 mt-1.5 rounded-full w-0 group-hover:w-8 transition-all duration-300"
+                        style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}
+                      />
+                    </div>
+
+                    {/* Live badge on hover */}
+                    <motion.div
+                      initial={{ opacity: 0, y: -4 }}
+                      whileHover={{ opacity: 1, y: 0 }}
+                      className="absolute top-2.5 right-2.5 px-2 py-0.5 bg-white/90 backdrop-blur-sm rounded-full shadow-sm">
+                      <span className="text-[10px] font-bold" style={{
+                        background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)",
+                        WebkitBackgroundClip: "text",
+                        WebkitTextFillColor: "transparent",
+                        backgroundClip: "text",
+                      }}>LIVE</span>
+                    </motion.div>
+
+                  </motion.div>
+                </Link>
+              </motion.div>
+            ))}
+          </div>
+        )}
+
+        {/* ── BOTTOM CTA ── */}
+        {categories.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.8 }}
+            className="text-center py-4">
+            <p className="text-stone-400 text-sm">Everything you need.</p>
+            <p className="font-bold mt-1" style={{
+              fontFamily: "'Playfair Display', Georgia, serif",
+              background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              backgroundClip: "text",
+              fontSize: "1.25rem",
+            }}>Just StudEx.</p>
+          </motion.div>
+        )}
+
+      </div>
+    </div>
+  );
+}

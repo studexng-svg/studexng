@@ -7,6 +7,8 @@ import { ChevronLeft, Package, Tag, DollarSign, FileText, Calendar, MapPin, User
 import Link from "next/link";
 import { motion } from "framer-motion";
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+
 interface Order {
   id: number;
   reference: string;
@@ -51,10 +53,8 @@ export default function SellerOrderDetailPage() {
 
     const fetchOrder = async () => {
       try {
-        const res = await fetch(`http://127.0.0.1:8000/api/orders/${id}/`, {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
+        const res = await fetch(`${API_URL}/api/orders/${id}/`, {
+          headers: { Authorization: `Bearer ${accessToken}` },
         });
 
         if (!res.ok) {
@@ -73,7 +73,6 @@ export default function SellerOrderDetailPage() {
         const data = await res.json();
         setOrder(data);
       } catch (err) {
-        console.error("Order fetch error:", err);
         setError("Failed to load order details");
       } finally {
         setLoading(false);
@@ -85,33 +84,25 @@ export default function SellerOrderDetailPage() {
 
   const handleMarkAsComplete = async () => {
     if (!order) return;
-
     setCompleting(true);
-
     const accessToken = localStorage.getItem("accessToken");
-
     try {
-      const res = await fetch(`http://127.0.0.1:8000/api/orders/${order.id}/mark_complete/`, {
+      const res = await fetch(`${API_URL}/api/orders/${order.id}/mark_complete/`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${accessToken}`,
         },
       });
-
       if (!res.ok) {
         const errorData = await res.json();
         throw new Error(errorData.detail || "Failed to mark as complete");
       }
-
       const data = await res.json();
       setOrder(data.order);
       setShowCompleteModal(false);
-      
-      // Show success message and redirect
       setTimeout(() => router.push("/seller/orders"), 1500);
     } catch (err) {
-      console.error("Mark complete error:", err);
       alert(`Failed to complete order: ${err instanceof Error ? err.message : "Try again"}`);
     } finally {
       setCompleting(false);
@@ -120,9 +111,9 @@ export default function SellerOrderDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-teal-50">
+      <div className="min-h-screen flex items-center justify-center bg-[#FAFAF9]">
         <motion.div animate={{ rotate: 360 }} transition={{ duration: 2, repeat: Infinity, ease: "linear" }}>
-          <Clock className="w-16 h-16 text-purple-600" />
+          <Clock className="w-10 h-10 text-teal-600" />
         </motion.div>
       </div>
     );
@@ -130,18 +121,22 @@ export default function SellerOrderDetailPage() {
 
   if (error || !order) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-teal-50 flex items-center justify-center p-6">
-        <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="text-center bg-white rounded-3xl p-8 shadow-xl">
-          <AlertCircle className="w-16 h-16 text-red-600 mx-auto mb-4" />
-          <h2 className="text-2xl font-black text-gray-800 mb-2">Order Not Found</h2>
-          <p className="text-sm text-gray-600 mb-6">{error || "This order may have been removed."}</p>
+      <div className="min-h-screen bg-[#FAFAF9] flex items-center justify-center p-6" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+        <div className="text-center bg-white border border-stone-200 rounded-2xl p-8 shadow-sm max-w-sm w-full">
+          <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
+          <h2 className="text-lg font-bold text-stone-800 mb-2" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+            Order Not Found
+          </h2>
+          <p className="text-sm text-stone-500 mb-6">{error || "This order may have been removed."}</p>
           <Link href="/seller/orders">
-            <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-              className="px-8 py-3 bg-gradient-to-r from-purple-600 to-teal-600 text-white font-bold rounded-xl mt-4">
+            <button
+              className="px-8 py-3 text-white font-semibold rounded-full shadow-md text-sm"
+              style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}
+            >
               Back to Orders
-            </motion.button>
+            </button>
           </Link>
-        </motion.div>
+        </div>
       </div>
     );
   }
@@ -151,228 +146,161 @@ export default function SellerOrderDetailPage() {
   const isCompleted = order.status === "completed";
 
   return (
-    <>
-      {/* TOP BAR */}
-      <motion.div
-        initial={{ y: -20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        className="sticky top-0 bg-white/90 backdrop-blur-xl z-40 border-b border-purple-100 shadow-sm"
-      >
-        <div className="flex items-center justify-between p-4 max-w-4xl mx-auto">
-          <Link href="/seller/orders">
-            <motion.button
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
-              className="p-2 hover:bg-purple-100 rounded-full transition"
-            >
-              <ChevronLeft className="w-6 h-6 text-purple-600" />
-            </motion.button>
-          </Link>
-          <h1 className="text-xl font-black bg-gradient-to-r from-purple-600 to-teal-500 bg-clip-text text-transparent">
+    <div className="min-h-screen bg-[#FAFAF9]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+      {/* HEADER */}
+      <div className="sticky top-0 bg-white/80 backdrop-blur-md z-40 border-b border-stone-100 shadow-sm">
+        <div className="flex items-center justify-between px-4 py-3">
+          <button onClick={() => router.back()} className="p-2.5 bg-white border border-stone-200 rounded-full shadow-sm active:scale-95 transition-all">
+            <ChevronLeft className="w-5 h-5 text-stone-600" />
+          </button>
+          <h1 className="text-base font-bold text-stone-900" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
             Order Details
           </h1>
           <div className="w-10" />
         </div>
-      </motion.div>
+      </div>
 
-      <div className="p-4 pb-32 space-y-6 max-w-4xl mx-auto">
+      <div className="px-4 pt-6 pb-32 space-y-4 max-w-2xl mx-auto">
         {/* ORDER ID + STATUS */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-gradient-to-r from-purple-100 to-teal-100 rounded-3xl p-6 border-2 border-purple-200"
-        >
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-sm text-gray-600 font-semibold">Order ID</p>
-              <p className="text-3xl font-black text-gray-800">#{order.reference}</p>
-              <p className="text-sm text-gray-600 mt-2">{new Date(order.created_at).toLocaleString()}</p>
+        <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm flex justify-between items-start">
+          <div>
+            <p className="text-xs text-stone-400 font-medium">Order ID</p>
+            <p className="text-2xl font-bold text-stone-900 mt-0.5">#{order.reference}</p>
+            <p className="text-xs text-stone-400 mt-1">{new Date(order.created_at).toLocaleString()}</p>
+          </div>
+          <span className={`px-3 py-1.5 rounded-full font-medium text-xs flex items-center gap-1.5 ${
+            isPending ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"
+          }`}>
+            {isPending ? <Clock className="w-3.5 h-3.5" /> : <CheckCircle className="w-3.5 h-3.5" />}
+            {isPending ? "Pending" : "Completed"}
+          </span>
+        </div>
+
+        {/* STATUS INFO */}
+        {isPending && order.status === "paid" && (
+          <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 flex gap-3">
+            <div className="w-9 h-9 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+              <Clock className="w-4 h-4 text-blue-600" />
             </div>
-            <div className={`px-4 py-2 rounded-full font-bold text-sm flex items-center gap-2 ${
-              isPending ? "bg-amber-100 text-amber-800" : "bg-green-100 text-green-800"
-            }`}>
-              {isPending ? (
-                <>
-                  <Clock className="w-5 h-5" />
-                  Pending
-                </>
-              ) : (
-                <>
-                  <CheckCircle className="w-5 h-5" />
-                  Completed
-                </>
-              )}
+            <div>
+              <p className="font-semibold text-blue-900 text-sm">Mark Order as Complete</p>
+              <p className="text-xs text-blue-700 mt-1">
+                {isService
+                  ? "Once you've completed the service, tap the button below to confirm."
+                  : "Once the food is ready for pickup/delivery, confirm it here."}
+              </p>
+              <p className="text-xs text-blue-600 mt-1">
+                Payment (₦{order.amount.toLocaleString()}) is held in escrow until the buyer confirms receipt.
+              </p>
             </div>
           </div>
-        </motion.div>
-
-        {/* WHAT TO DO */}
-        {isPending && order.status === "paid" && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="bg-blue-50 border-2 border-blue-300 rounded-3xl p-6"
-          >
-            <div className="flex items-start gap-4">
-              <div className="w-12 h-12 bg-blue-200 rounded-full flex items-center justify-center flex-shrink-0">
-                <Clock className="w-6 h-6 text-blue-700" />
-              </div>
-              <div>
-                <p className="font-black text-blue-900 text-lg">Mark Order as Complete</p>
-                <p className="text-sm text-blue-800 mt-2">
-                  {isService 
-                    ? "Once you've completed the service, tap the button below to confirm."
-                    : "Once the food is ready for pickup/delivery, confirm it here."}
-                </p>
-                <p className="text-xs text-blue-700 mt-2">
-                  Payment (₦{order.amount.toLocaleString()}) is held in escrow until the buyer confirms receipt.
-                </p>
-              </div>
-            </div>
-          </motion.div>
         )}
 
         {order.status === "seller_completed" && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="bg-amber-50 border-2 border-amber-300 rounded-3xl p-6"
-          >
-            <div className="flex items-start gap-4">
-              <div className="w-12 h-12 bg-amber-200 rounded-full flex items-center justify-center flex-shrink-0">
-                <Clock className="w-6 h-6 text-amber-700" />
-              </div>
-              <div>
-                <p className="font-black text-amber-900 text-lg">Waiting for Buyer Confirmation</p>
-                <p className="text-sm text-amber-800 mt-2">
-                  You've marked this order as complete. The buyer will now confirm receipt and release the payment.
-                </p>
-              </div>
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex gap-3">
+            <div className="w-9 h-9 bg-amber-100 rounded-full flex items-center justify-center flex-shrink-0">
+              <Clock className="w-4 h-4 text-amber-600" />
             </div>
-          </motion.div>
+            <div>
+              <p className="font-semibold text-amber-900 text-sm">Waiting for Buyer Confirmation</p>
+              <p className="text-xs text-amber-700 mt-1">
+                You've marked this order as complete. The buyer will now confirm receipt and release the payment.
+              </p>
+            </div>
+          </div>
         )}
 
         {isCompleted && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="bg-green-50 border-2 border-green-300 rounded-3xl p-6"
-          >
-            <div className="flex items-start gap-4">
-              <div className="w-12 h-12 bg-green-200 rounded-full flex items-center justify-center flex-shrink-0">
-                <CheckCircle className="w-6 h-6 text-green-700" />
-              </div>
-              <div>
-                <p className="font-black text-green-900 text-lg">Order Completed!</p>
-                <p className="text-sm text-green-800 mt-2">
-                  ₦{order.amount.toLocaleString()} has been added to your wallet.
-                </p>
-              </div>
+          <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex gap-3">
+            <div className="w-9 h-9 bg-emerald-100 rounded-full flex items-center justify-center flex-shrink-0">
+              <CheckCircle className="w-4 h-4 text-emerald-600" />
             </div>
-          </motion.div>
+            <div>
+              <p className="font-semibold text-emerald-900 text-sm">Order Completed!</p>
+              <p className="text-xs text-emerald-700 mt-1">
+                ₦{order.amount.toLocaleString()} has been added to your wallet.
+              </p>
+            </div>
+          </div>
         )}
 
-        {/* BUYER INFO */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="bg-white rounded-3xl p-6 shadow-xl"
-        >
-          <h3 className="text-2xl font-black text-gray-900 mb-6 flex items-center gap-2">
-            <User className="w-7 h-7 text-purple-600" />
+        {/* CUSTOMER DETAILS */}
+        <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm">
+          <h3 className="font-semibold text-stone-800 mb-4 flex items-center gap-2 text-sm">
+            <User className="w-4 h-4 text-teal-600" />
             Customer Details
           </h3>
-
-          <div className="space-y-4">
-            <div className="flex items-center gap-4 p-4 bg-purple-50 rounded-2xl">
-              <div className="w-12 h-12 bg-purple-200 rounded-full flex items-center justify-center">
-                <User className="w-6 h-6 text-purple-600" />
+          <div className="space-y-3">
+            <div className="flex items-center gap-3 p-3 bg-stone-50 rounded-xl">
+              <div className="w-9 h-9 bg-teal-50 rounded-full flex items-center justify-center">
+                <User className="w-4 h-4 text-teal-600" />
               </div>
               <div>
-                <p className="font-bold text-gray-900">{order.buyer.username}</p>
-                <p className="text-sm text-gray-600">Customer Name</p>
+                <p className="font-semibold text-stone-900 text-sm">{order.buyer.username}</p>
+                <p className="text-xs text-stone-400">Customer Name</p>
               </div>
             </div>
 
             {isService && order.service_details && (
-              <>
-                <div className="border-t-2 border-gray-200 pt-4 mt-4">
-                  <p className="font-bold text-gray-900 mb-3">Service Details:</p>
-                  <div className="space-y-2 text-sm text-gray-700">
-                    <p><span className="font-semibold">Service:</span> {order.service_details.service_name}</p>
-                    <p className="flex items-center gap-2">
-                      <Calendar className="w-4 h-4" />
-                      <span><span className="font-semibold">Date:</span> {order.service_details.date}</span>
-                    </p>
-                    <p className="flex items-center gap-2">
-                      <Clock className="w-4 h-4" />
-                      <span><span className="font-semibold">Time:</span> {order.service_details.time}</span>
-                    </p>
-                    <p className="flex items-center gap-2">
-                      <MapPin className="w-4 h-4" />
-                      <span><span className="font-semibold">Location:</span> {order.service_details.location}</span>
-                    </p>
-                  </div>
-                </div>
-              </>
+              <div className="border-t border-stone-100 pt-3 space-y-1.5 text-sm text-stone-600">
+                <p><span className="font-semibold text-stone-800">Service:</span> {order.service_details.service_name}</p>
+                <p className="flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5" />
+                  <span><span className="font-semibold text-stone-800">Date:</span> {order.service_details.date}</span>
+                </p>
+                <p className="flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5" />
+                  <span><span className="font-semibold text-stone-800">Time:</span> {order.service_details.time}</span>
+                </p>
+                <p className="flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5" />
+                  <span><span className="font-semibold text-stone-800">Location:</span> {order.service_details.location}</span>
+                </p>
+              </div>
             )}
 
             {!isService && order.food_items && (
-              <>
-                <div className="border-t-2 border-gray-200 pt-4 mt-4">
-                  <p className="font-bold text-gray-900 mb-3">Order Items:</p>
-                  <div className="space-y-2">
-                    {order.food_items.map((item, i) => (
-                      <div key={i} className="text-sm text-gray-700 p-2 bg-gray-50 rounded">
-                        {item.title} ×{item.quantity} - ₦{(item.price * item.quantity).toLocaleString()}
-                      </div>
-                    ))}
-                  </div>
+              <div className="border-t border-stone-100 pt-3">
+                <p className="font-semibold text-stone-800 text-sm mb-2">Order Items:</p>
+                <div className="space-y-1">
+                  {order.food_items.map((item, i) => (
+                    <div key={i} className="text-sm text-stone-600 p-2 bg-stone-50 rounded-lg">
+                      {item.title} ×{item.quantity} — ₦{(item.price * item.quantity).toLocaleString()}
+                    </div>
+                  ))}
                 </div>
-              </>
+              </div>
             )}
           </div>
-        </motion.div>
+        </div>
 
         {/* AMOUNT */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="bg-gradient-to-r from-purple-100 to-teal-100 rounded-3xl p-6 border-2 border-purple-200"
-        >
-          <p className="text-sm text-gray-700 font-semibold mb-2">Order Amount</p>
-          <p className="text-4xl font-black text-purple-600">₦{order.amount.toLocaleString()}</p>
-          <p className="text-xs text-gray-600 mt-3">
-            {isCompleted 
+        <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm">
+          <p className="text-xs text-stone-400 font-medium mb-1">Order Amount</p>
+          <p className="text-3xl font-bold text-teal-600">₦{order.amount.toLocaleString()}</p>
+          <p className="text-xs text-stone-400 mt-2">
+            {isCompleted
               ? "This amount has been released to your wallet."
               : "This amount is in escrow. It will be released to your wallet once the buyer confirms receipt."}
           </p>
-        </motion.div>
+        </div>
 
         {/* MARK AS COMPLETE BUTTON */}
         {order.status === "paid" && (
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
+          <button
             onClick={() => setShowCompleteModal(true)}
-            className="w-full py-5 bg-gradient-to-r from-purple-600 to-teal-500 text-white rounded-2xl font-black text-lg shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2"
+            className="w-full py-4 text-white font-semibold rounded-full shadow-md flex items-center justify-center gap-2 active:scale-[0.98] transition-all"
+            style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}
           >
-            <CheckCircle className="w-6 h-6" />
+            <CheckCircle className="w-5 h-5" />
             Mark as Complete
-          </motion.button>
+          </button>
         )}
 
         {isCompleted && (
-          <div className="text-center py-6 bg-green-50 rounded-2xl">
-            <CheckCircle className="w-12 h-12 text-green-600 mx-auto mb-3" />
-            <p className="text-gray-700 font-semibold">
-              Order completed and payment received!
-            </p>
+          <div className="text-center py-5 bg-emerald-50 border border-emerald-100 rounded-2xl">
+            <CheckCircle className="w-10 h-10 text-emerald-500 mx-auto mb-2" />
+            <p className="text-stone-700 font-medium text-sm">Order completed and payment received!</p>
           </div>
         )}
       </div>
@@ -382,92 +310,62 @@ export default function SellerOrderDetailPage() {
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4"
           onClick={() => !completing && setShowCompleteModal(false)}
         >
           <motion.div
-            initial={{ scale: 0.9, y: 20 }}
+            initial={{ scale: 0.95, y: 16 }}
             animate={{ scale: 1, y: 0 }}
-            exit={{ scale: 0.9, y: 20 }}
-            className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl"
+            className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl border border-stone-100"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-2xl font-black text-gray-900 mb-4">Mark as Complete?</h3>
-            <p className="text-gray-700 mb-6">
-              {isService 
+            <h3 className="text-lg font-bold text-stone-900 mb-3" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+              Mark as Complete?
+            </h3>
+            <p className="text-stone-600 text-sm mb-5">
+              {isService
                 ? "Are you ready to mark this service as complete?"
                 : "Is the food ready for pickup/delivery?"}
             </p>
 
-            <div className="bg-purple-50 rounded-xl p-4 mb-6">
-              <p className="text-sm text-gray-700">
-                <span className="font-bold">Order Amount:</span>
-              </p>
-              <p className="text-3xl font-black text-purple-600 mt-2">₦{order.amount.toLocaleString()}</p>
-              <p className="text-xs text-gray-600 mt-2">
-                In escrow until buyer confirms
-              </p>
+            <div className="bg-stone-50 border border-stone-100 rounded-xl p-4 mb-5">
+              <p className="text-xs text-stone-500">Order Amount</p>
+              <p className="text-2xl font-bold text-teal-600 mt-0.5">₦{order.amount.toLocaleString()}</p>
+              <p className="text-xs text-stone-400 mt-1">In escrow until buyer confirms</p>
             </div>
 
             <div className="flex gap-3">
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
+              <button
                 onClick={() => !completing && setShowCompleteModal(false)}
                 disabled={completing}
-                className="flex-1 py-3 bg-gray-200 text-gray-800 rounded-xl font-bold disabled:opacity-50"
+                className="flex-1 py-3 bg-stone-100 text-stone-700 rounded-full font-semibold text-sm disabled:opacity-50"
               >
                 Cancel
-              </motion.button>
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
+              </button>
+              <button
                 onClick={handleMarkAsComplete}
                 disabled={completing}
-                className="flex-1 py-3 bg-gradient-to-r from-purple-600 to-teal-500 text-white rounded-xl font-black disabled:opacity-50 flex items-center justify-center gap-2"
+                className="flex-1 py-3 text-white rounded-full font-semibold text-sm disabled:opacity-50 flex items-center justify-center gap-2"
+                style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}
               >
                 {completing ? (
                   <>
                     <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: "linear" }}>
-                      <Clock className="w-5 h-5" />
+                      <Clock className="w-4 h-4" />
                     </motion.div>
                     Processing...
                   </>
                 ) : (
                   <>
-                    <CheckCircle className="w-5 h-5" />
+                    <CheckCircle className="w-4 h-4" />
                     Yes, Complete
                   </>
                 )}
-              </motion.button>
+              </button>
             </div>
           </motion.div>
         </motion.div>
       )}
-
-      {/* BOTTOM NAV */}
-      <motion.div
-        initial={{ y: 100 }}
-        animate={{ y: 0 }}
-        transition={{ type: "spring", stiffness: 300, damping: 30 }}
-        className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-xl border-t border-gray-200 z-40 shadow-2xl"
-      >
-        <div className="flex justify-around py-3 max-w-4xl mx-auto w-full">
-          <Link href="/" className="text-gray-500 hover:text-purple-600 transition">
-            <span className="text-xs font-semibold">Home</span>
-          </Link>
-          <Link href="/categories" className="text-gray-500 hover:text-purple-600 transition">
-            <span className="text-xs font-semibold">Services</span>
-          </Link>
-          <Link href="/cart" className="text-gray-500 hover:text-purple-600 transition">
-            <span className="text-xs font-semibold">Cart</span>
-          </Link>
-          <Link href="/seller" className="text-purple-600 font-bold transition">
-            <span className="text-xs">Seller</span>
-          </Link>
-        </div>
-      </motion.div>
-    </>
+    </div>
   );
 }

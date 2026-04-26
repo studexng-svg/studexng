@@ -26,16 +26,16 @@ class UserAdmin(BaseUserAdmin):
             return []
         return [ProfileInline]
 
-    list_display = ['username', 'email', 'user_type', 'business_name', 'hostel', 'wallet_balance', 'is_verified_vendor', 'is_staff', 'is_active', 'created_at']
-    list_filter = ['user_type', 'is_verified_vendor', 'is_staff', 'is_active', 'hostel']
-    search_fields = ['username', 'email', 'phone', 'business_name', 'matric_number']
+    list_display = ['username', 'email', 'school', 'user_type', 'business_name', 'hostel', 'wallet_balance', 'is_verified_vendor', 'is_staff', 'is_active', 'created_at']
+    list_filter = ['school', 'user_type', 'is_verified_vendor', 'is_staff', 'is_active', 'hostel']
+    search_fields = ['username', 'email', 'phone', 'business_name', 'matric_number', 'school']
     readonly_fields = ['wallet_balance', 'created_at', 'updated_at']
 
     fieldsets = (
         (None, {'fields': ('username', 'password')}),
         ('Personal Info', {'fields': ('first_name', 'last_name', 'email', 'phone', 'bio', 'profile_image')}),
         ('StudEx Role', {'fields': ('user_type',)}),
-        ('Student Info', {'fields': ('matric_number', 'hostel')}),
+        ('Student Info', {'fields': ('school', 'matric_number', 'hostel')}),
         ('Vendor Info', {'fields': ('business_name', 'is_verified_vendor')}),
         ('Wallet', {'fields': ('wallet_balance',)}),
         ('Permissions', {'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions')}),

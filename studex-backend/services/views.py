@@ -3,6 +3,7 @@ from rest_framework import viewsets, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
+from django.db.models import Q
 from .models import Category, Listing, Transaction
 from .serializers import CategorySerializer, ListingSerializer, TransactionSerializer
 from rest_framework.views import APIView
@@ -52,6 +53,13 @@ class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = CategorySerializer
     permission_classes = [AllowAny]
 
+    def get_queryset(self):
+        user = self.request.user
+        campus = 'pau'
+        if user.is_authenticated:
+            campus = (getattr(user, 'school', 'pau') or 'pau').lower()
+        return Category.objects.filter(campus__in=[campus, 'all']).order_by('title')
+
 
 class ListingViewSet(viewsets.ModelViewSet):
     queryset = Listing.objects.all()
@@ -69,50 +77,68 @@ class ListingViewSet(viewsets.ModelViewSet):
         return [perm() for perm in permission_classes]
 
     def get_queryset(self):
-        queryset = self.queryset
+        user = self.request.user
 
-        # Filter by category slug or ID
-        category_param = self.request.query_params.get('category', None)
+        # Vendors see only their own listings — no campus filter needed
+        if user.is_authenticated and user.user_type == 'vendor':
+            return Listing.objects.filter(vendor=user).select_related('vendor', 'category')
+
+        # Public / student view — campus-scoped available listings
+        campus = 'pau'
+        if user.is_authenticated:
+            campus = (getattr(user, 'school', '') or 'pau').lower()
+
+        qs = Listing.objects.filter(campus=campus, is_available=True)
+
+        search = self.request.query_params.get('search')
+        if search:
+            qs = qs.filter(
+                Q(title__icontains=search) |
+                Q(description__icontains=search) |
+                Q(vendor__username__icontains=search) |
+                Q(vendor__business_name__icontains=search)
+            )
+
+        category_param = self.request.query_params.get('category')
         if category_param:
             if category_param.isdigit():
-                queryset = queryset.filter(category__id=category_param)
+                qs = qs.filter(category__id=category_param)
             else:
-                queryset = queryset.filter(category__slug=category_param)
+                qs = qs.filter(category__slug=category_param)
 
-        # Verified vendors see ONLY their own listings (vendor dashboard)
-        # Everyone else (buyers, guests, students) sees only available listings from all vendors
-        if self.request.user.is_authenticated and self.request.user.user_type == 'vendor':
-            return queryset.filter(vendor=self.request.user)
-
-        return queryset.filter(is_available=True)
+        return qs.select_related('vendor', 'category')
 
     def update(self, request, *args, **kwargs):
-        image_file = request.FILES.get('image')
-        if image_file:
-            image_url = upload_to_cloudinary(image_file, folder='studex/listings')
-            if image_url:
-                # Inject the Cloudinary URL into the request data
-                data = request.data.copy() if hasattr(request.data, 'copy') else dict(request.data)
-                data['image'] = image_url
-                request._full_data = data
         # Vendors cannot change is_available — only admin can via Django Admin
         if 'is_available' in request.data and not request.user.is_staff:
-            request.data._mutable = True if hasattr(request.data, '_mutable') else None
             try:
+                if hasattr(request.data, '_mutable'):
+                    request.data._mutable = True
                 request.data.pop('is_available')
             except Exception:
                 pass
         return super().update(request, *args, **kwargs)
+
+    def perform_update(self, serializer):
+        image_file = self.request.FILES.get('image')
+        if image_file:
+            image_url = upload_to_cloudinary(image_file, folder='studex/listings')
+            if image_url:
+                serializer.save(image=image_url)
+                return
+        serializer.save()
 
     def perform_create(self, serializer):
         image_url = None
         image_file = self.request.FILES.get('image')
         if image_file:
             image_url = upload_to_cloudinary(image_file, folder='studex/listings')
+        campus = (getattr(self.request.user, 'school', '') or 'pau').lower()
         listing = serializer.save(
             vendor=self.request.user,
             is_available=False,
-            image=image_url or ''
+            image=image_url or '',
+            campus=campus,
         )
         # Notify admin that a new listing needs review and approval
         try:

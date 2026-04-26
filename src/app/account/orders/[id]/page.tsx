@@ -93,29 +93,38 @@ export default function OrderDetailPage() {
     seller_completed: "bg-blue-100 text-blue-700",
     completed: "bg-emerald-100 text-emerald-700",
     disputed: "bg-red-100 text-red-700",
-    cancelled: "bg-gray-100 text-gray-500",
-  }[s] || "bg-gray-100 text-gray-500");
+    cancelled: "bg-stone-100 text-stone-500",
+  }[s] || "bg-stone-100 text-stone-500");
 
   const statusLabel = (s: string) => ({
-    pending: "Pending Payment", paid: "In Escrow", seller_completed: "Seller Completed",
-    completed: "Completed", disputed: "Disputed", cancelled: "Cancelled",
+    pending: "Pending Payment",
+    paid: "In Progress",
+    seller_completed: "Seller Completed",
+    completed: "Completed",
+    disputed: "Disputed",
+    cancelled: "Cancelled",
   }[s] || s);
 
   if (!isHydrated || loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950">
+    <div className="min-h-screen flex items-center justify-center bg-[#FAFAF9]">
       <motion.div animate={{ rotate: 360 }} transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}>
-        <Clock className="w-10 h-10 text-purple-600" />
+        <Clock className="w-10 h-10 text-teal-600" />
       </motion.div>
     </div>
   );
 
   if (error === "not_found" || !order) return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center p-6">
-      <div className="text-center bg-white dark:bg-gray-900 rounded-3xl p-8 shadow-xl">
+    <div className="min-h-screen bg-[#FAFAF9] flex items-center justify-center p-6">
+      <div className="text-center bg-white rounded-2xl p-8 shadow-sm border border-stone-200">
         <AlertCircle className="w-14 h-14 text-red-500 mx-auto mb-3" />
-        <h2 className="text-xl font-black text-gray-800 dark:text-white mb-2">Order Not Found</h2>
+        <h2 className="text-xl font-bold text-stone-800 mb-2">Order Not Found</h2>
         <Link href="/account/orders">
-          <button className="mt-4 px-6 py-3 bg-gradient-to-r from-purple-600 to-teal-500 text-white font-bold rounded-xl">Back to Orders</button>
+          <button
+            className="mt-4 px-6 py-3 text-white font-semibold rounded-full"
+            style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}
+          >
+            Back to Orders
+          </button>
         </Link>
       </div>
     </div>
@@ -125,61 +134,70 @@ export default function OrderDetailPage() {
   const isCompleted = order.status === 'completed';
 
   return (
-    <>
-      {/* TOP BAR */}
-      <motion.div initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
-        className="sticky top-0 bg-white dark:bg-gray-900 backdrop-blur-xl z-40 border-b border-gray-100 dark:border-gray-800 shadow-sm">
-        <div className="flex items-center justify-between p-4 max-w-4xl mx-auto">
+    <div className="min-h-screen bg-[#FAFAF9]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+      {/* HEADER */}
+      <div className="sticky top-0 bg-white/80 backdrop-blur-md z-40 border-b border-stone-100 shadow-sm">
+        <div className="flex items-center justify-between px-4 py-3 max-w-4xl mx-auto">
           <Link href="/account/orders">
-            <button className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition">
-              <ChevronLeft className="w-6 h-6 text-purple-600" />
+            <button className="p-2.5 bg-white border border-stone-200 rounded-full shadow-sm active:scale-95 transition-all">
+              <ChevronLeft className="w-5 h-5 text-stone-600" />
             </button>
           </Link>
-          <h1 className="text-xl font-black bg-gradient-to-r from-purple-600 to-teal-500 bg-clip-text text-transparent">Order Details</h1>
-          <button onClick={handleOpenChat}
-            className="p-2 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-full transition">
-            <MessageCircle className="w-6 h-6 text-purple-600" />
+          <h1 className="text-base font-bold text-stone-900" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+            Order Details
+          </h1>
+          <button
+            onClick={handleOpenChat}
+            className="p-2.5 bg-white border border-stone-200 rounded-full shadow-sm active:scale-95 transition-all"
+          >
+            <MessageCircle className="w-5 h-5 text-teal-600" />
           </button>
         </div>
-      </motion.div>
+      </div>
 
-      <div className="p-4 pb-24 space-y-4 max-w-4xl mx-auto bg-gray-50 dark:bg-gray-950 min-h-screen">
+      <div className="px-4 pt-6 pb-24 space-y-4 max-w-4xl mx-auto">
 
         {/* LOYALTY REWARD BANNER */}
         {loyaltyReward && (
           <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
-            className="bg-gradient-to-r from-amber-400 to-orange-400 rounded-2xl p-4 text-white text-center font-bold shadow-lg">
+            className="bg-gradient-to-r from-amber-400 to-orange-400 rounded-2xl p-4 text-white text-center font-semibold shadow-lg">
             {loyaltyReward}
           </motion.div>
         )}
 
         {/* ORDER HEADER */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-          className="bg-white dark:bg-gray-900 rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-gray-800">
+          className="bg-white rounded-2xl p-5 shadow-sm border border-stone-200">
           <div className="flex justify-between items-start">
             <div>
-              <p className="text-xs text-gray-400 font-medium">Reference</p>
-              <p className="font-black text-gray-800 dark:text-white text-sm mt-0.5">#{order.reference}</p>
-              <p className="text-xs text-gray-400 mt-1">{new Date(order.created_at).toLocaleDateString("en-NG", { day: "numeric", month: "long", year: "numeric" })}</p>
+              <p className="text-xs text-stone-400 font-medium">Reference</p>
+              <p className="font-semibold text-stone-800 text-sm mt-0.5">#{order.reference}</p>
+              <p className="text-xs text-stone-400 mt-1">
+                {new Date(order.created_at).toLocaleDateString("en-NG", {
+                  day: "numeric", month: "long", year: "numeric"
+                })}
+              </p>
             </div>
-            <div className={`px-3 py-1.5 rounded-full font-bold text-xs flex items-center gap-1.5 ${statusColor(order.status)}`}>
+            <div className={`px-3 py-1.5 rounded-full font-semibold text-xs flex items-center gap-1.5 ${statusColor(order.status)}`}>
               {isCompleted ? <CheckCircle className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
               {statusLabel(order.status)}
             </div>
           </div>
         </motion.div>
 
-        {/* ESCROW NOTICE */}
+        {/* IN-PROGRESS NOTICE */}
         {canConfirm && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
-            className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-2xl p-4">
+            className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
             <div className="flex gap-3">
               <Clock className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
               <div>
-                <p className="font-bold text-amber-900 dark:text-amber-300 text-sm">Payment Held in Escrow</p>
-                <p className="text-xs text-amber-800 dark:text-amber-400 mt-1">
-                  ₦{parseFloat(String(order.amount)).toLocaleString("en-NG", { minimumFractionDigits: 2 })} is secured.{" "}
-                  {order.status === 'seller_completed' ? "Seller marked complete — confirm to release payment." : "Waiting for seller to complete."}
+                <p className="font-semibold text-amber-900 text-sm">Awaiting Your Confirmation</p>
+                <p className="text-xs text-amber-800 mt-1">
+                  ₦{parseFloat(String(order.amount)).toLocaleString("en-NG", { minimumFractionDigits: 2 })} paid via Paystack.{" "}
+                  {order.status === 'seller_completed'
+                    ? "The vendor has marked this complete — confirm below if you received the service."
+                    : "Waiting for the vendor to deliver and mark the service complete."}
                 </p>
               </div>
             </div>
@@ -189,12 +207,14 @@ export default function OrderDetailPage() {
         {/* COMPLETED NOTICE */}
         {isCompleted && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
-            className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-700 rounded-2xl p-4">
+            className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4">
             <div className="flex gap-3">
               <CheckCircle className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
               <div>
-                <p className="font-bold text-emerald-900 dark:text-emerald-300 text-sm">Order Completed</p>
-                <p className="text-xs text-emerald-700 dark:text-emerald-400 mt-1">Payment has been released to the seller.</p>
+                <p className="font-semibold text-emerald-900 text-sm">Order Completed ✓</p>
+                <p className="text-xs text-emerald-700 mt-1">
+                  This order is complete. Paystack will transfer the vendor's share within 1-2 business days.
+                </p>
               </div>
             </div>
           </motion.div>
@@ -202,22 +222,22 @@ export default function OrderDetailPage() {
 
         {/* ORDER INFO */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
-          className="bg-white dark:bg-gray-900 rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-gray-800">
-          <h3 className="font-black text-gray-800 dark:text-white mb-4 flex items-center gap-2">
-            <Package className="w-5 h-5 text-purple-600" /> Order Info
+          className="bg-white rounded-2xl p-5 shadow-sm border border-stone-200">
+          <h3 className="font-semibold text-stone-800 mb-4 flex items-center gap-2">
+            <Package className="w-5 h-5 text-teal-600" /> Order Info
           </h3>
           <div className="space-y-3">
-            <div className="flex justify-between py-2 border-b border-gray-50 dark:border-gray-800">
-              <span className="text-sm text-gray-400">Item</span>
-              <span className="font-bold text-gray-800 dark:text-white text-sm">{order.listing?.title}</span>
+            <div className="flex justify-between py-2 border-b border-stone-50">
+              <span className="text-sm text-stone-400">Item</span>
+              <span className="font-semibold text-stone-800 text-sm">{order.listing?.title}</span>
             </div>
-            <div className="flex justify-between py-2 border-b border-gray-50 dark:border-gray-800">
-              <span className="text-sm text-gray-400">Seller</span>
-              <span className="font-bold text-gray-800 dark:text-white text-sm">{order.listing?.vendor?.username}</span>
+            <div className="flex justify-between py-2 border-b border-stone-50">
+              <span className="text-sm text-stone-400">Vendor</span>
+              <span className="font-semibold text-stone-800 text-sm">{order.listing?.vendor?.username}</span>
             </div>
             <div className="flex justify-between pt-2">
-              <span className="font-bold text-gray-700 dark:text-gray-300">Total</span>
-              <span className="font-black text-2xl text-purple-600">
+              <span className="font-semibold text-stone-700">Total</span>
+              <span className="font-bold text-2xl text-teal-700">
                 ₦{parseFloat(String(order.amount)).toLocaleString("en-NG", { minimumFractionDigits: 2 })}
               </span>
             </div>
@@ -226,13 +246,16 @@ export default function OrderDetailPage() {
 
         {/* CONFIRM BUTTON */}
         {canConfirm && (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="space-y-3">
-            <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
+            className="space-y-3">
+            <button
               onClick={() => setShowModal(true)}
-              className="w-full py-4 bg-gradient-to-r from-purple-600 to-teal-500 text-white rounded-2xl font-black text-base shadow-lg flex items-center justify-center gap-2">
-              <CheckCircle className="w-5 h-5" /> Confirm Receipt
-            </motion.button>
-            <button className="w-full py-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-2xl font-bold text-sm border border-red-100 dark:border-red-800">
+              className="w-full py-4 text-white rounded-full font-semibold text-base shadow-lg flex items-center justify-center gap-2 active:scale-[0.98] transition-all"
+              style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}
+            >
+              <CheckCircle className="w-5 h-5" /> Confirm Service Received
+            </button>
+            <button className="w-full py-3 bg-red-50 text-red-600 rounded-full font-semibold text-sm border border-red-100">
               Report an Issue
             </button>
           </motion.div>
@@ -256,35 +279,40 @@ export default function OrderDetailPage() {
           className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4"
           onClick={() => !confirming && setShowModal(false)}>
           <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
-            className="bg-white dark:bg-gray-900 rounded-3xl p-6 w-full max-w-md shadow-2xl"
+            className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl border border-stone-100"
             onClick={e => e.stopPropagation()}>
-            <h3 className="text-xl font-black text-gray-900 dark:text-white mb-2">Confirm Receipt?</h3>
-            <p className="text-gray-500 dark:text-gray-400 text-sm mb-5">Only confirm if you received the order. This releases payment to the seller.</p>
-            <div className="bg-purple-50 dark:bg-purple-900/20 rounded-xl p-4 mb-5 text-center">
-              <p className="text-xs text-gray-400">Amount to release</p>
-              <p className="text-3xl font-black text-purple-600 mt-1">
+            <h3 className="text-xl font-bold text-stone-900 mb-2">Confirm Service Received?</h3>
+            <p className="text-stone-500 text-sm mb-5">
+              Only confirm if the vendor delivered the service. This completes the order.
+            </p>
+            <div className="bg-teal-50 rounded-xl p-4 mb-5 text-center">
+              <p className="text-xs text-stone-400">Amount paid</p>
+              <p className="text-3xl font-bold text-teal-700 mt-1">
                 ₦{parseFloat(String(order.amount)).toLocaleString("en-NG", { minimumFractionDigits: 2 })}
               </p>
-              <p className="text-xs text-gray-400 mt-1">to {order.listing?.vendor?.username}</p>
+              <p className="text-xs text-stone-400 mt-1">to {order.listing?.vendor?.username}</p>
             </div>
-            <p className="text-xs text-center text-amber-600 dark:text-amber-400 mb-4">
-              🎁 Complete 5 orders to earn ₦100 loyalty credits!
+            <p className="text-xs text-center text-amber-600 mb-4">
+              🎁 Complete 10 orders to earn ₦200 loyalty credits!
             </p>
             <div className="flex gap-3">
               <button onClick={() => setShowModal(false)} disabled={confirming}
-                className="flex-1 py-3 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-xl font-bold disabled:opacity-50">
+                className="flex-1 py-3 bg-stone-100 text-stone-700 rounded-full font-semibold disabled:opacity-50">
                 Cancel
               </button>
-              <motion.button whileTap={{ scale: 0.97 }} onClick={handleConfirm} disabled={confirming}
-                className="flex-1 py-3 bg-gradient-to-r from-purple-600 to-teal-500 text-white rounded-xl font-black disabled:opacity-50 flex items-center justify-center gap-2">
+              <button onClick={handleConfirm} disabled={confirming}
+                className="flex-1 py-3 text-white rounded-full font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
+                style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
                 {confirming
-                  ? <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: "linear" }}><Clock className="w-5 h-5" /></motion.div>
+                  ? <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: "linear" }}>
+                      <Clock className="w-5 h-5" />
+                    </motion.div>
                   : <><CheckCircle className="w-5 h-5" /> Confirm</>}
-              </motion.button>
+              </button>
             </div>
           </motion.div>
         </motion.div>
       )}
-    </>
+    </div>
   );
 }

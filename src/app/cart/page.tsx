@@ -1,7 +1,7 @@
 // src/app/cart/page.tsx
 "use client";
 
-import { Plus, Minus, Trash2, ShoppingBag, ArrowRight, Sparkles, AlertCircle } from "lucide-react";
+import { Plus, Minus, Trash2, ShoppingBag, ArrowRight, Sparkles, AlertCircle, ChevronLeft } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -18,46 +18,32 @@ export default function CartPage() {
   const handleBack = () => {
     try {
       const prev = sessionStorage.getItem("cart-referrer");
-      if (prev) {
-        sessionStorage.removeItem("cart-referrer");
-        router.push(prev);
-      } else {
-        router.push("/categories");
-      }
-    } catch {
-      router.push("/categories");
-    }
+      if (prev) { sessionStorage.removeItem("cart-referrer"); router.push(prev); }
+      else router.push("/categories");
+    } catch { router.push("/categories"); }
   };
+
   const [unavailableIds, setUnavailableIds] = useState<Set<number>>(new Set());
   const [stockLimits, setStockLimits] = useState<Record<number, number>>({});
   const [checking, setChecking] = useState(true);
 
-  // On load, check each cart item's availability against backend
   useEffect(() => {
     if (cart.length === 0) { setChecking(false); return; }
     const checkAvailability = async () => {
       const unavailable = new Set<number>();
       const limits: Record<number, number> = {};
-      await Promise.all(cart.map(async (item) => {
+      await Promise.all(cart.map(async item => {
         try {
           const res = await fetch(`${API_URL}/api/services/listings/${item.id}/`);
           if (res.ok) {
             const data = await res.json();
-            if (!data.is_available || (data.track_inventory && data.stock_quantity === 0)) {
-              unavailable.add(item.id);
-            }
-            // Store stock limit for tracked items
-            if (data.track_inventory && data.stock_quantity > 0) {
-              limits[item.id] = data.stock_quantity;
-            }
-          } else {
-            unavailable.add(item.id);
-          }
+            if (!data.is_available || (data.track_inventory && data.stock_quantity === 0)) unavailable.add(item.id);
+            if (data.track_inventory && data.stock_quantity > 0) limits[item.id] = data.stock_quantity;
+          } else { unavailable.add(item.id); }
         } catch {}
       }));
       setUnavailableIds(unavailable);
       setStockLimits(limits);
-      // Clamp any cart quantities that exceed stock
       Object.entries(limits).forEach(([idStr, max]) => {
         const id = Number(idStr);
         const item = cart.find(i => i.id === id);
@@ -72,40 +58,27 @@ export default function CartPage() {
   const total = availableItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const hasUnavailable = unavailableIds.size > 0;
 
+  // ── EMPTY STATE ──────────────────────────────────────────────────────────
   if (cart.length === 0) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-purple-50 via-white to-teal-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 flex flex-col items-center justify-center px-8 pt-20 pb-32">
-        <motion.div initial={{ scale: 0, rotate: -180 }} animate={{ scale: 1, rotate: 0 }}
-          transition={{ type: "spring", stiffness: 200, damping: 20 }} className="relative">
-          <div className="absolute inset-0 blur-3xl">
-            <div className="w-64 h-64 bg-gradient-to-r from-purple-400 to-teal-400 rounded-full opacity-40 animate-pulse" />
+      <div className="min-h-screen bg-[#FAFAF9] flex flex-col items-center justify-center px-6 pb-28" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+        <motion.div
+          initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }}
+          className="text-center">
+          <div className="w-24 h-24 mx-auto mb-6 rounded-2xl flex items-center justify-center"
+            style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+            <ShoppingBag className="w-12 h-12 text-white" strokeWidth={1.5} />
           </div>
-          <motion.div initial={{ y: 20 }} animate={{ y: [0, -20, 0] }}
-            transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
-            className="relative z-10 bg-white/90 dark:bg-gray-800/90 backdrop-blur-xl rounded-3xl p-12 shadow-2xl border border-purple-100 dark:border-gray-700">
-            <ShoppingBag className="w-28 h-28 mx-auto text-purple-600 dark:text-purple-400" strokeWidth={1.5} />
-          </motion.div>
-          {[...Array(6)].map((_, i) => (
-            <motion.div key={i} initial={{ opacity: 0, scale: 0 }}
-              animate={{ opacity: [0.3, 1, 0.3], scale: [0, 1.5, 0],
-                x: Math.cos(i * 60 * Math.PI / 180) * 80,
-                y: Math.sin(i * 60 * Math.PI / 180) * 80 }}
-              transition={{ duration: 3, repeat: Infinity, delay: i * 0.3, ease: "easeOut" }}
-              className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
-              <Sparkles className="w-8 h-8 text-purple-500" />
-            </motion.div>
-          ))}
-        </motion.div>
-        <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }} className="text-center mt-12">
-          <h2 className="text-4xl font-black bg-gradient-to-r from-purple-600 to-teal-600 bg-clip-text text-transparent mb-3">
+          <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold mb-2">Empty Cart</p>
+          <h2 className="text-2xl font-bold text-stone-900 mb-2" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
             Your cart is empty
           </h2>
-          <p className="text-lg text-gray-600 dark:text-gray-400 mb-8">Time to add some glow to your life</p>
+          <p className="text-stone-400 text-sm mb-8">Add something from our services to get started.</p>
           <Link href="/categories">
-            <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-              className="px-10 py-5 bg-gradient-to-r from-purple-600 to-teal-600 text-white font-black text-xl rounded-full shadow-2xl flex items-center gap-3 mx-auto">
-              Browse Categories <ArrowRight className="w-6 h-6" />
+            <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+              className="px-8 py-3 text-white font-semibold rounded-full shadow-lg shadow-teal-200/60 inline-flex items-center gap-2 text-sm"
+              style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+              Browse Categories <ArrowRight className="w-4 h-4" />
             </motion.button>
           </Link>
         </motion.div>
@@ -114,74 +87,102 @@ export default function CartPage() {
   }
 
   return (
-    <>
-      <div className="sticky top-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl z-50 border-b border-gray-200 dark:border-gray-800">
-        <div className="flex items-center justify-between p-5">
+    <div className="min-h-screen bg-[#FAFAF9]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+
+      {/* ── STICKY HEADER ── */}
+      <div className="sticky top-0 bg-white/80 backdrop-blur-md z-40 border-b border-stone-100 shadow-sm">
+        <div className="flex items-center justify-between px-4 py-3">
           <button onClick={handleBack}
-            className="p-3 rounded-full bg-purple-100 dark:bg-purple-900/30 hover:bg-purple-200 transition-all active:scale-95">
-            <svg className="w-6 h-6 text-gray-900 dark:text-gray-100" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
+            className="p-2.5 bg-white border border-stone-200 hover:border-stone-300 rounded-full shadow-sm transition-all active:scale-95">
+            <ChevronLeft className="w-5 h-5 text-stone-600" />
           </button>
-          <h1 className="text-xl font-black text-gray-900 dark:text-white">Cart ({cart.length})</h1>
-          <button onClick={clearCart} className="text-red-500 dark:text-red-400 font-bold text-sm">Clear All</button>
+          <h1 className="text-base font-bold text-stone-900" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+            Cart ({cart.length})
+          </h1>
+          <button onClick={clearCart}
+            className="text-red-400 hover:text-red-600 font-medium text-sm transition-colors">
+            Clear All
+          </button>
         </div>
       </div>
 
-      <div className="p-5 pb-32 space-y-5 bg-[#FFF8F0] dark:bg-gray-950 min-h-screen">
+      <div className="px-4 pt-6 pb-28 space-y-4 max-w-2xl mx-auto">
 
-        {/* Unavailability warning banner */}
+        {/* ── SECTION HEADER ── */}
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}>
+          <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold">Your Order</p>
+          <h2 className="text-xl font-bold text-stone-900 mt-0.5" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+            Review your cart
+          </h2>
+        </motion.div>
+
+        {/* ── UNAVAILABILITY WARNING ── */}
         {!checking && hasUnavailable && (
           <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
-            className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-2xl p-4 flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-orange-500 flex-shrink-0 mt-0.5" />
+            className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
             <div>
-              <p className="font-bold text-orange-800 dark:text-orange-300 text-sm">Some items are unavailable</p>
-              <p className="text-orange-700 dark:text-orange-400 text-xs mt-0.5">
-                {unavailableIds.size} item{unavailableIds.size > 1 ? 's' : ''} in your cart {unavailableIds.size > 1 ? 'are' : 'is'} no longer available.
-                Remove {unavailableIds.size > 1 ? 'them' : 'it'} to proceed to checkout.
+              <p className="font-semibold text-amber-800 text-sm">Some items are unavailable</p>
+              <p className="text-amber-600 text-xs mt-0.5">
+                {unavailableIds.size} item{unavailableIds.size > 1 ? "s" : ""} in your cart {unavailableIds.size > 1 ? "are" : "is"} no longer available.
+                Remove {unavailableIds.size > 1 ? "them" : "it"} to proceed to checkout.
               </p>
             </div>
           </motion.div>
         )}
 
+        {/* ── CART ITEMS ── */}
         {cart.map((item, i) => {
           const isUnavailable = unavailableIds.has(item.id);
           return (
-            <motion.div key={item.id} initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: i * 0.1 }}
-              className={`bg-white dark:bg-gray-800 rounded-3xl p-5 shadow-lg border flex gap-4 relative overflow-hidden ${
-                isUnavailable
-                  ? 'border-red-200 dark:border-red-800 opacity-75'
-                  : 'border-purple-100 dark:border-gray-700'
+            <motion.div
+              key={item.id}
+              initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.08 }}
+              className={`bg-white rounded-2xl p-4 shadow-sm border flex gap-4 relative overflow-hidden transition-all ${
+                isUnavailable ? "border-red-200 opacity-70" : "border-stone-200 hover:border-teal-300 hover:shadow-md"
               }`}>
 
-              {/* Unavailable overlay label */}
+              {/* Unavailable badge */}
               {isUnavailable && (
-                <div className="absolute top-3 right-3 bg-red-500 text-white text-xs font-black px-2 py-1 rounded-full flex items-center gap-1">
+                <div className="absolute top-3 right-3 bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
                   <AlertCircle className="w-3 h-3" /> Unavailable
                 </div>
               )}
 
-              <div className={`relative w-24 h-24 rounded-2xl overflow-hidden ring-2 ${isUnavailable ? 'ring-red-200 grayscale' : 'ring-purple-100 dark:ring-purple-900/50'}`}>
-                <Image
-                  src={item.img?.startsWith("http") ? item.img : item.img?.startsWith("/") ? item.img : `/images/${item.img}`}
-                  alt={item.title} fill className="object-cover" />
+              {/* Image */}
+              <div className={`relative w-20 h-20 rounded-xl overflow-hidden flex-shrink-0 ${isUnavailable ? "grayscale" : ""}`}>
+                {item.img?.startsWith("http") || item.img?.startsWith("/") ? (
+                  <Image
+                    src={item.img.startsWith("http") ? item.img : item.img.startsWith("/") ? item.img : `/images/${item.img}`}
+                    alt={item.title} fill className="object-cover" />
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-br from-teal-50 to-purple-50 flex items-center justify-center">
+                    <Sparkles className="w-6 h-6 text-stone-300" />
+                  </div>
+                )}
               </div>
 
-              <div className="flex-1">
-                <h3 className="font-black text-lg text-gray-900 dark:text-white">{item.title}</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">₦{item.price.toLocaleString()} each</p>
+              {/* Info */}
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold text-stone-900 text-sm leading-tight truncate">{item.title}</h3>
+                <p className="text-xs text-stone-400 mt-0.5">₦{item.price.toLocaleString()} each</p>
+
                 {isUnavailable ? (
-                  <p className="text-red-500 text-xs font-bold mt-1">This item is sold out or no longer available</p>
+                  <p className="text-red-500 text-xs font-medium mt-1">No longer available</p>
                 ) : (
                   <>
-                    <p className="text-2xl font-black text-purple-600 dark:text-purple-400 mt-1">
+                    <p className="text-lg font-bold mt-1" style={{
+                      background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)",
+                      WebkitBackgroundClip: "text",
+                      WebkitTextFillColor: "transparent",
+                      backgroundClip: "text",
+                    }}>
                       ₦{(item.price * item.quantity).toLocaleString()}
                     </p>
                     {stockLimits[item.id] && (
-                      <p className="text-xs text-orange-500 font-semibold mt-0.5">
-                        Max: {stockLimits[item.id]} available
+                      <p className="text-xs text-amber-500 font-medium mt-0.5">
+                        Max {stockLimits[item.id]} available
                         {item.quantity >= stockLimits[item.id] && " · Limit reached"}
                       </p>
                     )}
@@ -189,57 +190,87 @@ export default function CartPage() {
                 )}
               </div>
 
-              <div className="flex flex-col justify-between items-end gap-4">
+              {/* Controls */}
+              <div className="flex flex-col justify-between items-end gap-3 flex-shrink-0">
                 {!isUnavailable && (
-                  <div className="flex items-center gap-3 bg-purple-50 dark:bg-purple-900/30 rounded-full px-4 py-2">
-                    <button onClick={() => updateQuantity(item.id, Math.max(1, item.quantity - 1))}>
-                      <Minus className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                  <div className="flex items-center gap-2 bg-stone-100 rounded-full px-3 py-1.5">
+                    <button onClick={() => updateQuantity(item.id, Math.max(1, item.quantity - 1))}
+                      className="text-stone-500 hover:text-teal-600 transition">
+                      <Minus className="w-4 h-4" />
                     </button>
-                    <span className="font-black text-purple-700 dark:text-purple-300 w-8 text-center">{item.quantity}</span>
+                    <span className="font-bold text-stone-700 w-5 text-center text-sm">{item.quantity}</span>
                     <button onClick={() => {
                       const max = stockLimits[item.id];
                       if (max && item.quantity >= max) return;
                       updateQuantity(item.id, item.quantity + 1);
-                    }}>
-                      <Plus className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                    }} className="text-stone-500 hover:text-teal-600 transition">
+                      <Plus className="w-4 h-4" />
                     </button>
                   </div>
                 )}
-                <button onClick={() => removeFromCart(item.id)} className="text-red-500 dark:text-red-400">
-                  <Trash2 className="w-6 h-6" />
+                <button onClick={() => removeFromCart(item.id)}
+                  className="text-stone-300 hover:text-red-400 transition">
+                  <Trash2 className="w-5 h-5" />
                 </button>
               </div>
             </motion.div>
           );
         })}
 
-        {/* Total & Checkout — only show if there are available items */}
+        {/* ── ORDER SUMMARY + CHECKOUT ── */}
         {availableItems.length > 0 && (
-          <motion.div initial={{ y: 40, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.3 }}
-            className="bg-gradient-to-r from-purple-600 to-teal-600 rounded-3xl p-6 text-white shadow-2xl">
-            <div className="flex justify-between items-center mb-2">
-              <p className="text-2xl font-black">Total</p>
-              <p className="text-4xl font-black">₦{total.toLocaleString()}</p>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
+            className="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm space-y-4">
+
+            {/* Summary */}
+            <div>
+              <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold mb-3">Order Summary</p>
+              <div className="space-y-2">
+                {availableItems.map(item => (
+                  <div key={item.id} className="flex justify-between items-center text-sm">
+                    <span className="text-stone-500 truncate max-w-[60%]">{item.title} × {item.quantity}</span>
+                    <span className="text-stone-700 font-medium">₦{(item.price * item.quantity).toLocaleString()}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="border-t border-stone-100 mt-3 pt-3 flex justify-between items-center">
+                <span className="font-bold text-stone-900" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>Total</span>
+                <span className="text-2xl font-bold" style={{
+                  background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                  backgroundClip: "text",
+                }}>₦{total.toLocaleString()}</span>
+              </div>
+              {hasUnavailable && (
+                <p className="text-amber-500 text-xs mt-1">Unavailable items excluded from total</p>
+              )}
             </div>
-            {hasUnavailable && (
-              <p className="text-white/70 text-xs mb-4">Unavailable items excluded from total</p>
-            )}
+
+            {/* Checkout button */}
             <Link href={hasUnavailable ? "#" : "/checkout"}
-              onClick={e => { if (hasUnavailable) { e.preventDefault(); } }}>
-              <motion.button whileHover={{ scale: hasUnavailable ? 1 : 1.02 }} whileTap={{ scale: 0.98 }}
+              onClick={e => { if (hasUnavailable) e.preventDefault(); }}>
+              <motion.button
+                whileHover={{ scale: hasUnavailable ? 1 : 1.02 }}
+                whileTap={{ scale: 0.98 }}
                 disabled={hasUnavailable}
-                className={`w-full py-5 font-black text-xl rounded-3xl shadow-xl flex items-center justify-center gap-3 transition ${
+                className={`w-full py-4 font-semibold text-sm rounded-full flex items-center justify-center gap-2 transition-all ${
                   hasUnavailable
-                    ? 'bg-white/40 text-white/60 cursor-not-allowed'
-                    : 'bg-white text-purple-600'
-                }`}>
-                {hasUnavailable ? 'Remove unavailable items first' : <>Checkout Now <ArrowRight className="w-6 h-6" /></>}
+                    ? "bg-stone-100 text-stone-400 cursor-not-allowed"
+                    : "text-white shadow-lg shadow-teal-200/60"
+                }`}
+                style={hasUnavailable ? {} : { background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+                {hasUnavailable
+                  ? "Remove unavailable items first"
+                  : <> Checkout Now <ArrowRight className="w-4 h-4" /></>
+                }
               </motion.button>
             </Link>
           </motion.div>
         )}
+
       </div>
-    </>
+    </div>
   );
 }

@@ -14,7 +14,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             'id', 'username', 'email', 'phone', 'password', 'password2',
-            'user_type', 'matric_number', 'hostel'
+            'user_type', 'matric_number', 'hostel', 'school'
         ]
         extra_kwargs = {
             'email': {'required': True},
@@ -42,12 +42,15 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
 
         return value
 
-    # ✅ EMAIL VALIDATION (FIXED + CLEANED)
+    # ✅ EMAIL VALIDATION
     def validate_email(self, value):
         value = value.lower().strip()
 
-        if not value.endswith('@pau.edu.ng'):
-            raise serializers.ValidationError("Only @pau.edu.ng email addresses are allowed")
+        allowed_domains = ('@pau.edu.ng', '@futo.edu.ng', '@gmail.com')
+        if not any(value.endswith(d) for d in allowed_domains):
+            raise serializers.ValidationError(
+                "Use your @pau.edu.ng, @futo.edu.ng, or Gmail address"
+            )
 
         if User.objects.filter(email__iexact=value).exists():
             raise serializers.ValidationError("Email already exists")
@@ -148,7 +151,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             'id', 'username', 'email', 'phone', 'user_type',
-            'matric_number', 'hostel', 'business_name', 'is_verified_vendor',
+            'matric_number', 'hostel', 'school', 'business_name', 'is_verified_vendor',
             'bio', 'profile_image', 'wallet_balance', 'created_at', 'profile',
             'is_staff', 'is_superuser',
             'whatsapp', 'instagram',
@@ -289,3 +292,65 @@ class SellerApplicationSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         return data
+
+
+class VendorListSerializer(serializers.ModelSerializer):
+    profile_picture = serializers.SerializerMethodField()
+    vendor_badge = serializers.SerializerMethodField()
+    rating = serializers.SerializerMethodField()
+    total_reviews = serializers.SerializerMethodField()
+    completion_rate = serializers.SerializerMethodField()
+    total_listings = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = [
+            'id', 'username', 'business_name', 'profile_picture',
+            'bio', 'vendor_badge', 'rating', 'total_reviews',
+            'completion_rate', 'total_listings', 'hostel',
+        ]
+
+    def get_profile_picture(self, obj):
+        if not obj.profile_image:
+            return None
+        try:
+            url = str(obj.profile_image.url) if hasattr(obj.profile_image, 'url') else str(obj.profile_image)
+        except Exception:
+            return None
+        if url.startswith('http'):
+            return url
+        try:
+            from cloudinary.utils import cloudinary_url
+            result, _ = cloudinary_url(url)
+            return result
+        except Exception:
+            pass
+        request = self.context.get('request')
+        return request.build_absolute_uri(url) if request else url
+
+    def get_vendor_badge(self, obj):
+        try:
+            return obj.profile.vendor_badge
+        except Profile.DoesNotExist:
+            return 'none'
+
+    def get_rating(self, obj):
+        try:
+            return float(obj.profile.rating)
+        except Profile.DoesNotExist:
+            return 0.0
+
+    def get_total_reviews(self, obj):
+        try:
+            return obj.profile.total_reviews
+        except Profile.DoesNotExist:
+            return 0
+
+    def get_completion_rate(self, obj):
+        try:
+            return float(obj.profile.completion_rate)
+        except Profile.DoesNotExist:
+            return 0.0
+
+    def get_total_listings(self, obj):
+        return obj.listings.filter(is_available=True).count()

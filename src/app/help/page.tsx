@@ -74,7 +74,7 @@ export default function HelpPage() {
         <motion.div {...fadeInUp} className="space-y-5">
           {/* WHATSAPP */}
           <motion.a
-            href="https://wa.me/2348123456789"
+            href="https://wa.me/2348027291641"
             target="_blank"
             rel="noopener noreferrer"
             {...cardHover}
@@ -87,7 +87,7 @@ export default function HelpPage() {
                 </div>
                 <div>
                   <p className="font-black text-gray-800">WhatsApp Support</p>
-                  <p className="text-xs text-gray-600">Instant reply • +234 812 345 6789</p>
+                  <p className="text-xs text-gray-600">Instant reply • +234 9081439022</p>
                 </div>
               </div>
               <ChevronRight className="w-5 h-5 text-gray-400" />
@@ -96,7 +96,7 @@ export default function HelpPage() {
 
           {/* EMAIL */}
           <motion.a
-            href="mailto:support@studex.com"
+            href="mailto:studex.biz@pau.edu.ng"
             {...cardHover}
             className="block"
           >
@@ -107,7 +107,7 @@ export default function HelpPage() {
                 </div>
                 <div>
                   <p className="font-black text-gray-800">Email Us</p>
-                  <p className="text-xs text-gray-600">Reply in &lt; 2 hrs • support@studex.com</p>
+                  <p className="text-xs text-gray-600">Reply in &lt; 2 hrs • studex.biz@pau.edu.ng</p>
                 </div>
               </div>
               <ChevronRight className="w-5 h-5 text-gray-400" />
@@ -127,7 +127,7 @@ export default function HelpPage() {
                 </div>
                 <div>
                   <p className="font-black text-gray-800">Call Support</p>
-                  <p className="text-xs text-gray-600">Toll-free • +234 800 123 4567</p>
+                  <p className="text-xs text-gray-600">Toll-free • +2348027291641</p>
                 </div>
               </div>
               <ChevronRight className="w-5 h-5 text-gray-400" />
