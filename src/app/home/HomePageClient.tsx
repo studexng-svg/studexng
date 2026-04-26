@@ -174,7 +174,7 @@ export default function HomePageClient({ initialVendors, initialListings }: Prop
     return (b.vendor?.profile?.completion_rate || 0) - (a.vendor?.profile?.completion_rate || 0);
   });
 
-  const featuredListings = sortedListings.slice(0, 6);
+  const featuredListings = sortedListings;
 
   return (
     <>
