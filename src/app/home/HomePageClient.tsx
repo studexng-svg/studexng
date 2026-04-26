@@ -415,6 +415,7 @@ export default function HomePageClient({ initialVendors, initialListings }: Prop
                     const rating = listing.vendor?.profile?.rating;
                     const totalReviews = listing.vendor?.profile?.total_reviews;
                     const wishlisted = mounted && isInWishlist(listing.id);
+                    const isService = (listing.listing_type || "").toLowerCase() !== "product";
 
                     return (
                       <motion.div
@@ -424,6 +425,9 @@ export default function HomePageClient({ initialVendors, initialListings }: Prop
                         viewport={{ once: true }}
                         transition={{ delay: Math.min(i * 0.05, 0.25) }}
                         className="bg-white rounded-2xl shadow-sm border border-stone-100 overflow-hidden">
+
+                        {/* ── Clickable card body (image + description) ── */}
+                        <Link href={`/listing/${listing.id}`} className="block">
 
                         {/* ── Image with overlays ── */}
                         <div className="relative w-full h-48 overflow-hidden">
@@ -479,11 +483,13 @@ export default function HomePageClient({ initialVendors, initialListings }: Prop
                             </div>
                           )}
                           <p className="text-sm text-stone-500 line-clamp-2 leading-relaxed">
-                            {listing.description || "Tap to view details and book this service."}
+                            {listing.description || "Tap to view details."}
                           </p>
                         </div>
 
-                        {/* ── Price + Book ── */}
+                        </Link>
+
+                        {/* ── Price + Book / Order ── */}
                         <div className="px-4 py-3 flex items-center justify-between">
                           <div>
                             <p className="text-xs text-stone-400 font-medium">Price</p>
@@ -496,7 +502,7 @@ export default function HomePageClient({ initialVendors, initialListings }: Prop
                               whileHover={{ scale: 1.04 }}
                               whileTap={{ scale: 0.96 }}
                               className="px-6 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-full font-semibold text-sm shadow-sm transition-colors">
-                              Book
+                              {isService ? "Book" : "Order"}
                             </motion.button>
                           </Link>
                         </div>
