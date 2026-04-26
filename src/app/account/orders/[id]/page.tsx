@@ -279,7 +279,7 @@ export default function OrderDetailPage() {
           className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4"
           onClick={() => !confirming && setShowModal(false)}>
           <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
-            className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl border border-stone-100"
+            className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl border border-stone-100 mb-20 sm:mb-0"
             onClick={e => e.stopPropagation()}>
             <h3 className="text-xl font-bold text-stone-900 mb-2">Confirm Service Received?</h3>
             <p className="text-stone-500 text-sm mb-5">

@@ -311,22 +311,17 @@ class VendorListSerializer(serializers.ModelSerializer):
         ]
 
     def get_profile_picture(self, obj):
-        if not obj.profile_image:
+        pic = getattr(obj, 'profile_image', None) or getattr(obj, 'profile_picture', None) or getattr(obj, 'avatar', None)
+        if not pic:
             return None
-        try:
-            url = str(obj.profile_image.url) if hasattr(obj.profile_image, 'url') else str(obj.profile_image)
-        except Exception:
-            return None
-        if url.startswith('http'):
-            return url
-        try:
-            from cloudinary.utils import cloudinary_url
-            result, _ = cloudinary_url(url)
-            return result
-        except Exception:
-            pass
-        request = self.context.get('request')
-        return request.build_absolute_uri(url) if request else url
+        if hasattr(pic, 'url'):
+            try:
+                return pic.url
+            except Exception:
+                return None
+        if isinstance(pic, str) and pic.startswith('http'):
+            return pic
+        return None
 
     def get_vendor_badge(self, obj):
         try:
