@@ -64,7 +64,7 @@ class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
 class ListingViewSet(viewsets.ModelViewSet):
     queryset = Listing.objects.all()
     serializer_class = ListingSerializer
-    filterset_fields = ['is_available', 'vendor']
+    filterset_fields = ['is_available']
     search_fields = ['title', 'description', 'vendor__username', 'vendor__business_name']
     ordering_fields = ['price', 'created_at', 'title']
     ordering = ['-created_at']
@@ -80,7 +80,7 @@ class ListingViewSet(viewsets.ModelViewSet):
         user = self.request.user
 
         # Public vendor profile filter — bypass all other logic
-        vendor_username = self.request.query_params.get('vendor')
+        vendor_username = self.request.query_params.get('vendor_username')
         if vendor_username:
             qs = Listing.objects.filter(vendor__username=vendor_username)
             return qs.select_related('vendor', 'category')
