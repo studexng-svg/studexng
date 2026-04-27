@@ -490,6 +490,7 @@ class ResetPasswordView(APIView):
 
 # ─── Public Vendor List ───────────────────────────────────────────────────────
 
+from rest_framework import generics
 from rest_framework.generics import ListAPIView
 from rest_framework.pagination import PageNumberPagination
 from django.db.models import Case, When, Value, IntegerField
@@ -534,3 +535,12 @@ class VendorListView(ListAPIView):
             .annotate(badge_order=badge_order)
             .order_by('badge_order', '-profile__rating')
         )
+
+
+class VendorDetailView(generics.RetrieveAPIView):
+    serializer_class = VendorListSerializer
+    permission_classes = [AllowAny]
+    lookup_field = 'username'
+
+    def get_queryset(self):
+        return User.objects.filter(is_verified_vendor=True).select_related('profile')

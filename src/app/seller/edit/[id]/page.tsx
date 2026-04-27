@@ -94,6 +94,11 @@ export default function EditProductPage() {
     if (!category) { setError("Category is required"); return; }
     if (!description.trim()) { setError("Description is required"); return; }
 
+    if (!newImageFile && !existingImage) {
+      setError("Please upload a listing image before saving.");
+      return;
+    }
+
     setSaving(true);
     setError("");
 
@@ -165,7 +170,7 @@ export default function EditProductPage() {
         <div className="space-y-3">
           <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold">Photo</p>
           <h2 className="text-lg font-bold text-stone-900" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
-            Service Photo
+            Service Photo <span className="text-red-500">*</span>
           </h2>
 
           {imagePreview ? (

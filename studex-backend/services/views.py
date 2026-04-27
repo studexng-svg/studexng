@@ -79,6 +79,12 @@ class ListingViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
 
+        # Public vendor profile filter — bypass all other logic
+        vendor_username = self.request.query_params.get('vendor')
+        if vendor_username:
+            qs = Listing.objects.filter(vendor__username=vendor_username, is_available=True)
+            return qs.select_related('vendor', 'category')
+
         # Vendors see only their own listings — no campus filter needed
         if user.is_authenticated and user.user_type == 'vendor':
             return Listing.objects.filter(vendor=user).select_related('vendor', 'category')

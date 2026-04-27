@@ -138,7 +138,7 @@ export default function AddService() {
           <div className="space-y-3">
             <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold">Photos</p>
             <h2 className="text-lg font-bold text-stone-900" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
-              Service Photos <span className="text-stone-400 font-normal text-sm">(up to 4)</span>
+              Service Photos <span className="text-red-500">*</span> <span className="text-stone-400 font-normal text-sm">(up to 4)</span>
             </h2>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {previews.map((src, index) => (

@@ -1,6 +1,7 @@
 # payments/views.py
 import hmac
 import hashlib
+import uuid
 import requests
 import logging
 import json
@@ -242,6 +243,110 @@ def get_checkout_config(request):
             "transaction_charge": 20000,
             "bearer": "account",
         } if subaccount_code else None,
+    })
+
+
+# ─────────────────────────────────────────
+# INITIALIZE PAYMENT
+# Server-side Paystack transaction init with subaccount split.
+# ─────────────────────────────────────────
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def initialize_payment(request):
+    """
+    POST /api/payments/initialize/
+    Calls Paystack /transaction/initialize with subaccount split and returns
+    { authorization_url, access_code, reference }.
+    """
+    listing_id = request.data.get("listing_id")
+    if not listing_id:
+        return Response({"error": "listing_id is required."}, status=400)
+
+    try:
+        from services.models import Listing
+        listing = Listing.objects.select_related("vendor").get(id=listing_id)
+    except Exception:
+        return Response({"error": "Listing not found."}, status=404)
+
+    buyer = request.user
+    amount = Decimal(str(listing.price))
+
+    discount_amount = Decimal("0")
+    try:
+        profile = buyer.profile
+        if profile.profile_bonus_eligible and not profile.profile_bonus_used:
+            discount_amount = (amount * Decimal("0.05")).quantize(Decimal("0.01"))
+    except Exception:
+        pass
+
+    final_amount = amount - discount_amount
+    checkout_amount = final_amount + SERVICE_FEE
+    total_amount_kobo = int(checkout_amount * 100)
+
+    reference = f"STX-{uuid.uuid4().hex[:16].upper()}"
+
+    callback_url = (
+        request.data.get("callback_url")
+        or getattr(settings, "PAYSTACK_CALLBACK_URL", "")
+        or ""
+    )
+
+    payload = {
+        "email": buyer.email,
+        "amount": total_amount_kobo,
+        "reference": reference,
+        "callback_url": callback_url,
+        "metadata": {
+            "listing_id": listing_id,
+            "buyer_id": buyer.id,
+            "type": "service",
+            "discount_amount": str(discount_amount),
+        },
+    }
+
+    subaccount_code = None
+    try:
+        bank_account = SellerBankAccount.objects.get(user=listing.vendor)
+        subaccount_code = bank_account.paystack_subaccount_code or None
+    except SellerBankAccount.DoesNotExist:
+        pass
+
+    if subaccount_code:
+        payload["subaccount"] = subaccount_code
+        payload["transaction_charge"] = 30000  # ₦300 StudEx fee in kobo
+        payload["bearer"] = "account"  # StudEx bears Paystack transaction fees
+    else:
+        logger.warning(
+            f"initialize_payment: no subaccount for vendor {listing.vendor.username} "
+            f"(listing {listing_id}). Full amount goes to StudEx settlement account."
+        )
+
+    secret_key = (getattr(settings, "PAYSTACK_SECRET_KEY", "") or "").strip()
+    if not secret_key:
+        return Response({"error": "Payment gateway not configured."}, status=503)
+
+    headers = {"Authorization": f"Bearer {secret_key}", "Content-Type": "application/json"}
+    try:
+        res = requests.post(
+            f"{PAYSTACK_BASE}/transaction/initialize",
+            headers=headers,
+            json=payload,
+            timeout=15,
+        )
+    except Exception as e:
+        logger.error(f"Paystack initialize request failed: {e}")
+        return Response({"error": "Payment initialization failed."}, status=500)
+
+    if res.status_code not in [200, 201]:
+        logger.error(f"Paystack init error {res.status_code}: {res.text[:300]}")
+        return Response({"error": "Payment initialization failed."}, status=500)
+
+    data = res.json().get("data", {})
+    return Response({
+        "authorization_url": data.get("authorization_url"),
+        "access_code": data.get("access_code"),
+        "reference": data.get("reference", reference),
     })
 
 

@@ -4,6 +4,7 @@ from rest_framework_simplejwt.views import TokenRefreshView
 from . import views
 from .views import SellerApplicationViewSet, ForgotPasswordView, ResetPasswordView
 from .views import check_profile_completion, check_username, send_otp, verify_otp
+from .views import VendorDetailView
 
 # Router for Seller Application endpoints
 router = DefaultRouter()
@@ -40,6 +41,7 @@ urlpatterns = [
     #   POST       /api/auth/seller/applications/revoke/{user_id}/
     path('', include(router.urls)),
 
-    # Public vendor list
+    # Public vendor list + detail
     path('vendors/', views.VendorListView.as_view(), name='vendor-list'),
+    path('vendors/<str:username>/', VendorDetailView.as_view(), name='vendor-detail'),
 ]

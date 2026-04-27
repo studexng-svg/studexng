@@ -344,9 +344,16 @@ export default function HomePageClient({ initialVendors, initialListings }: Prop
                     viewport={{ once: true }}
                     transition={{ delay: i * 0.06 }}
                     className="flex-shrink-0 flex flex-col items-center gap-2 w-20">
-                    <Link href={`/category/${vendor.username}`}>
+                    <Link href={`/vendor/${vendor.username}`}>
                       <motion.div whileTap={{ scale: 0.95 }} className="relative cursor-pointer">
-                        <VendorAvatar src={vendor.profile_picture} name={vendor.business_name || vendor.username} />
+                        <div style={{
+                          borderRadius: '50%',
+                          padding: '2px',
+                          background: 'linear-gradient(135deg, #0b1a18 0%, #1a0b2e 100%)',
+                          display: 'inline-block',
+                        }}>
+                          <VendorAvatar src={vendor.profile_picture} name={vendor.business_name || vendor.username} />
+                        </div>
                         {vendor.vendor_badge && vendor.vendor_badge !== "none" && (
                           <div className={`absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full border-2 border-white flex items-center justify-center text-[8px] font-bold
                             ${vendor.vendor_badge === "top" ? "bg-amber-400" : vendor.vendor_badge === "trusted" ? "bg-teal-500" : "bg-purple-500"}`}>

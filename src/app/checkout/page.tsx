@@ -36,16 +36,6 @@ export default function CheckoutPage() {
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [paystackLoaded, setPaystackLoaded] = useState(false);
-  const [subaccountCode, setSubaccountCode] = useState<string | null>(null);
-
-  // Prefetch subaccount on page load so handlePayment stays synchronous
-  useEffect(() => {
-    if (!isServiceBooking || !booking?.providerId) return;
-    fetchWithAuth(`${API_URL}/api/payments/seller-bank-account/`)
-      .then(r => r.json())
-      .then(data => setSubaccountCode(data.paystack_subaccount_code || null))
-      .catch(() => setSubaccountCode(null));
-  }, [isServiceBooking, booking?.providerId]);
 
   // Poll for Paystack script loaded by layout.tsx; inject fallback if needed
   useEffect(() => {
@@ -99,7 +89,7 @@ export default function CheckoutPage() {
     return data.order_id;
   };
 
-  const handlePayment = useCallback(() => {
+  const handlePayment = useCallback(async () => {
     const paystackKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || "";
 
     if (!paystackKey || paystackKey.includes("your_key")) {
@@ -110,56 +100,52 @@ export default function CheckoutPage() {
     if (!window.PaystackPop) { alert("Payment system not ready. Please refresh."); return; }
 
     setIsProcessing(true);
-    const ref = `STUDEX-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
-
-    const config: Record<string, any> = {
-      key: paystackKey,
-      email: user?.email || "user@studex.ng",
-      amount: Math.round(finalTotal * 100),
-      currency: "NGN",
-      ref,
-      metadata: {
-        custom_fields: [],
-        listing_id: isServiceBooking ? booking?.providerId : null,
-        type: isServiceBooking ? "service_booking" : "product_order",
-        customer: user?.username || "",
-      },
-      callback: function(response: any) {
-        if (response.status === "success") {
-          createOrder(response.reference, response.reference)
-            .then(orderId => {
-              if (isFoodOrder) clearCart();
-              if (isServiceBooking) clearBooking();
-              router.push(`/order-confirmation/${orderId}`);
-            })
-            .catch(() => {
-              alert(`Payment received but order failed. Contact support with ref: ${response.reference}`);
-              setIsProcessing(false);
-            });
-        } else {
-          setIsProcessing(false);
-        }
-      },
-      onClose: function() {
-        setIsProcessing(false);
-      },
-    };
-
-    if (subaccountCode && subaccountCode.startsWith("ACCT_")) {
-      config.subaccount = subaccountCode;
-      config.transaction_charge = 20000;
-      config.bearer = "account";
-    }
 
     try {
-      const handler = window.PaystackPop.setup(config);
+      const listingId = isServiceBooking ? booking?.providerId : cart[0]?.id;
+
+      // Step 1 — initialize payment on backend (this sets up the subaccount split)
+      const initRes = await fetchWithAuth(`${API_URL}/api/payments/initialize/`, {
+        method: "POST",
+        body: JSON.stringify({ listing_id: listingId }),
+      });
+      const initData = await initRes.json();
+      if (!initRes.ok) throw new Error(initData.error || "Failed to initialize payment");
+
+      const { access_code, reference } = initData;
+
+      // Step 2 — open Paystack popup with access_code from backend
+      const handler = window.PaystackPop.setup({
+        key: paystackKey,
+        access_code,
+        email: user?.email || "user@studex.ng",
+        ref: reference,
+        callback: function(response: any) {
+          if (response.status === "success") {
+            createOrder(response.reference, response.reference)
+              .then(orderId => {
+                if (isFoodOrder) clearCart();
+                if (isServiceBooking) clearBooking();
+                router.push(`/order-confirmation/${orderId}`);
+              })
+              .catch(() => {
+                alert(`Payment received but order failed. Contact support with ref: ${response.reference}`);
+                setIsProcessing(false);
+              });
+          } else {
+            setIsProcessing(false);
+          }
+        },
+        onClose: function() {
+          setIsProcessing(false);
+        },
+      });
       handler.openIframe();
     } catch (err: any) {
-      console.error("Paystack error:", err);
-      alert("Could not open payment. Please refresh and try again.");
+      alert(err.message || "Payment failed. Please try again.");
       setIsProcessing(false);
     }
-  }, [finalTotal, user, isFoodOrder, isServiceBooking, subaccountCode, paystackLoaded]);
+  }, [finalTotal, user, isFoodOrder, isServiceBooking, booking, cart, paystackLoaded]);
 
   // ── EMPTY STATE ──────────────────────────────────────────────────────────
   if (!isFoodOrder && !isServiceBooking) {
