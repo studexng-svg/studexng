@@ -11,6 +11,7 @@ import { useCartStore } from "@/lib/cartStore";
 import { useBookingStore } from "@/lib/bookingStore";
 import { useRouter } from "next/navigation";
 import { useAuth, fetchWithAuth } from "@/lib/authStore";
+import Script from "next/script";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -373,6 +374,11 @@ export default function CheckoutPage() {
         </p>
 
       </div>
+
+      <Script
+        src="https://js.paystack.co/v1/inline.js"
+        strategy="beforeInteractive"
+      />
     </div>
   );
 }
