@@ -18,7 +18,7 @@ const PAU_HOSTELS = [
 const FUTO_HOSTELS = [
   "Tetfund Boys", "Tetfund Girls", "NDDC Hostel",
   "Hostel A", "Hostel B", "Hostel C", "Hostel D", "Hostel E",
-  "Umuchima", "Eziobodo", "Off-Campus",
+  "Umuchima", "PG Hostel","Eziobodo", "Off-Campus",
 ];
 
 const SCHOOLS = ["PAU", "FUTO"];
