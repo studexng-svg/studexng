@@ -166,7 +166,7 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
   };
 
   const today = new Date().toISOString().split("T")[0];
-  const isService = listing?.listing_type === "service" || !listing?.listing_type;
+  const isService = (listing?.listing_type || "").toLowerCase() === "service";
 
   // ── NOT FOUND ──────────────────────────────────────────────────────────────
   if (!listing) return (
@@ -387,7 +387,7 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
                       onClick={openBooking}
                       className="w-full py-3.5 text-white font-semibold rounded-full flex items-center justify-center gap-2 text-sm shadow-lg shadow-teal-200/60"
                       style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
-                      <Calendar className="w-4 h-4" /> Book Now
+                      <Calendar className="w-4 h-4" /> Book
                     </motion.button>
                   </div>
                 )}

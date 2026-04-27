@@ -333,7 +333,7 @@ export default function CategoryPageClient({ slug, initialListings }: Props) {
                             {listing.is_available && listing.listing_type !== "service" && (
                               <motion.button whileTap={{ scale: 0.95 }} onClick={() => handleAddToCart(listing)}
                                 className="px-4 py-2.5 bg-gradient-to-r from-purple-600 to-teal-500 text-white font-bold rounded-xl shadow text-sm flex items-center gap-1.5">
-                                <ShoppingCart className="w-4 h-4" /> Add
+                                <ShoppingCart className="w-4 h-4" /> Order
                               </motion.button>
                             )}
                             {listing.is_available && listing.listing_type === "service" && (

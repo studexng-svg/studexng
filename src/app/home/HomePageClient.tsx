@@ -118,17 +118,14 @@ export default function HomePageClient({ initialVendors, initialListings }: Prop
     }).catch(() => {});
   }, [isHydrated, isLoggedIn, (user as any)?.school]);
 
-  const filters = ["All", "Services", "Products", "Food", "Beauty"];
+  const filters = ["All", "Services", "Products"];
   const handleFilter = (filter: string) => {
     setActiveFilter(filter);
     if (filter === "All") { setListings(allListings); return; }
     const filtered = allListings.filter(l => {
-      const cat = (l.category?.title || "").toLowerCase();
       const type = (l.listing_type || "").toLowerCase();
       if (filter === "Services") return type === "service";
       if (filter === "Products") return type === "product";
-      if (filter === "Food") return cat.includes("food") || cat.includes("drink");
-      if (filter === "Beauty") return cat.includes("nail") || cat.includes("lash") || cat.includes("hair") || cat.includes("make") || cat.includes("brow") || cat.includes("body");
       return true;
     });
     setListings(filtered);
@@ -420,7 +417,7 @@ export default function HomePageClient({ initialVendors, initialListings }: Prop
                     const rating = listing.vendor?.profile?.rating;
                     const totalReviews = listing.vendor?.profile?.total_reviews;
                     const wishlisted = mounted && isInWishlist(listing.id);
-                    const isService = (listing.listing_type || "").toLowerCase() !== "product";
+                    const isService = (listing.listing_type || "").toLowerCase() === "service";
 
                     return (
                       <motion.div
