@@ -7,9 +7,11 @@ export interface RegisterData {
   phone: string;
   password: string;
   password2: string;
-  user_type: "student" | "vendor";
+  user_type: string;
+  hostel: string;
+  school: string;
   matric_number?: string;
-  hostel?: string;
+  campus?: string;
   business_name?: string;
 }
 

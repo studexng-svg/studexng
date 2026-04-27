@@ -287,7 +287,7 @@ class SellerApplicationSerializer(serializers.ModelSerializer):
         user = self.context['request'].user
         # Delete any previous application (one per user)
         SellerApplication.objects.filter(user=user).delete()
-        application = SellerApplication.objects.create(**validated_data)
+        application = SellerApplication.objects.create(user=user, **validated_data)
         return application
 
     def validate(self, data):

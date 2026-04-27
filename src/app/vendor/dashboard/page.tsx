@@ -666,7 +666,7 @@ function ListingsTab() {
             </div>
             <label className="flex items-center gap-3 bg-white border border-dashed border-stone-300 rounded-xl px-4 py-3 cursor-pointer hover:border-teal-400 hover:bg-teal-50/30 transition">
               <ImageIcon className="w-4 h-4 text-stone-400" />
-              <span className="text-sm text-stone-400">{form.image ? form.image.name : "Upload image (optional)"}</span>
+              <span className="text-sm text-stone-400">{form.image ? form.image.name : "Upload image"}</span>
               <input type="file" accept="image/*" className="hidden" onChange={e => setForm(f => ({ ...f, image: e.target.files?.[0] || null }))} />
             </label>
             <select value={form.listing_type} onChange={e => setForm(f => ({ ...f, listing_type: e.target.value }))}
