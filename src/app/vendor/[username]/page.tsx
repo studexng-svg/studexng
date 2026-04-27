@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { ChevronLeft, Star, Sparkles } from "lucide-react";
 import Link from "next/link";
+import { fetchWithAuth } from "@/lib/authStore";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -41,7 +42,7 @@ export default function VendorProfilePage() {
       try {
         const [vRes, lRes] = await Promise.all([
           fetch(`${API_URL}/api/auth/vendors/${username}/`),
-          fetch(`${API_URL}/api/services/listings/?vendor=${username}`),
+          fetchWithAuth(`${API_URL}/api/services/listings/?vendor=${username}`),
         ]);
         if (vRes.ok) setVendor(await vRes.json());
         if (lRes.ok) {
