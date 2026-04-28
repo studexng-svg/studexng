@@ -1,7 +1,6 @@
 // src/app/admin/sellers/page.tsx
 "use client";
 
-import { motion } from "framer-motion";
 import { Store, CheckCircle, Clock, Search, Eye, Users, ArrowLeft } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -34,11 +33,7 @@ export default function AdminSellers() {
   return (
     <>
       {/* TOP BAR */}
-      <motion.div
-        initial={{ y: -100 }}
-        animate={{ y: 0 }}
-        className="sticky top-0 z-50 bg-gradient-to-r from-slate-900 via-purple-900 to-slate-900 border-b border-white/10 backdrop-blur-xl"
-      >
+      <div className="sticky top-0 z-50 bg-gradient-to-r from-slate-900 via-purple-900 to-slate-900 border-b border-white/10 backdrop-blur-xl animate-fadeUp">
         <div className="flex items-center justify-between px-5 py-4">
           <button onClick={() => router.back()} className="text-white p-2 hover:bg-white/10 rounded-xl transition">
             <ArrowLeft className="w-6 h-6" />
@@ -60,27 +55,27 @@ export default function AdminSellers() {
             />
           </div>
         </div>
-      </motion.div>
+      </div>
 
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 px-5 pt-4 pb-32">
 
         {/* Compact Stats */}
         <div className="grid grid-cols-3 gap-3 mb-6">
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-white/5 rounded-2xl p-4 text-center border border-white/10">
+          <div className="bg-white/5 rounded-2xl p-4 text-center border border-white/10 animate-fadeIn">
             <Users className="w-8 h-8 mx-auto text-purple-400 mb-1" />
             <p className="text-2xl font-black text-white">{sellers.length}</p>
             <p className="text-xs text-white/60">Total</p>
-          </motion.div>
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }} className="bg-emerald-500/10 rounded-2xl p-4 text-center border border-emerald-500/30">
+          </div>
+          <div className="bg-emerald-500/10 rounded-2xl p-4 text-center border border-emerald-500/30 animate-fadeIn">
             <CheckCircle className="w-8 h-8 mx-auto text-emerald-400 mb-1" />
             <p className="text-2xl font-black text-white">{verifiedCount}</p>
             <p className="text-xs text-white/60">Verified</p>
-          </motion.div>
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }} className="bg-amber-500/10 rounded-2xl p-4 text-center border border-amber-500/30">
+          </div>
+          <div className="bg-amber-500/10 rounded-2xl p-4 text-center border border-amber-500/30 animate-fadeIn">
             <Clock className="w-8 h-8 mx-auto text-amber-400 mb-1" />
             <p className="text-2xl font-black text-white">{pendingCount}</p>
             <p className="text-xs text-white/60">Pending</p>
-          </motion.div>
+          </div>
         </div>
 
         {/* Clean Seller Cards */}
@@ -92,14 +87,10 @@ export default function AdminSellers() {
             </div>
           ) : (
             filtered.map((seller, i) => (
-              <motion.div
+              <div
                 key={seller.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.08 }}
-                whileTap={{ scale: 0.98 }}
                 onClick={() => viewSeller(seller.id)}
-                className="bg-white/5 backdrop-blur-xl rounded-2xl p-5 border border-white/10 hover:border-purple-500/50 transition-all cursor-pointer"
+                className="bg-white/5 backdrop-blur-xl rounded-2xl p-5 border border-white/10 hover:border-purple-500/50 transition-all cursor-pointer animate-fadeUp active:scale-[0.98]"
               >
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-4">
@@ -130,7 +121,7 @@ export default function AdminSellers() {
                   <span className="text-emerald-400 font-bold">{seller.totalSales}</span>
                   <Eye className="w-5 h-5 text-white/50" />
                 </div>
-              </motion.div>
+              </div>
             ))
           )}
         </div>

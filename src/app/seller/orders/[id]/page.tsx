@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ChevronLeft, Package, Tag, DollarSign, FileText, Calendar, MapPin, User, Clock, CheckCircle, AlertCircle } from "lucide-react";
 import Link from "next/link";
-import { motion } from "framer-motion";
+import { fetchWithAuth } from "@/lib/authStore";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -43,19 +43,9 @@ export default function SellerOrderDetailPage() {
   const [showCompleteModal, setShowCompleteModal] = useState(false);
 
   useEffect(() => {
-    const accessToken = localStorage.getItem("accessToken");
-
-    if (!accessToken) {
-      setError("Please log in to view orders");
-      setLoading(false);
-      return;
-    }
-
     const fetchOrder = async () => {
       try {
-        const res = await fetch(`${API_URL}/api/orders/${id}/`, {
-          headers: { Authorization: `Bearer ${accessToken}` },
-        });
+        const res = await fetchWithAuth(`${API_URL}/api/orders/${id}/`);
 
         if (!res.ok) {
           if (res.status === 404) {
@@ -85,14 +75,9 @@ export default function SellerOrderDetailPage() {
   const handleMarkAsComplete = async () => {
     if (!order) return;
     setCompleting(true);
-    const accessToken = localStorage.getItem("accessToken");
     try {
-      const res = await fetch(`${API_URL}/api/orders/${order.id}/mark_complete/`, {
+      const res = await fetchWithAuth(`${API_URL}/api/orders/${order.id}/mark_complete/`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken}`,
-        },
       });
       if (!res.ok) {
         const errorData = await res.json();
@@ -112,9 +97,9 @@ export default function SellerOrderDetailPage() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#FAFAF9]">
-        <motion.div animate={{ rotate: 360 }} transition={{ duration: 2, repeat: Infinity, ease: "linear" }}>
+        <div className="animate-spin">
           <Clock className="w-10 h-10 text-teal-600" />
-        </motion.div>
+        </div>
       </div>
     );
   }
@@ -307,16 +292,12 @@ export default function SellerOrderDetailPage() {
 
       {/* COMPLETE ORDER MODAL */}
       {showCompleteModal && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        <div
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fadeIn"
           onClick={() => !completing && setShowCompleteModal(false)}
         >
-          <motion.div
-            initial={{ scale: 0.95, y: 16 }}
-            animate={{ scale: 1, y: 0 }}
-            className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl border border-stone-100"
+          <div
+            className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl border border-stone-100 animate-fadeUp"
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="text-lg font-bold text-stone-900 mb-3" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
@@ -350,9 +331,9 @@ export default function SellerOrderDetailPage() {
               >
                 {completing ? (
                   <>
-                    <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: "linear" }}>
+                    <div className="animate-spin">
                       <Clock className="w-4 h-4" />
-                    </motion.div>
+                    </div>
                     Processing...
                   </>
                 ) : (
@@ -363,8 +344,8 @@ export default function SellerOrderDetailPage() {
                 )}
               </button>
             </div>
-          </motion.div>
-        </motion.div>
+          </div>
+        </div>
       )}
     </div>
   );

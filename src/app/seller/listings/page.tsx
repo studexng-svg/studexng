@@ -5,8 +5,7 @@ import { Package, ChevronLeft, Trash2, Pencil, AlertCircle, Plus } from "lucide-
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
-import { useAuth } from "@/lib/authStore";
+import { useAuth, fetchWithAuth } from "@/lib/authStore";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -28,24 +27,14 @@ export default function SellerListings() {
   const { user: authUser } = useAuth();
 
   useEffect(() => {
-    const accessToken = localStorage.getItem("accessToken");
-
-    if (!accessToken) {
+    if (!authUser) {
       router.push("/auth");
       return;
     }
 
     const fetchListings = async () => {
-      if (!accessToken) {
-        setError("Please log in to view your listings");
-        setLoading(false);
-        return;
-      }
-
       try {
-        const res = await fetch(`${API_URL}/api/listings/`, {
-          headers: { Authorization: `Bearer ${accessToken}` },
-        });
+        const res = await fetchWithAuth(`${API_URL}/api/listings/`);
 
         if (!res.ok) {
           if (res.status === 401) {
@@ -67,15 +56,13 @@ export default function SellerListings() {
     };
 
     fetchListings();
-  }, [router]);
+  }, [router, authUser]);
 
   const handleDelete = async (id: number) => {
     if (!confirm("Delete this product? This cannot be undone.")) return;
-    const accessToken = localStorage.getItem("accessToken");
     try {
-      const res = await fetch(`${API_URL}/api/listings/${id}/`, {
+      const res = await fetchWithAuth(`${API_URL}/api/listings/${id}/`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${accessToken}` },
       });
       if (res.ok) {
         setProducts(products.filter((p) => p.id !== id));
@@ -90,9 +77,9 @@ export default function SellerListings() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#FAFAF9]">
-        <motion.div animate={{ rotate: 360 }} transition={{ duration: 2, repeat: Infinity }}>
+        <div className="animate-spin">
           <Package className="w-10 h-10 text-teal-600" />
-        </motion.div>
+        </div>
       </div>
     );
   }
@@ -143,12 +130,7 @@ export default function SellerListings() {
           </div>
         ) : (
           products.map((p, i) => (
-            <motion.div
-              key={p.id}
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.06 }}
-            >
+            <div key={p.id} className="animate-fadeUp">
               <Link href={`/seller/listings/${p.id}`}>
                 <div className="bg-white border border-stone-200 rounded-2xl shadow-sm hover:border-teal-300 hover:shadow-md transition-all flex items-center justify-between p-4 gap-3">
                   <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -198,7 +180,7 @@ export default function SellerListings() {
                   </div>
                 </div>
               </Link>
-            </motion.div>
+            </div>
           ))
         )}
       </div>

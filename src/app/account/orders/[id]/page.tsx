@@ -1,5 +1,4 @@
 "use client";
-import { motion } from "framer-motion";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { Package, CheckCircle, Clock, AlertCircle, ChevronLeft, MessageCircle } from "lucide-react";
@@ -107,9 +106,9 @@ export default function OrderDetailPage() {
 
   if (!isHydrated || loading) return (
     <div className="min-h-screen flex items-center justify-center bg-[#FAFAF9]">
-      <motion.div animate={{ rotate: 360 }} transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}>
+      <div className="animate-spin">
         <Clock className="w-10 h-10 text-teal-600" />
-      </motion.div>
+      </div>
     </div>
   );
 
@@ -159,15 +158,13 @@ export default function OrderDetailPage() {
 
         {/* LOYALTY REWARD BANNER */}
         {loyaltyReward && (
-          <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
-            className="bg-gradient-to-r from-amber-400 to-orange-400 rounded-2xl p-4 text-white text-center font-semibold shadow-lg">
+          <div className="bg-gradient-to-r from-amber-400 to-orange-400 rounded-2xl p-4 text-white text-center font-semibold shadow-lg animate-fadeUp">
             {loyaltyReward}
-          </motion.div>
+          </div>
         )}
 
         {/* ORDER HEADER */}
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-2xl p-5 shadow-sm border border-stone-200">
+        <div className="bg-white rounded-2xl p-5 shadow-sm border border-stone-200 animate-fadeUp">
           <div className="flex justify-between items-start">
             <div>
               <p className="text-xs text-stone-400 font-medium">Reference</p>
@@ -183,12 +180,11 @@ export default function OrderDetailPage() {
               {statusLabel(order.status)}
             </div>
           </div>
-        </motion.div>
+        </div>
 
         {/* IN-PROGRESS NOTICE */}
         {canConfirm && (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
-            className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 animate-fadeUp">
             <div className="flex gap-3">
               <Clock className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
               <div>
@@ -201,13 +197,12 @@ export default function OrderDetailPage() {
                 </p>
               </div>
             </div>
-          </motion.div>
+          </div>
         )}
 
         {/* COMPLETED NOTICE */}
         {isCompleted && (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
-            className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4">
+          <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 animate-fadeUp">
             <div className="flex gap-3">
               <CheckCircle className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
               <div>
@@ -217,12 +212,11 @@ export default function OrderDetailPage() {
                 </p>
               </div>
             </div>
-          </motion.div>
+          </div>
         )}
 
         {/* ORDER INFO */}
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
-          className="bg-white rounded-2xl p-5 shadow-sm border border-stone-200">
+        <div className="bg-white rounded-2xl p-5 shadow-sm border border-stone-200 animate-fadeUp">
           <h3 className="font-semibold text-stone-800 mb-4 flex items-center gap-2">
             <Package className="w-5 h-5 text-teal-600" /> Order Info
           </h3>
@@ -242,12 +236,11 @@ export default function OrderDetailPage() {
               </span>
             </div>
           </div>
-        </motion.div>
+        </div>
 
         {/* CONFIRM BUTTON */}
         {canConfirm && (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
-            className="space-y-3">
+          <div className="space-y-3 animate-fadeUp">
             <button
               onClick={() => setShowModal(true)}
               className="w-full py-4 text-white rounded-full font-semibold text-base shadow-lg flex items-center justify-center gap-2 active:scale-[0.98] transition-all"
@@ -258,28 +251,28 @@ export default function OrderDetailPage() {
             <button className="w-full py-3 bg-red-50 text-red-600 rounded-full font-semibold text-sm border border-red-100">
               Report an Issue
             </button>
-          </motion.div>
+          </div>
         )}
 
         {/* REVIEW FORM */}
         {isCompleted && canReview && (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>
+          <div className="animate-fadeUp">
             <ReviewForm
               orderId={order.id}
               vendorName={order.listing?.vendor?.username}
               onSuccess={() => setCanReview(false)}
             />
-          </motion.div>
+          </div>
         )}
       </div>
 
       {/* CONFIRM MODAL */}
       {showModal && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4"
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4 animate-fadeIn"
           onClick={() => !confirming && setShowModal(false)}>
-          <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
-            className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl border border-stone-100 mb-20 sm:mb-0"
+          <div
+            className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl border border-stone-100 mb-20 sm:mb-0 animate-fadeUp"
             onClick={e => e.stopPropagation()}>
             <h3 className="text-xl font-bold text-stone-900 mb-2">Confirm Service Received?</h3>
             <p className="text-stone-500 text-sm mb-5">
@@ -304,14 +297,14 @@ export default function OrderDetailPage() {
                 className="flex-1 py-3 text-white rounded-full font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
                 style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
                 {confirming
-                  ? <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: "linear" }}>
+                  ? <div className="animate-spin">
                       <Clock className="w-5 h-5" />
-                    </motion.div>
+                    </div>
                   : <><CheckCircle className="w-5 h-5" /> Confirm</>}
               </button>
             </div>
-          </motion.div>
-        </motion.div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -13,7 +13,13 @@
       "Bash(python manage.py shell -c ' *)",
       "WebFetch(domain:www.pexels.com)",
       "Bash(curl -L https://videos.pexels.com/video-files/7683405/7683405-hd_1920_1080_30fps.mp4 -H 'Referer: https://www.pexels.com/' -o /c/Users/HomePC/Documents/studexng/public/videos/hero.mp4 --progress-bar)",
-      "Bash(echo \"Exit code: $?\")"
+      "Bash(echo \"Exit code: $?\")",
+      "WebSearch",
+      "Bash(curl -sI \"https://www.pexels.com/download/video/9694501/\" -L --max-redirs 5)",
+      "Bash(curl -sI https://www.pexels.com/download/video/27165007/ -H 'User-Agent: Mozilla/5.0 \\(Windows NT 10.0; Win64; x64\\) AppleWebKit/537.36' -L --max-redirs 10)",
+      "Bash(curl -sI \"https://assets.mixkit.co/videos/48365/48365-preview-preview.mp4\")",
+      "Bash(curl -sI \"https://assets.mixkit.co/videos/preview/mixkit-dancing-african-fishermen-on-a-boat-48365-large.mp4\")",
+      "WebFetch(domain:coverr.co)"
     ]
   }
 }

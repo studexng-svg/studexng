@@ -5,8 +5,7 @@ import { Package, Clock, CheckCircle, ChevronLeft, Calendar, MapPin, User, Dolla
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
-import { useAuth } from "@/lib/authStore";
+import { useAuth, fetchWithAuth } from "@/lib/authStore";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -40,24 +39,14 @@ export default function SellerOrdersPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    const accessToken = localStorage.getItem("accessToken");
-
-    if (!accessToken) {
+    if (!authUser) {
       router.push("/auth");
       return;
     }
 
     const fetchOrders = async () => {
-      if (!accessToken) {
-        setError("Please log in to view orders");
-        setLoading(false);
-        return;
-      }
-
       try {
-        const res = await fetch(`${API_URL}/api/orders/pending/`, {
-          headers: { Authorization: `Bearer ${accessToken}` },
-        });
+        const res = await fetchWithAuth(`${API_URL}/api/orders/pending/`);
 
         if (!res.ok) {
           if (res.status === 401) {
@@ -86,7 +75,7 @@ export default function SellerOrdersPage() {
     };
 
     fetchOrders();
-  }, [router]);
+  }, [router, authUser]);
 
   const pendingCount = orders.length;
   const completedToday = 0;
@@ -94,9 +83,9 @@ export default function SellerOrdersPage() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#FAFAF9]">
-        <motion.div animate={{ rotate: 360 }} transition={{ duration: 2, repeat: Infinity, ease: "linear" }}>
+        <div className="animate-spin">
           <Clock className="w-10 h-10 text-teal-600" />
-        </motion.div>
+        </div>
       </div>
     );
   }
@@ -156,12 +145,7 @@ export default function SellerOrdersPage() {
         ) : (
           <div className="space-y-3">
             {orders.map((order, index) => (
-              <motion.div
-                key={order.id}
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.05 }}
-              >
+              <div key={order.id} className="animate-fadeUp">
                 <Link href={`/seller/orders/${order.id}`}>
                   <div className="bg-white border border-stone-200 rounded-2xl shadow-sm hover:border-teal-300 hover:shadow-md transition-all overflow-hidden">
                     {/* Card header */}
@@ -238,7 +222,7 @@ export default function SellerOrdersPage() {
                     </div>
                   </div>
                 </Link>
-              </motion.div>
+              </div>
             ))}
           </div>
         )}

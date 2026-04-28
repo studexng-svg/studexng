@@ -1,6 +1,5 @@
 "use client";
 import { useState } from "react";
-import { motion } from "framer-motion";
 import { Star } from "lucide-react";
 import { fetchWithAuth } from "@/lib/authStore";
 
@@ -34,11 +33,10 @@ export default function ReviewForm({ orderId, vendorName, onSuccess }: {
   };
 
   if (submitted) return (
-    <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
-      className="bg-teal-50 border border-teal-200 rounded-2xl p-5 text-center">
+    <div className="bg-teal-50 border border-teal-200 rounded-2xl p-5 text-center animate-fadeUp">
       <p className="font-bold text-teal-800">Review submitted! ⭐</p>
       <p className="text-sm text-teal-700 mt-1">Thanks for rating {vendorName}.</p>
-    </motion.div>
+    </div>
   );
 
   return (
@@ -53,14 +51,14 @@ export default function ReviewForm({ orderId, vendorName, onSuccess }: {
 
       <div className="flex gap-2">
         {[1, 2, 3, 4, 5].map(star => (
-          <motion.button key={star} whileTap={{ scale: 0.8 }}
+          <button key={star} className="tap-scale"
             onClick={() => setRating(star)}
             onMouseEnter={() => setHovered(star)}
             onMouseLeave={() => setHovered(0)}>
             <Star className={`w-9 h-9 transition-all ${
               star <= (hovered || rating) ? "fill-amber-400 text-amber-400" : "text-stone-200"
             }`} />
-          </motion.button>
+          </button>
         ))}
       </div>
 
@@ -80,14 +78,13 @@ export default function ReviewForm({ orderId, vendorName, onSuccess }: {
 
       {error && <p className="text-red-500 text-sm">{error}</p>}
 
-      <motion.button
-        whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
+      <button
         onClick={handleSubmit}
         disabled={submitting || !rating}
-        className="w-full py-3 rounded-full font-semibold text-white text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+        className="w-full py-3 rounded-full font-semibold text-white text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all hover-scale tap-scale"
         style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
         {submitting ? "Submitting..." : "Submit Review"}
-      </motion.button>
+      </button>
     </div>
   );
 }

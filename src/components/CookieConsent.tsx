@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion"; // kept for exit animation
 import { X, Cookie } from "lucide-react";
 import Link from "next/link";
 
@@ -63,14 +63,12 @@ export default function CookieConsent() {
                     <p className="text-gray-500 text-xs">Essential & Analytics</p>
                   </div>
                 </div>
-                <motion.button
-                  whileHover={{ scale: 1.1, rotate: 90 }}
-                  whileTap={{ scale: 0.9 }}
+                <button
                   onClick={() => setIsVisible(false)}
-                  className="text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0"
+                  className="text-gray-400 hover:text-gray-600 hover:scale-110 hover:rotate-90 active:scale-90 transition-all flex-shrink-0"
                 >
                   <X className="w-4 h-4" />
-                </motion.button>
+                </button>
               </div>
 
               {/* Description */}
@@ -97,23 +95,19 @@ export default function CookieConsent() {
 
               {/* Buttons */}
               <div className="flex gap-2 pt-1">
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
+                <button
                   onClick={handleReject}
-                  className="flex-1 px-2 py-1.5 text-xs font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-all duration-200"
+                  className="flex-1 px-2 py-1.5 text-xs font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-all duration-200 hover-scale tap-scale"
                 >
                   Reject
-                </motion.button>
+                </button>
 
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
+                <button
                   onClick={handleAccept}
-                  className="flex-1 px-2 py-1.5 text-xs font-semibold text-white bg-gradient-to-r from-purple-600 to-teal-600 hover:from-purple-700 hover:to-teal-700 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg"
+                  className="flex-1 px-2 py-1.5 text-xs font-semibold text-white bg-gradient-to-r from-purple-600 to-teal-600 hover:from-purple-700 hover:to-teal-700 rounded-lg transition-all duration-200 shadow-md hover:shadow-lg hover-scale tap-scale"
                 >
                   Accept
-                </motion.button>
+                </button>
               </div>
             </div>
           </div>

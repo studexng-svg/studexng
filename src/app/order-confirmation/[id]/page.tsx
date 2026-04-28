@@ -3,7 +3,6 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
 import Link from "next/link";
 import {
   CheckCircle,
@@ -109,11 +108,11 @@ export default function OrderConfirmationPage() {
         </h2>
         <p className="text-sm text-stone-400 mb-6">{error || "We couldn't load this order."}</p>
         <Link href="/home">
-          <motion.button whileTap={{ scale: 0.97 }}
-            className="px-6 py-3 rounded-full font-semibold text-white text-sm"
+          <button
+            className="px-6 py-3 rounded-full font-semibold text-white text-sm tap-scale"
             style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
             Back to Home
-          </motion.button>
+          </button>
         </Link>
       </div>
     );
@@ -144,27 +143,17 @@ export default function OrderConfirmationPage() {
       <div className="px-4 pt-6 pb-56 md:pb-16 max-w-2xl mx-auto space-y-5">
 
         {/* SUCCESS ICON */}
-        <motion.div
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          transition={{ type: "spring", stiffness: 200, delay: 0.1 }}
-          className="flex justify-center pt-2"
-        >
+        <div className="flex justify-center pt-2 animate-fadeUp">
           <div
             className="w-20 h-20 rounded-full flex items-center justify-center shadow-lg"
             style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}
           >
             <CheckCircle className="w-10 h-10 text-white" />
           </div>
-        </motion.div>
+        </div>
 
         {/* HEADING */}
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="text-center"
-        >
+        <div className="text-center animate-fadeUp">
           <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold">Payment Successful</p>
           <h2 className="text-2xl font-bold text-stone-900 mt-0.5"
             style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
@@ -173,15 +162,10 @@ export default function OrderConfirmationPage() {
           <p className="text-sm text-stone-400 mt-1">
             Your order is in escrow and the seller has been notified.
           </p>
-        </motion.div>
+        </div>
 
         {/* ORDER DETAILS CARD */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.25 }}
-          className="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm space-y-4"
-        >
+        <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm space-y-4 animate-fadeUp">
           {/* Reference */}
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-teal-50 rounded-full flex items-center justify-center flex-shrink-0">
@@ -231,15 +215,10 @@ export default function OrderConfirmationPage() {
               <p className="text-xl font-bold text-stone-900 mt-0.5">₦{order.amount.toLocaleString()}</p>
             </div>
           </div>
-        </motion.div>
+        </div>
 
         {/* ESCROW INFO */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="bg-teal-50 border border-teal-100 rounded-2xl p-4 flex items-start gap-3"
-        >
+        <div className="bg-teal-50 border border-teal-100 rounded-2xl p-4 flex items-start gap-3 animate-fadeUp">
           <div className="w-9 h-9 bg-teal-600 rounded-full flex items-center justify-center flex-shrink-0">
             <Shield className="w-4 h-4 text-white" />
           </div>
@@ -253,51 +232,39 @@ export default function OrderConfirmationPage() {
               <span>You have 7 days to confirm or dispute</span>
             </div>
           </div>
-        </motion.div>
+        </div>
 
         {/* ACTION BUTTONS */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.35 }}
-          className="grid grid-cols-2 gap-3"
-        >
+        <div className="grid grid-cols-2 gap-3 animate-fadeUp">
           <Link href="/home" className="w-full">
-            <motion.button
-              whileTap={{ scale: 0.97 }}
-              className="w-full py-3 rounded-full font-semibold text-stone-600 bg-white border border-stone-200 text-sm flex items-center justify-center gap-2 shadow-sm transition-all"
+            <button
+              className="w-full py-3 rounded-full font-semibold text-stone-600 bg-white border border-stone-200 text-sm flex items-center justify-center gap-2 shadow-sm transition-all tap-scale"
             >
               <Home className="w-4 h-4" />
               Back to Home
-            </motion.button>
+            </button>
           </Link>
 
           <Link href={`/account/orders/${order.id}`} className="w-full">
-            <motion.button
-              whileTap={{ scale: 0.97 }}
-              className="w-full py-3 rounded-full font-semibold text-white text-sm flex items-center justify-center gap-2 transition-all"
+            <button
+              className="w-full py-3 rounded-full font-semibold text-white text-sm flex items-center justify-center gap-2 transition-all tap-scale"
               style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}
             >
               <Package className="w-4 h-4" />
               View Order
-            </motion.button>
+            </button>
           </Link>
-        </motion.div>
+        </div>
 
         {/* CONTACT SELLER */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-        >
-          <motion.button
-            whileTap={{ scale: 0.97 }}
-            className="w-full py-3 rounded-full font-semibold text-stone-600 bg-white border border-stone-200 text-sm flex items-center justify-center gap-2 shadow-sm transition-all"
+        <div className="animate-fadeUp">
+          <button
+            className="w-full py-3 rounded-full font-semibold text-stone-600 bg-white border border-stone-200 text-sm flex items-center justify-center gap-2 shadow-sm transition-all tap-scale"
           >
             <MessageCircle className="w-4 h-4" />
             Contact Seller
-          </motion.button>
-        </motion.div>
+          </button>
+        </div>
 
         {/* NOTE */}
         <p className="text-center text-xs text-stone-400">
@@ -305,11 +272,7 @@ export default function OrderConfirmationPage() {
         </p>
 
         {/* APP FEEDBACK */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.45 }}
-        >
+        <div className="animate-fadeUp">
           {feedbackSubmitted ? (
             <div className="bg-teal-50 border border-teal-200 rounded-2xl p-5 text-center">
               <p className="font-bold text-teal-800">Thanks for your feedback!</p>
@@ -328,14 +291,14 @@ export default function OrderConfirmationPage() {
 
               <div className="flex gap-2">
                 {[1, 2, 3, 4, 5].map(star => (
-                  <motion.button key={star} whileTap={{ scale: 0.8 }}
+                  <button key={star} className="tap-scale"
                     onClick={() => setFeedbackRating(star)}
                     onMouseEnter={() => setFeedbackHovered(star)}
                     onMouseLeave={() => setFeedbackHovered(0)}>
                     <Star className={`w-9 h-9 transition-all ${
                       star <= (feedbackHovered || feedbackRating) ? "fill-amber-400 text-amber-400" : "text-stone-200"
                     }`} />
-                  </motion.button>
+                  </button>
                 ))}
               </div>
 
@@ -355,17 +318,16 @@ export default function OrderConfirmationPage() {
 
               {feedbackError && <p className="text-red-500 text-sm">{feedbackError}</p>}
 
-              <motion.button
-                whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
+              <button
                 onClick={submitFeedback}
                 disabled={feedbackSubmitting || !feedbackRating}
-                className="w-full py-3 rounded-full font-semibold text-white text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all mb-4"
+                className="w-full py-3 rounded-full font-semibold text-white text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all mb-4 hover-scale tap-scale"
                 style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
                 {feedbackSubmitting ? "Submitting..." : "Submit Feedback"}
-              </motion.button>
+              </button>
             </div>
           )}
-        </motion.div>
+        </div>
 
       </div>
     </div>

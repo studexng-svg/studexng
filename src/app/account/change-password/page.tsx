@@ -3,7 +3,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
+import { fetchWithAuth } from "@/lib/authStore";
 import { Lock, ChevronLeft, Save, Eye, EyeOff, CheckCircle, XCircle } from "lucide-react";
 
 export default function ChangePasswordPage() {
@@ -58,16 +58,10 @@ export default function ChangePasswordPage() {
     }
 
     try {
-      const token = localStorage.getItem("accessToken");
-
-      const res = await fetch(
+      const res = await fetchWithAuth(
         `${process.env.NEXT_PUBLIC_API_URL}/api/auth/change-password/`,
         {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
           body: JSON.stringify({
             old_password: passwords.oldPassword,
             new_password: passwords.newPassword,
@@ -115,15 +109,11 @@ export default function ChangePasswordPage() {
         <div className="max-w-md mx-auto space-y-8">
           {/* SUCCESS MESSAGE */}
           {success && (
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              className="bg-emerald-50 border-2 border-emerald-200 rounded-2xl p-5 text-center"
-            >
+            <div className="bg-emerald-50 border-2 border-emerald-200 rounded-2xl p-5 text-center animate-fadeUp">
               <CheckCircle className="w-12 h-12 text-emerald-600 mx-auto mb-3" />
               <p className="font-semibold text-emerald-800">Password Changed!</p>
               <p className="text-sm text-emerald-700">Redirecting to profile...</p>
-            </motion.div>
+            </div>
           )}
 
           {/* FORM */}
@@ -191,14 +181,10 @@ export default function ChangePasswordPage() {
 
                 {/* ERROR */}
                 {error && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="bg-red-50 border border-red-200 rounded-xl p-3 text-red-700 text-sm font-medium flex items-center gap-2"
-                  >
+                  <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-red-700 text-sm font-medium flex items-center gap-2 animate-fadeUp">
                     <XCircle className="w-5 h-5" />
                     {error}
-                  </motion.div>
+                  </div>
                 )}
               </div>
 

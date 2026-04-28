@@ -5,7 +5,6 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ChevronLeft, Package, Tag, FileText, Calendar, Eye, TrendingUp, Edit3, ArrowLeft, AlertCircle } from "lucide-react";
 import Link from "next/link";
-import { motion } from "framer-motion";
 import { fetchWithAuth, useAuth } from "@/lib/authStore";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
@@ -64,9 +63,9 @@ export default function SellerProductDetails() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#FAFAF9]">
-        <motion.div animate={{ rotate: 360 }} transition={{ duration: 2, repeat: Infinity }}>
+        <div className="animate-spin">
           <Package className="w-10 h-10 text-teal-600" />
-        </motion.div>
+        </div>
       </div>
     );
   }

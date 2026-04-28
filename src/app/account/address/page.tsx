@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
 import {
   User, Mail, Phone, BookOpen, Layers, School, Heart,
   ShoppingBag, Store, Edit3, CheckCircle2, Lock, Save,
@@ -362,22 +361,19 @@ export default function ProfilePage() {
       <div className="px-4 pt-5 pb-32 space-y-6">
 
         {savedMsg && (
-          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
-            className="bg-emerald-50 border border-emerald-200 rounded-2xl p-3 text-center text-emerald-700 font-semibold text-sm">
+          <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-3 text-center text-emerald-700 font-semibold text-sm animate-fadeUp">
             ✓ {savedMsg}
-          </motion.div>
+          </div>
         )}
 
         {saveError && (
-          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
-            className="bg-red-50 border border-red-200 rounded-2xl p-3 text-center text-red-700 font-semibold text-sm">
+          <div className="bg-red-50 border border-red-200 rounded-2xl p-3 text-center text-red-700 font-semibold text-sm animate-fadeUp">
             ⚠️ {saveError}
-          </motion.div>
+          </div>
         )}
 
         {completionPct < 100 && !bonusGranted && (
-          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
-            className="text-white rounded-2xl p-5 shadow-lg"
+          <div className="text-white rounded-2xl p-5 shadow-lg animate-fadeUp"
             style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
             <div className="flex justify-between items-center">
               <div>
@@ -389,24 +385,22 @@ export default function ProfilePage() {
               <p className="text-4xl font-bold">{completionPct}%</p>
             </div>
             <div className="mt-3 bg-white/30 h-2.5 rounded-full overflow-hidden">
-              <motion.div initial={{ width: 0 }} animate={{ width: `${completionPct}%` }}
-                transition={{ duration: 0.8 }} className="h-full bg-white rounded-full" />
+              <div className="h-full bg-white rounded-full transition-[width] duration-700 ease-out" style={{ width: `${completionPct}%` }} />
             </div>
             {missingFields.length > 0 && (
               <p className="text-xs text-white/80 mt-2">Missing: {missingFields.join(" • ")}</p>
             )}
-          </motion.div>
+          </div>
         )}
 
         {bonusGranted && completionPct === 100 && (
-          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
-            className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-center gap-3">
+          <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-center gap-3 animate-fadeUp">
             <CheckCircle2 className="w-6 h-6 text-emerald-600 flex-shrink-0" />
             <div>
               <p className="font-semibold text-emerald-800 text-sm">Profile Complete!</p>
               <p className="text-xs text-emerald-700">5% discount applied to your first order</p>
             </div>
-          </motion.div>
+          </div>
         )}
 
         {/* Avatar */}
@@ -599,16 +593,15 @@ export default function ProfilePage() {
                 <p className="text-xs text-red-500 mt-2">{hostelError}</p>
               )}
 
-              <motion.button
-                whileTap={{ scale: 0.97 }}
+              <button
                 onClick={handleHostelSave}
                 disabled={hostelSaving || !profile.campus}
-                className="mt-3 w-full py-3 text-white rounded-full font-semibold text-sm shadow-md flex items-center justify-center gap-2 disabled:opacity-50"
+                className="mt-3 w-full py-3 text-white rounded-full font-semibold text-sm shadow-md flex items-center justify-center gap-2 disabled:opacity-50 tap-scale"
                 style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}
               >
                 <Save className="w-4 h-4" />
                 {hostelSaving ? "Saving..." : "Update Hostel"}
-              </motion.button>
+              </button>
             </div>
           </div>
         </div>
@@ -620,46 +613,46 @@ export default function ProfilePage() {
             { icon: ShoppingBag, label: "Bought",   value: stats.bought,   from: "from-purple-50", to: "to-indigo-50",   iconColor: "text-purple-600", numColor: "text-purple-700" },
             { icon: Heart,       label: "Wishlist", value: stats.wishlist, from: "from-pink-50",   to: "to-purple-50",   iconColor: "text-pink-600",   numColor: "text-pink-700" },
           ].map(({ icon: Icon, label, value, from, to, iconColor, numColor }) => (
-            <motion.div key={label} whileHover={{ y: -3 }}
-              className={`bg-gradient-to-br ${from} ${to} rounded-2xl p-4 text-center shadow-sm border border-white`}>
+            <div key={label}
+              className={`bg-gradient-to-br ${from} ${to} rounded-2xl p-4 text-center shadow-sm border border-white hover:-translate-y-1 transition-transform`}>
               <Icon className={`w-7 h-7 ${iconColor} mx-auto mb-1`} />
               <p className={`text-xl font-bold ${numColor}`}>{value}</p>
               <p className="text-xs text-stone-600 font-medium">{label}</p>
-            </motion.div>
+            </div>
           ))}
         </div>
 
         {/* Action Buttons */}
         <div className="space-y-3">
           {isEditing ? (
-            <motion.button whileTap={{ scale: 0.98 }} onClick={saveProfile}
+            <button onClick={saveProfile}
               disabled={saving || !!usernameError}
-              className="w-full py-4 text-white rounded-full font-semibold text-lg shadow-lg flex items-center justify-center gap-2 disabled:opacity-70"
+              className="w-full py-4 text-white rounded-full font-semibold text-lg shadow-lg flex items-center justify-center gap-2 disabled:opacity-70 tap-scale"
               style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
               <Save className="w-5 h-5" />
               {saving ? "Saving..." : "Save Changes"}
-            </motion.button>
+            </button>
           ) : (
-            <motion.button whileTap={{ scale: 0.98 }} onClick={() => setIsEditing(true)}
-              className="w-full py-4 text-white rounded-full font-semibold text-lg shadow-lg flex items-center justify-center gap-2"
+            <button onClick={() => setIsEditing(true)}
+              className="w-full py-4 text-white rounded-full font-semibold text-lg shadow-lg flex items-center justify-center gap-2 tap-scale"
               style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
               <Edit3 className="w-5 h-5" /> Edit Profile
-            </motion.button>
+            </button>
           )}
 
           {isEditing && (
-            <motion.button whileTap={{ scale: 0.98 }}
+            <button
               onClick={() => { setIsEditing(false); setSaveError(""); setUsernameError(""); loadProfile(); }}
-              className="w-full py-3 bg-stone-100 text-stone-600 rounded-full font-semibold text-base flex items-center justify-center gap-2">
+              className="w-full py-3 bg-stone-100 text-stone-600 rounded-full font-semibold text-base flex items-center justify-center gap-2 tap-scale">
               Cancel
-            </motion.button>
+            </button>
           )}
 
           <Link href="/account/change-password">
-            <motion.button whileTap={{ scale: 0.98 }}
-              className="w-full py-4 bg-white text-red-600 rounded-full font-semibold text-lg shadow border-2 border-red-100 flex items-center justify-center gap-2 mt-2">
+            <button
+              className="w-full py-4 bg-white text-red-600 rounded-full font-semibold text-lg shadow border-2 border-red-100 flex items-center justify-center gap-2 mt-2 tap-scale">
               <Lock className="w-5 h-5" /> Change Password
-            </motion.button>
+            </button>
           </Link>
         </div>
 

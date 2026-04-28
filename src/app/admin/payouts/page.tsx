@@ -1,7 +1,6 @@
 // src/app/admin/payouts/page.tsx
 "use client";
 
-import { motion } from "framer-motion";
 import {
   ChevronLeft,
   DollarSign,
@@ -129,11 +128,7 @@ function AdminPayouts() {
   return (
     <>
       {/* TOP BAR */}
-      <motion.div
-        initial={{ y: -100 }}
-        animate={{ y: 0 }}
-        className="sticky top-0 z-50 bg-gradient-to-r from-slate-900 via-purple-900 to-slate-900 border-b border-white/10 backdrop-blur-xl"
-      >
+      <div className="sticky top-0 z-50 bg-gradient-to-r from-slate-900 via-purple-900 to-slate-900 border-b border-white/10 backdrop-blur-xl animate-fadeUp">
         <div className="flex items-center justify-between px-5 py-4">
           <button onClick={() => router.back()} className="p-2 hover:bg-white/10 rounded-xl transition">
             <ChevronLeft className="w-6 h-6 text-white" />
@@ -163,7 +158,7 @@ function AdminPayouts() {
             />
           </div>
         </div>
-      </motion.div>
+      </div>
 
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 px-5 pt-4 pb-32 space-y-6">
 
@@ -175,21 +170,18 @@ function AdminPayouts() {
             { label: "Approved", value: stats.approved, color: "from-blue-500 to-cyan-600" },
             { label: "Completed", value: stats.completed, color: "from-emerald-500 to-teal-600" },
           ].map((stat, i) => (
-            <motion.div
+            <div
               key={stat.label}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.1 }}
-              className={`bg-gradient-to-br ${stat.color} rounded-2xl p-5 text-white shadow-xl`}
+              className={`bg-gradient-to-br ${stat.color} rounded-2xl p-5 text-white shadow-xl animate-fadeUp`}
             >
               <p className="text-sm opacity-90">{stat.label}</p>
               <p className="text-3xl font-black mt-1">{stat.value}</p>
-            </motion.div>
+            </div>
           ))}
         </div>
 
         {/* PENDING SUMMARY */}
-        <motion.div className="bg-gradient-to-r from-emerald-500 to-teal-600 rounded-3xl p-6 text-white shadow-2xl">
+        <div className="bg-gradient-to-r from-emerald-500 to-teal-600 rounded-3xl p-6 text-white shadow-2xl animate-fadeUp">
           <div className="flex justify-between items-start">
             <div>
               <p className="text-lg font-bold flex items-center gap-2">
@@ -207,7 +199,7 @@ function AdminPayouts() {
               <Download className="w-5 h-5" /> Export
             </button>
           </div>
-        </motion.div>
+        </div>
 
         {/* PAYOUTS LIST */}
         <div className="space-y-4">
@@ -219,13 +211,10 @@ function AdminPayouts() {
             </div>
           ) : (
             filteredPayouts.map((payout, i) => (
-              <motion.div
+              <div
                 key={payout.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.05 }}
                 onClick={() => router.push(`/admin/payouts/${payout.id}`)}
-                className="bg-white/5 backdrop-blur-xl rounded-2xl p-5 border border-white/10 hover:border-purple-500/50 hover:bg-white/10 transition cursor-pointer"
+                className="bg-white/5 backdrop-blur-xl rounded-2xl p-5 border border-white/10 hover:border-purple-500/50 hover:bg-white/10 transition cursor-pointer animate-fadeUp"
               >
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-4">
@@ -311,7 +300,7 @@ function AdminPayouts() {
                     <ArrowRight className="w-6 h-6 text-white/40 ml-2" />
                   </div>
                 )}
-              </motion.div>
+              </div>
             ))
           )}
         </div>

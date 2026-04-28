@@ -3,7 +3,6 @@
 
 import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
-import { motion } from "framer-motion";
 
 interface BackButtonProps {
   fallbackUrl?: string;
@@ -44,10 +43,8 @@ export default function BackButton({
   };
 
   return (
-    <motion.button
+    <button
       onClick={handleBack}
-      whileHover={{ scale: 1.05, x: -2 }}
-      whileTap={{ scale: 0.95 }}
       className={`
         flex items-center gap-2
         px-4 py-2
@@ -56,6 +53,8 @@ export default function BackButton({
         border border-gray-200 dark:border-gray-700
         rounded-lg
         shadow-sm hover:shadow-md
+        hover:scale-[1.05] hover:-translate-x-0.5
+        active:scale-95
         transition-all duration-200
         font-medium text-sm
         ${className}
@@ -64,6 +63,6 @@ export default function BackButton({
     >
       <ArrowLeft className="w-4 h-4" />
       {label && <span>{label}</span>}
-    </motion.button>
+    </button>
   );
 }

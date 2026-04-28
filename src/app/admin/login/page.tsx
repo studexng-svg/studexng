@@ -74,7 +74,7 @@ export default function AdminLogin() {
           <div className="flex justify-between items-center mb-10">
             <motion.button
               whileTap={{ scale: 0.9 }}
-              onClick={() => router.push("/login")}
+              onClick={() => router.push("/auth")}
               className="text-white/70 hover:text-white flex items-center gap-2 text-sm font-medium transition"
             >
               <ArrowLeft className="w-5 h-5" />

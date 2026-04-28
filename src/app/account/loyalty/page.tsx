@@ -1,7 +1,6 @@
 // src/app/account/loyalty/page.tsx
 "use client";
 import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { Gift, Star, ChevronLeft, Loader } from "lucide-react";
 import { useAuth, fetchWithAuth } from "@/lib/authStore";
@@ -65,18 +64,16 @@ export default function LoyaltyPage() {
         ) : (
           <>
             {/* CREDIT BALANCE */}
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-              className="rounded-2xl p-6 text-white text-center shadow-xl"
+            <div className="rounded-2xl p-6 text-white text-center shadow-xl animate-fadeUp"
               style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
               <Gift className="w-12 h-12 mx-auto mb-3 opacity-90" />
               <p className="text-sm font-semibold opacity-80">Available Credits</p>
               <p className="text-5xl font-bold mt-1">₦{data.credit_balance.toLocaleString()}</p>
               <p className="text-sm opacity-80 mt-2">Applied automatically at checkout</p>
-            </motion.div>
+            </div>
 
             {/* PROGRESS TO NEXT REWARD */}
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
-              className="bg-white rounded-2xl p-5 shadow-sm border border-stone-200">
+            <div className="bg-white rounded-2xl p-5 shadow-sm border border-stone-200 animate-fadeUp">
               <div className="flex justify-between items-center mb-3">
                 <p className="font-semibold text-stone-800">Next Reward</p>
                 <span className="text-sm font-semibold text-teal-600">
@@ -84,11 +81,9 @@ export default function LoyaltyPage() {
                 </span>
               </div>
               <div className="w-full bg-stone-100 rounded-full h-3 overflow-hidden">
-                <motion.div
-                  initial={{ width: 0 }} animate={{ width: `${progress}%` }}
-                  transition={{ duration: 1, ease: "easeOut" }}
-                  className="h-full rounded-full"
-                  style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}
+                <div
+                  className="h-full rounded-full transition-[width] duration-700 ease-out"
+                  style={{ width: `${progress}%`, background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}
                 />
               </div>
               <div className="flex justify-between mt-2">
@@ -99,11 +94,10 @@ export default function LoyaltyPage() {
                   {data.orders_until_next_reward} more to go!
                 </p>
               </div>
-            </motion.div>
+            </div>
 
             {/* TOTAL ORDERS STAT */}
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
-              className="bg-white rounded-2xl p-5 shadow-sm border border-stone-200">
+            <div className="bg-white rounded-2xl p-5 shadow-sm border border-stone-200 animate-fadeUp">
               <div className="flex items-center gap-3">
                 <Star className="w-6 h-6 text-amber-500" />
                 <div>
@@ -113,12 +107,11 @@ export default function LoyaltyPage() {
                   <p className="text-sm text-stone-500">Total on-platform orders</p>
                 </div>
               </div>
-            </motion.div>
+            </div>
 
             {/* TRANSACTION HISTORY */}
             {data.recent_transactions.length > 0 && (
-              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
-                className="bg-white rounded-2xl p-5 shadow-sm border border-stone-200">
+              <div className="bg-white rounded-2xl p-5 shadow-sm border border-stone-200 animate-fadeUp">
                 <p className="font-semibold text-stone-800 mb-4">Recent Activity</p>
                 <div className="space-y-3">
                   {data.recent_transactions.map((t, i) => (
@@ -135,12 +128,11 @@ export default function LoyaltyPage() {
                     </div>
                   ))}
                 </div>
-              </motion.div>
+              </div>
             )}
 
             {/* HOW IT WORKS */}
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.25 }}
-              className="bg-teal-50 rounded-2xl p-5 border border-teal-100">
+            <div className="bg-teal-50 rounded-2xl p-5 border border-teal-100 animate-fadeIn">
               <p className="font-semibold text-teal-900 mb-3">How it works</p>
               {[
                 "Complete an order on StudEx",
@@ -156,7 +148,7 @@ export default function LoyaltyPage() {
                   <p className="text-sm text-teal-800">{step}</p>
                 </div>
               ))}
-            </motion.div>
+            </div>
           </>
         )}
       </div>

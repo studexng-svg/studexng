@@ -1,7 +1,6 @@
 // src/app/account/orders/page.tsx
 "use client";
 
-import { motion } from "framer-motion";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Package, CheckCircle, Clock, ChevronLeft, AlertCircle } from "lucide-react";
@@ -98,9 +97,9 @@ export default function OrdersPage() {
   if (!isHydrated || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#FAFAF9]">
-        <motion.div animate={{ rotate: 360 }} transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}>
+        <div className="animate-spin">
           <Clock className="w-12 h-12 text-teal-600" />
-        </motion.div>
+        </div>
       </div>
     );
   }
@@ -124,14 +123,13 @@ export default function OrdersPage() {
 
       <div className="px-4 pt-6 pb-32 space-y-4 max-w-4xl mx-auto">
         {error && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-            className="text-center text-red-600 font-medium bg-red-50 p-4 rounded-xl border border-red-200">
+          <div className="text-center text-red-600 font-medium bg-red-50 p-4 rounded-xl border border-red-200 animate-fadeIn">
             {error}
-          </motion.div>
+          </div>
         )}
 
         {orders.length === 0 && !error ? (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-20">
+          <div className="text-center py-20 animate-fadeIn">
             <Package className="w-20 h-20 text-stone-300 mx-auto mb-4" />
             <p className="text-stone-500 font-medium">No orders yet</p>
             <p className="text-stone-400 text-sm mt-2">Book a service or order food to get started</p>
@@ -146,9 +144,7 @@ export default function OrdersPage() {
           </motion.div>
         ) : (
           orders.map((order, index) => (
-            <motion.div key={order.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.05 }}
-              className="bg-white rounded-2xl border border-stone-200 shadow-sm overflow-hidden hover:border-teal-300 hover:shadow-md transition-all">
+            <div key={order.id} className="bg-white rounded-2xl border border-stone-200 shadow-sm overflow-hidden hover:border-teal-300 hover:shadow-md transition-all animate-fadeUp">
               <Link href={`/account/orders/${order.id}`}>
                 <div className="cursor-pointer">
                   {/* HEADER */}
@@ -184,7 +180,7 @@ export default function OrdersPage() {
                   </div>
                 </div>
               </Link>
-            </motion.div>
+            </div>
           ))
         )}
       </div>

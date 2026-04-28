@@ -3,7 +3,6 @@
 
 import { ReactNode } from "react";
 import BackButton from "./BackButton";
-import { motion } from "framer-motion";
 
 interface PageHeaderProps {
   title: string;
@@ -42,15 +41,14 @@ export default function PageHeader({
   className = ""
 }: PageHeaderProps) {
   return (
-    <motion.header
-      initial={{ opacity: 0, y: -20 }}
-      animate={{ opacity: 1, y: 0 }}
+    <header
       className={`
         sticky top-0 z-40
         bg-white/80
         backdrop-blur-md
         border-b border-stone-100
         shadow-sm
+        animate-fadeUp
         ${className}
       `}
     >
@@ -87,6 +85,6 @@ export default function PageHeader({
           )}
         </div>
       </div>
-    </motion.header>
+    </header>
   );
 }

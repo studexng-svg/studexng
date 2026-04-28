@@ -4,8 +4,8 @@
 import { ChevronLeft, TrendingUp, DollarSign, Calendar, User, Package, Download } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
+import { useAuth, fetchWithAuth } from "@/lib/authStore";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -29,6 +29,7 @@ interface Order {
 
 export default function SellerOrderHistoryPage() {
   const router = useRouter();
+  const { user: authUser } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,24 +39,14 @@ export default function SellerOrderHistoryPage() {
   const [totalRevenue, setTotalRevenue] = useState(0);
 
   useEffect(() => {
-    const accessToken = localStorage.getItem("accessToken");
-
-    if (!accessToken) {
+    if (!authUser) {
       router.push("/auth");
       return;
     }
 
     const fetchOrders = async () => {
-      if (!accessToken) {
-        setError("Please log in to view order history");
-        setLoading(false);
-        return;
-      }
-
       try {
-        const res = await fetch(`${API_URL}/api/orders/`, {
-          headers: { Authorization: `Bearer ${accessToken}` },
-        });
+        const res = await fetchWithAuth(`${API_URL}/api/orders/`);
 
         if (!res.ok) {
           if (res.status === 401) {
@@ -83,7 +74,7 @@ export default function SellerOrderHistoryPage() {
     };
 
     fetchOrders();
-  }, [router]);
+  }, [router, authUser]);
 
   const applyFilters = (orderList: Order[], date: string, search: string) => {
     let filtered = [...orderList];
@@ -142,9 +133,9 @@ export default function SellerOrderHistoryPage() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#FAFAF9]">
-        <motion.div animate={{ rotate: 360 }} transition={{ duration: 2, repeat: Infinity, ease: "linear" }}>
+        <div className="animate-spin">
           <Package className="w-10 h-10 text-teal-600" />
-        </motion.div>
+        </div>
       </div>
     );
   }
@@ -243,13 +234,7 @@ export default function SellerOrderHistoryPage() {
         ) : (
           <div className="space-y-3">
             {filteredOrders.map((order, index) => (
-              <motion.div
-                key={order.id}
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.04 }}
-                className="bg-white border border-stone-200 rounded-2xl p-4 shadow-sm hover:border-teal-300 hover:shadow-md transition-all"
-              >
+              <div key={order.id} className="bg-white border border-stone-200 rounded-2xl p-4 shadow-sm hover:border-teal-300 hover:shadow-md transition-all animate-fadeUp">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <p className="font-semibold text-stone-900 text-sm">#{order.reference}</p>
@@ -272,7 +257,7 @@ export default function SellerOrderHistoryPage() {
                     </span>
                   </div>
                 </div>
-              </motion.div>
+              </div>
             ))}
           </div>
         )}

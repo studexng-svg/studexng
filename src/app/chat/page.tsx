@@ -1,7 +1,6 @@
 // src/app/chat/page.tsx
 "use client";
 
-import { motion } from "framer-motion";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { MessageCircle, ChevronLeft, Search, X } from "lucide-react";
@@ -93,7 +92,7 @@ export default function ChatListPage() {
       <div className="px-4 pt-6 pb-28 max-w-2xl mx-auto space-y-4">
 
         {/* ── SECTION HEADER ── */}
-        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}>
+        <div className="animate-fadeUp">
           <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold">Inbox</p>
           <h2 className="text-xl font-bold text-stone-900 mt-0.5" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
             Your Conversations
@@ -115,8 +114,7 @@ export default function ChatListPage() {
           </div>
         ) : filtered.length === 0 ? (
           /* ── EMPTY STATE ── */
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-            className="bg-white rounded-2xl p-12 text-center border border-stone-100 shadow-sm">
+          <div className="bg-white rounded-2xl p-12 text-center border border-stone-100 shadow-sm animate-fadeUp">
             <div className="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center"
               style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
               <MessageCircle className="w-8 h-8 text-white" strokeWidth={1.5} />
@@ -128,20 +126,15 @@ export default function ChatListPage() {
             <p className="text-stone-400 text-sm">
               {search ? `Nothing matched "${search}"` : "Message a vendor from their listing page to get started."}
             </p>
-          </motion.div>
+          </div>
         ) : (
           /* ── CONVERSATION LIST ── */
           <div className="space-y-3">
             {filtered.map((conv, i) => (
-              <motion.div
-                key={conv.id}
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.05 }}>
+              <div key={conv.id} className="animate-fadeUp">
                 <Link href={`/chat/${conv.id}`}>
-                  <motion.div
-                    whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }}
-                    className={`bg-white rounded-2xl p-4 flex items-center gap-3 shadow-sm border transition-all cursor-pointer ${
+                  <div
+                    className={`bg-white rounded-2xl p-4 flex items-center gap-3 shadow-sm border transition-all cursor-pointer hover:-translate-y-0.5 active:scale-[0.98] ${
                       conv.unread_count > 0
                         ? "border-teal-200 bg-teal-50/30"
                         : "border-stone-200 hover:border-teal-300 hover:shadow-md"
@@ -184,9 +177,9 @@ export default function ChatListPage() {
                         </span>
                       </div>
                     )}
-                  </motion.div>
+                  </div>
                 </Link>
-              </motion.div>
+              </div>
             ))}
           </div>
         )}

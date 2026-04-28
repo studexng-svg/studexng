@@ -5,7 +5,6 @@ import { Plus, Minus, Trash2, ShoppingBag, ArrowRight, Sparkles, AlertCircle, Ch
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
 import { useCartStore } from "@/lib/cartStore";
 import { useEffect, useState } from "react";
 
@@ -62,9 +61,7 @@ export default function CartPage() {
   if (cart.length === 0) {
     return (
       <div className="min-h-screen bg-[#FAFAF9] flex flex-col items-center justify-center px-6 pb-28" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-        <motion.div
-          initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }}
-          className="text-center">
+        <div className="text-center animate-fadeUp">
           <div className="w-24 h-24 mx-auto mb-6 rounded-2xl flex items-center justify-center"
             style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
             <ShoppingBag className="w-12 h-12 text-white" strokeWidth={1.5} />
@@ -75,13 +72,13 @@ export default function CartPage() {
           </h2>
           <p className="text-stone-400 text-sm mb-8">Add something from our services to get started.</p>
           <Link href="/categories">
-            <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
-              className="px-8 py-3 text-white font-semibold rounded-full shadow-lg shadow-teal-200/60 inline-flex items-center gap-2 text-sm"
+            <button
+              className="px-8 py-3 text-white font-semibold rounded-full shadow-lg shadow-teal-200/60 inline-flex items-center gap-2 text-sm hover-scale tap-scale"
               style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
               Browse Categories <ArrowRight className="w-4 h-4" />
-            </motion.button>
+            </button>
           </Link>
-        </motion.div>
+        </div>
       </div>
     );
   }
@@ -109,7 +106,7 @@ export default function CartPage() {
       <div className="px-4 pt-6 pb-28 space-y-4 max-w-2xl mx-auto">
 
         {/* ── SECTION HEADER ── */}
-        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}>
+        <div className="animate-fadeUp">
           <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold">Your Order</p>
           <h2 className="text-xl font-bold text-stone-900 mt-0.5" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
             Review your cart
@@ -118,8 +115,7 @@ export default function CartPage() {
 
         {/* ── UNAVAILABILITY WARNING ── */}
         {!checking && hasUnavailable && (
-          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
-            className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3">
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3 animate-fadeUp">
             <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
             <div>
               <p className="font-semibold text-amber-800 text-sm">Some items are unavailable</p>
@@ -128,18 +124,16 @@ export default function CartPage() {
                 Remove {unavailableIds.size > 1 ? "them" : "it"} to proceed to checkout.
               </p>
             </div>
-          </motion.div>
+          </div>
         )}
 
         {/* ── CART ITEMS ── */}
         {cart.map((item, i) => {
           const isUnavailable = unavailableIds.has(item.id);
           return (
-            <motion.div
+            <div
               key={item.id}
-              initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.08 }}
-              className={`bg-white rounded-2xl p-4 shadow-sm border flex gap-4 relative overflow-hidden transition-all ${
+              className={`bg-white rounded-2xl p-4 shadow-sm border flex gap-4 relative overflow-hidden transition-all animate-fadeUp ${
                 isUnavailable ? "border-red-200 opacity-70" : "border-stone-200 hover:border-teal-300 hover:shadow-md"
               }`}>
 
@@ -213,15 +207,13 @@ export default function CartPage() {
                   <Trash2 className="w-5 h-5" />
                 </button>
               </div>
-            </motion.div>
+            </div>
           );
         })}
 
         {/* ── ORDER SUMMARY + CHECKOUT ── */}
         {availableItems.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
-            className="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm space-y-4">
+          <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm space-y-4 animate-fadeUp">
 
             {/* Summary */}
             <div>
@@ -251,11 +243,9 @@ export default function CartPage() {
             {/* Checkout button */}
             <Link href={hasUnavailable ? "#" : "/checkout"}
               onClick={e => { if (hasUnavailable) e.preventDefault(); }}>
-              <motion.button
-                whileHover={{ scale: hasUnavailable ? 1 : 1.02 }}
-                whileTap={{ scale: 0.98 }}
+              <button
                 disabled={hasUnavailable}
-                className={`w-full py-4 font-semibold text-sm rounded-full flex items-center justify-center gap-2 transition-all ${
+                className={`w-full py-4 font-semibold text-sm rounded-full flex items-center justify-center gap-2 transition-all tap-scale ${
                   hasUnavailable
                     ? "bg-stone-100 text-stone-400 cursor-not-allowed"
                     : "text-white shadow-lg shadow-teal-200/60"
@@ -265,9 +255,9 @@ export default function CartPage() {
                   ? "Remove unavailable items first"
                   : <> Checkout Now <ArrowRight className="w-4 h-4" /></>
                 }
-              </motion.button>
+              </button>
             </Link>
-          </motion.div>
+          </div>
         )}
 
       </div>

@@ -2,7 +2,6 @@
 
 import { Heart, Package, ChevronLeft } from "lucide-react";
 import Link from "next/link";
-import { motion } from "framer-motion";
 import { useAuth } from "@/lib/authStore";
 import { useCartStore } from "@/lib/cartStore";
 import { useWishlistStore } from "@/lib/wishlistStore";
@@ -82,14 +81,9 @@ export default function WishlistPage() {
     <div className="min-h-screen bg-[#FAFAF9]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       {/* TOAST */}
       {toast && (
-        <motion.div
-          initial={{ y: -50, opacity: 0 }}
-          animate={{ y: 60, opacity: 1 }}
-          exit={{ y: -50, opacity: 0 }}
-          className="fixed top-4 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full shadow-lg z-50 font-medium text-sm text-white bg-teal-600"
-        >
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full shadow-lg z-50 font-medium text-sm text-white bg-teal-600 animate-fadeIn">
           {toast}
-        </motion.div>
+        </div>
       )}
 
       {/* STICKY HEADER */}
@@ -114,12 +108,9 @@ export default function WishlistPage() {
       {/* WISHLIST ITEMS */}
       <div className="px-4 pt-4 pb-32 space-y-4 max-w-2xl mx-auto">
         {wishlist.map((item, index) => (
-          <motion.div
+          <div
             key={`${item.id}-${index}`}
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.3 }}
-            className="bg-white border border-stone-200 hover:border-teal-300 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all"
+            className="bg-white border border-stone-200 hover:border-teal-300 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all animate-fadeUp"
           >
             <Link href={`/listing/${item.id}`}>
               <div className="flex gap-3 p-4 cursor-pointer hover:bg-stone-50 transition-colors">
@@ -166,7 +157,7 @@ export default function WishlistPage() {
                 <Heart className="w-5 h-5 fill-red-400" />
               </button>
             </div>
-          </motion.div>
+          </div>
         ))}
       </div>
     </div>

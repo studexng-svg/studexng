@@ -1,7 +1,6 @@
 // src/app/admin/page.tsx
 "use client";
 
-import { motion } from "framer-motion";
 import {
   Shield,
   Users,
@@ -155,13 +154,9 @@ export default function AdminDashboard() {
 
   return (
     <>
-      <motion.div
-        initial={{ y: -100 }}
-        animate={{ y: 0 }}
-        className="sticky top-0 z-50 bg-gradient-to-r from-slate-900 via-purple-900 to-slate-900 border-b border-white/10 backdrop-blur-xl"
-      >
+      <div className="sticky top-0 z-50 bg-gradient-to-r from-slate-900 via-purple-900 to-slate-900 border-b border-white/10 backdrop-blur-xl animate-fadeUp">
         <div className="flex items-center justify-between p-5">
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }} className="flex items-center gap-4">
+          <div className="flex items-center gap-4 animate-fadeIn">
             <div className="w-12 h-12 bg-gradient-to-br from-purple-600 to-teal-600 rounded-2xl flex items-center justify-center shadow-2xl">
               <Shield className="w-7 h-7 text-white" />
             </div>
@@ -171,9 +166,9 @@ export default function AdminDashboard() {
                 Welcome back, <span className="font-bold text-purple-300">{adminName}</span>
               </p>
             </div>
-          </motion.div>
+          </div>
 
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }} className="flex items-center gap-4">
+          <div className="flex items-center gap-4 animate-fadeIn">
             <button className="relative p-3 rounded-xl bg-white/10 hover:bg-white/20 transition">
               <Bell className="w-6 h-6 text-white" />
               {(escrowData.pendingDisputes > 0 || escrowData.pendingWithdrawals > 0) && (
@@ -187,21 +182,17 @@ export default function AdminDashboard() {
               <LogOut className="w-5 h-5" />
               <span className="font-medium">Logout</span>
             </button>
-          </motion.div>
+          </div>
         </div>
-      </motion.div>
+      </div>
 
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-6 pb-32">
         {/* PRIMARY STATS */}
         <div className="grid grid-cols-2 gap-5 mb-8">
           {stats.map((stat, i) => (
-            <motion.div
+            <div
               key={i}
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.15 }}
-              whileHover={{ scale: 1.05 }}
-              className="bg-white/5 backdrop-blur-xl rounded-3xl p-6 border border-white/10 hover:border-purple-500/50 transition-all"
+              className="bg-white/5 backdrop-blur-xl rounded-3xl p-6 border border-white/10 hover:border-purple-500/50 hover:scale-105 transition-all animate-fadeUp"
             >
               <div className="flex items-center justify-between mb-4">
                 <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${stat.color} flex items-center justify-center shadow-lg`}>
@@ -214,19 +205,14 @@ export default function AdminDashboard() {
               </div>
               <p className="text-3xl font-black text-white">{stat.value}</p>
               <p className="text-white/70 text-sm mt-1">{stat.label}</p>
-            </motion.div>
+            </div>
           ))}
         </div>
 
         {/* ESCROW ALERT & STATS */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-8">
           {/* IN ESCROW */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.6 }}
-            className="bg-gradient-to-r from-blue-500/20 to-cyan-500/20 border border-blue-500/50 rounded-3xl p-6 backdrop-blur-xl"
-          >
+          <div className="bg-gradient-to-r from-blue-500/20 to-cyan-500/20 border border-blue-500/50 rounded-3xl p-6 backdrop-blur-xl animate-fadeUp">
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-white/80 text-sm font-semibold flex items-center gap-2">
@@ -236,16 +222,11 @@ export default function AdminDashboard() {
                 <p className="text-blue-300 text-sm mt-1">Held safely until order completion</p>
               </div>
             </div>
-          </motion.div>
+          </div>
 
           {/* DISPUTES ALERT */}
           {escrowData.pendingDisputes > 0 && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.7 }}
-              className="bg-gradient-to-r from-red-500/20 to-orange-500/20 border border-red-500/50 rounded-3xl p-6 backdrop-blur-xl"
-            >
+            <div className="bg-gradient-to-r from-red-500/20 to-orange-500/20 border border-red-500/50 rounded-3xl p-6 backdrop-blur-xl animate-fadeUp">
               <div className="flex items-start justify-between">
                 <div>
                   <p className="text-white/80 text-sm font-semibold flex items-center gap-2">
@@ -261,16 +242,11 @@ export default function AdminDashboard() {
                   Review
                 </Link>
               </div>
-            </motion.div>
+            </div>
           )}
 
           {/* COMPLETED ORDERS */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.8 }}
-            className="bg-gradient-to-r from-emerald-500/20 to-teal-500/20 border border-emerald-500/50 rounded-3xl p-6 backdrop-blur-xl"
-          >
+          <div className="bg-gradient-to-r from-emerald-500/20 to-teal-500/20 border border-emerald-500/50 rounded-3xl p-6 backdrop-blur-xl animate-fadeUp">
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-white/80 text-sm font-semibold flex items-center gap-2">
@@ -280,17 +256,13 @@ export default function AdminDashboard() {
                 <p className="text-emerald-300 text-sm mt-1">₦{escrowData.totalRevenue.toLocaleString()}</p>
               </div>
             </div>
-          </motion.div>
+          </div>
         </div>
 
         {/* CRITICAL ALERTS */}
         <div className="space-y-4 mb-8">
           {escrowData.pendingWithdrawals > 0 && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="bg-gradient-to-r from-emerald-500/20 to-teal-500/20 border border-emerald-500/50 rounded-3xl p-6 flex items-center justify-between backdrop-blur-xl"
-            >
+            <div className="bg-gradient-to-r from-emerald-500/20 to-teal-500/20 border border-emerald-500/50 rounded-3xl p-6 flex items-center justify-between backdrop-blur-xl animate-fadeUp">
               <div className="flex items-center gap-4">
                 <div className="w-14 h-14 bg-emerald-500/30 rounded-2xl flex items-center justify-center">
                   <DollarSign className="w-8 h-8 text-emerald-300" />
@@ -306,15 +278,11 @@ export default function AdminDashboard() {
               >
                 Process
               </Link>
-            </motion.div>
+            </div>
           )}
 
           {escrowData.pendingApprovals > 0 && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/50 rounded-3xl p-6 flex items-center justify-between backdrop-blur-xl"
-            >
+            <div className="bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/50 rounded-3xl p-6 flex items-center justify-between backdrop-blur-xl animate-fadeUp">
               <div className="flex items-center gap-4">
                 <div className="w-14 h-14 bg-amber-500/30 rounded-2xl flex items-center justify-center">
                   <AlertCircle className="w-8 h-8 text-amber-300" />
@@ -330,21 +298,18 @@ export default function AdminDashboard() {
               >
                 Review Now
               </Link>
-            </motion.div>
+            </div>
           )}
         </div>
 
         {/* QUICK ACTIONS */}
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.9 }}>
+        <div className="animate-fadeIn">
           <h2 className="text-2xl font-black text-white mb-6">Quick Actions</h2>
           <div className="space-y-4">
             {quickActions.map((action, i) => (
-              <motion.div
+              <div
                 key={i}
-                initial={{ opacity: 0, x: -50 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 1.0 + i * 0.08 }}
-                whileHover={{ x: 10 }}
+                className="animate-fadeUp hover:translate-x-2 transition-transform"
               >
                 <Link
                   href={action.href}
@@ -362,22 +327,18 @@ export default function AdminDashboard() {
                     </div>
                     <div className="flex items-center gap-4">
                       {action.badge !== undefined && action.badge > 0 && (
-                        <motion.span
-                          initial={{ scale: 0 }}
-                          animate={{ scale: 1 }}
-                          className="px-3 py-1 bg-red-500 text-white text-sm font-bold rounded-full"
-                        >
+                        <span className="px-3 py-1 bg-red-500 text-white text-sm font-bold rounded-full animate-fadeIn">
                           {action.badge} New
-                        </motion.span>
+                        </span>
                       )}
                       <ChevronRight className="w-6 h-6 text-white/50 group-hover:text-white group-hover:translate-x-2 transition" />
                     </div>
                   </div>
                 </Link>
-              </motion.div>
+              </div>
             ))}
           </div>
-        </motion.div>
+        </div>
 
         <div className="mt-12 text-center">
           <p className="text-white/40 text-xs">

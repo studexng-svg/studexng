@@ -1,7 +1,6 @@
 // src/app/admin/orders/page.tsx
 "use client";
 
-import { motion } from "framer-motion";
 import {
   ChevronLeft,
   Package,
@@ -37,7 +36,6 @@ function AdminOrders() {
   useEffect(() => {
     setMounted(true);
     const allOrders = JSON.parse(localStorage.getItem("allOrders") || "[]");
-    console.log("Admin loading orders:", allOrders); // Debug
     setOrders(allOrders);
   }, []);
 
@@ -106,11 +104,7 @@ function AdminOrders() {
   return (
     <>
       {/* TOP BAR */}
-      <motion.div
-        initial={{ y: -100 }}
-        animate={{ y: 0 }}
-        className="sticky top-0 z-50 bg-gradient-to-r from-slate-900 via-purple-900 to-slate-900 border-b border-white/10 backdrop-blur-xl"
-      >
+      <div className="sticky top-0 z-50 bg-gradient-to-r from-slate-900 via-purple-900 to-slate-900 border-b border-white/10 backdrop-blur-xl animate-fadeUp">
         <div className="flex items-center justify-between px-5 py-4">
           <button onClick={() => router.back()} className="p-2 hover:bg-white/10 rounded-xl transition">
             <ChevronLeft className="w-6 h-6 text-white" />
@@ -154,7 +148,7 @@ function AdminOrders() {
             ))}
           </div>
         </div>
-      </motion.div>
+      </div>
 
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 px-5 pt-4 pb-32 space-y-6">
         {/* STATS GRID */}
@@ -166,16 +160,13 @@ function AdminOrders() {
             { label: "Disputed", value: stats.disputed, color: "from-red-500 to-orange-600" },
             { label: "Refunded", value: stats.refunded, color: "from-blue-500 to-cyan-600" },
           ].map((stat, i) => (
-            <motion.div
+            <div
               key={stat.label}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.1 }}
-              className={`bg-gradient-to-br ${stat.color} rounded-2xl p-5 text-white shadow-xl`}
+              className={`bg-gradient-to-br ${stat.color} rounded-2xl p-5 text-white shadow-xl animate-fadeUp`}
             >
               <p className="text-sm opacity-90">{stat.label}</p>
               <p className="text-3xl font-black mt-1">{stat.value}</p>
-            </motion.div>
+            </div>
           ))}
         </div>
 
@@ -189,13 +180,10 @@ function AdminOrders() {
             </div>
           ) : (
             filteredOrders.map((order, i) => (
-              <motion.div
+              <div
                 key={order.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.05 }}
                 onClick={() => router.push(`/admin/orders/${order.id}`)}
-                className="bg-white/5 backdrop-blur-xl rounded-2xl p-5 border border-white/10 hover:border-purple-500/50 hover:bg-white/10 transition cursor-pointer"
+                className="bg-white/5 backdrop-blur-xl rounded-2xl p-5 border border-white/10 hover:border-purple-500/50 hover:bg-white/10 transition cursor-pointer animate-fadeUp"
               >
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-4">
@@ -242,7 +230,7 @@ function AdminOrders() {
                   </p>
                   <ArrowRight className="w-6 h-6 text-white/40" />
                 </div>
-              </motion.div>
+              </div>
             ))
           )}
         </div>

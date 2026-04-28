@@ -1,7 +1,6 @@
 // src/app/admin/disputes/page.tsx
 "use client";
 
-import { motion } from "framer-motion";
 import {
   ChevronLeft,
   AlertCircle,
@@ -116,11 +115,7 @@ function AdminDisputes() {
   return (
     <>
       {/* TOP BAR */}
-      <motion.div
-        initial={{ y: -100 }}
-        animate={{ y: 0 }}
-        className="sticky top-0 z-50 bg-gradient-to-r from-slate-900 via-purple-900 to-slate-900 border-b border-white/10 backdrop-blur-xl"
-      >
+      <div className="sticky top-0 z-50 bg-gradient-to-r from-slate-900 via-purple-900 to-slate-900 border-b border-white/10 backdrop-blur-xl animate-fadeUp">
         <div className="flex items-center justify-between px-5 py-4">
           <button onClick={() => router.back()} className="p-2 hover:bg-white/10 rounded-xl transition">
             <ChevronLeft className="w-6 h-6 text-white" />
@@ -160,7 +155,7 @@ function AdminDisputes() {
             ))}
           </div>
         </div>
-      </motion.div>
+      </div>
 
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 px-5 pt-4 pb-32 space-y-6">
 
@@ -172,16 +167,13 @@ function AdminDisputes() {
             { label: "Resolved", value: stats.resolved, color: "from-emerald-500 to-teal-600" },
             { label: "Appealed", value: stats.appealed, color: "from-amber-500 to-orange-600" },
           ].map((stat, i) => (
-            <motion.div
+            <div
               key={stat.label}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.1 }}
-              className={`bg-gradient-to-br ${stat.color} rounded-2xl p-5 text-white shadow-xl`}
+              className={`bg-gradient-to-br ${stat.color} rounded-2xl p-5 text-white shadow-xl animate-fadeUp`}
             >
               <p className="text-sm opacity-90">{stat.label}</p>
               <p className="text-3xl font-black mt-1">{stat.value}</p>
-            </motion.div>
+            </div>
           ))}
         </div>
 
@@ -194,13 +186,10 @@ function AdminDisputes() {
             </div>
           ) : (
             filteredDisputes.map((dispute, i) => (
-              <motion.div
+              <div
                 key={dispute.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.05 }}
                 onClick={() => router.push(`/admin/disputes/${dispute.id}`)}
-                className="bg-white/5 backdrop-blur-xl rounded-2xl p-5 border border-white/10 hover:border-red-500/50 hover:bg-white/10 transition cursor-pointer"
+                className="bg-white/5 backdrop-blur-xl rounded-2xl p-5 border border-white/10 hover:border-red-500/50 hover:bg-white/10 transition cursor-pointer animate-fadeUp"
               >
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-4">
@@ -249,7 +238,7 @@ function AdminDisputes() {
                   <span className="text-white/50 text-xs">Tap to review & resolve</span>
                   <ArrowRight className="w-5 h-5 text-white/40" />
                 </div>
-              </motion.div>
+              </div>
             ))
           )}
         </div>

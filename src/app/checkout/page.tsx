@@ -23,7 +23,7 @@ declare global {
 
 export default function CheckoutPage() {
   const router = useRouter();
-  const { user, isAuthReady, isLoggedIn, isHydrated } = useAuth();
+  const { user, isLoggedIn, isHydrated } = useAuth();
   const { cart, clearCart } = useCartStore();
   const { booking, clearBooking } = useBookingStore();
 

@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { motion } from "framer-motion";
 import { ChevronLeft, Star, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { fetchWithAuth } from "@/lib/authStore";
@@ -137,10 +136,7 @@ export default function VendorProfilePage() {
             <div className="space-y-3">
               {listings.map(listing => (
                 <Link key={listing.id} href={`/listing/${listing.id}`}>
-                  <motion.div
-                    whileTap={{ scale: 0.98 }}
-                    className="bg-white border border-stone-200 hover:border-teal-300 rounded-2xl overflow-hidden shadow-sm flex gap-3 p-3 transition-all"
-                  >
+                  <div className="bg-white border border-stone-200 hover:border-teal-300 rounded-2xl overflow-hidden shadow-sm flex gap-3 p-3 transition-all active:scale-[0.98]">
                     <div className="w-20 h-20 rounded-xl overflow-hidden flex-shrink-0">
                       <SafeImage
                         src={listing.image?.startsWith("http") ? listing.image : null}
@@ -162,7 +158,7 @@ export default function VendorProfilePage() {
                         ₦{Number(listing.price).toLocaleString()}
                       </p>
                     </div>
-                  </motion.div>
+                  </div>
                 </Link>
               ))}
             </div>

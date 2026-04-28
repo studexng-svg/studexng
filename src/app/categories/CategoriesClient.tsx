@@ -1,6 +1,5 @@
 "use client";
 
-import { motion } from "framer-motion";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, Sparkles } from "lucide-react";
@@ -40,7 +39,7 @@ export default function CategoriesClient({ categories }: { categories: Category[
       <div className="px-4 pt-6 pb-28 max-w-2xl mx-auto space-y-6">
 
         {/* ── SECTION HEADER ── */}
-        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}>
+        <div className="animate-fadeUp">
           <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold">Browse</p>
           <h2 className="text-2xl font-bold text-stone-900 mt-1" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
             What do you need today?
@@ -49,28 +48,20 @@ export default function CategoriesClient({ categories }: { categories: Category[
         </motion.div>
 
         {categories.length === 0 ? (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-            className="bg-white rounded-2xl p-12 text-center border border-stone-100 shadow-sm">
+          <div className="bg-white rounded-2xl p-12 text-center border border-stone-100 shadow-sm animate-fadeIn">
             <Sparkles className="w-12 h-12 text-stone-200 mx-auto mb-3" />
             <h3 className="text-lg font-bold text-stone-400" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
               No categories yet
             </h3>
             <p className="text-stone-400 text-sm mt-1">Check back soon!</p>
-          </motion.div>
+          </div>
         ) : (
           /* ── CATEGORIES GRID ── */
           <div className="grid grid-cols-2 gap-4">
             {categories.map((cat, i) => (
-              <motion.div
-                key={cat.id}
-                initial={{ opacity: 0, y: 24 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.07, type: "spring", stiffness: 120 }}>
+              <div key={cat.id} className="animate-fadeUp">
                 <Link href={`/category/${cat.slug}`}>
-                  <motion.div
-                    whileHover={{ y: -4 }}
-                    whileTap={{ scale: 0.97 }}
-                    className="relative aspect-square rounded-2xl overflow-hidden shadow-sm border border-stone-200 hover:border-teal-300 hover:shadow-md transition-all cursor-pointer group">
+                  <div className="relative aspect-square rounded-2xl overflow-hidden shadow-sm border border-stone-200 hover:border-teal-300 hover:shadow-md transition-all cursor-pointer group hover:-translate-y-1 tap-scale">
 
                     {/* Image */}
                     {cat.image?.startsWith("http") ? (
@@ -102,32 +93,25 @@ export default function CategoriesClient({ categories }: { categories: Category[
                     </div>
 
                     {/* Live badge on hover */}
-                    <motion.div
-                      initial={{ opacity: 0, y: -4 }}
-                      whileHover={{ opacity: 1, y: 0 }}
-                      className="absolute top-2.5 right-2.5 px-2 py-0.5 bg-white/90 backdrop-blur-sm rounded-full shadow-sm">
+                    <div className="absolute top-2.5 right-2.5 px-2 py-0.5 bg-white/90 backdrop-blur-sm rounded-full shadow-sm opacity-0 group-hover:opacity-100 transition-opacity">
                       <span className="text-[10px] font-bold" style={{
                         background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)",
                         WebkitBackgroundClip: "text",
                         WebkitTextFillColor: "transparent",
                         backgroundClip: "text",
                       }}>LIVE</span>
-                    </motion.div>
+                    </div>
 
-                  </motion.div>
+                  </div>
                 </Link>
-              </motion.div>
+              </div>
             ))}
           </div>
         )}
 
         {/* ── BOTTOM CTA ── */}
         {categories.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.8 }}
-            className="text-center py-4">
+          <div className="text-center py-4 animate-fadeIn">
             <p className="text-stone-400 text-sm">Everything you need.</p>
             <p className="font-bold mt-1" style={{
               fontFamily: "'Playfair Display', Georgia, serif",
@@ -137,7 +121,7 @@ export default function CategoriesClient({ categories }: { categories: Category[
               backgroundClip: "text",
               fontSize: "1.25rem",
             }}>Just StudEx.</p>
-          </motion.div>
+          </div>
         )}
 
       </div>

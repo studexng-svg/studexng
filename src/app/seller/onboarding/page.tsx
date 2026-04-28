@@ -4,7 +4,6 @@ import { Store, ChevronLeft, CheckCircle, X, Shield, ArrowRight, CreditCard, Fli
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
 import { useAuth, fetchWithAuth } from "@/lib/authStore";
 
 export default function SellerOnboarding() {
@@ -138,11 +137,7 @@ export default function SellerOnboarding() {
 
         {/* STEP 1: WELCOME */}
         {step === 1 && (
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-center space-y-6"
-          >
+          <div className="animate-fadeUp text-center space-y-6">
             <div className="w-24 h-24 mx-auto bg-teal-50 rounded-full flex items-center justify-center border border-teal-100">
               <Store className="w-12 h-12 text-teal-600" />
             </div>
@@ -162,16 +157,12 @@ export default function SellerOnboarding() {
               Start Application
               <ArrowRight className="w-4 h-4" />
             </button>
-          </motion.div>
+          </div>
         )}
 
         {/* STEP 2: DOCUMENTS */}
         {step === 2 && (
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="space-y-6"
-          >
+          <div className="animate-fadeUp space-y-6">
             <div>
               <h2 className="text-xl font-bold text-stone-900" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
                 Verify Your Identity
@@ -256,16 +247,12 @@ export default function SellerOnboarding() {
               Continue to Review
               {isStep2Complete && <ArrowRight className="w-4 h-4" />}
             </button>
-          </motion.div>
+          </div>
         )}
 
         {/* STEP 3: REVIEW & SUBMIT */}
         {step === 3 && (
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-center space-y-6"
-          >
+          <div className="animate-fadeUp text-center space-y-6">
             <div className="w-24 h-24 mx-auto bg-emerald-50 rounded-full flex items-center justify-center border border-emerald-100">
               <CheckCircle className="w-12 h-12 text-emerald-600" />
             </div>
@@ -321,7 +308,7 @@ export default function SellerOnboarding() {
                 </button>
               </div>
             )}
-          </motion.div>
+          </div>
         )}
       </div>
     </div>

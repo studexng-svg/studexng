@@ -4,8 +4,7 @@
 import { ChevronLeft, TrendingUp, Wallet, AlertCircle, DollarSign, Calendar } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
-import { useAuth } from "@/lib/authStore";
+import { useAuth, fetchWithAuth } from "@/lib/authStore";
 import { useRouter } from "next/navigation";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
@@ -42,25 +41,13 @@ export default function SellerPayouts() {
     }
 
     const fetchData = async () => {
-      const accessToken = localStorage.getItem("accessToken");
-
-      if (!accessToken) {
-        setError("Please log in to view payouts");
-        setLoading(false);
-        return;
-      }
-
       try {
-        const profileRes = await fetch(`${API_URL}/api/auth/profile/`, {
-          headers: { Authorization: `Bearer ${accessToken}` },
-        });
+        const profileRes = await fetchWithAuth(`${API_URL}/api/auth/profile/`);
         if (!profileRes.ok) throw new Error("Failed to load profile");
         const profileData = await profileRes.json();
         setWalletBalance(parseFloat(profileData.wallet_balance || "0"));
 
-        const txRes = await fetch(`${API_URL}/api/transactions/`, {
-          headers: { Authorization: `Bearer ${accessToken}` },
-        });
+        const txRes = await fetchWithAuth(`${API_URL}/api/transactions/`);
         if (!txRes.ok) throw new Error("Failed to load transactions");
 
         const txData = await txRes.json();
@@ -111,9 +98,9 @@ export default function SellerPayouts() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#FAFAF9]">
-        <motion.div animate={{ rotate: 360 }} transition={{ duration: 2, repeat: Infinity, ease: "linear" }}>
+        <div className="animate-spin">
           <Wallet className="w-10 h-10 text-teal-600" />
-        </motion.div>
+        </div>
       </div>
     );
   }
@@ -200,12 +187,7 @@ export default function SellerPayouts() {
                   onClick={() => setSelectedTransaction(txn)}
                   className="w-full text-left"
                 >
-                  <motion.div
-                    initial={{ opacity: 0, y: 12 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.04 }}
-                    className="bg-white border border-stone-200 rounded-2xl p-4 flex items-center justify-between hover:border-teal-300 hover:shadow-md transition-all"
-                  >
+                  <div className="bg-white border border-stone-200 rounded-2xl p-4 flex items-center justify-between hover:border-teal-300 hover:shadow-md transition-all animate-fadeUp">
                     <div className="flex items-center gap-3 flex-1">
                       <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${getStatusColor(txn.status)}`}>
                         <DollarSign className="w-4 h-4" />
@@ -239,16 +221,12 @@ export default function SellerPayouts() {
 
       {/* TRANSACTION DETAIL MODAL */}
       {selectedTransaction && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        <div
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fadeIn"
           onClick={() => setSelectedTransaction(null)}
         >
-          <motion.div
-            initial={{ scale: 0.95, y: 16 }}
-            animate={{ scale: 1, y: 0 }}
-            className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl border border-stone-100"
+          <div
+            className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl border border-stone-100 animate-fadeUp"
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="text-lg font-bold text-stone-900 mb-4" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
@@ -296,8 +274,8 @@ export default function SellerPayouts() {
                 Close
               </button>
             </div>
-          </motion.div>
-        </motion.div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -1,7 +1,6 @@
 // src/app/admin/analytics/page.tsx
 "use client";
 
-import { motion } from "framer-motion";
 import {
   ChevronLeft,
   TrendingUp,
@@ -14,6 +13,7 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import BottomNav from "@/components/layout/BottomNav";
 import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
@@ -76,11 +76,7 @@ export default function AdminAnalytics() {
   return (
     <>
       {/* TOP BAR */}
-      <motion.div
-        initial={{ y: -100 }}
-        animate={{ y: 0 }}
-        className="sticky top-0 z-50 bg-gradient-to-r from-slate-900 via-purple-900 to-slate-900 border-b border-white/10 backdrop-blur-xl"
-      >
+      <div className="sticky top-0 z-50 bg-gradient-to-r from-slate-900 via-purple-900 to-slate-900 border-b border-white/10 backdrop-blur-xl animate-fadeUp">
         <div className="flex items-center justify-between px-5 py-4">
           <button onClick={() => router.back()} className="p-2 hover:bg-white/10 rounded-xl transition">
             <ChevronLeft className="w-6 h-6 text-white" />
@@ -88,7 +84,7 @@ export default function AdminAnalytics() {
           <h1 className="text-xl font-black text-white">Analytics</h1>
           <Calendar className="w-6 h-6 text-white/60" />
         </div>
-      </motion.div>
+      </div>
 
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 px-5 pt-4 pb-32 space-y-6">
 
@@ -100,12 +96,9 @@ export default function AdminAnalytics() {
             { label: "Active Users", value: stats.totalUsers.toLocaleString(), icon: Users, color: "from-purple-600 to-pink-600", trend: "+18.7%" },
             { label: "Live Products", value: stats.totalProducts, icon: Package, color: "from-amber-500 to-orange-600", trend: "+9.1%" },
           ].map((stat, i) => (
-            <motion.div
+            <div
               key={i}
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.1 }}
-              className={`bg-gradient-to-br ${stat.color} rounded-3xl p-6 text-white shadow-2xl relative overflow-hidden`}
+              className={`bg-gradient-to-br ${stat.color} rounded-3xl p-6 text-white shadow-2xl relative overflow-hidden animate-fadeUp`}
             >
               <div className="flex justify-between items-start">
                 <div>
@@ -120,16 +113,12 @@ export default function AdminAnalytics() {
                   <stat.icon className="w-12 h-12 mt-4 opacity-40" />
                 </div>
               </div>
-            </motion.div>
+            </div>
           ))}
         </div>
 
         {/* REVENUE CHART */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-white/5 backdrop-blur-xl rounded-3xl p-6 border border-white/10"
-        >
+        <div className="bg-white/5 backdrop-blur-xl rounded-3xl p-6 border border-white/10 animate-fadeUp">
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-2xl font-black text-white flex items-center gap-3">
               <TrendingUp className="w-8 h-8 text-emerald-400" />
@@ -159,12 +148,12 @@ export default function AdminAnalytics() {
               </LineChart>
             </ResponsiveContainer>
           </div>
-        </motion.div>
+        </div>
 
         {/* PIE + BAR ROW */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* ORDER STATUS PIE */}
-          <motion.div className="bg-white/5 backdrop-blur-xl rounded-3xl p-6 border border-white/10">
+          <div className="bg-white/5 backdrop-blur-xl rounded-3xl p-6 border border-white/10">
             <h3 className="text-xl font-black text-white mb-6">Order Status Distribution</h3>
             <ResponsiveContainer width="100%" height={300}>
               <PieChart>
@@ -193,10 +182,10 @@ export default function AdminAnalytics() {
                 </div>
               ))}
             </div>
-          </motion.div>
+          </div>
 
           {/* CATEGORY SALES BAR */}
-          <motion.div className="bg-white/5 backdrop-blur-xl rounded-3xl p-6 border border-white/10">
+          <div className="bg-white/5 backdrop-blur-xl rounded-3xl p-6 border border-white/10">
             <h3 className="text-xl font-black text-white mb-6">Top Categories</h3>
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={categorySales}>
@@ -207,15 +196,11 @@ export default function AdminAnalytics() {
                 <Bar dataKey="sales" fill="#a78bfa" radius={[12, 12, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
-          </motion.div>
+          </div>
         </div>
 
         {/* AOV HERO */}
-        <motion.div
-          initial={{ scale: 0.9, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 rounded-3xl p-10 text-white shadow-2xl relative overflow-hidden"
-        >
+        <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 rounded-3xl p-10 text-white shadow-2xl relative overflow-hidden animate-fadeUp">
           <div className="relative z-10">
             <p className="text-2xl opacity-90">Average Order Value</p>
             <p className="text-7xl font-black mt-4">₦{stats.avgOrderValue.toLocaleString()}</p>
@@ -224,18 +209,10 @@ export default function AdminAnalytics() {
           <div className="absolute -bottom-20 -right-20 opacity-20">
             <DollarSign className="w-80 h-80" />
           </div>
-        </motion.div>
-      </div>
-
-      {/* BOTTOM NAV */}
-      <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent backdrop-blur-xl border-t border-white/10 z-40">
-        <div className="flex justify-around py-4">
-          <button className="text-white/60">Dashboard</button>
-          <button className="text-white/60">Users</button>
-          <button className="text-white/60">Orders</button>
-          <button className="text-white font-black text-lg">Analytics</button>
         </div>
       </div>
+
+      <BottomNav />
     </>
   );
 }

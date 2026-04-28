@@ -211,11 +211,7 @@ function AdminSellerApprovals() {
       )}
 
       {/* TOP BAR */}
-      <motion.div
-        initial={{ y: -100 }}
-        animate={{ y: 0 }}
-        className="sticky top-0 z-50 bg-gradient-to-r from-slate-900 via-purple-900 to-slate-900 border-b border-white/10 backdrop-blur-xl"
-      >
+      <div className="sticky top-0 z-50 bg-gradient-to-r from-slate-900 via-purple-900 to-slate-900 border-b border-white/10 backdrop-blur-xl animate-fadeUp">
         <div className="flex items-center justify-between p-5">
           <button
             onClick={() => router.back()}
@@ -240,22 +236,18 @@ function AdminSellerApprovals() {
             <RefreshCw className={`w-5 h-5 ${loading ? "animate-spin" : ""}`} />
           </button>
         </div>
-      </motion.div>
+      </div>
 
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-6 pb-32 space-y-6">
 
         {/* ERROR BANNER */}
         {error && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-red-500/20 border border-red-500/40 text-red-300 px-4 py-3 rounded-2xl text-center text-sm font-medium flex items-center justify-between"
-          >
+          <div className="bg-red-500/20 border border-red-500/40 text-red-300 px-4 py-3 rounded-2xl text-center text-sm font-medium flex items-center justify-between animate-fadeUp">
             <span>{error}</span>
             <button onClick={() => setError("")} className="underline text-red-200 ml-3">
               Dismiss
             </button>
-          </motion.div>
+          </div>
         )}
 
         {/* LOADING */}
@@ -265,25 +257,18 @@ function AdminSellerApprovals() {
             <p className="text-white/60">Loading applications...</p>
           </div>
         ) : applications.length === 0 ? (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="text-center py-20"
-          >
+          <div className="text-center py-20 animate-fadeIn">
             <CreditCard className="w-20 h-20 mx-auto text-white/20 mb-4" />
             <p className="text-white/60 text-lg">No applications yet</p>
             <p className="text-white/40 text-sm mt-2">
               Applications will appear here when sellers apply
             </p>
-          </motion.div>
+          </div>
         ) : (
           applications.map((app, i) => (
-            <motion.div
+            <div
               key={app.id}
-              initial={{ opacity: 0, y: 50 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.1 }}
-              className="bg-white/5 backdrop-blur-xl rounded-3xl p-6 border border-white/10 space-y-6"
+              className="bg-white/5 backdrop-blur-xl rounded-3xl p-6 border border-white/10 space-y-6 animate-fadeUp"
             >
               {/* APPLICANT INFO */}
               <div className="flex items-start justify-between">
@@ -331,10 +316,9 @@ function AdminSellerApprovals() {
                   {idCards.map(({ key, label, icon: Icon, hint }) => {
                     const url = app[key];
                     return (
-                      <motion.div
+                      <div
                         key={key}
-                        whileHover={{ scale: 1.01 }}
-                        className="bg-white/10 rounded-2xl overflow-hidden border border-white/20 hover:border-purple-500/50 transition-all"
+                        className="bg-white/10 rounded-2xl overflow-hidden border border-white/20 hover:border-purple-500/50 hover:scale-[1.01] transition-all"
                       >
                         <div className="relative group">
                           {url ? (
@@ -384,7 +368,7 @@ function AdminSellerApprovals() {
                             </button>
                           )}
                         </div>
-                      </motion.div>
+                      </div>
                     );
                   })}
                 </div>
@@ -419,24 +403,24 @@ function AdminSellerApprovals() {
               )}
 
               {app.status === "approved" && (
-                <motion.div className="bg-emerald-500/20 border border-emerald-500/50 rounded-2xl p-4 text-center">
+                <div className="bg-emerald-500/20 border border-emerald-500/50 rounded-2xl p-4 text-center">
                   <p className="text-emerald-300 font-bold flex items-center justify-center gap-2">
                     <Check className="w-5 h-5" /> Approved — Seller can now start selling
                   </p>
-                </motion.div>
+                </div>
               )}
 
               {app.status === "rejected" && (
-                <motion.div className="bg-red-500/20 border border-red-500/50 rounded-2xl p-4 text-center">
+                <div className="bg-red-500/20 border border-red-500/50 rounded-2xl p-4 text-center">
                   <p className="text-red-300 font-bold flex items-center justify-center gap-2">
                     <X className="w-5 h-5" /> Rejected — Seller cannot proceed
                   </p>
                   {app.notes && (
                     <p className="text-red-400/70 text-xs mt-1">{app.notes}</p>
                   )}
-                </motion.div>
+                </div>
               )}
-            </motion.div>
+            </div>
           ))
         )}
       </div>

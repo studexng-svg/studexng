@@ -2,33 +2,19 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
 import { Mail, MessageCircle, Phone, ArrowLeft, Headphones, Clock, Shield, Zap, ChevronRight, X } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import BottomNav from "@/components/layout/BottomNav";
 
 export default function HelpPage() {
   const router = useRouter();
 
-  const fadeInUp = {
-    initial: { opacity: 0, y: 20 },
-    animate: { opacity: 1, y: 0 },
-    transition: { duration: 0.6 },
-  };
-
-  const cardHover = {
-    whileHover: { y: -4, scale: 1.02 },
-    whileTap: { scale: 0.98 },
-  };
 
   return (
     <>
       {/* TOP BAR — BIG LOGO */}
-      <motion.div
-        initial={{ y: -20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        className="sticky top-0 bg-white/80 backdrop-blur-xl z-40 border-b border-white/20 shadow-sm"
-      >
+      <div className="sticky top-0 bg-white/80 backdrop-blur-xl z-40 border-b border-white/20 shadow-sm animate-fadeUp">
         <div className="flex items-center justify-between p-4">
           <button
             onClick={() => router.back()}
@@ -50,35 +36,32 @@ export default function HelpPage() {
             Help Center
           </h1>
         </div>
-      </motion.div>
+      </div>
 
       <div className="p-6 pb-32 space-y-8">
         {/* HERO */}
-        <motion.div {...fadeInUp} className="text-center">
-          <motion.div
-            animate={{ rotate: [0, 5, -5, 0] }}
-            transition={{ duration: 3, repeat: Infinity, repeatDelay: 4 }}
+        <div className="text-center animate-fadeUp">
+          <div
             className="w-28 h-28 mx-auto bg-gradient-to-br from-purple-100 to-teal-100 rounded-full flex items-center justify-center shadow-xl mb-5"
           >
             <Headphones className="w-16 h-16 text-purple-600" />
-          </motion.div>
+          </div>
           <h1 className="text-3xl font-black bg-gradient-to-r from-purple-600 to-teal-500 bg-clip-text text-transparent">
             How Can We Help?
           </h1>
           <p className="text-sm text-gray-600 mt-2 max-w-md mx-auto">
             Fast, friendly support from real humans. Available <strong>24/7</strong> — no bots.
           </p>
-        </motion.div>
+        </div>
 
         {/* SUPPORT OPTIONS — GLASS CARDS */}
-        <motion.div {...fadeInUp} className="space-y-5">
+        <div className="space-y-5 animate-fadeUp">
           {/* WHATSAPP */}
-          <motion.a
+          <a
             href="https://wa.me/2348027291641"
             target="_blank"
             rel="noopener noreferrer"
-            {...cardHover}
-            className="block"
+            className="block hover:-translate-y-1 active:scale-[0.98] transition-transform"
           >
             <div className="bg-white/70 backdrop-blur-md rounded-2xl p-5 flex items-center justify-between shadow-lg border border-white/30 hover:shadow-xl transition-all">
               <div className="flex items-center gap-4">
@@ -92,13 +75,12 @@ export default function HelpPage() {
               </div>
               <ChevronRight className="w-5 h-5 text-gray-400" />
             </div>
-          </motion.a>
+          </a>
 
           {/* EMAIL */}
-          <motion.a
+          <a
             href="mailto:studex.biz@pau.edu.ng"
-            {...cardHover}
-            className="block"
+            className="block hover:-translate-y-1 active:scale-[0.98] transition-transform"
           >
             <div className="bg-white/70 backdrop-blur-md rounded-2xl p-5 flex items-center justify-between shadow-lg border border-white/30 hover:shadow-xl transition-all">
               <div className="flex items-center gap-4">
@@ -112,13 +94,12 @@ export default function HelpPage() {
               </div>
               <ChevronRight className="w-5 h-5 text-gray-400" />
             </div>
-          </motion.a>
+          </a>
 
           {/* CALL */}
-          <motion.a
+          <a
             href="tel:+2348001234567"
-            {...cardHover}
-            className="block"
+            className="block hover:-translate-y-1 active:scale-[0.98] transition-transform"
           >
             <div className="bg-white/70 backdrop-blur-md rounded-2xl p-5 flex items-center justify-between shadow-lg border border-white/30 hover:shadow-xl transition-all">
               <div className="flex items-center gap-4">
@@ -132,11 +113,11 @@ export default function HelpPage() {
               </div>
               <ChevronRight className="w-5 h-5 text-gray-400" />
             </div>
-          </motion.a>
-        </motion.div>
+          </a>
+        </div>
 
         {/* FEATURES */}
-        <motion.div {...fadeInUp} className="bg-gradient-to-r from-purple-50 to-teal-50 rounded-2xl p-6 space-y-4">
+        <div className="bg-gradient-to-r from-purple-50 to-teal-50 rounded-2xl p-6 space-y-4 animate-fadeUp">
           <div className="flex items-center gap-3">
             <Zap className="w-6 h-6 text-purple-600" />
             <p className="font-bold text-gray-800">Average Response: 3 mins</p>
@@ -149,38 +130,22 @@ export default function HelpPage() {
             <Shield className="w-6 h-6 text-emerald-600" />
             <p className="font-bold text-gray-800">100% Verified Nigerian Team</p>
           </div>
-        </motion.div>
+        </div>
 
         {/* FAQ CTA */}
-        <motion.div {...fadeInUp} className="text-center">
+        <div className="text-center animate-fadeUp">
           <p className="text-sm text-gray-600 mb-3">Common questions?</p>
           <Link href="/faq">
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="bg-gradient-to-r from-purple-600 to-teal-500 text-white px-8 py-4 rounded-full font-black shadow-xl"
+            <button
+              className="bg-gradient-to-r from-purple-600 to-teal-500 text-white px-8 py-4 rounded-full font-black shadow-xl hover-scale tap-scale"
             >
               View FAQ
-            </motion.button>
+            </button>
           </Link>
-        </motion.div>
+        </div>
       </div>
 
-      {/* BOTTOM NAV */}
-      <motion.div
-        initial={{ y: 100 }}
-        animate={{ y: 0 }}
-        transition={{ type: "spring", stiffness: 300, damping: 30 }}
-        className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-xl border-t border-white/20 z-50 shadow-2xl"
-      >
-        <div className="flex justify-around py-3">
-          <Link href="/" className="text-gray-500"><span className="text-xs">Home</span></Link>
-          <Link href="/categories" className="text-gray-500"><span className="text-xs">Shop</span></Link>
-          <Link href="/cart" className="text-gray-500"><span className="text-xs">Cart</span></Link>
-          <Link href="/wishlist" className="text-gray-500"><span className="text-xs">Wishlist</span></Link>
-          <div className="text-teal-600 font-black"><span className="text-xs">Help</span></div>
-        </div>
-      </motion.div>
+      <BottomNav />
     </>
   );
 }
