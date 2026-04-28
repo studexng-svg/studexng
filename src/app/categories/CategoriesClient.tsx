@@ -45,7 +45,7 @@ export default function CategoriesClient({ categories }: { categories: Category[
             What do you need today?
           </h2>
           <p className="text-stone-400 text-sm mt-0.5">All services available on campus.</p>
-        </motion.div>
+        </div>
 
         {categories.length === 0 ? (
           <div className="bg-white rounded-2xl p-12 text-center border border-stone-100 shadow-sm animate-fadeIn">

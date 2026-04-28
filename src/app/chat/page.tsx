@@ -97,7 +97,7 @@ export default function ChatListPage() {
           <h2 className="text-xl font-bold text-stone-900 mt-0.5" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
             Your Conversations
           </h2>
-        </motion.div>
+        </div>
 
         {/* ── LOADING ── */}
         {loading ? (

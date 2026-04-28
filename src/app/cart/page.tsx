@@ -111,7 +111,7 @@ export default function CartPage() {
           <h2 className="text-xl font-bold text-stone-900 mt-0.5" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
             Review your cart
           </h2>
-        </motion.div>
+        </div>
 
         {/* ── UNAVAILABILITY WARNING ── */}
         {!checking && hasUnavailable && (

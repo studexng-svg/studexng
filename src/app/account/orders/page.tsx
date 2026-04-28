@@ -141,7 +141,7 @@ export default function OrdersPage() {
                 Start Exploring
               </button>
             </Link>
-          </motion.div>
+          </div>
         ) : (
           orders.map((order, index) => (
             <div key={order.id} className="bg-white rounded-2xl border border-stone-200 shadow-sm overflow-hidden hover:border-teal-300 hover:shadow-md transition-all animate-fadeUp">

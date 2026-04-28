@@ -204,7 +204,7 @@ export default function SellerPayouts() {
                     <span className={`text-xs font-medium px-2.5 py-1 rounded-full whitespace-nowrap flex-shrink-0 ml-2 ${getStatusColor(txn.status)}`}>
                       {getStatusText(txn.status)}
                     </span>
-                  </motion.div>
+                  </div>
                 </button>
               ))}
             </div>
