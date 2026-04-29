@@ -169,7 +169,8 @@ export default function HomePageClient({ initialVendors, initialListings }: Prop
     <>
       {toast && (
         <motion.div initial={{ y: -50, opacity: 0 }} animate={{ y: 60, opacity: 1 }}
-          className="fixed top-4 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full shadow-lg z-50 font-medium text-sm text-white bg-teal-600">
+          className="fixed top-4 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full shadow-lg z-50 font-medium text-sm text-white"
+          style={{ background: GRAD }}>
           {toast}
         </motion.div>
       )}
@@ -264,19 +265,21 @@ export default function HomePageClient({ initialVendors, initialListings }: Prop
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}>
             {isLoggedIn && user ? (
               <>
-                <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold">Welcome back</p>
-                <h1 className="text-2xl font-bold text-stone-900 mt-1" style={SERIF}>
+                <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-bold">Welcome back</p>
+                <h1 className="text-3xl font-black italic tracking-tighter uppercase text-stone-900 mt-1"
+                  style={{ fontFamily: "var(--font-jakarta), 'Plus Jakarta Sans', sans-serif" }}>
                   Hey, {user.username || "there"} 👋
                 </h1>
-                <p className="text-stone-400 text-sm mt-0.5">Here's what's available on campus today.</p>
+                <p className="text-stone-400 text-sm mt-1">Here's what's available on campus today.</p>
               </>
             ) : (
               <>
-                <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold">PAU Campus Marketplace</p>
-                <h1 className="text-2xl font-bold text-stone-900 mt-1" style={SERIF}>
+                <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-bold">Campus Marketplace</p>
+                <h1 className="text-3xl font-black italic tracking-tighter uppercase text-stone-900 mt-1"
+                  style={{ fontFamily: "var(--font-jakarta), 'Plus Jakarta Sans', sans-serif" }}>
                   Discover Services
                 </h1>
-                <p className="text-stone-400 text-sm mt-0.5">Browse verified vendors on campus.</p>
+                <p className="text-stone-400 text-sm mt-1">Browse verified vendors on campus.</p>
               </>
             )}
           </motion.div>
@@ -285,14 +288,11 @@ export default function HomePageClient({ initialVendors, initialListings }: Prop
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
             <Link href="/categories">
               <motion.div whileHover={{ y: -3 }} whileTap={{ scale: 0.98 }}
-                className="relative rounded-2xl overflow-hidden h-36 cursor-pointer shadow-md"
-                style={{ background: "linear-gradient(135deg, #0b1a18 0%, #1a0b2e 100%)" }}>
-                <div className="absolute top-0 right-0 w-48 h-48 rounded-full bg-teal-500/20 blur-3xl pointer-events-none" />
-                <div className="absolute bottom-0 left-0 w-40 h-40 rounded-full bg-purple-600/20 blur-3xl pointer-events-none" />
-                <div className="absolute inset-0 opacity-[0.04]"
-                  style={{ backgroundImage: `radial-gradient(circle, #5eead4 1px, transparent 1px)`, backgroundSize: "24px 24px" }} />
+                className="relative rounded-2xl overflow-hidden h-36 cursor-pointer shadow-md bg-gradient-to-br from-teal-500 to-purple-600">
+                <div className="absolute top-0 right-0 w-48 h-48 rounded-full bg-white/10 blur-3xl pointer-events-none" />
+                <div className="absolute bottom-0 left-0 w-40 h-40 rounded-full bg-white/10 blur-3xl pointer-events-none" />
                 <div className="relative z-10 h-full flex flex-col justify-center px-6">
-                  <p className="text-teal-400 text-xs tracking-[0.25em] uppercase font-semibold mb-1">Campus Marketplace</p>
+                  <p className="text-white/80 text-xs tracking-[0.25em] uppercase font-semibold mb-1">Campus Marketplace</p>
                   <h2 className="text-xl font-bold text-white" style={SERIF}>
                     Every service,{" "}
                     <span className="italic" style={{
@@ -302,7 +302,7 @@ export default function HomePageClient({ initialVendors, initialListings }: Prop
                       backgroundClip: "text",
                     }}>one tap away.</span>
                   </h2>
-                  <p className="text-white/50 text-xs mt-2 flex items-center gap-1">
+                  <p className="text-white/70 text-xs mt-2 flex items-center gap-1">
                     Browse all categories <ChevronRight className="w-3 h-3" />
                   </p>
                 </div>
@@ -316,8 +316,9 @@ export default function HomePageClient({ initialVendors, initialListings }: Prop
             <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold">On Campus</p>
-                  <h2 className="text-xl font-bold text-stone-900 mt-0.5" style={SERIF}>
+                  <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-bold">On Campus</p>
+                  <h2 className="text-2xl font-black italic tracking-tighter uppercase text-stone-900 mt-0.5"
+                    style={{ fontFamily: "var(--font-jakarta), 'Plus Jakarta Sans', sans-serif" }}>
                     Vendors
                   </h2>
                 </div>
@@ -337,7 +338,7 @@ export default function HomePageClient({ initialVendors, initialListings }: Prop
                         <div style={{
                           borderRadius: '50%',
                           padding: '3px',
-                          background: 'linear-gradient(135deg, #0b1a18 0%, #1a0b2e 100%)',
+                          background: 'linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)',
                           display: 'inline-block',
                         }}>
                           <div style={{
@@ -378,8 +379,9 @@ export default function HomePageClient({ initialVendors, initialListings }: Prop
           <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
             <div className="flex items-center justify-between mb-4">
               <div>
-                <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold">Available Now</p>
-                <h2 className="text-xl font-bold text-stone-900 mt-0.5" style={SERIF}>
+                <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-bold">Available Now</p>
+                <h2 className="text-2xl font-black italic tracking-tighter uppercase text-stone-900 mt-0.5"
+                  style={{ fontFamily: "var(--font-jakarta), 'Plus Jakarta Sans', sans-serif" }}>
                   {activeFilter === "All" ? "Featured Services" : activeFilter}
                 </h2>
               </div>
@@ -494,7 +496,8 @@ export default function HomePageClient({ initialVendors, initialListings }: Prop
                             <motion.button
                               whileHover={{ scale: 1.04 }}
                               whileTap={{ scale: 0.96 }}
-                              className="px-6 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-full font-semibold text-sm shadow-sm transition-colors">
+                              className="px-6 py-2.5 text-white rounded-full font-black text-sm shadow-sm uppercase tracking-wide transition-opacity hover:opacity-90"
+                              style={{ background: GRAD }}>
                               {isService ? "Book" : "Order"}
                             </motion.button>
                           </Link>
@@ -529,12 +532,11 @@ export default function HomePageClient({ initialVendors, initialListings }: Prop
           {!isLoggedIn && (
             <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
               className="bg-white border border-stone-200 rounded-2xl p-6 text-center shadow-sm relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-teal-100/60 blur-2xl pointer-events-none" />
-              <div className="absolute bottom-0 left-0 w-32 h-32 rounded-full bg-purple-100/60 blur-2xl pointer-events-none" />
               <div className="relative z-10">
                 <Shield className="w-8 h-8 mx-auto mb-3 text-teal-600" />
-                <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold mb-1">Safe & Secure</p>
-                <h3 className="text-xl font-bold text-stone-900 mb-1" style={SERIF}>
+                <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-bold mb-1">Safe & Secure</p>
+                <h3 className="text-2xl font-black italic tracking-tighter uppercase text-stone-900 mb-1"
+                  style={{ fontFamily: "var(--font-jakarta), 'Plus Jakarta Sans', sans-serif" }}>
                   Ready to book?
                 </h3>
                 <p className="text-stone-400 text-sm mb-5">Create a free account to book any service.</p>

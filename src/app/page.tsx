@@ -1,25 +1,13 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  ArrowRight, Sparkles, Utensils, Shirt, Scissors,
-  Shield, MessageCircle, Zap, Heart, Users, TrendingUp,
-  Star, CheckCircle, Quote
-} from "lucide-react";
+import { ArrowRight, Sparkles, Star, Quote } from "lucide-react";
 import { useEffect, useState } from "react";
 import Script from "next/script";
 import Link from "next/link";
 // REMOVE BEFORE PRODUCTION
 import { generateStructuredData } from "@/lib/metadata";
-import { GRAD, GRAD_TEXT, SERIF } from "@/lib/tokens";
-
-/* ─── THEME ─────────────────────────────────────────────── */
-// Primary:   #0D9488  (teal-600)
-// Secondary: #7C3AED  (purple-600)
-// Gradient:  teal → purple
-// BG:        #FAFAF9  (warm cream/stone-50)
-// Surface:   #FFFFFF
-// Text:      #1C1917  (stone-900)
+import { GRAD_TEXT, SERIF } from "@/lib/tokens";
 
 /* ─── DATA ─────────────────────────────────────────────── */
 const reviews = [
@@ -32,20 +20,15 @@ const reviews = [
   { name: "Lolope & Nonye",            text: "I like the aesthetics",                                                                                          stars: 5 },
 ];
 
-const services = [
-  { icon: Sparkles, title: "Lashes",  desc: "Expert extensions & precision maintenance", tag: "Beauty",     color: "from-purple-500 to-purple-700" },
-  { icon: Scissors, title: "Nails",   desc: "Manicures, gel sets, intricate nail art",    tag: "Beauty",     color: "from-teal-500 to-teal-700" },
-  { icon: Shirt,    title: "Laundry", desc: "Pick-up, wash, press, and return",           tag: "Essentials", color: "from-purple-400 to-teal-500" },
-  { icon: Utensils, title: "Food",    desc: "Fresh meals delivered to your door",          tag: "Dining",     color: "from-teal-400 to-purple-500" },
-];
-
-const features = [
-  { icon: Shield,        title: "Secure Payments",     desc: "Funds held in escrow. Released only when you're satisfied." },
-  { icon: MessageCircle, title: "Direct Messaging",    desc: "Chat with vendors before you commit to a booking." },
-  { icon: Zap,           title: "Instant Booking",     desc: "Reserve a slot in under 30 seconds, no back-and-forth." },
-  { icon: Heart,         title: "Save Favourites",     desc: "Wishlist the vendors you trust and return to them easily." },
-  { icon: Users,         title: "Verified Reviews",    desc: "Every rating is from a real student on campus." },
-  { icon: TrendingUp,    title: "Transparent Pricing", desc: "Compare rates and always know exactly what you'll pay." },
+const heroImages = [
+  { src: "https://images.unsplash.com/photo-1490645935967-10de6ba17061?auto=format&fit=crop&q=60&w=1200", label: "Food" },
+  { src: "https://images.unsplash.com/photo-1445205170230-053b83016050?auto=format&fit=crop&q=60&w=1200", label: "Fashion" },
+  { src: "https://images.unsplash.com/photo-1582735689369-4fe89db7114c?auto=format&fit=crop&q=60&w=1200", label: "Laundry" },
+  { src: "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&q=60&w=1200", label: "Photography" },
+  { src: "https://images.unsplash.com/photo-1519699047748-de8e457a634e?auto=format&fit=crop&q=60&w=1200", label: "Hair" },
+  { src: "https://images.unsplash.com/photo-1604654894610-df63bc536371?auto=format&fit=crop&q=60&w=1200", label: "Nails" },
+  { src: "https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?auto=format&fit=crop&q=60&w=1200", label: "Drinks" },
+  { src: "https://images.unsplash.com/photo-1596462502278-27bfdc403348?auto=format&fit=crop&q=60&w=1200", label: "Makeup" },
 ];
 
 /* ─── STAR ROW ─────────────────────────────────────────── */
@@ -105,7 +88,7 @@ function ReviewCarousel() {
             >
               <Quote className="w-8 h-8 text-teal-400/60 mb-4" />
               <p className="text-xl text-stone-700 leading-relaxed mb-5 italic" style={SERIF}>
-                "{reviews[current].text}"
+                &ldquo;{reviews[current].text}&rdquo;
               </p>
               <div className="flex items-center justify-between">
                 <div>
@@ -141,10 +124,29 @@ function ReviewCarousel() {
 export default function LandingPage() {
   const [mounted, setMounted] = useState(false);
   const [isLoggedIn] = useState(false);
+  const [featuredListings, setFeaturedListings] = useState<any[]>([]);
+  const [heroIndex, setHeroIndex] = useState(0);
+  const listingCount = 53;
+  const vendorCount = 38;
 
   useEffect(() => {
     setMounted(true);
     document.title = "StudEx — Campus Marketplace for Student Services | PAU";
+
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+    fetch(`${API_URL}/api/services/listings/?campus=pau`)
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (!data) return;
+        const all = data.results || data || [];
+        setFeaturedListings(all.filter((l: any) => l.image?.startsWith("http")).slice(0, 6));
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const t = setInterval(() => setHeroIndex(p => (p + 1) % heroImages.length), 4000);
+    return () => clearInterval(t);
   }, []);
 
   const navigate = (path: string) => { window.location.href = path; };
@@ -173,291 +175,278 @@ export default function LandingPage() {
       <Script id="sd-site" type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(generateStructuredData.website()) }} />
 
       {/* ── HERO ─────────────────────────────────────────── */}
-      <div className="relative min-h-screen flex flex-col items-center justify-center px-6 text-center overflow-hidden">
+      <div className="relative min-h-screen h-screen flex flex-col bg-purple-950 overflow-hidden">
 
-        {/* Video background */}
-        <video
-          autoPlay
-          muted
-          loop
-          playsInline
-          className="absolute inset-0 w-full h-full object-cover"
-          style={{ zIndex: 0 }}
-        >
-          <source src="/videos/hero.mp4" type="video/mp4" />
-        </video>
+        {/* Hero background image */}
+        {heroImages.map((img, i) => (
+          <img
+            key={img.label}
+            src={img.src}
+            alt={img.label}
+            crossOrigin="anonymous"
+            loading={i === 0 ? "eager" : "lazy"}
+            decoding="async"
+            className="absolute inset-0 w-full h-full object-cover object-center transition-opacity duration-1000"
+            style={{ zIndex: 0, opacity: i === heroIndex ? 1 : 0 }}
+            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+          />
+        ))}
+        {/* Overlay */}
+        <div className="absolute inset-0" style={{ zIndex: 1, background: "linear-gradient(to bottom, rgba(13,148,136,0.30) 0%, rgba(124,58,237,0.50) 45%, rgba(88,28,135,0.82) 100%)" }} />
 
-        {/* Dark overlay over video */}
-        <div className="absolute inset-0 bg-black/60" style={{ zIndex: 1 }} />
+        <div className="relative z-10 max-w-2xl mx-auto px-6 text-white pt-24 pb-16">
 
-        {/* Dot grid overlay */}
-        <div className="absolute inset-0 opacity-[0.04] pointer-events-none"
-          style={{ backgroundImage: `radial-gradient(circle, #5eead4 1px, transparent 1px)`, backgroundSize: "24px 24px", zIndex: 2 }} />
-
-        <div className="relative z-10 max-w-2xl mx-auto space-y-6" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-
-          {/* Badge */}
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-white/10 bg-white/5 text-teal-400 text-xs font-semibold tracking-[0.2em] uppercase"
-          >
+          {/* Live badge */}
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-white text-xs font-bold tracking-widest uppercase mb-8">
             <span className="w-2 h-2 rounded-full bg-teal-400 animate-pulse" />
-            PAU &amp; FUTO Campus Marketplace
-          </motion.div>
+            Now Live · PAU & FUTO
+          </div>
 
-          {/* Heading */}
-          <motion.h1
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.35 }}
-            className="text-4xl md:text-6xl font-bold text-white leading-tight"
-            style={SERIF}
-          >
-            Everything you need,{" "}
-            <span className="italic" style={{
-              background: "linear-gradient(135deg, #2dd4bf 0%, #a78bfa 100%)",
-              WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text"
-            }}>
-              one tap away.
-            </span>
-          </motion.h1>
+          {/* Bold headline */}
+          <h1 className="text-5xl md:text-7xl font-black leading-[0.95] tracking-tighter mb-6 italic uppercase"
+            style={{ fontFamily: "var(--font-jakarta), 'Plus Jakarta Sans', sans-serif" }}>
+            THE CAMPUS<br />
+            <span style={{
+              background: "linear-gradient(to right, #5eead4, #ffffff, #c4b5fd)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              backgroundClip: "text",
+            }}>MARKETPLACE</span><span className="text-white/60 text-base font-bold uppercase tracking-widest"> — At Your Fingertips</span>
+          </h1>
 
-          {/* Subheading */}
-          <motion.p
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.55 }}
-            className="text-white/60 text-lg leading-relaxed"
-          >
-            Book nail artists, laundry, food, tutors and more — all from verified vendors on your campus. No stress, no hassle.
-          </motion.p>
+          {/* Subheadline */}
+          <p className="text-white/70 text-lg leading-relaxed mb-8 max-w-md">
+            Food, beauty, laundry, photography and more, all from verified vendors right on your campus.
+          </p>
 
-          {/* Stats */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.7 }}
-            className="flex items-center justify-center gap-8 py-4"
-          >
-            <div className="text-center">
-              <p className="text-2xl font-bold text-white">PAU</p>
-              <p className="text-xs text-white/40 mt-0.5">Pan-Atlantic University</p>
-            </div>
-            <div className="w-px h-10 bg-white/10" />
-            <div className="text-center">
-              <p className="text-2xl font-bold text-white">FUTO</p>
-              <p className="text-xs text-white/40 mt-0.5">Federal University of Technology</p>
-            </div>
-            <div className="w-px h-10 bg-white/10" />
-            <div className="text-center">
-              <p className="text-2xl font-bold text-white">100%</p>
-              <p className="text-xs text-white/40 mt-0.5">Verified Vendors</p>
-            </div>
-          </motion.div>
+          {/* Service pills */}
+          <div className="flex flex-wrap gap-2 mb-10">
+            {["🍜 Food", "💅 Nails", "🧺 Laundry", "📸 Photography", "👗 Fashion", "💇 Hair"].map(s => (
+              <span key={s} className="px-3 py-1.5 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 text-white text-xs font-semibold">
+                {s}
+              </span>
+            ))}
+          </div>
 
-          {/* CTA Buttons */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.85 }}
-            className="flex flex-col sm:flex-row gap-3 justify-center pt-2"
-          >
+          {/* CTA */}
+          <div className="flex flex-col sm:flex-row gap-3">
             <Link href="/auth">
-              <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
-                className="px-8 py-4 text-white font-semibold rounded-full shadow-lg shadow-teal-900/60 text-sm"
-                style={{ background: GRAD }}>
-                Get Started — It&apos;s Free
-              </motion.button>
+              <button className="px-8 py-4 text-white font-black rounded-full text-sm uppercase tracking-wider shadow-2xl transition-transform hover:scale-105 active:scale-95"
+                style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+                Start Ordering →
+              </button>
             </Link>
             <Link href="/home">
-              <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
-                className="px-8 py-4 text-white/70 font-medium rounded-full border border-white/10 hover:border-white/20 text-sm transition">
+              <button className="px-8 py-4 text-white/80 font-bold rounded-full border border-white/20 backdrop-blur-sm text-sm uppercase tracking-wider hover:bg-white/10 transition">
                 Browse Services
-              </motion.button>
+              </button>
             </Link>
-          </motion.div>
+          </div>
 
-          {/* Scroll hint */}
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 1.2 }}
-            className="text-white/30 text-xs pt-4"
-          >
-            Scroll to explore ↓
-          </motion.p>
+          {/* Stats row */}
+          <div className="flex items-center gap-8 mt-12 pt-8 border-t border-white/10">
+            <div>
+              <p className="text-2xl font-black text-white">{vendorCount}+</p>
+              <p className="text-xs text-white/40 font-bold uppercase tracking-wider mt-0.5">Vendors</p>
+            </div>
+            <div className="w-px h-10 bg-white/10" />
+            <div>
+              <p className="text-2xl font-black text-white">{listingCount}+</p>
+              <p className="text-xs text-white/40 font-bold uppercase tracking-wider mt-0.5">Services</p>
+            </div>
+            <div className="w-px h-10 bg-white/10" />
+            <div>
+              <p className="text-2xl font-black text-white">2</p>
+              <p className="text-xs text-white/40 font-bold uppercase tracking-wider mt-0.5">Campuses</p>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* ── SERVICES ─────────────────────────────────────── */}
-      <section className="py-32 bg-[#FAFAF9]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-        <div className="max-w-6xl mx-auto px-6">
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="mb-16"
-          >
-            <p className="text-teal-600 text-xs tracking-[0.3em] uppercase font-semibold mb-3">What We Offer</p>
-            <h2
-              className="text-4xl md:text-5xl font-bold text-stone-900"
-              style={SERIF}
-            >
-              Our Services
-            </h2>
-          </motion.div>
+      {/* ── WHO IS THIS FOR ──────────────────────────────── */}
+      <section className="py-12 px-6 bg-white border-b border-stone-100">
+        <div className="max-w-2xl mx-auto">
+          <div className="grid grid-cols-2 gap-4">
+            <Link href="/auth">
+              <div className="p-5 rounded-2xl border-2 border-teal-500 bg-teal-50 hover:bg-teal-100 transition cursor-pointer">
+                <p className="text-2xl mb-2">🛍️</p>
+                <p className="font-black text-stone-900 text-sm uppercase tracking-wide">I&apos;m a Student</p>
+                <p className="text-stone-500 text-xs mt-1">Browse and order services on campus</p>
+                <p className="text-teal-600 font-bold text-xs mt-3">Start Ordering →</p>
+              </div>
+            </Link>
+            <Link href="/auth">
+              <div className="p-5 rounded-2xl border-2 border-purple-500 bg-purple-50 hover:bg-purple-100 transition cursor-pointer">
+                <p className="text-2xl mb-2">💼</p>
+                <p className="font-black text-stone-900 text-sm uppercase tracking-wide">I&apos;m a Vendor</p>
+                <p className="text-stone-500 text-xs mt-1">List your services and earn on campus</p>
+                <p className="text-purple-600 font-bold text-xs mt-3">Start Selling →</p>
+              </div>
+            </Link>
+          </div>
+        </div>
+      </section>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-5">
-            {services.map((s, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                whileHover={{ y: -6 }}
-                transition={{ delay: i * 0.08 }}
-                viewport={{ once: true }}
-                className="group border border-stone-200 bg-white hover:border-teal-300 rounded-2xl p-7 transition-all duration-300 shadow-sm hover:shadow-md"
-              >
-                <p className="text-purple-500 text-xs tracking-widest uppercase mb-4 font-medium">{s.tag}</p>
-                <div
-                  className={`w-10 h-10 mb-5 rounded-xl flex items-center justify-center bg-gradient-to-br ${s.color}`}
-                >
-                  <s.icon className="w-5 h-5 text-white" strokeWidth={1.5} />
-                </div>
-                <h3 className="text-xl font-semibold text-stone-900 mb-2" style={{ fontFamily: "'Playfair Display', serif" }}>
-                  {s.title}
-                </h3>
-                <p className="text-stone-400 text-sm leading-relaxed">{s.desc}</p>
-              </motion.div>
+      {/* ── HOW IT WORKS ─────────────────────────────────── */}
+      <section className="py-20 px-6 text-white" style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+        <div className="max-w-2xl mx-auto">
+          <h2 className="text-4xl md:text-5xl font-black italic tracking-tighter uppercase mb-16 text-center">
+            Order in <span style={{ color: "#ccfbf1" }}>3 Steps</span>
+          </h2>
+          <div className="grid grid-cols-3 gap-6">
+            {[
+              { num: "01", icon: "🔍", title: "Browse", desc: "Find services from verified vendors on your campus" },
+              { num: "02", icon: "💳", title: "Pay", desc: "Secure payment via Paystack — fast and safe" },
+              { num: "03", icon: "✅", title: "Receive", desc: "Confirm delivery and release payment to vendor" },
+            ].map((step) => (
+              <div key={step.num} className="text-center">
+                <p className="text-5xl font-black text-white/30 mb-2">{step.num}</p>
+                <p className="text-3xl mb-3">{step.icon}</p>
+                <p className="font-black text-white text-sm uppercase tracking-wider mb-1">{step.title}</p>
+                <p className="text-white/85 text-xs leading-relaxed">{step.desc}</p>
+              </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ── WHY STUDEX ───────────────────────────────────── */}
-      <section className="py-32 bg-white relative" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-        <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-teal-200/60 to-transparent" />
-
-        {/* Background blobs */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-20 right-0 w-80 h-80 rounded-full bg-purple-50/80 blur-3xl" />
-          <div className="absolute bottom-20 left-0 w-80 h-80 rounded-full bg-teal-50/80 blur-3xl" />
-        </div>
-
-        <div className="max-w-6xl mx-auto px-6 relative z-10">
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="mb-16"
-          >
-            <p className="text-teal-600 text-xs tracking-[0.3em] uppercase font-semibold mb-3">Why Choose Us</p>
-            <h2
-              className="text-4xl md:text-5xl font-bold text-stone-900"
-              style={SERIF}
-            >
-              Built for campus life.
-            </h2>
-          </motion.div>
-
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {features.map((f, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.08 }}
-                viewport={{ once: true }}
-                className="border border-stone-100 bg-stone-50 rounded-2xl p-7 hover:border-teal-200 hover:bg-white transition-colors shadow-sm"
-              >
-                <div
-                  className="w-9 h-9 rounded-lg flex items-center justify-center mb-5"
-                  style={{ background: GRAD }}
-                >
-                  <f.icon className="w-4 h-4 text-white" strokeWidth={1.5} />
+      {/* ── CATEGORIES ───────────────────────────────────── */}
+      <section className="py-20 px-6 bg-[#FAFAF9]">
+        <div className="max-w-2xl mx-auto">
+          <p className="text-teal-700 text-xs tracking-[0.25em] uppercase font-bold mb-2">What&apos;s Available</p>
+          <h2 className="text-4xl font-black italic tracking-tighter uppercase text-stone-900 mb-10"
+            style={{ fontFamily: "var(--font-jakarta), 'Plus Jakarta Sans', sans-serif" }}>
+            Everything<br />You Need
+          </h2>
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              { emoji: "🍜", name: "Food & Drinks", desc: "Jollof, pasta, zobo & more", color: "bg-orange-50 border-orange-100" },
+              { emoji: "💅", name: "Beauty", desc: "Nails, lashes, makeup", color: "bg-purple-50 border-purple-100" },
+              { emoji: "🧺", name: "Laundry", desc: "Wash, dry & fold", color: "bg-teal-50 border-teal-100" },
+              { emoji: "📸", name: "Photography", desc: "Shoots & editing", color: "bg-blue-50 border-blue-100" },
+              { emoji: "👗", name: "Fashion", desc: "Tailoring & styling", color: "bg-pink-50 border-pink-100" },
+              { emoji: "💪", name: "Fitness", desc: "Personal trainers", color: "bg-green-50 border-green-100" },
+            ].map((cat) => (
+              <Link key={cat.name} href="/home">
+                <div className={`${cat.color} border rounded-2xl p-4 hover:scale-105 active:scale-95 transition-transform cursor-pointer`}>
+                  <p className="text-3xl mb-2">{cat.emoji}</p>
+                  <p className="font-black text-stone-900 text-sm uppercase tracking-wide">{cat.name}</p>
+                  <p className="text-stone-400 text-xs mt-0.5">{cat.desc}</p>
                 </div>
-                <h3 className="text-base font-semibold text-stone-900 mb-2">{f.title}</h3>
-                <p className="text-stone-400 text-sm leading-relaxed">{f.desc}</p>
-              </motion.div>
+              </Link>
             ))}
           </div>
         </div>
-        <div className="absolute bottom-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-purple-200/50 to-transparent" />
+      </section>
+
+      {/* ── LIVE LISTINGS ────────────────────────────────── */}
+      <section className="py-20 px-6 bg-[#FAFAF9]">
+        <div className="max-w-2xl mx-auto">
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <p className="text-teal-700 text-xs tracking-[0.25em] uppercase font-bold mb-1">Live Now</p>
+              <h2 className="text-3xl font-black italic tracking-tighter uppercase text-stone-900"
+                style={{ fontFamily: "var(--font-jakarta), 'Plus Jakarta Sans', sans-serif" }}>
+                {listingCount}+ Services Available
+              </h2>
+            </div>
+            <Link href="/home">
+              <button className="px-4 py-2 rounded-full border border-teal-600 text-teal-700 text-xs font-bold uppercase tracking-wider hover:bg-teal-50 transition">
+                View All →
+              </button>
+            </Link>
+          </div>
+
+          {/* Listing cards grid */}
+          <div className="grid grid-cols-2 gap-3">
+            {featuredListings.length > 0 ? featuredListings.map((listing: any) => (
+              <Link key={listing.id} href="/auth">
+                <div className="bg-white rounded-2xl overflow-hidden border border-stone-100 shadow-sm hover:shadow-md hover:scale-105 active:scale-95 transition-all cursor-pointer">
+                  <div className="relative w-full h-32 overflow-hidden bg-stone-100">
+                    <img
+                      src={listing.image}
+                      alt={listing.title}
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                    />
+                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
+                      <p className="text-white font-bold text-xs line-clamp-1">{listing.title}</p>
+                    </div>
+                  </div>
+                  <div className="p-3">
+                    <p className="text-xs text-stone-400 mb-1">@{listing.vendor?.username}</p>
+                    <p className="font-black text-stone-900 text-sm">₦{Number(listing.price).toLocaleString()}</p>
+                  </div>
+                </div>
+              </Link>
+            )) : (
+              [1, 2, 3, 4].map(i => (
+                <div key={i} className="bg-white rounded-2xl overflow-hidden border border-stone-100 shadow-sm">
+                  <div className="w-full h-32 bg-stone-100 animate-pulse" />
+                  <div className="p-3 space-y-2">
+                    <div className="h-3 bg-stone-100 rounded-full animate-pulse w-2/3" />
+                    <div className="h-4 bg-stone-100 rounded-full animate-pulse w-1/2" />
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Sign up CTA below listings */}
+          <div className="mt-6 p-4 bg-teal-50 border border-teal-100 rounded-2xl text-center">
+            <p className="text-teal-800 font-bold text-sm mb-1">Want to order any of these?</p>
+            <p className="text-teal-600 text-xs mb-3">Create a free account — takes 30 seconds</p>
+            <Link href="/auth">
+              <button className="px-6 py-2.5 text-white font-black rounded-full text-xs uppercase tracking-wider"
+                style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+                Sign Up Free →
+              </button>
+            </Link>
+          </div>
+        </div>
       </section>
 
       {/* ── REVIEWS ──────────────────────────────────────── */}
       <ReviewCarousel />
 
-      {/* ── FINAL CTA ────────────────────────────────────── */}
-      <section className="py-40 bg-[#FAFAF9] relative overflow-hidden" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-        {/* Gradient mesh background */}
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[500px] rounded-full bg-gradient-to-br from-teal-100/70 via-purple-100/50 to-transparent blur-3xl" />
-        </div>
-
-        <div className="relative z-10 text-center px-6 max-w-3xl mx-auto">
-          <motion.p
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true }}
-            className="text-teal-600 text-xs tracking-[0.3em] uppercase font-semibold mb-4"
-          >
-            Get Started Today
-          </motion.p>
-
-          <motion.h2
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="text-5xl md:text-7xl font-bold text-stone-900 mb-6"
-            style={SERIF}
-          >
-            Everything you need,
-            <br />
-            <span className="italic" style={GRAD_TEXT}>
-              right on campus.
-            </span>
-          </motion.h2>
-
-          <motion.p
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            transition={{ delay: 0.2 }}
-            viewport={{ once: true }}
-            className="text-stone-400 text-lg mb-12"
-          >
-            One platform. All your campus services.
-          </motion.p>
-
-          <motion.button
-            onClick={() => navigate("/auth")}
-            whileHover={{ scale: 1.04 }}
-            whileTap={{ scale: 0.97 }}
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="px-12 py-5 text-white font-semibold text-base rounded-full inline-flex items-center gap-3 transition-all shadow-xl shadow-teal-200/50"
-            style={{ background: GRAD }}
-          >
-            Start Booking <ArrowRight className="w-5 h-5" />
-          </motion.button>
-
-          <motion.div
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            transition={{ delay: 0.4 }}
-            viewport={{ once: true }}
-            className="mt-10 flex items-center justify-center gap-8 flex-wrap"
-          >
-            {["No credit card required", "100% Free to join", "Instant access"].map((text, i) => (
-              <div key={i} className="flex items-center gap-2 text-stone-400 text-sm">
-                <CheckCircle className="w-4 h-4 text-teal-500" />
-                <span>{text}</span>
+      {/* ── TRUST ────────────────────────────────────────── */}
+      <section className="py-20 px-6 text-white" style={{ background: "linear-gradient(135deg, #7C3AED 0%, #0D9488 100%)" }}>
+        <div className="max-w-2xl mx-auto">
+          <h2 className="text-4xl font-black italic tracking-tighter uppercase mb-10 text-center">
+            Built for <span style={{ color: "#ccfbf1" }}>Students</span>
+          </h2>
+          <div className="space-y-3">
+            {[
+              { icon: "✅", title: "Verified Vendors Only", desc: "Every vendor submits valid ID before listing on StudEx" },
+              { icon: "⚡", title: "Campus-Fast", desc: "Everything is on campus — no long waits or delivery fees" },
+            ].map((item) => (
+              <div key={item.title} className="flex items-start gap-4 p-5 rounded-2xl bg-white/15 border border-white/25 hover:bg-white/25 transition">
+                <span className="text-2xl flex-shrink-0">{item.icon}</span>
+                <div>
+                  <p className="font-black text-white text-sm uppercase tracking-wide">{item.title}</p>
+                  <p className="text-white/90 text-xs mt-0.5 leading-relaxed">{item.desc}</p>
+                </div>
               </div>
             ))}
-          </motion.div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── FINAL CTA ────────────────────────────────────── */}
+      <section className="py-20 px-6 bg-[#FAFAF9] text-center">
+        <div className="max-w-sm mx-auto">
+          <h2 className="text-4xl font-black italic tracking-tighter uppercase text-stone-900 mb-3"
+            style={{ fontFamily: "var(--font-jakarta), 'Plus Jakarta Sans', sans-serif" }}>
+            Ready to Order?
+          </h2>
+          <p className="text-stone-400 text-sm mb-8">Join PAU and FUTO students already using StudEx.</p>
+          <Link href="/auth">
+            <button className="w-full px-8 py-4 text-white font-black rounded-full text-sm uppercase tracking-wider shadow-xl transition-transform hover:scale-105 active:scale-95"
+              style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+              Create Free Account →
+            </button>
+          </Link>
+          <p className="text-stone-400 text-xs mt-4">Free to join. No hidden charges.</p>
         </div>
       </section>
 

@@ -582,7 +582,8 @@ export default function AccountPage() {
                 Stud<span style={GRAD_TEXT}>Ex</span>
               </span>
             </Link>
-            <h1 className="text-base font-bold text-stone-900" style={SERIF}>My Account</h1>
+            <h1 className="text-base font-black italic tracking-tight uppercase text-stone-900"
+              style={{ fontFamily: "var(--font-jakarta), 'Plus Jakarta Sans', sans-serif" }}>My Account</h1>
             <div className="relative">
               <button
                 onClick={() => setShowNotifications(v => !v)}
@@ -676,7 +677,8 @@ export default function AccountPage() {
                 </motion.button>
               </div>
               <div className="flex-1 min-w-0">
-                <h2 className="text-xl font-bold text-stone-900 truncate" style={SERIF}>
+                <h2 className="text-xl font-black italic tracking-tight uppercase text-stone-900 truncate"
+                  style={{ fontFamily: "var(--font-jakarta), 'Plus Jakarta Sans', sans-serif" }}>
                   {currentUser?.username || "Campus User"}
                 </h2>
                 <p className="text-sm text-stone-400 mt-0.5 truncate">{currentUser?.email}</p>
@@ -697,24 +699,25 @@ export default function AccountPage() {
               <Link href="/vendor/dashboard">
                 <motion.div whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }}
                   className="flex items-center justify-between p-4 rounded-2xl shadow-sm border cursor-pointer"
-                  style={{ background: "linear-gradient(135deg, #0b1a18 0%, #1a0b2e 100%)", borderColor: "rgba(13,148,136,0.3)" }}>
+                  style={{ background: GRAD, borderColor: "rgba(255,255,255,0.15)" }}>
                   <div className="flex items-center gap-3">
-                    <div className="w-11 h-11 rounded-xl flex items-center justify-center shadow-md" style={{ background: GRAD }}>
+                    <div className="w-11 h-11 rounded-xl flex items-center justify-center shadow-md bg-white/20">
                       <LayoutDashboard className="w-5 h-5 text-white" />
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <p className="font-bold text-white text-sm">Vendor Hub</p>
+                        <p className="font-black italic tracking-tight uppercase text-white text-sm"
+                          style={{ fontFamily: "var(--font-jakarta), 'Plus Jakarta Sans', sans-serif" }}>Vendor Hub</p>
                         {(unreadMessages > 0 || pendingBookings > 0) && (
                           <span className="bg-red-500 text-white text-xs font-bold rounded-full min-w-[18px] h-4 flex items-center justify-center px-1">
                             {unreadMessages + pendingBookings}
                           </span>
                         )}
                       </div>
-                      <p className="text-xs text-white/50">Messages, bookings, earnings & listings</p>
+                      <p className="text-xs text-white/80">Messages, bookings, earnings & listings</p>
                     </div>
                   </div>
-                  <ChevronRight className="w-5 h-5 text-white/30" />
+                  <ChevronRight className="w-5 h-5 text-white/60" />
                 </motion.div>
               </Link>
             </motion.div>
@@ -763,8 +766,9 @@ export default function AccountPage() {
 
           {/* ── SECTION LABEL ── */}
           <div className="pt-2">
-            <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold mb-1">Quick Access</p>
-            <h2 className="text-xl font-bold text-stone-900" style={SERIF}>Your Space</h2>
+            <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-bold mb-1">Quick Access</p>
+            <h2 className="text-2xl font-black italic tracking-tighter uppercase text-stone-900"
+              style={{ fontFamily: "var(--font-jakarta), 'Plus Jakarta Sans', sans-serif" }}>Your Space</h2>
           </div>
 
           {/* ── MENU ITEMS ── */}
@@ -779,7 +783,7 @@ export default function AccountPage() {
                         <item.icon className="w-4 h-4 text-white" />
                       </div>
                       <div>
-                        <p className="font-semibold text-stone-900 text-sm">{item.label}</p>
+                        <p className="font-bold text-stone-900 text-sm">{item.label}</p>
                         <p className="text-xs text-stone-400">{item.sub}</p>
                       </div>
                     </div>
@@ -800,17 +804,18 @@ export default function AccountPage() {
           {/* ── BECOME A VENDOR CTA ── */}
           {!vendorApproved && !vendorPending && (
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}>
-              <div className="relative rounded-2xl p-5 overflow-hidden shadow-md" style={{ background: "linear-gradient(135deg, #0b1a18 0%, #1a0b2e 100%)" }}>
-                <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-teal-500/20 blur-2xl pointer-events-none" />
-                <div className="absolute bottom-0 left-0 w-32 h-32 rounded-full bg-purple-600/20 blur-2xl pointer-events-none" />
+              <div className="relative rounded-2xl p-5 overflow-hidden shadow-md" style={{ background: GRAD }}>
+                <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-white/10 blur-2xl pointer-events-none" />
+                <div className="absolute bottom-0 left-0 w-32 h-32 rounded-full bg-white/10 blur-2xl pointer-events-none" />
                 <div className="relative z-10 flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-11 h-11 rounded-xl flex items-center justify-center border border-white/20" style={{ background: GRAD }}>
+                    <div className="w-11 h-11 rounded-xl flex items-center justify-center bg-white/20 border border-white/20">
                       <Store className="w-5 h-5 text-white" />
                     </div>
                     <div>
-                      <p className="font-bold text-white text-sm" style={SERIF}>Become a Vendor</p>
-                      <p className="text-xs text-white/50">Earn on campus. List now.</p>
+                      <p className="font-black italic tracking-tight uppercase text-white text-sm"
+                        style={{ fontFamily: "var(--font-jakarta), 'Plus Jakarta Sans', sans-serif" }}>Become a Vendor</p>
+                      <p className="text-xs text-white/80">Earn on campus. List now.</p>
                     </div>
                   </div>
                   <Link href="/seller/onboarding">

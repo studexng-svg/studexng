@@ -22,3 +22,6 @@ export const SANS: CSSProperties = {
 
 export const toArray = (d: any): any[] =>
   Array.isArray(d) ? d : (d?.results ?? []);
+
+export const ACCENT = "#f97316"; // orange-500
+export const ACCENT_DARK = "#ea580c"; // orange-600
