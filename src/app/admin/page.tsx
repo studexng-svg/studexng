@@ -2,14 +2,11 @@
 "use client";
 
 import {
-  Shield,
   Users,
   Package,
   DollarSign,
   Store,
   FileText,
-  LogOut,
-  Bell,
   TrendingUp,
   AlertCircle,
   ChevronRight,
@@ -21,10 +18,10 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { adminApi } from "@/lib/adminApi";
+import AdminTopBar from "@/components/layout/AdminTopBar";
 
 export default function AdminDashboard() {
   const router = useRouter();
-  const [adminName, setAdminName] = useState("Admin");
   const [stats, setStats] = useState([
     { label: "Total Users", value: "1,284", change: "+12%", icon: Users, color: "from-purple-500 to-purple-600" },
     { label: "Active Sellers", value: "87", change: "+8%", icon: Store, color: "from-teal-500 to-teal-600" },
@@ -43,14 +40,11 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     const isAdmin = localStorage.getItem("isAdmin") === "true";
-    const name = localStorage.getItem("adminName") || "Admin";
 
     if (!isAdmin) {
       router.push("/admin/login");
       return;
     }
-
-    setAdminName(name);
 
     // Fetch real dashboard data from backend
     const fetchDashboardData = async () => {
@@ -116,11 +110,6 @@ export default function AdminDashboard() {
     fetchDashboardData();
   }, [router]);
 
-  const handleLogout = async () => {
-    await adminApi.logout();
-    router.push("/admin/login");
-  };
-
   const quickActions = [
     { 
       label: "Pending Disputes", 
@@ -154,37 +143,7 @@ export default function AdminDashboard() {
 
   return (
     <>
-      <div className="sticky top-0 z-50 bg-gradient-to-r from-slate-900 via-purple-900 to-slate-900 border-b border-white/10 backdrop-blur-xl animate-fadeUp">
-        <div className="flex items-center justify-between p-5">
-          <div className="flex items-center gap-4 animate-fadeIn">
-            <div className="w-12 h-12 bg-gradient-to-br from-purple-600 to-teal-600 rounded-2xl flex items-center justify-center shadow-2xl">
-              <Shield className="w-7 h-7 text-white" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-black text-white">Admin Panel</h1>
-              <p className="text-white/70 text-sm">
-                Welcome back, <span className="font-bold text-purple-300">{adminName}</span>
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-4 animate-fadeIn">
-            <button className="relative p-3 rounded-xl bg-white/10 hover:bg-white/20 transition">
-              <Bell className="w-6 h-6 text-white" />
-              {(escrowData.pendingDisputes > 0 || escrowData.pendingWithdrawals > 0) && (
-                <span className="absolute top-1 right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse"></span>
-              )}
-            </button>
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-2 px-4 py-3 bg-red-500/20 hover:bg-red-500/30 text-red-300 rounded-xl transition"
-            >
-              <LogOut className="w-5 h-5" />
-              <span className="font-medium">Logout</span>
-            </button>
-          </div>
-        </div>
-      </div>
+      <AdminTopBar title="StudEx Admin" />
 
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-6 pb-32">
         {/* PRIMARY STATS */}

@@ -12,6 +12,7 @@ import { useBookingStore } from "@/lib/bookingStore";
 import { useRouter } from "next/navigation";
 import { useAuth, fetchWithAuth } from "@/lib/authStore";
 import Script from "next/script";
+import { GRAD, GRAD_TEXT, SERIF } from "@/lib/tokens";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -155,19 +156,19 @@ export default function CheckoutPage() {
         style={{ fontFamily: "'DM Sans', sans-serif" }}>
         <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} className="text-center">
           <div className="w-24 h-24 mx-auto mb-6 rounded-2xl flex items-center justify-center"
-            style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+            style={{ background: GRAD }}>
             <Package className="w-12 h-12 text-white" strokeWidth={1.5} />
           </div>
           <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold mb-2">Empty</p>
           <h2 className="text-2xl font-bold text-stone-900 mb-2"
-            style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+            style={SERIF}>
             Nothing to checkout
           </h2>
           <p className="text-stone-400 text-sm mb-8">Go book a service or add items to your cart first.</p>
           <Link href="/home">
             <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
               className="px-8 py-3 text-white font-semibold rounded-full shadow-lg shadow-teal-200/60 inline-flex items-center gap-2 text-sm"
-              style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+              style={{ background: GRAD }}>
               Explore StudEx <ArrowRight className="w-4 h-4" />
             </motion.button>
           </Link>
@@ -189,7 +190,7 @@ export default function CheckoutPage() {
           </Link>
           <div className="text-center">
             <h1 className="text-base font-bold text-stone-900"
-              style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+              style={SERIF}>
               Secure Checkout
             </h1>
             <p className="text-xs text-stone-400 flex items-center gap-1 justify-center mt-0.5">
@@ -208,7 +209,7 @@ export default function CheckoutPage() {
             {isServiceBooking ? "Service Booking" : "Product Order"}
           </p>
           <h2 className="text-xl font-bold text-stone-900 mt-0.5"
-            style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+            style={SERIF}>
             Review your order
           </h2>
         </motion.div>
@@ -219,7 +220,7 @@ export default function CheckoutPage() {
             className="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-xl flex items-center justify-center"
-                style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+                style={{ background: GRAD }}>
                 <Calendar className="w-5 h-5 text-white" />
               </div>
               <div>
@@ -261,10 +262,7 @@ export default function CheckoutPage() {
                   <p className="font-medium text-stone-900 text-sm">{item.title}</p>
                   <p className="text-xs text-stone-400 mt-0.5">× {item.quantity}</p>
                 </div>
-                <p className="font-semibold text-sm" style={{
-                  background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)",
-                  WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text",
-                }}>
+                <p className="font-semibold text-sm" style={GRAD_TEXT}>
                   ₦{(item.price * item.quantity).toLocaleString()}
                 </p>
               </motion.div>
@@ -291,13 +289,10 @@ export default function CheckoutPage() {
             </div>
             <div className="border-t border-stone-100 pt-3 flex justify-between items-center">
               <span className="font-bold text-stone-900"
-                style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+                style={SERIF}>
                 Total
               </span>
-              <span className="text-2xl font-bold" style={{
-                background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)",
-                WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text",
-              }}>
+              <span className="text-2xl font-bold" style={GRAD_TEXT}>
                 ₦{finalTotal.toLocaleString()}
               </span>
             </div>
@@ -356,7 +351,7 @@ export default function CheckoutPage() {
               whileTap={{ scale: isProcessing ? 1 : 0.97 }}
               disabled={isProcessing || !isLoggedIn || !paystackLoaded}
               className="w-full py-4 rounded-full font-semibold text-white text-base shadow-lg shadow-teal-200/60 flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+              style={{ background: GRAD }}>
               {isProcessing ? (
                 <><Loader className="w-5 h-5 animate-spin" /> Processing...</>
               ) : (

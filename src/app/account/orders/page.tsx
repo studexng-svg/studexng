@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Package, CheckCircle, Clock, ChevronLeft, AlertCircle } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAuth, fetchWithAuth } from "@/lib/authStore";
+import { GRAD, SERIF } from "@/lib/tokens";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -114,7 +115,7 @@ export default function OrdersPage() {
               <ChevronLeft className="w-5 h-5 text-stone-600" />
             </button>
           </Link>
-          <h1 className="text-base font-bold text-stone-900" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+          <h1 className="text-base font-bold text-stone-900" style={SERIF}>
             My Orders
           </h1>
           <div className="w-10" />
@@ -136,7 +137,7 @@ export default function OrdersPage() {
             <Link href="/home">
               <button
                 className="mt-6 px-8 py-3 text-white rounded-full font-semibold shadow-lg"
-                style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}
+                style={{ background: GRAD }}
               >
                 Start Exploring
               </button>

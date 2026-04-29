@@ -6,6 +6,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/authStore";
+import { GRAD, SERIF } from "@/lib/tokens";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -167,12 +168,22 @@ export default function AuthPage() {
     if (usernameTimer.current) clearTimeout(usernameTimer.current);
     setUsernameChecking(true);
     usernameTimer.current = setTimeout(async () => {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
       try {
-        const res = await fetch(`${API_URL}/api/auth/check-username/?username=${encodeURIComponent(signupForm.username)}`);
+        const res = await fetch(
+          `${API_URL}/api/auth/check-username/?username=${encodeURIComponent(signupForm.username)}`,
+          { signal: controller.signal }
+        );
+        clearTimeout(timeoutId);
         const data = await res.json();
-        setUsernameAvailable(data.available);
-      } catch { setUsernameAvailable(null); }
-      finally { setUsernameChecking(false); }
+        setUsernameAvailable(data.available ?? null);
+      } catch {
+        clearTimeout(timeoutId);
+        setUsernameAvailable(null);
+      } finally {
+        setUsernameChecking(false);
+      }
     }, 600);
     return () => { if (usernameTimer.current) clearTimeout(usernameTimer.current); };
   }, [signupForm.username]);
@@ -185,7 +196,7 @@ export default function AuthPage() {
   const matricVal = validateMatric(signupForm.matric_number || "");
   const isFUTO = signupForm.school === "FUTO";
   const schoolOk = !!signupForm.school;
-  const step1Valid = usernameVal.ok && usernameAvailable === true && emailVal.ok &&
+  const step1Valid = usernameVal.ok && usernameAvailable !== false && emailVal.ok &&
     phoneVal.ok && hostelOk && passwordVal.ok && schoolOk &&
     (!isFUTO || matricVal.ok);
 
@@ -346,12 +357,12 @@ export default function AuthPage() {
               {/* Header */}
               <div className="text-center mb-8">
                 <div className="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center shadow-md"
-                  style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+                  style={{ background: GRAD }}>
                   <Store className="w-9 h-9 text-white" />
                 </div>
                 <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold mb-1">StudEx</p>
                 <h1 className="text-2xl font-bold text-stone-900"
-                  style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+                  style={SERIF}>
                   {isForgotPassword ? "Reset Password" : "Welcome Back"}
                 </h1>
                 <p className="text-sm text-stone-400 mt-1">
@@ -369,14 +380,14 @@ export default function AuthPage() {
                       </div>
                       <div>
                         <h3 className="text-lg font-bold text-stone-900"
-                          style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>Link Ready!</h3>
+                          style={SERIF}>Link Ready!</h3>
                         <p className="text-sm text-stone-400 mt-1">Reset link for</p>
                         <p className="font-semibold text-teal-600 mt-0.5 text-sm">{resetEmail}</p>
                       </div>
                       {resetLink && (
                         <a href={resetLink}
                           className="block w-full py-3.5 rounded-full text-white font-semibold text-sm text-center shadow-lg shadow-teal-200/60"
-                          style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+                          style={{ background: GRAD }}>
                           Reset My Password →
                         </a>
                       )}
@@ -399,7 +410,7 @@ export default function AuthPage() {
                       {loginError && <p className="text-sm text-red-500 text-center">{loginError}</p>}
                       <button type="submit" disabled={isLoading}
                         className="w-full py-3.5 rounded-full font-semibold text-white text-sm shadow-lg shadow-teal-200/60 disabled:opacity-50"
-                        style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+                        style={{ background: GRAD }}>
                         {isLoading ? "Getting link..." : "Get Reset Link"}
                       </button>
                       <button type="button" onClick={() => { setIsForgotPassword(false); setLoginError(""); }}
@@ -461,7 +472,7 @@ export default function AuthPage() {
                   <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
                     type="submit" disabled={isLoading || accountDisabled}
                     className="w-full py-3.5 rounded-full font-semibold text-white text-sm shadow-lg shadow-teal-200/60 transition-all disabled:opacity-50"
-                    style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+                    style={{ background: GRAD }}>
                     {isLoading ? "Logging in..." : accountDisabled ? "Account Disabled" : "Login to StudEx"}
                   </motion.button>
                 </form>
@@ -500,12 +511,12 @@ export default function AuthPage() {
               {/* Header */}
               <div className="text-center mb-6">
                 <div className="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center shadow-md"
-                  style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+                  style={{ background: GRAD }}>
                   <Store className="w-9 h-9 text-white" />
                 </div>
                 <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold mb-1">StudEx</p>
                 <h1 className="text-2xl font-bold text-stone-900"
-                  style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+                  style={SERIF}>
                   {step === 1 ? "Create Account" : "Verify Email"}
                 </h1>
                 <p className="text-sm text-stone-400 mt-1">
@@ -535,7 +546,7 @@ export default function AuthPage() {
                                 ? "text-white border-transparent"
                                 : "bg-white text-stone-600 border-stone-200 hover:border-teal-300"
                             }`}
-                            style={signupForm.school === school ? { background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" } : {}}>
+                            style={signupForm.school === school ? { background: GRAD } : {}}>
                             {school}
                           </button>
                         ))}
@@ -712,7 +723,7 @@ export default function AuthPage() {
                 <motion.button whileHover={{ scale: isLoading ? 1 : 1.02 }} whileTap={{ scale: isLoading ? 1 : 0.97 }}
                   type="submit" disabled={isLoading || (step === 1 && !step1Valid)}
                   className="w-full py-3 rounded-full font-semibold text-white text-sm shadow-lg shadow-teal-200/60 transition-all disabled:opacity-50"
-                  style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+                  style={{ background: GRAD }}>
                   {isLoading ? "Processing..." : step === 1 ? "Send Verification Code" : "Complete Signup"}
                 </motion.button>
               </form>

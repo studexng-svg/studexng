@@ -4,6 +4,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth, fetchWithAuth } from "@/lib/authStore";
+import { GRAD, SERIF, toArray } from "@/lib/tokens";
 import {
   MessageCircle, Calendar, DollarSign, Package, ShoppingBag,
   Send, Check, X, Plus, Edit2, Trash2,
@@ -66,7 +67,7 @@ export default function VendorDashboard() {
               <ArrowLeft className="w-4 h-4 text-stone-600" />
             </button>
             <div>
-              <h1 className="text-base font-bold text-stone-900" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+              <h1 className="text-base font-bold text-stone-900" style={SERIF}>
                 Vendor Hub
               </h1>
               <p className="text-stone-400 text-xs">{user?.username}</p>
@@ -74,7 +75,7 @@ export default function VendorDashboard() {
           </div>
           <div
             className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-white text-sm"
-            style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}
+            style={{ background: GRAD }}
           >
             {(user?.username?.[0] || "V").toUpperCase()}
           </div>
@@ -155,7 +156,7 @@ function MessagesTab() {
     try {
       const res = await fetchWithAuth(`${API_URL}/api/chat/conversations/`);
       const data = await res.json();
-      setConversations(Array.isArray(data) ? data : (data.results || []));
+      setConversations(toArray(data));
     } catch {} finally { setLoading(false); }
   };
 
@@ -163,7 +164,7 @@ function MessagesTab() {
     try {
       const res = await fetchWithAuth(`${API_URL}/api/chat/conversations/${id}/messages/`);
       const data = await res.json();
-      const raw = Array.isArray(data) ? data : (data.results || []);
+      const raw = toArray(data);
       const currentUsername = user?.username;
       setMessages(raw.map((m: any) => ({
         ...m,
@@ -206,7 +207,7 @@ function MessagesTab() {
               <div className="flex items-center gap-2.5">
                 <div
                   className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
-                  style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}
+                  style={{ background: GRAD }}
                 >
                   {conv.buyer_username?.[0]?.toUpperCase() || "?"}
                 </div>
@@ -244,7 +245,7 @@ function MessagesTab() {
             <div className="px-4 py-3 border-b border-stone-100 flex items-center gap-3 flex-shrink-0">
               <div
                 className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white"
-                style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}
+                style={{ background: GRAD }}
               >
                 {activeConv.buyer_username?.[0]?.toUpperCase() || "?"}
               </div>
@@ -264,7 +265,7 @@ function MessagesTab() {
                       ? "text-white rounded-br-sm"
                       : "bg-stone-100 text-stone-800 rounded-bl-sm"
                   }`}
-                  style={msg.is_mine ? { background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" } : {}}>
+                  style={msg.is_mine ? { background: GRAD } : {}}>
                     <p className={`text-xs font-medium mb-1 ${msg.is_mine ? "text-teal-100 text-right" : "text-stone-500"}`}>
                       {msg.sender_username || (msg.is_mine ? user?.username : activeConv.buyer_username)}
                     </p>
@@ -284,7 +285,7 @@ function MessagesTab() {
                 className="flex-1 bg-white border border-stone-200 rounded-xl px-4 py-2.5 text-stone-900 text-sm placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 transition" />
               <button onClick={sendMessage} disabled={sending || !text.trim()}
                 className="p-2.5 text-white disabled:opacity-40 rounded-xl transition active:scale-95"
-                style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+                style={{ background: GRAD }}>
                 {sending ? <Loader className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
               </button>
             </div>
@@ -309,7 +310,7 @@ function BookingsTab() {
     try {
       const res = await fetchWithAuth(`${API_URL}/api/orders/bookings/`);
       const data = await res.json();
-      const list = Array.isArray(data) ? data : (data.results || []);
+      const list = toArray(data);
       const vendorOnly = list.filter((b: any) => b.vendor_username === user?.username);
       setBookings(vendorOnly);
     } catch {} finally { setLoading(false); }
@@ -337,7 +338,7 @@ function BookingsTab() {
                 ? "text-white shadow-sm"
                 : "bg-white border border-stone-200 text-stone-600 hover:border-stone-300"
             }`}
-            style={filter === f ? { background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" } : {}}>
+            style={filter === f ? { background: GRAD } : {}}>
             {f} {f !== "all" && `(${bookings.filter(b => b.status === f).length})`}
           </button>
         ))}
@@ -352,7 +353,7 @@ function BookingsTab() {
               <div className="flex items-center gap-3 mb-3">
                 <div
                   className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
-                  style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}
+                  style={{ background: GRAD }}
                 >
                   {booking.buyer_username?.[0]?.toUpperCase() || "?"}
                 </div>
@@ -401,7 +402,7 @@ function BookingsTab() {
                   <button onClick={() => handleAction(booking.id, "confirm")}
                     disabled={actionLoading === booking.id}
                     className="flex-1 py-2.5 text-white disabled:opacity-50 rounded-full font-semibold text-sm transition flex items-center justify-center gap-2 active:scale-[0.98]"
-                    style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+                    style={{ background: GRAD }}>
                     {actionLoading === booking.id ? <Loader className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
                     Accept
                   </button>
@@ -554,7 +555,7 @@ function ListingsTab() {
     try {
       const res = await fetchWithAuth(`${API_URL}/api/services/listings/`);
       const data = await res.json();
-      setListings(Array.isArray(data) ? data : (data.results || []));
+      setListings(toArray(data));
     } catch {} finally { setLoading(false); }
   };
 
@@ -562,7 +563,7 @@ function ListingsTab() {
     try {
       const res = await fetch(`${API_URL}/api/services/categories/`);
       const data = await res.json();
-      setCategories(Array.isArray(data) ? data : (data.results || []));
+      setCategories(toArray(data));
     } catch {}
   };
 
@@ -625,7 +626,7 @@ function ListingsTab() {
     <div className="overflow-y-auto pb-4" style={{ maxHeight: "calc(100vh - 200px)" }}>
       {toast && (
         <div className="fixed top-6 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full font-semibold text-white text-sm z-50 shadow-xl"
-          style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+          style={{ background: GRAD }}>
           {toast}
         </div>
       )}
@@ -637,7 +638,7 @@ function ListingsTab() {
         </div>
         <button onClick={() => { resetForm(); setShowForm(true); }}
           className="flex items-center gap-1.5 px-4 py-2 text-white rounded-full font-semibold text-sm transition active:scale-95"
-          style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+          style={{ background: GRAD }}>
           <Plus className="w-4 h-4" /> Add
         </button>
       </div>
@@ -689,7 +690,7 @@ function ListingsTab() {
             <div className="flex gap-3">
               <button onClick={handleSave} disabled={saving || !form.title || !form.price || !form.category}
                 className="flex-1 py-3 text-white disabled:opacity-40 rounded-full font-semibold text-sm transition active:scale-[0.98]"
-                style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+                style={{ background: GRAD }}>
                 {saving ? "Saving..." : editing ? "Update" : "Create Listing"}
               </button>
               <button onClick={resetForm}
@@ -756,7 +757,7 @@ function OrdersTab() {
       try {
         const res = await fetchWithAuth(`${API_URL}/api/orders/orders/`);
         const data = await res.json();
-        setOrders(Array.isArray(data) ? data : (data.results || []));
+        setOrders(toArray(data));
       } catch {} finally { setLoading(false); }
     };
     load();

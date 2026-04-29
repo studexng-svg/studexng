@@ -10,6 +10,7 @@ import {
   ChevronRight, Hourglass, Ban,
 } from "lucide-react";
 import { useAuth, fetchWithAuth } from "@/lib/authStore";
+import { GRAD, SERIF, toArray } from "@/lib/tokens";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 const SERVICE_FEE = 200;
@@ -132,7 +133,7 @@ export default function BuyerBookingsPage() {
       const res = await fetchWithAuth(`${API_URL}/api/orders/bookings/`);
       if (!res.ok) throw new Error("Failed to load bookings");
       const data = await res.json();
-      const all: Booking[] = Array.isArray(data) ? data : (data.results || []);
+      const all: Booking[] = toArray(data);
       setBookings(all.filter(b => b.buyer_username === user?.username));
     } catch {
       setError("Could not load bookings. Pull to refresh.");
@@ -413,7 +414,7 @@ export default function BuyerBookingsPage() {
                 </button>
                 <button onClick={proceedToPaystack}
                   className="flex-1 py-3 text-white rounded-full font-semibold text-sm flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-transform"
-                  style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+                  style={{ background: GRAD }}>
                   <CreditCard className="w-4 h-4" />
                   {paystackReady ? `Pay ₦${totalWithFee.toLocaleString()}` : "Loading..."}
                 </button>
@@ -432,7 +433,7 @@ export default function BuyerBookingsPage() {
           >
             <ArrowLeft className="w-5 h-5 text-stone-600" />
           </button>
-          <h1 className="text-base font-bold text-stone-900" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+          <h1 className="text-base font-bold text-stone-900" style={SERIF}>
             My Bookings
           </h1>
           <button
@@ -454,7 +455,7 @@ export default function BuyerBookingsPage() {
                   ? "text-white shadow-md"
                   : "bg-white text-stone-500 border border-stone-200"
               }`}
-              style={filter === f ? { background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" } : {}}>
+              style={filter === f ? { background: GRAD } : {}}>
               {f}{counts[f] > 0 && <span className={`ml-1 text-xs ${filter === f ? "opacity-80" : "text-teal-500"}`}>({counts[f]})</span>}
             </button>
           ))}
@@ -524,7 +525,7 @@ export default function BuyerBookingsPage() {
                   {isConfirmed && (
                     <button onClick={() => handlePay(booking.id)}
                       className="flex-1 py-3 text-white rounded-xl font-semibold text-sm flex items-center justify-center gap-2 shadow-md active:scale-95 transition-transform"
-                      style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+                      style={{ background: GRAD }}>
                       <CreditCard className="w-4 h-4" /> Pay ₦{(Number(booking.listing_price) + SERVICE_FEE).toLocaleString()}
                     </button>
                   )}

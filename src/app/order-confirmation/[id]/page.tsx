@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 
 import { fetchWithAuth } from "@/lib/authStore";
+import { GRAD, SERIF } from "@/lib/tokens";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -103,14 +104,14 @@ export default function OrderConfirmationPage() {
           <Package className="w-8 h-8 text-stone-400" />
         </div>
         <h2 className="text-lg font-bold text-stone-900 mb-1"
-          style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+          style={SERIF}>
           Order Not Found
         </h2>
         <p className="text-sm text-stone-400 mb-6">{error || "We couldn't load this order."}</p>
         <Link href="/home">
           <button
             className="px-6 py-3 rounded-full font-semibold text-white text-sm tap-scale"
-            style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+            style={{ background: GRAD }}>
             Back to Home
           </button>
         </Link>
@@ -133,7 +134,7 @@ export default function OrderConfirmationPage() {
             <ChevronLeft className="w-5 h-5 text-stone-600" />
           </button>
           <h1 className="text-base font-bold text-stone-900"
-            style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+            style={SERIF}>
             Order Confirmed
           </h1>
           <div className="w-10" />
@@ -146,7 +147,7 @@ export default function OrderConfirmationPage() {
         <div className="flex justify-center pt-2 animate-fadeUp">
           <div
             className="w-20 h-20 rounded-full flex items-center justify-center shadow-lg"
-            style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}
+            style={{ background: GRAD }}
           >
             <CheckCircle className="w-10 h-10 text-white" />
           </div>
@@ -156,7 +157,7 @@ export default function OrderConfirmationPage() {
         <div className="text-center animate-fadeUp">
           <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold">Payment Successful</p>
           <h2 className="text-2xl font-bold text-stone-900 mt-0.5"
-            style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+            style={SERIF}>
             Order Confirmed!
           </h2>
           <p className="text-sm text-stone-400 mt-1">
@@ -248,7 +249,7 @@ export default function OrderConfirmationPage() {
           <Link href={`/account/orders/${order.id}`} className="w-full">
             <button
               className="w-full py-3 rounded-full font-semibold text-white text-sm flex items-center justify-center gap-2 transition-all tap-scale"
-              style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}
+              style={{ background: GRAD }}
             >
               <Package className="w-4 h-4" />
               View Order
@@ -283,7 +284,7 @@ export default function OrderConfirmationPage() {
               <div>
                 <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold">Quick Feedback</p>
                 <h3 className="text-lg font-bold text-stone-900 mt-0.5"
-                  style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+                  style={SERIF}>
                   How was your experience?
                 </h3>
                 <p className="text-sm text-stone-400 mt-0.5">Rate the StudEx checkout experience</p>
@@ -322,7 +323,7 @@ export default function OrderConfirmationPage() {
                 onClick={submitFeedback}
                 disabled={feedbackSubmitting || !feedbackRating}
                 className="w-full py-3 rounded-full font-semibold text-white text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all mb-4 hover-scale tap-scale"
-                style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+                style={{ background: GRAD }}>
                 {feedbackSubmitting ? "Submitting..." : "Submit Feedback"}
               </button>
             </div>

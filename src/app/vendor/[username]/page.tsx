@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { ChevronLeft, Star, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { fetchWithAuth } from "@/lib/authStore";
+import { GRAD, GRAD_TEXT, SERIF } from "@/lib/tokens";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -73,7 +74,7 @@ export default function VendorProfilePage() {
           >
             <ChevronLeft className="w-5 h-5 text-stone-600" />
           </button>
-          <h1 className="text-base font-bold text-stone-900" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+          <h1 className="text-base font-bold text-stone-900" style={SERIF}>
             {vendor?.business_name || vendor?.username || "Vendor"}
           </h1>
           <div className="w-10" />
@@ -97,7 +98,7 @@ export default function VendorProfilePage() {
               ) : (
                 <div
                   className="w-full h-full flex items-center justify-center text-white font-bold text-xl"
-                  style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}
+                  style={{ background: GRAD }}
                 >
                   {(vendor.business_name || vendor.username || "?").slice(0, 2).toUpperCase()}
                 </div>
@@ -146,15 +147,7 @@ export default function VendorProfilePage() {
                     <div className="flex-1 min-w-0">
                       <p className="font-bold text-stone-900 text-sm line-clamp-1">{listing.title}</p>
                       <p className="text-xs text-stone-400 mt-0.5 line-clamp-2">{listing.description}</p>
-                      <p
-                        className="text-base font-bold mt-1"
-                        style={{
-                          background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)",
-                          WebkitBackgroundClip: "text",
-                          WebkitTextFillColor: "transparent",
-                          backgroundClip: "text",
-                        }}
-                      >
+                      <p className="text-base font-bold mt-1" style={GRAD_TEXT}>
                         ₦{Number(listing.price).toLocaleString()}
                       </p>
                     </div>

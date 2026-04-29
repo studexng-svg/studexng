@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
+import { GRAD, SERIF } from "@/lib/tokens";
 import { ChevronLeft, ChevronDown, ChevronUp, HelpCircle, MessageCircle, Shield, CreditCard, Star, Package, Calendar } from "lucide-react";
 
 const faqs = [
@@ -132,7 +133,7 @@ export default function FAQPage() {
             className="p-2.5 bg-white border border-stone-200 hover:border-stone-300 rounded-full shadow-sm transition-all active:scale-95">
             <ChevronLeft className="w-5 h-5 text-stone-600" />
           </button>
-          <h1 className="text-base font-bold text-stone-900" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+          <h1 className="text-base font-bold text-stone-900" style={SERIF}>
             Help & FAQ
           </h1>
           <div className="w-10" />
@@ -144,9 +145,9 @@ export default function FAQPage() {
         {/* HERO */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
           className="rounded-2xl p-6 text-white text-center shadow-md"
-          style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+          style={{ background: GRAD }}>
           <HelpCircle className="w-12 h-12 mx-auto mb-3 opacity-90" />
-          <h2 className="text-xl font-bold mb-1" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+          <h2 className="text-xl font-bold mb-1" style={SERIF}>
             How can we help?
           </h2>
           <p className="text-sm opacity-80">Find answers to common questions about StudEx</p>
@@ -207,7 +208,7 @@ export default function FAQPage() {
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}
           className="bg-white rounded-2xl p-5 shadow-sm border border-stone-200 text-center">
           <MessageCircle className="w-8 h-8 text-teal-600 mx-auto mb-2" />
-          <p className="font-bold text-stone-900 mb-1" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+          <p className="font-bold text-stone-900 mb-1" style={SERIF}>
             Still need help?
           </p>
           <p className="text-sm text-stone-500 mb-4">
@@ -215,7 +216,7 @@ export default function FAQPage() {
           </p>
           <a href="mailto:support@studex.ng"
             className="inline-block px-6 py-3 text-white font-semibold rounded-full text-sm shadow-lg shadow-teal-200/60"
-            style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+            style={{ background: GRAD }}>
             Email Support
           </a>
         </motion.div>

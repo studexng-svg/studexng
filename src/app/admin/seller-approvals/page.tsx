@@ -1,10 +1,11 @@
 "use client";
 
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import {
-  Check, X, Eye, Calendar, Clock, Zap, ArrowLeft,
-  UserCheck, CreditCard, FlipHorizontal, ZoomIn, Loader2, RefreshCw,
+  Check, X, Eye, Calendar, Clock, Zap,
+  CreditCard, FlipHorizontal, ZoomIn, Loader2, RefreshCw,
 } from "lucide-react";
+import AdminTopBar from "@/components/layout/AdminTopBar";
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 
@@ -210,35 +211,18 @@ function AdminSellerApprovals() {
         />
       )}
 
-      {/* TOP BAR */}
-      <div className="sticky top-0 z-50 bg-gradient-to-r from-slate-900 via-purple-900 to-slate-900 border-b border-white/10 backdrop-blur-xl animate-fadeUp">
-        <div className="flex items-center justify-between p-5">
-          <button
-            onClick={() => router.back()}
-            className="text-white hover:bg-white/10 p-3 rounded-xl transition"
-          >
-            <ArrowLeft className="w-6 h-6" />
-          </button>
-          <h1 className="text-2xl font-black text-white flex items-center gap-3">
-            <UserCheck className="w-8 h-8 text-purple-400" />
-            Seller Approvals
-            {pendingCount > 0 && (
-              <span className="bg-yellow-500 text-black text-sm font-black px-2.5 py-0.5 rounded-full">
-                {pendingCount}
-              </span>
-            )}
-          </h1>
-          <button
-            onClick={fetchApplications}
-            className="text-white hover:bg-white/10 p-3 rounded-xl transition"
-            title="Refresh"
-          >
-            <RefreshCw className={`w-5 h-5 ${loading ? "animate-spin" : ""}`} />
-          </button>
-        </div>
-      </div>
+      <AdminTopBar title="Seller Approvals" />
 
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-6 pb-32 space-y-6">
+        <div className="flex justify-end">
+          <button
+            onClick={fetchApplications}
+            className="text-white/60 hover:text-white hover:bg-white/10 p-2 rounded-xl transition flex items-center gap-2 text-sm"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+            Refresh
+          </button>
+        </div>
 
         {/* ERROR BANNER */}
         {error && (

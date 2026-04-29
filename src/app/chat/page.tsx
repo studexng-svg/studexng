@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { MessageCircle, ChevronLeft, Search, X } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAuth, fetchWithAuth } from "@/lib/authStore";
+import { GRAD, SERIF } from "@/lib/tokens";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -56,7 +57,7 @@ export default function ChatListPage() {
           </button>
 
           <div className="flex items-center gap-2">
-            <h1 className="text-base font-bold text-stone-900" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+            <h1 className="text-base font-bold text-stone-900" style={SERIF}>
               Messages
             </h1>
             {totalUnread > 0 && (
@@ -94,7 +95,7 @@ export default function ChatListPage() {
         {/* ── SECTION HEADER ── */}
         <div className="animate-fadeUp">
           <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold">Inbox</p>
-          <h2 className="text-xl font-bold text-stone-900 mt-0.5" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+          <h2 className="text-xl font-bold text-stone-900 mt-0.5" style={SERIF}>
             Your Conversations
           </h2>
         </div>
@@ -116,11 +117,11 @@ export default function ChatListPage() {
           /* ── EMPTY STATE ── */
           <div className="bg-white rounded-2xl p-12 text-center border border-stone-100 shadow-sm animate-fadeUp">
             <div className="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center"
-              style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+              style={{ background: GRAD }}>
               <MessageCircle className="w-8 h-8 text-white" strokeWidth={1.5} />
             </div>
             <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold mb-2">No Messages</p>
-            <h3 className="text-lg font-bold text-stone-900 mb-1" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+            <h3 className="text-lg font-bold text-stone-900 mb-1" style={SERIF}>
               {search ? "No results found" : "No conversations yet"}
             </h3>
             <p className="text-stone-400 text-sm">
@@ -142,7 +143,7 @@ export default function ChatListPage() {
 
                     {/* Avatar */}
                     <div className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg flex-shrink-0 shadow-sm"
-                      style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+                      style={{ background: GRAD }}>
                       {conv.other_user?.username?.[0]?.toUpperCase() || "?"}
                     </div>
 
@@ -171,7 +172,7 @@ export default function ChatListPage() {
                     {/* Unread badge */}
                     {conv.unread_count > 0 && (
                       <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
-                        style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+                        style={{ background: GRAD }}>
                         <span className="text-white text-[10px] font-bold">
                           {conv.unread_count > 9 ? "9+" : conv.unread_count}
                         </span>

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth, fetchWithAuth } from "@/lib/authStore";
+import { GRAD, SERIF } from "@/lib/tokens";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -92,7 +93,7 @@ export default function SellerListings() {
           <button onClick={() => router.back()} className="p-2.5 bg-white border border-stone-200 rounded-full shadow-sm active:scale-95 transition-all">
             <ChevronLeft className="w-5 h-5 text-stone-600" />
           </button>
-          <h1 className="text-base font-bold text-stone-900" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+          <h1 className="text-base font-bold text-stone-900" style={SERIF}>
             My Listings
           </h1>
           <Link href="/seller/add">
@@ -114,14 +115,14 @@ export default function SellerListings() {
             <div className="w-24 h-24 mx-auto bg-stone-100 rounded-full flex items-center justify-center">
               <Package className="w-12 h-12 text-stone-400" />
             </div>
-            <h2 className="text-lg font-bold text-stone-800" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+            <h2 className="text-lg font-bold text-stone-800" style={SERIF}>
               No Listings Yet
             </h2>
             <p className="text-sm text-stone-500">Start selling and earn on campus!</p>
             <Link href="/seller/add">
               <button
                 className="mt-2 px-8 py-3 text-white font-semibold rounded-full shadow-md flex items-center gap-2 mx-auto"
-                style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}
+                style={{ background: GRAD }}
               >
                 <Plus className="w-4 h-4" />
                 Add First Listing
@@ -189,7 +190,7 @@ export default function SellerListings() {
         <Link href="/seller/add">
           <button
             className="fixed bottom-24 right-4 text-white p-4 rounded-full shadow-xl z-40 active:scale-95 transition-all"
-            style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}
+            style={{ background: GRAD }}
           >
             <Plus className="w-6 h-6" />
           </button>

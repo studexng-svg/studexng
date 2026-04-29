@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth, fetchWithAuth } from "@/lib/authStore";
+import { GRAD, SERIF } from "@/lib/tokens";
 
 export default function SellerOnboarding() {
   const [step, setStep] = useState(1);
@@ -104,7 +105,7 @@ export default function SellerOnboarding() {
           >
             <ChevronLeft className="w-5 h-5 text-stone-600" />
           </button>
-          <h1 className="text-base font-bold text-stone-900" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+          <h1 className="text-base font-bold text-stone-900" style={SERIF}>
             Become a Seller
           </h1>
           <div className="w-10" />
@@ -122,7 +123,7 @@ export default function SellerOnboarding() {
                     ? "text-white"
                     : "bg-stone-100 text-stone-400"
                 }`}
-                style={i <= step ? { background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" } : {}}
+                style={i <= step ? { background: GRAD } : {}}
               >
                 {i < step ? <CheckCircle className="w-5 h-5" /> : i}
               </div>
@@ -142,7 +143,7 @@ export default function SellerOnboarding() {
               <Store className="w-12 h-12 text-teal-600" />
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-stone-900" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+              <h2 className="text-2xl font-bold text-stone-900" style={SERIF}>
                 Sell on StudEx
               </h2>
               <p className="text-sm text-stone-500 mt-2 leading-relaxed max-w-xs mx-auto">
@@ -152,7 +153,7 @@ export default function SellerOnboarding() {
             <button
               onClick={() => setStep(2)}
               className="w-full py-4 rounded-full font-semibold text-white shadow-md flex items-center justify-center gap-2 active:scale-[0.98] transition-all"
-              style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}
+              style={{ background: GRAD }}
             >
               Start Application
               <ArrowRight className="w-4 h-4" />
@@ -164,7 +165,7 @@ export default function SellerOnboarding() {
         {step === 2 && (
           <div className="animate-fadeUp space-y-6">
             <div>
-              <h2 className="text-xl font-bold text-stone-900" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+              <h2 className="text-xl font-bold text-stone-900" style={SERIF}>
                 Verify Your Identity
               </h2>
               <p className="text-sm text-stone-500 mt-1">Upload both sides of your student ID card</p>
@@ -242,7 +243,7 @@ export default function SellerOnboarding() {
               onClick={() => setStep(3)}
               disabled={!isStep2Complete}
               className="w-full py-4 rounded-full font-semibold text-white shadow-md flex items-center justify-center gap-2 transition-all disabled:opacity-50 active:scale-[0.98]"
-              style={{ background: isStep2Complete ? "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" : "#D6D3D1" }}
+              style={{ background: isStep2Complete ? GRAD : "#D6D3D1" }}
             >
               Continue to Review
               {isStep2Complete && <ArrowRight className="w-4 h-4" />}
@@ -258,7 +259,7 @@ export default function SellerOnboarding() {
             </div>
 
             <div>
-              <h2 className="text-2xl font-bold text-stone-900" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+              <h2 className="text-2xl font-bold text-stone-900" style={SERIF}>
                 {success ? "Application Submitted!" : "Ready to Submit?"}
               </h2>
             </div>
@@ -296,7 +297,7 @@ export default function SellerOnboarding() {
                   onClick={handleSubmit}
                   disabled={loading}
                   className="w-full py-4 rounded-full font-semibold text-white shadow-md disabled:opacity-50 transition-all active:scale-[0.98]"
-                  style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}
+                  style={{ background: GRAD }}
                 >
                   {loading ? "Submitting Application..." : "Submit Application"}
                 </button>

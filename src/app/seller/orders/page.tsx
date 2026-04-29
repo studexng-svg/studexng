@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth, fetchWithAuth } from "@/lib/authStore";
+import { GRAD, SERIF } from "@/lib/tokens";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -78,7 +79,6 @@ export default function SellerOrdersPage() {
   }, [router, authUser]);
 
   const pendingCount = orders.length;
-  const completedToday = 0;
 
   if (loading) {
     return (
@@ -98,7 +98,7 @@ export default function SellerOrdersPage() {
           <button onClick={() => router.back()} className="p-2.5 bg-white border border-stone-200 rounded-full shadow-sm active:scale-95 transition-all">
             <ChevronLeft className="w-5 h-5 text-stone-600" />
           </button>
-          <h1 className="text-base font-bold text-stone-900" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+          <h1 className="text-base font-bold text-stone-900" style={SERIF}>
             Pending Orders
           </h1>
           <Link href="/seller/orders/history">
@@ -111,15 +111,9 @@ export default function SellerOrdersPage() {
 
       <div className="px-4 pt-6 pb-32 space-y-5 max-w-2xl mx-auto">
         {/* STATS */}
-        <div className="grid grid-cols-2 gap-3">
-          <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm">
-            <p className="text-xs text-stone-500 font-medium">Pending Confirmation</p>
-            <p className="text-3xl font-bold text-amber-600 mt-1">{pendingCount}</p>
-          </div>
-          <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm">
-            <p className="text-xs text-stone-500 font-medium">Completed Today</p>
-            <p className="text-3xl font-bold text-emerald-600 mt-1">{completedToday}</p>
-          </div>
+        <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm">
+          <p className="text-xs text-stone-500 font-medium">Pending Confirmation</p>
+          <p className="text-3xl font-bold text-amber-600 mt-1">{pendingCount}</p>
         </div>
 
         {error && (
@@ -136,7 +130,7 @@ export default function SellerOrdersPage() {
             <Link href="/seller">
               <button
                 className="mt-3 px-8 py-3 text-white font-semibold rounded-full shadow-md text-sm"
-                style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}
+                style={{ background: GRAD }}
               >
                 Back to Dashboard
               </button>

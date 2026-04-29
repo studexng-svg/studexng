@@ -12,6 +12,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useAuth, fetchWithAuth } from "@/lib/authStore";
 import { useWishlistStore } from "@/lib/wishlistStore";
+import { GRAD, SERIF } from "@/lib/tokens";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -81,12 +82,13 @@ export default function ProfilePage() {
     if (!user) return;
     const extras = storageKey ? localStorage.getItem(storageKey) : null;
     const parsed = extras ? JSON.parse(extras) : {};
+    const getSchool = (email?: string) =>
+      email?.endsWith('@pau.edu.ng') ? 'PAU' : email?.endsWith('@futo.edu.ng') ? 'FUTO' : '';
     try {
       const res = await fetchWithAuth(`${API_URL}/api/auth/me/`);
       if (res.ok) {
         const djangoUser = await res.json();
-        const schoolFromEmail = djangoUser.email?.endsWith('@pau.edu.ng') ? 'PAU'
-          : djangoUser.email?.endsWith('@futo.edu.ng') ? 'FUTO' : '';
+        const schoolFromEmail = getSchool(djangoUser.email);
         setProfile({
           name: djangoUser.username || "",
           email: djangoUser.email || "",
@@ -110,8 +112,7 @@ export default function ProfilePage() {
     } catch (e) {
       console.warn("Failed to load Django profile", e);
     }
-    const schoolFromEmail = user.email?.endsWith('@pau.edu.ng') ? 'PAU'
-      : user.email?.endsWith('@futo.edu.ng') ? 'FUTO' : '';
+    const schoolFromEmail = getSchool(user.email);
     setProfile({
       name: user.username || "",
       email: user.email || "",
@@ -351,7 +352,7 @@ export default function ProfilePage() {
           >
             <ChevronLeft className="w-5 h-5 text-stone-600" />
           </button>
-          <h1 className="text-base font-bold text-stone-900" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+          <h1 className="text-base font-bold text-stone-900" style={SERIF}>
             My Profile
           </h1>
           <div className="w-10" />
@@ -374,7 +375,7 @@ export default function ProfilePage() {
 
         {completionPct < 100 && !bonusGranted && (
           <div className="text-white rounded-2xl p-5 shadow-lg animate-fadeUp"
-            style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+            style={{ background: GRAD }}>
             <div className="flex justify-between items-center">
               <div>
                 <h3 className="text-lg font-semibold flex items-center gap-2">
@@ -597,7 +598,7 @@ export default function ProfilePage() {
                 onClick={handleHostelSave}
                 disabled={hostelSaving || !profile.campus}
                 className="mt-3 w-full py-3 text-white rounded-full font-semibold text-sm shadow-md flex items-center justify-center gap-2 disabled:opacity-50 tap-scale"
-                style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}
+                style={{ background: GRAD }}
               >
                 <Save className="w-4 h-4" />
                 {hostelSaving ? "Saving..." : "Update Hostel"}
@@ -628,14 +629,14 @@ export default function ProfilePage() {
             <button onClick={saveProfile}
               disabled={saving || !!usernameError}
               className="w-full py-4 text-white rounded-full font-semibold text-lg shadow-lg flex items-center justify-center gap-2 disabled:opacity-70 tap-scale"
-              style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+              style={{ background: GRAD }}>
               <Save className="w-5 h-5" />
               {saving ? "Saving..." : "Save Changes"}
             </button>
           ) : (
             <button onClick={() => setIsEditing(true)}
               className="w-full py-4 text-white rounded-full font-semibold text-lg shadow-lg flex items-center justify-center gap-2 tap-scale"
-              style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+              style={{ background: GRAD }}>
               <Edit3 className="w-5 h-5" /> Edit Profile
             </button>
           )}

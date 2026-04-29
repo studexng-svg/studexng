@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth, fetchWithAuth } from "@/lib/authStore";
+import { GRAD, GRAD_TEXT, SERIF } from "@/lib/tokens";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 const POLL_INTERVAL = 30_000;
@@ -22,7 +23,7 @@ const isPendingVendor = (u: any) => u?.user_type === "vendor" && !u?.is_verified
 const MENU_ITEMS = [
   { href: "/account/orders",   icon: Package,       label: "My Orders",       sub: "Track your purchases",       bg: "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)" },
   { href: "/account/bookings", icon: Calendar,      label: "My Bookings",     sub: "View upcoming appointments", bg: "linear-gradient(135deg, #0D9488 0%, #059669 100%)" },
-  { href: "/chat",             icon: MessageCircle, label: "Messages",        sub: "Your conversations",         bg: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" },
+  { href: "/chat",             icon: MessageCircle, label: "Messages",        sub: "Your conversations",         bg: GRAD },
   { href: "/account/loyalty",  icon: Gift,          label: "Loyalty Rewards", sub: "Points & exclusive deals",   bg: "linear-gradient(135deg, #f59e0b 0%, #ef4444 100%)" },
   { href: "/wishlist",         icon: Heart,         label: "Wishlist",        sub: "Saved items",                bg: "linear-gradient(135deg, #ec4899 0%, #f43f5e 100%)" },
   { href: "/account/address",  icon: Settings,      label: "Address Book",    sub: "Manage delivery addresses",  bg: "linear-gradient(135deg, #3b82f6 0%, #6366f1 100%)" },
@@ -194,7 +195,7 @@ function CanvasCrop({
           onClick={handleDone}
           disabled={!img}
           className="flex-1 py-3 rounded-full text-white text-sm font-semibold shadow-lg disabled:opacity-50"
-          style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+          style={{ background: GRAD }}>
           Done & Upload
         </motion.button>
       </div>
@@ -435,7 +436,7 @@ export default function AccountPage() {
               <div className="flex items-center justify-between px-5 py-4 border-b border-stone-100">
                 <div className="flex items-center gap-2">
                   <span className="text-xl">{getNotifIcon(selectedNotif.type)}</span>
-                  <h3 className="font-bold text-stone-900 text-sm" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+                  <h3 className="font-bold text-stone-900 text-sm" style={SERIF}>
                     {selectedNotif.title}
                   </h3>
                 </div>
@@ -471,7 +472,7 @@ export default function AccountPage() {
                       setTimeout(() => { isNavigating.current = false; }, 2000);
                     }}
                     className="flex-1 py-3 rounded-full text-white text-sm font-semibold shadow-lg"
-                    style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+                    style={{ background: GRAD }}>
                     Go There
                   </motion.button>
                 )}
@@ -498,7 +499,7 @@ export default function AccountPage() {
               initial={{ scale: 0.92, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.92, opacity: 0 }}
               className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl">
               <div className="flex items-center justify-between px-5 py-4 border-b border-stone-100">
-                <h3 className="font-bold text-stone-900" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+                <h3 className="font-bold text-stone-900" style={SERIF}>
                   Adjust Photo
                 </h3>
                 <button
@@ -538,7 +539,7 @@ export default function AccountPage() {
                 ) : (
                   <div
                     className="w-full h-full flex items-center justify-center text-white text-6xl font-bold"
-                    style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+                    style={{ background: GRAD }}>
                     {initials}
                   </div>
                 )}
@@ -548,7 +549,7 @@ export default function AccountPage() {
                   whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
                   onClick={() => { setViewModalOpen(false); setTimeout(() => fileInputRef.current?.click(), 150); }}
                   className="px-6 py-3 rounded-full text-white text-sm font-semibold shadow-lg flex items-center gap-2"
-                  style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+                  style={{ background: GRAD }}>
                   <Camera className="w-4 h-4" /> Change Photo
                 </motion.button>
                 {profilePic && (
@@ -577,14 +578,11 @@ export default function AccountPage() {
           <div className="flex items-center justify-between px-4 py-3">
             <Link href="/home" className="flex items-center gap-2">
               <img src="/images/logo-1.jpg" alt="StudEx" className="w-9 h-9 rounded-full object-cover shadow-sm" />
-              <span className="font-bold text-lg text-stone-900" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
-                Stud<span style={{
-                  background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)",
-                  WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text",
-                }}>Ex</span>
+              <span className="font-bold text-lg text-stone-900" style={SERIF}>
+                Stud<span style={GRAD_TEXT}>Ex</span>
               </span>
             </Link>
-            <h1 className="text-base font-bold text-stone-900" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>My Account</h1>
+            <h1 className="text-base font-bold text-stone-900" style={SERIF}>My Account</h1>
             <div className="relative">
               <button
                 onClick={() => setShowNotifications(v => !v)}
@@ -602,7 +600,7 @@ export default function AccountPage() {
                     initial={{ opacity: 0, y: -8, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
                     className="absolute right-0 top-12 w-80 bg-white rounded-2xl shadow-xl border border-stone-100 z-50 overflow-hidden">
                     <div className="flex items-center justify-between p-4 border-b border-stone-100">
-                      <h3 className="font-bold text-stone-900 text-sm" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>Notifications</h3>
+                      <h3 className="font-bold text-stone-900 text-sm" style={SERIF}>Notifications</h3>
                       <div className="flex items-center gap-2">
                         {unreadNotifications > 0 && (
                           <button onClick={markAllRead} className="text-xs text-teal-600 hover:underline flex items-center gap-1">
@@ -656,13 +654,13 @@ export default function AccountPage() {
                 <motion.button whileTap={{ scale: 0.96 }} onClick={() => setViewModalOpen(true)} className="relative block">
                   <div className="w-20 h-20 rounded-full overflow-hidden shadow-md ring-2 ring-stone-100">
                     {uploading ? (
-                      <div className="w-full h-full flex items-center justify-center" style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+                      <div className="w-full h-full flex items-center justify-center" style={{ background: GRAD }}>
                         <div className="w-6 h-6 border-2 border-white/40 border-t-white rounded-full animate-spin" />
                       </div>
                     ) : profilePic ? (
                       <img src={profilePic} alt="Profile" className="w-full h-full object-cover block" />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-white text-2xl font-bold" style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+                      <div className="w-full h-full flex items-center justify-center text-white text-2xl font-bold" style={{ background: GRAD }}>
                         {initials}
                       </div>
                     )}
@@ -673,12 +671,12 @@ export default function AccountPage() {
                 </motion.button>
                 <motion.button whileTap={{ scale: 0.9 }} onClick={() => fileInputRef.current?.click()} disabled={uploading}
                   className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full border-2 border-white shadow-md flex items-center justify-center"
-                  style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+                  style={{ background: GRAD }}>
                   <Camera className="w-3 h-3 text-white" />
                 </motion.button>
               </div>
               <div className="flex-1 min-w-0">
-                <h2 className="text-xl font-bold text-stone-900 truncate" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+                <h2 className="text-xl font-bold text-stone-900 truncate" style={SERIF}>
                   {currentUser?.username || "Campus User"}
                 </h2>
                 <p className="text-sm text-stone-400 mt-0.5 truncate">{currentUser?.email}</p>
@@ -701,7 +699,7 @@ export default function AccountPage() {
                   className="flex items-center justify-between p-4 rounded-2xl shadow-sm border cursor-pointer"
                   style={{ background: "linear-gradient(135deg, #0b1a18 0%, #1a0b2e 100%)", borderColor: "rgba(13,148,136,0.3)" }}>
                   <div className="flex items-center gap-3">
-                    <div className="w-11 h-11 rounded-xl flex items-center justify-center shadow-md" style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+                    <div className="w-11 h-11 rounded-xl flex items-center justify-center shadow-md" style={{ background: GRAD }}>
                       <LayoutDashboard className="w-5 h-5 text-white" />
                     </div>
                     <div>
@@ -743,7 +741,7 @@ export default function AccountPage() {
                 <Link href="/account/bank-account">
                   <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
                     className="px-4 py-2 rounded-full text-xs font-semibold text-white shadow-sm"
-                    style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+                    style={{ background: GRAD }}>
                     {hasBankAccount ? "Update" : "Add"}
                   </motion.button>
                 </Link>
@@ -766,7 +764,7 @@ export default function AccountPage() {
           {/* ── SECTION LABEL ── */}
           <div className="pt-2">
             <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold mb-1">Quick Access</p>
-            <h2 className="text-xl font-bold text-stone-900" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>Your Space</h2>
+            <h2 className="text-xl font-bold text-stone-900" style={SERIF}>Your Space</h2>
           </div>
 
           {/* ── MENU ITEMS ── */}
@@ -807,11 +805,11 @@ export default function AccountPage() {
                 <div className="absolute bottom-0 left-0 w-32 h-32 rounded-full bg-purple-600/20 blur-2xl pointer-events-none" />
                 <div className="relative z-10 flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-11 h-11 rounded-xl flex items-center justify-center border border-white/20" style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+                    <div className="w-11 h-11 rounded-xl flex items-center justify-center border border-white/20" style={{ background: GRAD }}>
                       <Store className="w-5 h-5 text-white" />
                     </div>
                     <div>
-                      <p className="font-bold text-white text-sm" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>Become a Vendor</p>
+                      <p className="font-bold text-white text-sm" style={SERIF}>Become a Vendor</p>
                       <p className="text-xs text-white/50">Earn on campus. List now.</p>
                     </div>
                   </div>

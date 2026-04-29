@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { ChevronLeft, Package, Tag, FileText, Calendar, Eye, TrendingUp, Edit3, ArrowLeft, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { fetchWithAuth, useAuth } from "@/lib/authStore";
+import { GRAD, SERIF } from "@/lib/tokens";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -74,14 +75,14 @@ export default function SellerProductDetails() {
     return (
       <div className="min-h-screen bg-[#FAFAF9] flex flex-col items-center justify-center p-6 text-center" style={{ fontFamily: "'DM Sans', sans-serif" }}>
         <AlertCircle className="w-14 h-14 text-red-400 mx-auto mb-4" />
-        <h2 className="text-lg font-bold text-stone-800 mb-2" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+        <h2 className="text-lg font-bold text-stone-800 mb-2" style={SERIF}>
           Product Not Found
         </h2>
         <p className="text-sm text-stone-500 mb-6">{error || "This item may have been removed."}</p>
         <Link href="/seller/listings">
           <button
             className="px-8 py-3 text-white font-semibold rounded-full shadow-md flex items-center gap-2"
-            style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}
+            style={{ background: GRAD }}
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Listings
@@ -99,7 +100,7 @@ export default function SellerProductDetails() {
           <button onClick={() => router.back()} className="p-2.5 bg-white border border-stone-200 rounded-full shadow-sm active:scale-95 transition-all">
             <ChevronLeft className="w-5 h-5 text-stone-600" />
           </button>
-          <h1 className="text-base font-bold text-stone-900" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+          <h1 className="text-base font-bold text-stone-900" style={SERIF}>
             Listing Details
           </h1>
           <div className="w-10" />
@@ -126,7 +127,7 @@ export default function SellerProductDetails() {
 
         {/* TITLE + PRICE */}
         <div>
-          <h2 className="text-xl font-bold text-stone-900" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+          <h2 className="text-xl font-bold text-stone-900" style={SERIF}>
             {product.title}
           </h2>
           <p className="text-2xl font-bold text-teal-600 mt-1">
@@ -194,7 +195,7 @@ export default function SellerProductDetails() {
           <Link href={`/seller/edit/${product.id}`} className="flex-1">
             <button
               className="w-full py-3.5 text-white font-semibold rounded-full shadow-md flex items-center justify-center gap-2 text-sm"
-              style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}
+              style={{ background: GRAD }}
             >
               <Edit3 className="w-4 h-4" />
               Edit Listing

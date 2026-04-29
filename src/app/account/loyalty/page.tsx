@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Gift, Star, ChevronLeft, Loader } from "lucide-react";
 import { useAuth, fetchWithAuth } from "@/lib/authStore";
+import { GRAD, SERIF } from "@/lib/tokens";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -47,7 +48,7 @@ export default function LoyaltyPage() {
           >
             <ChevronLeft className="w-5 h-5 text-stone-600" />
           </button>
-          <h1 className="text-base font-bold text-stone-900" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+          <h1 className="text-base font-bold text-stone-900" style={SERIF}>
             Loyalty Rewards
           </h1>
           <div className="w-10" />
@@ -65,7 +66,7 @@ export default function LoyaltyPage() {
           <>
             {/* CREDIT BALANCE */}
             <div className="rounded-2xl p-6 text-white text-center shadow-xl animate-fadeUp"
-              style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+              style={{ background: GRAD }}>
               <Gift className="w-12 h-12 mx-auto mb-3 opacity-90" />
               <p className="text-sm font-semibold opacity-80">Available Credits</p>
               <p className="text-5xl font-bold mt-1">₦{data.credit_balance.toLocaleString()}</p>
@@ -83,7 +84,7 @@ export default function LoyaltyPage() {
               <div className="w-full bg-stone-100 rounded-full h-3 overflow-hidden">
                 <div
                   className="h-full rounded-full transition-[width] duration-700 ease-out"
-                  style={{ width: `${progress}%`, background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}
+                  style={{ width: `${progress}%`, background: GRAD }}
                 />
               </div>
               <div className="flex justify-between mt-2">
@@ -142,7 +143,7 @@ export default function LoyaltyPage() {
               ].map((step, i) => (
                 <div key={i} className="flex gap-3 mb-2">
                   <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
-                    style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+                    style={{ background: GRAD }}>
                     <span className="text-white text-xs font-semibold">{i + 1}</span>
                   </div>
                   <p className="text-sm text-teal-800">{step}</p>

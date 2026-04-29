@@ -5,7 +5,7 @@ import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Bell, Check, X, Calendar, ShoppingCart, CheckCircle, AlertTriangle, Star, Package } from "lucide-react";
-import { getToken } from "@/lib/authStore";   // ✅ getToken() helper, no useAuth needed here
+import { getToken } from "@/lib/authStore";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 

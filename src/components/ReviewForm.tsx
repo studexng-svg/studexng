@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { Star } from "lucide-react";
 import { fetchWithAuth } from "@/lib/authStore";
+import { GRAD, SERIF } from "@/lib/tokens";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -43,7 +44,7 @@ export default function ReviewForm({ orderId, vendorName, onSuccess }: {
     <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm space-y-4">
       <div>
         <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold">Leave a Review</p>
-        <h3 className="text-lg font-bold text-stone-900 mt-0.5" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+        <h3 className="text-lg font-bold text-stone-900 mt-0.5" style={SERIF}>
           Rate your experience
         </h3>
         <p className="text-sm text-stone-400 mt-0.5">How was {vendorName}?</p>
@@ -82,7 +83,7 @@ export default function ReviewForm({ orderId, vendorName, onSuccess }: {
         onClick={handleSubmit}
         disabled={submitting || !rating}
         className="w-full py-3 rounded-full font-semibold text-white text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all hover-scale tap-scale"
-        style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+        style={{ background: GRAD }}>
         {submitting ? "Submitting..." : "Submit Review"}
       </button>
     </div>

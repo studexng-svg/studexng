@@ -11,6 +11,7 @@ import Script from "next/script";
 import Link from "next/link";
 // REMOVE BEFORE PRODUCTION
 import { generateStructuredData } from "@/lib/metadata";
+import { GRAD, GRAD_TEXT, SERIF } from "@/lib/tokens";
 
 /* ─── THEME ─────────────────────────────────────────────── */
 // Primary:   #0D9488  (teal-600)
@@ -86,7 +87,7 @@ function ReviewCarousel() {
           className="text-center mb-20"
         >
           <p className="text-teal-600 text-xs tracking-[0.3em] uppercase font-semibold mb-4">Student Voices</p>
-          <h2 className="text-5xl md:text-6xl font-bold text-stone-900" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+          <h2 className="text-5xl md:text-6xl font-bold text-stone-900" style={SERIF}>
             What Students Say
           </h2>
         </motion.div>
@@ -103,7 +104,7 @@ function ReviewCarousel() {
               className="absolute w-full border border-stone-200 bg-stone-50 shadow-sm rounded-2xl p-10"
             >
               <Quote className="w-8 h-8 text-teal-400/60 mb-4" />
-              <p className="text-xl text-stone-700 leading-relaxed mb-5 italic" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+              <p className="text-xl text-stone-700 leading-relaxed mb-5 italic" style={SERIF}>
                 "{reviews[current].text}"
               </p>
               <div className="flex items-center justify-between">
@@ -212,7 +213,7 @@ export default function LandingPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.35 }}
             className="text-4xl md:text-6xl font-bold text-white leading-tight"
-            style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
+            style={SERIF}
           >
             Everything you need,{" "}
             <span className="italic" style={{
@@ -266,7 +267,7 @@ export default function LandingPage() {
             <Link href="/auth">
               <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
                 className="px-8 py-4 text-white font-semibold rounded-full shadow-lg shadow-teal-900/60 text-sm"
-                style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+                style={{ background: GRAD }}>
                 Get Started — It&apos;s Free
               </motion.button>
             </Link>
@@ -302,7 +303,7 @@ export default function LandingPage() {
             <p className="text-teal-600 text-xs tracking-[0.3em] uppercase font-semibold mb-3">What We Offer</p>
             <h2
               className="text-4xl md:text-5xl font-bold text-stone-900"
-              style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
+              style={SERIF}
             >
               Our Services
             </h2>
@@ -355,7 +356,7 @@ export default function LandingPage() {
             <p className="text-teal-600 text-xs tracking-[0.3em] uppercase font-semibold mb-3">Why Choose Us</p>
             <h2
               className="text-4xl md:text-5xl font-bold text-stone-900"
-              style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
+              style={SERIF}
             >
               Built for campus life.
             </h2>
@@ -373,7 +374,7 @@ export default function LandingPage() {
               >
                 <div
                   className="w-9 h-9 rounded-lg flex items-center justify-center mb-5"
-                  style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}
+                  style={{ background: GRAD }}
                 >
                   <f.icon className="w-4 h-4 text-white" strokeWidth={1.5} />
                 </div>
@@ -411,19 +412,11 @@ export default function LandingPage() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             className="text-5xl md:text-7xl font-bold text-stone-900 mb-6"
-            style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
+            style={SERIF}
           >
             Everything you need,
             <br />
-            <span
-              className="italic"
-              style={{
-                background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-                backgroundClip: "text",
-              }}
-            >
+            <span className="italic" style={GRAD_TEXT}>
               right on campus.
             </span>
           </motion.h2>
@@ -446,7 +439,7 @@ export default function LandingPage() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             className="px-12 py-5 text-white font-semibold text-base rounded-full inline-flex items-center gap-3 transition-all shadow-xl shadow-teal-200/50"
-            style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}
+            style={{ background: GRAD }}
           >
             Start Booking <ArrowRight className="w-5 h-5" />
           </motion.button>
@@ -476,16 +469,7 @@ export default function LandingPage() {
             style={{ fontFamily: "'Playfair Display', serif" }}
           >
             StudEx{" "}
-            <span
-              style={{
-                background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-                backgroundClip: "text",
-              }}
-            >
-              ·
-            </span>{" "}
+            <span style={GRAD_TEXT}>·</span>{" "}
             Made in Nigeria 🇳🇬
           </p>
 

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth, fetchWithAuth } from "@/lib/authStore";
 import { useWishlistStore } from "@/lib/wishlistStore";
+import { GRAD, GRAD_TEXT, SERIF } from "@/lib/tokens";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -53,7 +54,7 @@ function VendorAvatar({ src, name }: { src: string | null; name: string }) {
   if (!src || error) {
     return (
       <div className="w-16 h-16 rounded-full flex items-center justify-center text-white font-bold text-lg flex-shrink-0 shadow-md"
-        style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+        style={{ background: GRAD }}>
         {initials}
       </div>
     );
@@ -180,13 +181,8 @@ export default function HomePageClient({ initialVendors, initialListings }: Prop
           <div className="flex items-center justify-between px-4 py-3 gap-3">
             <Link href="/home" className="flex items-center gap-2 flex-shrink-0">
               <img src="/images/logo-1.jpg" alt="StudEx" loading="lazy" className="w-9 h-9 rounded-full object-cover shadow-sm" />
-              <span className="font-bold text-lg text-stone-900" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
-                Stud<span style={{
-                  background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)",
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                  backgroundClip: "text",
-                }}>Ex</span>
+              <span className="font-bold text-lg text-stone-900" style={SERIF}>
+                Stud<span style={GRAD_TEXT}>Ex</span>
               </span>
             </Link>
 
@@ -227,12 +223,7 @@ export default function HomePageClient({ initialVendors, initialListings }: Prop
                               <p className="font-semibold text-stone-900 text-sm truncate">{item.title}</p>
                               <p className="text-xs text-stone-400">@{item.vendor?.username || item.vendor}</p>
                             </div>
-                            <p className="font-bold text-sm flex-shrink-0" style={{
-                              background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)",
-                              WebkitBackgroundClip: "text",
-                              WebkitTextFillColor: "transparent",
-                              backgroundClip: "text",
-                            }}>₦{Number(item.price).toLocaleString()}</p>
+                            <p className="font-bold text-sm flex-shrink-0" style={GRAD_TEXT}>₦{Number(item.price).toLocaleString()}</p>
                           </div>
                         </Link>
                       ))
@@ -246,7 +237,7 @@ export default function HomePageClient({ initialVendors, initialListings }: Prop
               <Link href="/auth">
                 <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
                   className="px-4 py-2 text-white font-medium rounded-full text-sm shadow-sm flex-shrink-0"
-                  style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+                  style={{ background: GRAD }}>
                   Login
                 </motion.button>
               </Link>
@@ -260,7 +251,7 @@ export default function HomePageClient({ initialVendors, initialListings }: Prop
                 className={`flex-shrink-0 px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${
                   activeFilter === filter ? "text-white shadow-sm" : "bg-stone-100 text-stone-500 hover:bg-stone-200"
                 }`}
-                style={activeFilter === filter ? { background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" } : {}}>
+                style={activeFilter === filter ? { background: GRAD } : {}}>
                 {filter}
               </button>
             ))}
@@ -274,7 +265,7 @@ export default function HomePageClient({ initialVendors, initialListings }: Prop
             {isLoggedIn && user ? (
               <>
                 <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold">Welcome back</p>
-                <h1 className="text-2xl font-bold text-stone-900 mt-1" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+                <h1 className="text-2xl font-bold text-stone-900 mt-1" style={SERIF}>
                   Hey, {user.username || "there"} 👋
                 </h1>
                 <p className="text-stone-400 text-sm mt-0.5">Here's what's available on campus today.</p>
@@ -282,7 +273,7 @@ export default function HomePageClient({ initialVendors, initialListings }: Prop
             ) : (
               <>
                 <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold">PAU Campus Marketplace</p>
-                <h1 className="text-2xl font-bold text-stone-900 mt-1" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+                <h1 className="text-2xl font-bold text-stone-900 mt-1" style={SERIF}>
                   Discover Services
                 </h1>
                 <p className="text-stone-400 text-sm mt-0.5">Browse verified vendors on campus.</p>
@@ -302,7 +293,7 @@ export default function HomePageClient({ initialVendors, initialListings }: Prop
                   style={{ backgroundImage: `radial-gradient(circle, #5eead4 1px, transparent 1px)`, backgroundSize: "24px 24px" }} />
                 <div className="relative z-10 h-full flex flex-col justify-center px-6">
                   <p className="text-teal-400 text-xs tracking-[0.25em] uppercase font-semibold mb-1">Campus Marketplace</p>
-                  <h2 className="text-xl font-bold text-white" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+                  <h2 className="text-xl font-bold text-white" style={SERIF}>
                     Every service,{" "}
                     <span className="italic" style={{
                       background: "linear-gradient(135deg, #2dd4bf 0%, #a78bfa 100%)",
@@ -326,7 +317,7 @@ export default function HomePageClient({ initialVendors, initialListings }: Prop
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold">On Campus</p>
-                  <h2 className="text-xl font-bold text-stone-900 mt-0.5" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+                  <h2 className="text-xl font-bold text-stone-900 mt-0.5" style={SERIF}>
                     Vendors
                   </h2>
                 </div>
@@ -388,7 +379,7 @@ export default function HomePageClient({ initialVendors, initialListings }: Prop
             <div className="flex items-center justify-between mb-4">
               <div>
                 <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold">Available Now</p>
-                <h2 className="text-xl font-bold text-stone-900 mt-0.5" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+                <h2 className="text-xl font-bold text-stone-900 mt-0.5" style={SERIF}>
                   {activeFilter === "All" ? "Featured Services" : activeFilter}
                 </h2>
               </div>
@@ -403,7 +394,7 @@ export default function HomePageClient({ initialVendors, initialListings }: Prop
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                 className="bg-white rounded-2xl p-12 text-center border border-stone-100 shadow-sm">
                 <Sparkles className="w-12 h-12 text-stone-200 mx-auto mb-3" />
-                <h3 className="text-lg font-bold text-stone-400" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+                <h3 className="text-lg font-bold text-stone-400" style={SERIF}>
                   No listings yet
                 </h3>
                 <p className="text-stone-400 text-sm mt-1">Check back soon!</p>
@@ -518,13 +509,13 @@ export default function HomePageClient({ initialVendors, initialListings }: Prop
                   <motion.div whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }}
                     className="mt-4 bg-white border border-stone-200 hover:border-teal-300 rounded-2xl p-5 flex items-center justify-between shadow-sm hover:shadow-md transition-all cursor-pointer">
                     <div>
-                      <p className="font-semibold text-stone-900" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+                      <p className="font-semibold text-stone-900" style={SERIF}>
                         See all services
                       </p>
                       <p className="text-stone-400 text-sm">{allListings.length} listings available</p>
                     </div>
                     <div className="w-10 h-10 rounded-full flex items-center justify-center"
-                      style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+                      style={{ background: GRAD }}>
                       <ArrowRight className="w-5 h-5 text-white" />
                     </div>
                   </motion.div>
@@ -543,14 +534,14 @@ export default function HomePageClient({ initialVendors, initialListings }: Prop
               <div className="relative z-10">
                 <Shield className="w-8 h-8 mx-auto mb-3 text-teal-600" />
                 <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold mb-1">Safe & Secure</p>
-                <h3 className="text-xl font-bold text-stone-900 mb-1" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+                <h3 className="text-xl font-bold text-stone-900 mb-1" style={SERIF}>
                   Ready to book?
                 </h3>
                 <p className="text-stone-400 text-sm mb-5">Create a free account to book any service.</p>
                 <Link href="/auth">
                   <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
                     className="px-8 py-3 text-white font-semibold rounded-full text-sm shadow-lg shadow-teal-200/60 inline-flex items-center gap-2"
-                    style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+                    style={{ background: GRAD }}>
                     Create Account <ArrowRight className="w-4 h-4" />
                   </motion.button>
                 </Link>

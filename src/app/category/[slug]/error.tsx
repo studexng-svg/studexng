@@ -1,5 +1,7 @@
 'use client';
 
+import { GRAD } from "@/lib/tokens";
+
 export default function Error({ reset }: { reset: () => void }) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-teal-50 flex items-center justify-center p-6">
@@ -8,7 +10,7 @@ export default function Error({ reset }: { reset: () => void }) {
         <button
           onClick={reset}
           className="px-6 py-3 text-white font-medium rounded-full text-sm"
-          style={{ background: 'linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)' }}>
+          style={{ background: GRAD }}>
           Try again
         </button>
       </div>

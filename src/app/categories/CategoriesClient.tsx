@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, Sparkles } from "lucide-react";
+import { GRAD, GRAD_TEXT, SERIF } from "@/lib/tokens";
 
 interface Category {
   id: number;
@@ -27,7 +28,7 @@ export default function CategoriesClient({ categories }: { categories: Category[
           </button>
 
           <div className="text-center">
-            <h1 className="text-base font-bold text-stone-900" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+            <h1 className="text-base font-bold text-stone-900" style={SERIF}>
               Categories
             </h1>
           </div>
@@ -41,7 +42,7 @@ export default function CategoriesClient({ categories }: { categories: Category[
         {/* ── SECTION HEADER ── */}
         <div className="animate-fadeUp">
           <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold">Browse</p>
-          <h2 className="text-2xl font-bold text-stone-900 mt-1" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+          <h2 className="text-2xl font-bold text-stone-900 mt-1" style={SERIF}>
             What do you need today?
           </h2>
           <p className="text-stone-400 text-sm mt-0.5">All services available on campus.</p>
@@ -50,7 +51,7 @@ export default function CategoriesClient({ categories }: { categories: Category[
         {categories.length === 0 ? (
           <div className="bg-white rounded-2xl p-12 text-center border border-stone-100 shadow-sm animate-fadeIn">
             <Sparkles className="w-12 h-12 text-stone-200 mx-auto mb-3" />
-            <h3 className="text-lg font-bold text-stone-400" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+            <h3 className="text-lg font-bold text-stone-400" style={SERIF}>
               No categories yet
             </h3>
             <p className="text-stone-400 text-sm mt-1">Check back soon!</p>
@@ -88,18 +89,13 @@ export default function CategoriesClient({ categories }: { categories: Category[
                       </p>
                       <div
                         className="h-0.5 mt-1.5 rounded-full w-0 group-hover:w-8 transition-all duration-300"
-                        style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}
+                        style={{ background: GRAD }}
                       />
                     </div>
 
                     {/* Live badge on hover */}
                     <div className="absolute top-2.5 right-2.5 px-2 py-0.5 bg-white/90 backdrop-blur-sm rounded-full shadow-sm opacity-0 group-hover:opacity-100 transition-opacity">
-                      <span className="text-[10px] font-bold" style={{
-                        background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)",
-                        WebkitBackgroundClip: "text",
-                        WebkitTextFillColor: "transparent",
-                        backgroundClip: "text",
-                      }}>LIVE</span>
+                      <span className="text-[10px] font-bold" style={GRAD_TEXT}>LIVE</span>
                     </div>
 
                   </div>
@@ -113,14 +109,7 @@ export default function CategoriesClient({ categories }: { categories: Category[
         {categories.length > 0 && (
           <div className="text-center py-4 animate-fadeIn">
             <p className="text-stone-400 text-sm">Everything you need.</p>
-            <p className="font-bold mt-1" style={{
-              fontFamily: "'Playfair Display', Georgia, serif",
-              background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-              backgroundClip: "text",
-              fontSize: "1.25rem",
-            }}>Just StudEx.</p>
+            <p className="font-bold mt-1" style={{ ...SERIF, ...GRAD_TEXT, fontSize: "1.25rem" }}>Just StudEx.</p>
           </div>
         )}
 

@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { useAuth, fetchWithAuth } from "@/lib/authStore";
 import { useCartStore } from "@/lib/cartStore";
+import { GRAD, GRAD_TEXT, SERIF } from "@/lib/tokens";
 import VendorBadge from "@/components/VendorBadge";
 import ChatWindow from "@/components/ChatWindow";
 
@@ -177,13 +178,13 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
           <AlertCircle className="w-8 h-8 text-red-400" />
         </div>
         <h3 className="text-lg font-bold text-stone-900 mb-1"
-          style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+          style={SERIF}>
           Listing not found
         </h3>
         <p className="text-stone-400 text-sm mb-4">This listing may have been removed.</p>
         <button onClick={() => router.back()}
           className="px-6 py-2.5 text-white font-medium rounded-full text-sm shadow-sm"
-          style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+          style={{ background: GRAD }}>
           Go Back
         </button>
       </div>
@@ -230,7 +231,7 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
               <ChevronLeft className="w-5 h-5 text-stone-600" />
             </button>
             <h1 className="font-bold text-stone-900 text-base truncate flex-1"
-              style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+              style={SERIF}>
               {listing.title}
             </h1>
           </div>
@@ -281,14 +282,11 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
                     {listing.category?.title}
                   </p>
                   <h2 className="text-xl font-bold text-stone-900"
-                    style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+                    style={SERIF}>
                     {listing.title}
                   </h2>
                 </div>
-                <p className="text-2xl font-bold whitespace-nowrap" style={{
-                  background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)",
-                  WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text",
-                }}>
+                <p className="text-2xl font-bold whitespace-nowrap" style={GRAD_TEXT}>
                   ₦{Number(listing.price).toLocaleString()}
                 </p>
               </div>
@@ -313,7 +311,7 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-11 h-11 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-sm"
-                    style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+                    style={{ background: GRAD }}>
                     {vendorName[0]?.toUpperCase()}
                   </div>
                   <div>
@@ -341,7 +339,7 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
                 whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
                 onClick={handleAddToCart}
                 className="w-full py-4 text-white font-semibold rounded-full flex items-center justify-center gap-2 text-base shadow-lg shadow-teal-200/60"
-                style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+                style={{ background: GRAD }}>
                 <ShoppingCart className="w-5 h-5" /> Add to Cart
               </motion.button>
             )}
@@ -370,7 +368,7 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
                   className="w-full flex items-center justify-between p-4 text-left hover:bg-stone-50 transition">
                   <div className="flex items-center gap-2">
                     <div className="w-8 h-8 rounded-lg flex items-center justify-center"
-                      style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+                      style={{ background: GRAD }}>
                       <Calendar className="w-4 h-4 text-white" />
                     </div>
                     <span className="font-semibold text-stone-900 text-sm">Book a Date & Time</span>
@@ -386,7 +384,7 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
                       whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
                       onClick={openBooking}
                       className="w-full py-3.5 text-white font-semibold rounded-full flex items-center justify-center gap-2 text-sm shadow-lg shadow-teal-200/60"
-                      style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+                      style={{ background: GRAD }}>
                       <Calendar className="w-4 h-4" /> Book
                     </motion.button>
                   </div>
@@ -409,7 +407,7 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
                               <CheckCircle className="w-8 h-8 text-teal-500" />
                             </div>
                             <p className="font-bold text-stone-900 text-lg"
-                              style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+                              style={SERIF}>
                               Booking Request Sent!
                             </p>
                             <p className="text-stone-400 text-sm">
@@ -419,7 +417,7 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
                               whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
                               onClick={() => router.push("/account/bookings")}
                               className="mt-2 px-6 py-2.5 text-white font-medium rounded-full text-sm shadow-sm"
-                              style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+                              style={{ background: GRAD }}>
                               View My Bookings
                             </motion.button>
                           </motion.div>
@@ -448,7 +446,7 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
                                         ? "text-white border-transparent shadow-sm"
                                         : "bg-stone-50 text-stone-600 border-stone-200 hover:border-teal-300"
                                     }`}
-                                    style={bookingTime === slot ? { background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" } : {}}>
+                                    style={bookingTime === slot ? { background: GRAD } : {}}>
                                     {slot}
                                   </button>
                                 ))}
@@ -496,7 +494,7 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
                               onClick={handleBooking}
                               disabled={bookingStep === "confirming" || !bookingDate || !bookingTime || !bookingLocation.trim()}
                               className="w-full py-4 rounded-full font-semibold text-white text-sm flex items-center justify-center gap-2 shadow-lg shadow-teal-200/60 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                              style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+                              style={{ background: GRAD }}>
                               {bookingStep === "confirming"
                                 ? <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin inline-block" /> Sending...</>
                                 : <><Send className="w-4 h-4" /> Send Booking Request</>}

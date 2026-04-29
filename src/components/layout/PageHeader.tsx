@@ -3,6 +3,7 @@
 
 import { ReactNode } from "react";
 import BackButton from "./BackButton";
+import { SERIF } from "@/lib/tokens";
 
 interface PageHeaderProps {
   title: string;
@@ -75,7 +76,7 @@ export default function PageHeader({
 
         {/* Title Row */}
         <div>
-          <h1 className="text-base font-bold text-stone-900" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+          <h1 className="text-base font-bold text-stone-900" style={SERIF}>
             {title}
           </h1>
           {subtitle && (

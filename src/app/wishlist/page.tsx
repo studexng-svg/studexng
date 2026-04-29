@@ -7,6 +7,7 @@ import { useCartStore } from "@/lib/cartStore";
 import { useWishlistStore } from "@/lib/wishlistStore";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { GRAD, GRAD_TEXT, SERIF } from "@/lib/tokens";
 
 export default function WishlistPage() {
   const router = useRouter();
@@ -49,7 +50,7 @@ export default function WishlistPage() {
           <Link href="/auth">
             <button
               className="px-6 py-3 text-white font-medium rounded-full shadow-lg text-sm"
-              style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+              style={{ background: GRAD }}>
               Login
             </button>
           </Link>
@@ -68,7 +69,7 @@ export default function WishlistPage() {
           <Link href="/categories">
             <button
               className="px-6 py-3 text-white font-medium rounded-full shadow-lg text-sm"
-              style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+              style={{ background: GRAD }}>
               Browse Categories
             </button>
           </Link>
@@ -94,7 +95,7 @@ export default function WishlistPage() {
             className="p-2.5 bg-white border border-stone-200 hover:border-stone-300 rounded-full shadow-sm transition-all active:scale-95">
             <ChevronLeft className="w-5 h-5 text-stone-600" />
           </button>
-          <h1 className="text-base font-bold text-stone-900" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+          <h1 className="text-base font-bold text-stone-900" style={SERIF}>
             Wishlist ({wishlist.length})
           </h1>
           <button
@@ -127,12 +128,7 @@ export default function WishlistPage() {
                   <p className="font-semibold text-stone-900 line-clamp-2 text-sm">
                     {item.title}
                   </p>
-                  <p className="text-base font-bold mt-1" style={{
-                    background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)",
-                    WebkitBackgroundClip: "text",
-                    WebkitTextFillColor: "transparent",
-                    backgroundClip: "text",
-                  }}>
+                  <p className="text-base font-bold mt-1" style={GRAD_TEXT}>
                     ₦{item.price?.toLocaleString()}
                   </p>
                 </div>
@@ -143,7 +139,7 @@ export default function WishlistPage() {
               <button
                 onClick={() => handleAddToCart(item)}
                 className="flex items-center gap-1.5 px-5 py-2.5 text-white font-semibold rounded-full text-sm shadow-lg shadow-teal-200/60 transition-all"
-                style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+                style={{ background: GRAD }}>
                 <Package className="w-4 h-4" />
                 Add to Cart
               </button>

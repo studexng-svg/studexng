@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { useAuth, fetchWithAuth, getToken } from "@/lib/authStore";
+import { GRAD } from "@/lib/tokens";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 const DELETE_EVERYONE_LIMIT_HOURS = 60;
@@ -308,7 +309,7 @@ export default function ChatRoomPage() {
           <ChevronLeft className="w-5 h-5 text-stone-600" />
         </button>
         <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-base flex-shrink-0 shadow-sm"
-          style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+          style={{ background: GRAD }}>
           {otherUser?.[0]?.toUpperCase() || "?"}
         </div>
         <div className="flex-1 min-w-0">
@@ -388,7 +389,7 @@ export default function ChatRoomPage() {
                     ? "text-white rounded-br-sm"
                     : "bg-white text-stone-900 shadow-sm rounded-bl-sm border border-stone-100"
                 } ${msg.is_pinned ? 'ring-2 ring-teal-400/40' : ''}`}
-                style={msg.is_mine ? { background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" } : {}}
+                style={msg.is_mine ? { background: GRAD } : {}}
               >
                 {!msg.is_mine && <p className="text-xs font-semibold text-teal-600 mb-1">{msg.sender_username}</p>}
 
@@ -564,7 +565,7 @@ export default function ChatRoomPage() {
           onClick={handleSend}
           disabled={sending || (!input.trim() && !imageFile)}
           className="p-2.5 text-white rounded-xl disabled:opacity-40 flex-shrink-0 transition active:scale-95"
-          style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}
+          style={{ background: GRAD }}
         >
           {sending ? <Loader className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
         </button>

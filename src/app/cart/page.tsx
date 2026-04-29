@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCartStore } from "@/lib/cartStore";
 import { useEffect, useState } from "react";
+import { GRAD, GRAD_TEXT, SERIF } from "@/lib/tokens";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -63,18 +64,18 @@ export default function CartPage() {
       <div className="min-h-screen bg-[#FAFAF9] flex flex-col items-center justify-center px-6 pb-28" style={{ fontFamily: "'DM Sans', sans-serif" }}>
         <div className="text-center animate-fadeUp">
           <div className="w-24 h-24 mx-auto mb-6 rounded-2xl flex items-center justify-center"
-            style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+            style={{ background: GRAD }}>
             <ShoppingBag className="w-12 h-12 text-white" strokeWidth={1.5} />
           </div>
           <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold mb-2">Empty Cart</p>
-          <h2 className="text-2xl font-bold text-stone-900 mb-2" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+          <h2 className="text-2xl font-bold text-stone-900 mb-2" style={SERIF}>
             Your cart is empty
           </h2>
           <p className="text-stone-400 text-sm mb-8">Add something from our services to get started.</p>
           <Link href="/categories">
             <button
               className="px-8 py-3 text-white font-semibold rounded-full shadow-lg shadow-teal-200/60 inline-flex items-center gap-2 text-sm hover-scale tap-scale"
-              style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+              style={{ background: GRAD }}>
               Browse Categories <ArrowRight className="w-4 h-4" />
             </button>
           </Link>
@@ -93,7 +94,7 @@ export default function CartPage() {
             className="p-2.5 bg-white border border-stone-200 hover:border-stone-300 rounded-full shadow-sm transition-all active:scale-95">
             <ChevronLeft className="w-5 h-5 text-stone-600" />
           </button>
-          <h1 className="text-base font-bold text-stone-900" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+          <h1 className="text-base font-bold text-stone-900" style={SERIF}>
             Cart ({cart.length})
           </h1>
           <button onClick={clearCart}
@@ -108,7 +109,7 @@ export default function CartPage() {
         {/* ── SECTION HEADER ── */}
         <div className="animate-fadeUp">
           <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold">Your Order</p>
-          <h2 className="text-xl font-bold text-stone-900 mt-0.5" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+          <h2 className="text-xl font-bold text-stone-900 mt-0.5" style={SERIF}>
             Review your cart
           </h2>
         </div>
@@ -166,12 +167,7 @@ export default function CartPage() {
                   <p className="text-red-500 text-xs font-medium mt-1">No longer available</p>
                 ) : (
                   <>
-                    <p className="text-lg font-bold mt-1" style={{
-                      background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)",
-                      WebkitBackgroundClip: "text",
-                      WebkitTextFillColor: "transparent",
-                      backgroundClip: "text",
-                    }}>
+                    <p className="text-lg font-bold mt-1" style={GRAD_TEXT}>
                       ₦{(item.price * item.quantity).toLocaleString()}
                     </p>
                     {stockLimits[item.id] && (
@@ -227,13 +223,8 @@ export default function CartPage() {
                 ))}
               </div>
               <div className="border-t border-stone-100 mt-3 pt-3 flex justify-between items-center">
-                <span className="font-bold text-stone-900" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>Total</span>
-                <span className="text-2xl font-bold" style={{
-                  background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)",
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                  backgroundClip: "text",
-                }}>₦{total.toLocaleString()}</span>
+                <span className="font-bold text-stone-900" style={SERIF}>Total</span>
+                <span className="text-2xl font-bold" style={GRAD_TEXT}>₦{total.toLocaleString()}</span>
               </div>
               {hasUnavailable && (
                 <p className="text-amber-500 text-xs mt-1">Unavailable items excluded from total</p>
@@ -250,7 +241,7 @@ export default function CartPage() {
                     ? "bg-stone-100 text-stone-400 cursor-not-allowed"
                     : "text-white shadow-lg shadow-teal-200/60"
                 }`}
-                style={hasUnavailable ? {} : { background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+                style={hasUnavailable ? {} : { background: GRAD }}>
                 {hasUnavailable
                   ? "Remove unavailable items first"
                   : <> Checkout Now <ArrowRight className="w-4 h-4" /></>

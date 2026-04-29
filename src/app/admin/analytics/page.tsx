@@ -2,18 +2,16 @@
 "use client";
 
 import {
-  ChevronLeft,
   TrendingUp,
   Users,
   Package,
   DollarSign,
   ShoppingCart,
   ArrowUp,
-  Calendar,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import BottomNav from "@/components/layout/BottomNav";
+import AdminTopBar from "@/components/layout/AdminTopBar";
 import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
@@ -21,7 +19,6 @@ import {
 
 export const dynamic = 'force-dynamic';
 export default function AdminAnalytics() {
-  const router = useRouter();
   const [stats, setStats] = useState({
     totalRevenue: 0,
     totalOrders: 0,
@@ -75,16 +72,7 @@ export default function AdminAnalytics() {
 
   return (
     <>
-      {/* TOP BAR */}
-      <div className="sticky top-0 z-50 bg-gradient-to-r from-slate-900 via-purple-900 to-slate-900 border-b border-white/10 backdrop-blur-xl animate-fadeUp">
-        <div className="flex items-center justify-between px-5 py-4">
-          <button onClick={() => router.back()} className="p-2 hover:bg-white/10 rounded-xl transition">
-            <ChevronLeft className="w-6 h-6 text-white" />
-          </button>
-          <h1 className="text-xl font-black text-white">Analytics</h1>
-          <Calendar className="w-6 h-6 text-white/60" />
-        </div>
-      </div>
+      <AdminTopBar title="Analytics" />
 
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 px-5 pt-4 pb-32 space-y-6">
 

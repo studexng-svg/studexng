@@ -1,7 +1,8 @@
 // src/app/admin/users/page.tsx
 "use client";
 
-import { ArrowLeft, Search, Mail, ShieldCheck, User, Users, Ban, TrendingUp } from "lucide-react";
+import { Search, Mail, ShieldCheck, User, Users } from "lucide-react";
+import AdminTopBar from "@/components/layout/AdminTopBar";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { adminApi } from "@/lib/adminApi";
@@ -37,32 +38,19 @@ export default function AdminUsers() {
 
   return (
     <>
-      {/* TOP BAR */}
-      <div className="sticky top-0 z-50 bg-gradient-to-r from-slate-900 via-purple-900 to-slate-900 border-b border-white/10 backdrop-blur-xl animate-fadeUp">
-        <div className="flex items-center justify-between px-5 py-4">
-          <button onClick={() => router.back()} className="p-2 hover:bg-white/10 rounded-xl transition">
-            <ArrowLeft className="w-6 h-6 text-white" />
-          </button>
-          <h1 className="text-xl font-black text-white">All Users</h1>
-          <div className="w-10" />
-        </div>
-
-        {/* Search */}
-        <div className="px-5 pb-4">
-          <div className="relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/50" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search name, email, matric..."
-              className="w-full pl-12 pr-4 py-3 bg-white/10 backdrop-blur-xl rounded-xl text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-purple-500/50 text-sm"
-            />
-          </div>
-        </div>
-      </div>
+      <AdminTopBar title="User Management" />
 
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 px-5 pt-4 pb-32">
+        <div className="relative mb-5">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/50" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search name, email, matric..."
+            className="w-full pl-12 pr-4 py-3 bg-white/10 backdrop-blur-xl rounded-xl text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-purple-500/50 text-sm"
+          />
+        </div>
 
         {/* Stats */}
         <div className="grid grid-cols-3 gap-3 mb-6">

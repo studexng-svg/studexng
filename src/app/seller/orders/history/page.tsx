@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth, fetchWithAuth } from "@/lib/authStore";
+import { GRAD, SERIF } from "@/lib/tokens";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -148,7 +149,7 @@ export default function SellerOrderHistoryPage() {
           <button onClick={() => router.back()} className="p-2.5 bg-white border border-stone-200 rounded-full shadow-sm active:scale-95 transition-all">
             <ChevronLeft className="w-5 h-5 text-stone-600" />
           </button>
-          <h1 className="text-base font-bold text-stone-900" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+          <h1 className="text-base font-bold text-stone-900" style={SERIF}>
             Order History
           </h1>
           <div className="w-10" />
@@ -159,7 +160,7 @@ export default function SellerOrderHistoryPage() {
         {/* REVENUE SUMMARY */}
         <div
           className="rounded-2xl p-5 text-white shadow-md"
-          style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}
+          style={{ background: GRAD }}
         >
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
@@ -199,7 +200,7 @@ export default function SellerOrderHistoryPage() {
                     ? "text-white shadow-md"
                     : "bg-white border border-stone-200 text-stone-600 hover:border-stone-300"
                 }`}
-                style={dateFilter === period ? { background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" } : {}}
+                style={dateFilter === period ? { background: GRAD } : {}}
               >
                 {period === "all" && "All Time"}
                 {period === "today" && "Today"}
@@ -225,7 +226,7 @@ export default function SellerOrderHistoryPage() {
             <Link href="/seller/orders">
               <button
                 className="mt-3 px-8 py-3 text-white font-semibold rounded-full shadow-md text-sm"
-                style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}
+                style={{ background: GRAD }}
               >
                 View Pending Orders
               </button>

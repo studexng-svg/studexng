@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { AlertCircle, ChevronLeft, Image as ImageIcon, Save, X } from "lucide-react";
 import { fetchWithAuth } from "@/lib/authStore";
+import { GRAD, SERIF } from "@/lib/tokens";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -149,7 +150,7 @@ export default function EditProductPage() {
           </button>
           <h1
             className="text-base font-bold text-stone-900"
-            style={{ fontFamily: "'Playfair Display', Georgia, serif" }}
+            style={SERIF}
           >
             Edit Listing
           </h1>
@@ -169,7 +170,7 @@ export default function EditProductPage() {
         {/* IMAGE */}
         <div className="space-y-3">
           <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold">Photo</p>
-          <h2 className="text-lg font-bold text-stone-900" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+          <h2 className="text-lg font-bold text-stone-900" style={SERIF}>
             Service Photo <span className="text-red-500">*</span>
           </h2>
 
@@ -293,7 +294,7 @@ export default function EditProductPage() {
           type="submit"
           disabled={saving}
           className="w-full py-4 rounded-full text-white font-semibold text-base shadow-lg shadow-teal-200/60 disabled:opacity-60 flex items-center justify-center gap-2 transition active:scale-[0.98]"
-          style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}
+          style={{ background: GRAD }}
         >
           <Save className="w-5 h-5" />
           {saving ? "Saving..." : "Save Changes"}

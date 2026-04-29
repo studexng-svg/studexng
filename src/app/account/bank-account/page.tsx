@@ -4,6 +4,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth, fetchWithAuth } from "@/lib/authStore";
+import { GRAD, SERIF } from "@/lib/tokens";
 import { ChevronLeft, Banknote, Loader, Check, AlertCircle, Search } from "lucide-react";
 import Link from "next/link";
 
@@ -214,7 +215,7 @@ export default function BankAccountPage() {
             </button>
           </Link>
           <div className="text-center">
-            <h1 className="text-base font-bold text-stone-900" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+            <h1 className="text-base font-bold text-stone-900" style={SERIF}>
               Payout Account
             </h1>
             <p className="text-xs text-stone-500">Where your earnings are sent</p>
@@ -332,7 +333,7 @@ export default function BankAccountPage() {
           {/* Save Button */}
           <button onClick={handleSave} disabled={saving || !isComplete}
             className="w-full py-4 text-white disabled:opacity-40 disabled:cursor-not-allowed rounded-full font-semibold transition flex items-center justify-center gap-2 shadow-lg"
-            style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+            style={{ background: GRAD }}>
             {saving ? <><Loader className="w-5 h-5 animate-spin" /> Saving...</> : <><Check className="w-5 h-5" /> Save Bank Account</>}
           </button>
         </div>

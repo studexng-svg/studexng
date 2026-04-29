@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { api } from "../../../lib/api";
 import { useAuth, fetchWithAuth } from "@/lib/authStore";
+import { GRAD, SERIF } from "@/lib/tokens";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -36,7 +37,6 @@ export default function SellerDashboard() {
   const [totalWithdrawn, setTotalWithdrawn] = useState(0);
 
   const [pendingOrders, setPendingOrders] = useState<Order[]>([]);
-  const [completedToday, setCompletedToday] = useState(0);
 
   const [vendorFeedbackRating, setVendorFeedbackRating] = useState(0);
   const [vendorFeedbackHovered, setVendorFeedbackHovered] = useState(0);
@@ -115,11 +115,6 @@ export default function SellerDashboard() {
               const earnedAmount = completedOrders.reduce((sum: number, o: any) => sum + parseFloat(o.amount || 0), 0);
               setTotalEarned(earnedAmount);
 
-              const today = new Date().toDateString();
-              const completedCount = completedOrders.filter((o: any) => {
-                return new Date(o.created_at).toDateString() === today;
-              }).length;
-              setCompletedToday(completedCount);
             }
 
             setTotalWithdrawn(0);
@@ -128,7 +123,6 @@ export default function SellerDashboard() {
             setInEscrow(0);
             setTotalEarned(0);
             setTotalWithdrawn(0);
-            setCompletedToday(0);
           }
         } else {
           setIsSeller(false);
@@ -196,14 +190,14 @@ export default function SellerDashboard() {
         <div className="flex items-center justify-between px-4 py-3 max-w-2xl mx-auto">
           <div className="flex items-center gap-2">
             <Store className="w-5 h-5 text-teal-600" />
-            <h1 className="text-base font-bold text-stone-900" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+            <h1 className="text-base font-bold text-stone-900" style={SERIF}>
               Seller Hub
             </h1>
           </div>
           <Link href="/seller/orders">
             <button
               className="relative p-2.5 text-white rounded-full shadow-sm active:scale-95 transition-all"
-              style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}
+              style={{ background: GRAD }}
             >
               <Bell className="w-4 h-4" />
               {pendingOrders.length > 0 && (
@@ -280,7 +274,7 @@ export default function SellerDashboard() {
         {/* WALLET CARD */}
         <div
           className="rounded-2xl p-5 text-white shadow-md relative overflow-hidden"
-          style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}
+          style={{ background: GRAD }}
         >
           <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -translate-y-12 translate-x-12 pointer-events-none" />
           <div className="absolute bottom-0 left-0 w-20 h-20 bg-white/10 rounded-full translate-y-10 -translate-x-10 pointer-events-none" />
@@ -432,7 +426,7 @@ export default function SellerDashboard() {
           <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm space-y-4">
             <div>
               <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold">Vendor Feedback</p>
-              <h3 className="text-lg font-bold text-stone-900 mt-0.5" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+              <h3 className="text-lg font-bold text-stone-900 mt-0.5" style={SERIF}>
                 How&apos;s selling on StudEx?
               </h3>
               <p className="text-sm text-stone-400 mt-0.5">Your feedback helps us build a better platform</p>
@@ -472,7 +466,7 @@ export default function SellerDashboard() {
               onClick={submitVendorFeedback}
               disabled={vendorFeedbackSubmitting || !vendorFeedbackRating}
               className="w-full py-3 rounded-full font-semibold text-white text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-              style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+              style={{ background: GRAD }}>
               {vendorFeedbackSubmitting ? "Submitting..." : "Submit Feedback"}
             </motion.button>
           </div>

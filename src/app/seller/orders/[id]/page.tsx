@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { ChevronLeft, Package, Tag, DollarSign, FileText, Calendar, MapPin, User, Clock, CheckCircle, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { fetchWithAuth } from "@/lib/authStore";
+import { GRAD, SERIF } from "@/lib/tokens";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -109,14 +110,14 @@ export default function SellerOrderDetailPage() {
       <div className="min-h-screen bg-[#FAFAF9] flex items-center justify-center p-6" style={{ fontFamily: "'DM Sans', sans-serif" }}>
         <div className="text-center bg-white border border-stone-200 rounded-2xl p-8 shadow-sm max-w-sm w-full">
           <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
-          <h2 className="text-lg font-bold text-stone-800 mb-2" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+          <h2 className="text-lg font-bold text-stone-800 mb-2" style={SERIF}>
             Order Not Found
           </h2>
           <p className="text-sm text-stone-500 mb-6">{error || "This order may have been removed."}</p>
           <Link href="/seller/orders">
             <button
               className="px-8 py-3 text-white font-semibold rounded-full shadow-md text-sm"
-              style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}
+              style={{ background: GRAD }}
             >
               Back to Orders
             </button>
@@ -138,7 +139,7 @@ export default function SellerOrderDetailPage() {
           <button onClick={() => router.back()} className="p-2.5 bg-white border border-stone-200 rounded-full shadow-sm active:scale-95 transition-all">
             <ChevronLeft className="w-5 h-5 text-stone-600" />
           </button>
-          <h1 className="text-base font-bold text-stone-900" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+          <h1 className="text-base font-bold text-stone-900" style={SERIF}>
             Order Details
           </h1>
           <div className="w-10" />
@@ -275,7 +276,7 @@ export default function SellerOrderDetailPage() {
           <button
             onClick={() => setShowCompleteModal(true)}
             className="w-full py-4 text-white font-semibold rounded-full shadow-md flex items-center justify-center gap-2 active:scale-[0.98] transition-all"
-            style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}
+            style={{ background: GRAD }}
           >
             <CheckCircle className="w-5 h-5" />
             Mark as Complete
@@ -300,7 +301,7 @@ export default function SellerOrderDetailPage() {
             className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl border border-stone-100 animate-fadeUp"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-lg font-bold text-stone-900 mb-3" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+            <h3 className="text-lg font-bold text-stone-900 mb-3" style={SERIF}>
               Mark as Complete?
             </h3>
             <p className="text-stone-600 text-sm mb-5">
@@ -327,7 +328,7 @@ export default function SellerOrderDetailPage() {
                 onClick={handleMarkAsComplete}
                 disabled={completing}
                 className="flex-1 py-3 text-white rounded-full font-semibold text-sm disabled:opacity-50 flex items-center justify-center gap-2"
-                style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}
+                style={{ background: GRAD }}
               >
                 {completing ? (
                   <>

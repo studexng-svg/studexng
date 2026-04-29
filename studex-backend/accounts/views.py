@@ -95,9 +95,12 @@ def verify_otp(request):
 def check_username(request):
     username = request.query_params.get('username', '').strip()
     if not username:
-        return Response({'available': False, 'error': 'No username provided'}, status=400)
-    exists = User.objects.filter(username__iexact=username).exists()
-    return Response({'available': not exists})
+        return Response({'available': False}, status=200)
+    try:
+        exists = User.objects.filter(username__iexact=username).exists()
+        return Response({'available': not exists}, status=200)
+    except Exception:
+        return Response({'available': None}, status=200)
 
 
 # ─── Auth Views ───────────────────────────────────────────────────────────────

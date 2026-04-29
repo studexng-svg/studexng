@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { fetchWithAuth } from "@/lib/authStore";
 import { Lock, ChevronLeft, Save, Eye, EyeOff, CheckCircle, XCircle } from "lucide-react";
+import { GRAD, SERIF } from "@/lib/tokens";
 
 export default function ChangePasswordPage() {
   const router = useRouter();
@@ -98,7 +99,7 @@ export default function ChangePasswordPage() {
           >
             <ChevronLeft className="w-5 h-5 text-stone-600" />
           </button>
-          <h1 className="text-base font-bold text-stone-900" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+          <h1 className="text-base font-bold text-stone-900" style={SERIF}>
             Change Password
           </h1>
           <div className="w-10" />
@@ -193,7 +194,7 @@ export default function ChangePasswordPage() {
                 onClick={handleSave}
                 disabled={!passwords.oldPassword || !passwords.newPassword || !passwords.confirmPassword}
                 className="w-full py-4 text-white rounded-full font-semibold text-base shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition active:scale-[0.98]"
-                style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}
+                style={{ background: GRAD }}
               >
                 <Save className="w-5 h-5" />
                 Update Password

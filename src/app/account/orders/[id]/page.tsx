@@ -4,6 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 import { Package, CheckCircle, Clock, AlertCircle, ChevronLeft, MessageCircle } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAuth, fetchWithAuth } from "@/lib/authStore";
+import { GRAD, SERIF } from "@/lib/tokens";
 import ReviewForm from "@/components/ReviewForm";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
@@ -120,7 +121,7 @@ export default function OrderDetailPage() {
         <Link href="/account/orders">
           <button
             className="mt-4 px-6 py-3 text-white font-semibold rounded-full"
-            style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}
+            style={{ background: GRAD }}
           >
             Back to Orders
           </button>
@@ -142,7 +143,7 @@ export default function OrderDetailPage() {
               <ChevronLeft className="w-5 h-5 text-stone-600" />
             </button>
           </Link>
-          <h1 className="text-base font-bold text-stone-900" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+          <h1 className="text-base font-bold text-stone-900" style={SERIF}>
             Order Details
           </h1>
           <button
@@ -244,7 +245,7 @@ export default function OrderDetailPage() {
             <button
               onClick={() => setShowModal(true)}
               className="w-full py-4 text-white rounded-full font-semibold text-base shadow-lg flex items-center justify-center gap-2 active:scale-[0.98] transition-all"
-              style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}
+              style={{ background: GRAD }}
             >
               <CheckCircle className="w-5 h-5" /> Confirm Service Received
             </button>
@@ -295,7 +296,7 @@ export default function OrderDetailPage() {
               </button>
               <button onClick={handleConfirm} disabled={confirming}
                 className="flex-1 py-3 text-white rounded-full font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
-                style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+                style={{ background: GRAD }}>
                 {confirming
                   ? <div className="animate-spin">
                       <Clock className="w-5 h-5" />

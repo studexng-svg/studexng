@@ -19,7 +19,10 @@
       "Bash(curl -sI https://www.pexels.com/download/video/27165007/ -H 'User-Agent: Mozilla/5.0 \\(Windows NT 10.0; Win64; x64\\) AppleWebKit/537.36' -L --max-redirs 10)",
       "Bash(curl -sI \"https://assets.mixkit.co/videos/48365/48365-preview-preview.mp4\")",
       "Bash(curl -sI \"https://assets.mixkit.co/videos/preview/mixkit-dancing-african-fishermen-on-a-boat-48365-large.mp4\")",
-      "WebFetch(domain:coverr.co)"
+      "WebFetch(domain:coverr.co)",
+      "Bash(curl -s \"http://127.0.0.1:8000/api/auth/check-username/?username=testuser123\")",
+      "Bash(curl -s \"http://127.0.0.1:8000/api/auth/check-username/?username=\")",
+      "Bash(curl -s \"http://127.0.0.1:8000/api/auth/check-username/?username=test%40%23%24\")"
     ]
   }
 }

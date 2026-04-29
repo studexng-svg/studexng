@@ -5,8 +5,8 @@ import { Plus, X, AlertCircle, ChevronLeft, Image as ImageIcon } from "lucide-re
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { motion } from "framer-motion";
 import { fetchWithAuth, useAuth } from "@/lib/authStore";
+import { GRAD, SERIF } from "@/lib/tokens";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -116,7 +116,7 @@ export default function AddService() {
           <button onClick={() => router.back()} className="p-2.5 bg-white border border-stone-200 rounded-full shadow-sm active:scale-95 transition-all">
             <ChevronLeft className="w-5 h-5 text-stone-600" />
           </button>
-          <h1 className="text-base font-bold text-stone-900" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+          <h1 className="text-base font-bold text-stone-900" style={SERIF}>
             Add New Service
           </h1>
           <div className="w-10" />
@@ -137,7 +137,7 @@ export default function AddService() {
           {/* PHOTOS */}
           <div className="space-y-3">
             <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold">Photos</p>
-            <h2 className="text-lg font-bold text-stone-900" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
+            <h2 className="text-lg font-bold text-stone-900" style={SERIF}>
               Service Photos <span className="text-red-500">*</span> <span className="text-stone-400 font-normal text-sm">(up to 4)</span>
             </h2>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -222,7 +222,7 @@ export default function AddService() {
           {/* SUBMIT */}
           <button type="submit" disabled={loading}
             className="w-full py-4 rounded-full text-white font-semibold text-base shadow-lg shadow-teal-200/60 disabled:opacity-60 flex items-center justify-center gap-2 transition active:scale-[0.98]"
-            style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+            style={{ background: GRAD }}>
             <Plus className="w-5 h-5" />
             {loading ? "Publishing..." : "Publish Service"}
           </button>
