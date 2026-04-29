@@ -194,79 +194,82 @@ export default function LandingPage() {
         {/* Overlay */}
         <div className="absolute inset-0" style={{ zIndex: 1, background: "linear-gradient(to bottom, rgba(13,148,136,0.30) 0%, rgba(124,58,237,0.50) 45%, rgba(88,28,135,0.82) 100%)" }} />
 
-        <div className="relative z-10 max-w-2xl mx-auto px-6 text-white pt-24 pb-16">
+        <div className="relative z-10 w-full max-w-7xl mx-auto px-6 lg:px-16 text-white pt-24 pb-16">
+          <div className="grid grid-cols-1 lg:grid-cols-2 lg:gap-20 lg:items-end">
 
-          {/* Live badge */}
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-white text-xs font-bold tracking-widest uppercase mb-8">
-            <span className="w-2 h-2 rounded-full bg-teal-400 animate-pulse" />
-            Now Live · PAU & FUTO
-          </div>
-
-          {/* Bold headline */}
-          <h1 className="text-5xl md:text-7xl font-black leading-[0.95] tracking-tighter mb-6 italic uppercase"
-            style={{ fontFamily: "var(--font-jakarta), 'Plus Jakarta Sans', sans-serif" }}>
-            THE CAMPUS<br />
-            <span style={{
-              background: "linear-gradient(to right, #5eead4, #ffffff, #c4b5fd)",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-              backgroundClip: "text",
-            }}>MARKETPLACE</span><span className="text-white/60 text-base font-bold uppercase tracking-widest"> — At Your Fingertips</span>
-          </h1>
-
-          {/* Subheadline */}
-          <p className="text-white/70 text-lg leading-relaxed mb-8 max-w-md">
-            Food, beauty, laundry, photography and more, all from verified vendors right on your campus.
-          </p>
-
-          {/* Service pills */}
-          <div className="flex flex-wrap gap-2 mb-10">
-            {["🍜 Food", "💅 Nails", "🧺 Laundry", "📸 Photography", "👗 Fashion", "💇 Hair"].map(s => (
-              <span key={s} className="px-3 py-1.5 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 text-white text-xs font-semibold">
-                {s}
-              </span>
-            ))}
-          </div>
-
-          {/* CTA */}
-          <div className="flex flex-col sm:flex-row gap-3">
-            <Link href="/auth">
-              <button className="px-8 py-4 text-white font-black rounded-full text-sm uppercase tracking-wider shadow-2xl transition-transform hover:scale-105 active:scale-95"
-                style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
-                Start Ordering →
-              </button>
-            </Link>
-            <Link href="/home">
-              <button className="px-8 py-4 text-white/80 font-bold rounded-full border border-white/20 backdrop-blur-sm text-sm uppercase tracking-wider hover:bg-white/10 transition">
-                Browse Services
-              </button>
-            </Link>
-          </div>
-
-          {/* Stats row */}
-          <div className="flex items-center gap-8 mt-12 pt-8 border-t border-white/10">
+            {/* ── Left: badge + headline + subheadline ── */}
             <div>
-              <p className="text-2xl font-black text-white">{vendorCount}+</p>
-              <p className="text-xs text-white/40 font-bold uppercase tracking-wider mt-0.5">Vendors</p>
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-white text-xs font-bold tracking-widest uppercase mb-8">
+                <span className="w-2 h-2 rounded-full bg-teal-400 animate-pulse" />
+                Now Live · PAU & FUTO
+              </div>
+
+              <h1 className="text-5xl md:text-7xl lg:text-8xl font-black leading-[0.95] tracking-tighter mb-6 italic uppercase"
+                style={{ fontFamily: "var(--font-jakarta), 'Plus Jakarta Sans', sans-serif" }}>
+                THE CAMPUS<br />
+                <span style={{
+                  background: "linear-gradient(to right, #5eead4, #ffffff, #c4b5fd)",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                  backgroundClip: "text",
+                }}>MARKETPLACE</span><span className="text-white/60 text-base font-bold uppercase tracking-widest"> — At Your Fingertips</span>
+              </h1>
+
+              <p className="text-white/70 text-lg leading-relaxed max-w-md">
+                Food, beauty, laundry, photography and more, all from verified vendors right on your campus.
+              </p>
             </div>
-            <div className="w-px h-10 bg-white/10" />
-            <div>
-              <p className="text-2xl font-black text-white">{listingCount}+</p>
-              <p className="text-xs text-white/40 font-bold uppercase tracking-wider mt-0.5">Services</p>
+
+            {/* ── Right: pills + CTAs + stats ── */}
+            <div className="mt-10 lg:mt-0 lg:pb-1">
+              <div className="flex flex-wrap gap-2 mb-8">
+                {["🍜 Food", "💅 Nails", "🧺 Laundry", "📸 Photography", "👗 Fashion", "💇 Hair"].map(s => (
+                  <span key={s} className="px-3 py-1.5 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 text-white text-xs font-semibold">
+                    {s}
+                  </span>
+                ))}
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-3 mb-10">
+                <Link href="/auth">
+                  <button className="px-8 py-4 text-white font-black rounded-full text-sm uppercase tracking-wider shadow-2xl transition-transform hover:scale-105 active:scale-95"
+                    style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+                    Start Ordering →
+                  </button>
+                </Link>
+                <Link href="/home">
+                  <button className="px-8 py-4 text-white/80 font-bold rounded-full border border-white/20 backdrop-blur-sm text-sm uppercase tracking-wider hover:bg-white/10 transition">
+                    Browse Services
+                  </button>
+                </Link>
+              </div>
+
+              <div className="flex items-center gap-8 pt-8 border-t border-white/10">
+                <div>
+                  <p className="text-3xl font-black text-white">{vendorCount}+</p>
+                  <p className="text-xs text-white/40 font-bold uppercase tracking-wider mt-0.5">Vendors</p>
+                </div>
+                <div className="w-px h-10 bg-white/10" />
+                <div>
+                  <p className="text-3xl font-black text-white">{listingCount}+</p>
+                  <p className="text-xs text-white/40 font-bold uppercase tracking-wider mt-0.5">Services</p>
+                </div>
+                <div className="w-px h-10 bg-white/10" />
+                <div>
+                  <p className="text-3xl font-black text-white">2</p>
+                  <p className="text-xs text-white/40 font-bold uppercase tracking-wider mt-0.5">Campuses</p>
+                </div>
+              </div>
             </div>
-            <div className="w-px h-10 bg-white/10" />
-            <div>
-              <p className="text-2xl font-black text-white">2</p>
-              <p className="text-xs text-white/40 font-bold uppercase tracking-wider mt-0.5">Campuses</p>
-            </div>
+
           </div>
         </div>
       </div>
 
       {/* ── WHO IS THIS FOR ──────────────────────────────── */}
       <section className="py-12 px-6 bg-white border-b border-stone-100">
-        <div className="max-w-2xl mx-auto">
-          <div className="grid grid-cols-2 gap-4">
+        <div className="max-w-6xl mx-auto">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <Link href="/auth">
               <div className="p-5 rounded-2xl border-2 border-teal-500 bg-teal-50 hover:bg-teal-100 transition cursor-pointer">
                 <p className="text-2xl mb-2">🛍️</p>
@@ -289,11 +292,11 @@ export default function LandingPage() {
 
       {/* ── HOW IT WORKS ─────────────────────────────────── */}
       <section className="py-20 px-6 text-white" style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
-        <div className="max-w-2xl mx-auto">
+        <div className="max-w-6xl mx-auto">
           <h2 className="text-4xl md:text-5xl font-black italic tracking-tighter uppercase mb-16 text-center">
             Order in <span style={{ color: "#ccfbf1" }}>3 Steps</span>
           </h2>
-          <div className="grid grid-cols-3 gap-6">
+          <div className="grid grid-cols-3 lg:gap-16 gap-6">
             {[
               { num: "01", icon: "🔍", title: "Browse", desc: "Find services from verified vendors on your campus" },
               { num: "02", icon: "💳", title: "Pay", desc: "Secure payment via Paystack — fast and safe" },
@@ -312,13 +315,13 @@ export default function LandingPage() {
 
       {/* ── CATEGORIES ───────────────────────────────────── */}
       <section className="py-20 px-6 bg-[#FAFAF9]">
-        <div className="max-w-2xl mx-auto">
+        <div className="max-w-6xl mx-auto">
           <p className="text-teal-700 text-xs tracking-[0.25em] uppercase font-bold mb-2">What&apos;s Available</p>
           <h2 className="text-4xl font-black italic tracking-tighter uppercase text-stone-900 mb-10"
             style={{ fontFamily: "var(--font-jakarta), 'Plus Jakarta Sans', sans-serif" }}>
             Everything<br />You Need
           </h2>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             {[
               { emoji: "🍜", name: "Food & Drinks", desc: "Jollof, pasta, zobo & more", color: "bg-orange-50 border-orange-100" },
               { emoji: "💅", name: "Beauty", desc: "Nails, lashes, makeup", color: "bg-purple-50 border-purple-100" },
@@ -341,7 +344,7 @@ export default function LandingPage() {
 
       {/* ── LIVE LISTINGS ────────────────────────────────── */}
       <section className="py-20 px-6 bg-[#FAFAF9]">
-        <div className="max-w-2xl mx-auto">
+        <div className="max-w-6xl mx-auto">
           <div className="flex items-center justify-between mb-8">
             <div>
               <p className="text-teal-700 text-xs tracking-[0.25em] uppercase font-bold mb-1">Live Now</p>
@@ -358,7 +361,7 @@ export default function LandingPage() {
           </div>
 
           {/* Listing cards grid */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             {featuredListings.length > 0 ? featuredListings.map((listing: any) => (
               <Link key={listing.id} href="/auth">
                 <div className="bg-white rounded-2xl overflow-hidden border border-stone-100 shadow-sm hover:shadow-md hover:scale-105 active:scale-95 transition-all cursor-pointer">
@@ -411,11 +414,11 @@ export default function LandingPage() {
 
       {/* ── TRUST ────────────────────────────────────────── */}
       <section className="py-20 px-6 text-white" style={{ background: "linear-gradient(135deg, #7C3AED 0%, #0D9488 100%)" }}>
-        <div className="max-w-2xl mx-auto">
+        <div className="max-w-6xl mx-auto">
           <h2 className="text-4xl font-black italic tracking-tighter uppercase mb-10 text-center">
             Built for <span style={{ color: "#ccfbf1" }}>Students</span>
           </h2>
-          <div className="space-y-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {[
               { icon: "✅", title: "Verified Vendors Only", desc: "Every vendor submits valid ID before listing on StudEx" },
               { icon: "⚡", title: "Campus-Fast", desc: "Everything is on campus — no long waits or delivery fees" },
@@ -434,7 +437,7 @@ export default function LandingPage() {
 
       {/* ── FINAL CTA ────────────────────────────────────── */}
       <section className="py-20 px-6 bg-[#FAFAF9] text-center">
-        <div className="max-w-sm mx-auto">
+        <div className="max-w-xl mx-auto">
           <h2 className="text-4xl font-black italic tracking-tighter uppercase text-stone-900 mb-3"
             style={{ fontFamily: "var(--font-jakarta), 'Plus Jakarta Sans', sans-serif" }}>
             Ready to Order?
