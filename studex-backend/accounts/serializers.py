@@ -300,7 +300,7 @@ class SellerApplicationSerializer(serializers.ModelSerializer):
         return obj.user.matric_number or ''
 
     def create(self, validated_data):
-        user = self.context['request'].user
+        user = validated_data.pop('user', None) or self.context['request'].user
         # Delete any previous application (one per user)
         SellerApplication.objects.filter(user=user).delete()
         application = SellerApplication.objects.create(user=user, **validated_data)
