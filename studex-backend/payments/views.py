@@ -375,6 +375,7 @@ def initialize_payment(request):
                     "authorization_url": data.get("authorization_url"),
                     "access_code": data.get("access_code"),
                     "reference": data.get("reference", reference),
+                    "amount_kobo": total_amount_kobo,
                 })
             logger.error(f"Paystack retry also failed: {retry_json.get('message')}")
 
@@ -389,6 +390,7 @@ def initialize_payment(request):
         "authorization_url": data.get("authorization_url"),
         "access_code": data.get("access_code"),
         "reference": data.get("reference", reference),
+        "amount_kobo": total_amount_kobo,
     })
 
 

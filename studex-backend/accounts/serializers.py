@@ -144,6 +144,7 @@ class UserLoginSerializer(serializers.Serializer):
 
 class UserProfileSerializer(serializers.ModelSerializer):
     profile = serializers.SerializerMethodField()
+    profile_image = serializers.SerializerMethodField()
     whatsapp = serializers.CharField(write_only=True, required=False, allow_blank=True, allow_null=True)
     instagram = serializers.CharField(write_only=True, required=False, allow_blank=True, allow_null=True)
 
@@ -157,6 +158,21 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'whatsapp', 'instagram',
         ]
         read_only_fields = ['wallet_balance', 'is_verified_vendor', 'created_at', 'is_staff', 'is_superuser']
+
+    def get_profile_image(self, obj):
+        """Always return an absolute URL — works with Cloudinary, S3, and local storage."""
+        if not obj.profile_image:
+            return None
+        try:
+            url = obj.profile_image.url
+            if url and url.startswith('http'):
+                return url
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(url)
+            return url
+        except Exception:
+            return None
 
     def get_profile(self, obj):
         try:

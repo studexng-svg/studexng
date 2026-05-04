@@ -17,6 +17,8 @@ urlpatterns = [
     path('api/reviews/', include('reviews.urls')),
     path('api/loyalty/', include('loyalty.urls')),
     path('api/notifications/', include('notifications.urls')),
+    path('api/cart/', include('cart.urls')),
+    path('api/wishlist/', include('wishlist.urls')),
 ]
 
 # ← NEW: Serve media files during development (DEBUG = True)

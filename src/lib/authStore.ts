@@ -33,6 +33,7 @@ interface AuthState {
   setHydrated: (hydrated: boolean) => void;
   setAuthReady: (ready: boolean) => void;
   updateTokens: (accessToken: string, refreshToken: string) => void;
+  refreshProfile: () => Promise<void>;
 }
 
 export const useAuth = create<AuthState>()(
@@ -51,24 +52,32 @@ export const useAuth = create<AuthState>()(
         if (typeof document !== 'undefined') {
           document.cookie = `studex_campus=${((userData as any).school || 'pau').toLowerCase()}; path=/; max-age=31536000`;
         }
-        // Load this user's cart from localStorage
+        // Sync cart and wishlist from backend on login
         try {
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
           const { useCart } = require("@/lib/cartStore");
           useCart.getState().loadCartForUser(userData.id);
+        } catch {}
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
+          const { useWishlistStore } = require("@/lib/wishlistStore");
+          useWishlistStore.getState().loadWishlistForUser(userData.id);
         } catch {}
       },
 
       logout: () => {
         try {
-          const userId = useAuth.getState().user?.id;
-          if (userId) {
-            localStorage.removeItem(`studex-wishlist-${userId}`);
-          }
           localStorage.removeItem("auth-storage");
-          // Clear cart state on logout
+          // Clear cart and wishlist on logout
           try {
+            // eslint-disable-next-line @typescript-eslint/no-require-imports
             const { useCart } = require("@/lib/cartStore");
             useCart.getState().loadCartForUser(null);
+          } catch {}
+          try {
+            // eslint-disable-next-line @typescript-eslint/no-require-imports
+            const { useWishlistStore } = require("@/lib/wishlistStore");
+            useWishlistStore.getState().loadWishlistForUser(null);
           } catch {}
         } catch {}
         set({ user: null, isLoggedIn: false, accessToken: null, refreshToken: null, isAuthReady: true });
@@ -85,6 +94,17 @@ export const useAuth = create<AuthState>()(
       setHydrated: (hydrated) => set({ isHydrated: hydrated }),
       setAuthReady: (ready) => set({ isAuthReady: ready }),
       updateTokens: (accessToken, refreshToken) => set({ accessToken, refreshToken }),
+
+      refreshProfile: async () => {
+        try {
+          const res = await fetchWithAuth(`${API_BASE_URL}/api/auth/profile/`);
+          if (!res.ok) return;
+          const fresh = await res.json();
+          set((state) => ({
+            user: state.user ? { ...state.user, ...fresh } : state.user,
+          }));
+        } catch {}
+      },
     }),
     {
       name: "auth-storage",
@@ -95,7 +115,25 @@ export const useAuth = create<AuthState>()(
         refreshToken: state.refreshToken,
       }),
       onRehydrateStorage: () => (state) => {
-        if (state) state.setHydrated(true);
+        if (!state) return;
+        state.setHydrated(true);
+        // On page refresh: re-sync profile, cart, and wishlist from backend
+        if (state.isLoggedIn && state.user) {
+          setTimeout(() => {
+            // Refresh profile first — gets fresh profile_image URL from backend
+            useAuth.getState().refreshProfile();
+            try {
+              // eslint-disable-next-line @typescript-eslint/no-require-imports
+              const { useCart } = require("@/lib/cartStore");
+              useCart.getState().loadCartForUser(state.user!.id);
+            } catch {}
+            try {
+              // eslint-disable-next-line @typescript-eslint/no-require-imports
+              const { useWishlistStore } = require("@/lib/wishlistStore");
+              useWishlistStore.getState().loadWishlistForUser(state.user!.id);
+            } catch {}
+          }, 0);
+        }
       },
     }
   )

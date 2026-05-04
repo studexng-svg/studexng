@@ -118,13 +118,15 @@ export default function CheckoutPage() {
       const initData = await initRes.json();
       if (!initRes.ok) throw new Error(initData.error || "Failed to initialize payment");
 
-      const { access_code, reference } = initData;
+      const { access_code, reference, amount_kobo } = initData;
       if (!access_code) throw new Error("Payment initialization incomplete. Please try again.");
 
       const handler = window.PaystackPop.setup({
         key: paystackKey,
         access_code,
         email: user?.email || "user@studex.ng",
+        amount: amount_kobo ?? Math.round(finalTotal * 100),
+        currency: "NGN",
         ref: reference,
         callback: function(response: any) {
           if (response.status === "success") {

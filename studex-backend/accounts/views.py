@@ -197,15 +197,21 @@ def update_user_profile(request):
             )
         user.username = new_username
 
+    # ── Profile image — handle separately since serializer field is read-only ──
+    if 'profile_image' in request.FILES:
+        user.profile_image = request.FILES['profile_image']
+        user.save(update_fields=['profile_image'])
+    elif data.get('profile_image') is None and 'profile_image' in data:
+        # Explicit null → remove profile picture
+        user.profile_image = None
+        user.save(update_fields=['profile_image'])
+
     # ── Other fields handled by serializer ────────────────────────────────
-    # Pass remaining data to the serializer but exclude username
-    # (we've already handled it above)
-    serializer_data = {k: v for k, v in data.items() if k != 'username'}
+    serializer_data = {k: v for k, v in data.items() if k not in ('username', 'profile_image')}
     serializer = UserProfileSerializer(user, data=serializer_data, partial=True)
 
     if serializer.is_valid():
         serializer.save()
-        # Re-fetch fresh data after save
         user.refresh_from_db()
         return Response({
             'message': 'Profile updated successfully',
