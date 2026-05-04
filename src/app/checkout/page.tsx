@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import {
   Package, CreditCard, ChevronLeft, Shield, Lock, Check,
-  Calendar, MapPin, Clock, Loader, Sparkles, ArrowRight
+  Calendar, MapPin, Clock, Loader, Sparkles, ArrowRight, AlertCircle
 } from "lucide-react";
 import { useCartStore } from "@/lib/cartStore";
 import { useBookingStore } from "@/lib/bookingStore";
@@ -38,6 +38,7 @@ export default function CheckoutPage() {
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [paystackLoaded, setPaystackLoaded] = useState(false);
+  const [paymentError, setPaymentError] = useState("");
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -92,19 +93,24 @@ export default function CheckoutPage() {
 
   const handlePayment = useCallback(async () => {
     const paystackKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || "";
+    setPaymentError("");
 
     if (!paystackKey || paystackKey.includes("your_key")) {
-      alert("Payment key not configured.");
+      setPaymentError("Payment key not configured. Please contact support.");
       return;
     }
-    if (finalTotal <= 0) { alert("Invalid amount."); return; }
-    if (!window.PaystackPop) { alert("Payment system not ready. Please refresh."); return; }
+    if (finalTotal <= 0) { setPaymentError("Invalid amount. Please go back and try again."); return; }
+    if (!window.PaystackPop) { setPaymentError("Payment system not ready. Please refresh the page."); return; }
+
+    const listingId = isServiceBooking ? booking?.providerId : cart[0]?.id;
+    if (!listingId) {
+      setPaymentError("Could not determine listing. Please go back and try again.");
+      return;
+    }
 
     setIsProcessing(true);
 
     try {
-      const listingId = isServiceBooking ? booking?.providerId : cart[0]?.id;
-
       const initRes = await fetchWithAuth(`${API_URL}/api/payments/initialize/`, {
         method: "POST",
         body: JSON.stringify({ listing_id: listingId }),
@@ -113,6 +119,7 @@ export default function CheckoutPage() {
       if (!initRes.ok) throw new Error(initData.error || "Failed to initialize payment");
 
       const { access_code, reference } = initData;
+      if (!access_code) throw new Error("Payment initialization incomplete. Please try again.");
 
       const handler = window.PaystackPop.setup({
         key: paystackKey,
@@ -128,7 +135,7 @@ export default function CheckoutPage() {
                 router.push(`/order-confirmation/${orderId}`);
               })
               .catch(() => {
-                alert(`Payment received but order failed. Contact support with ref: ${response.reference}`);
+                setPaymentError(`Payment received but order failed. Save this reference and contact support: ${response.reference}`);
                 setIsProcessing(false);
               });
           } else {
@@ -141,7 +148,7 @@ export default function CheckoutPage() {
       });
       handler.openIframe();
     } catch (err: any) {
-      alert(err.message || "Payment failed. Please try again.");
+      setPaymentError(err.message || "Payment failed. Please try again.");
       setIsProcessing(false);
     }
   }, [finalTotal, user, isFoodOrder, isServiceBooking, booking, cart, paystackLoaded]);
@@ -331,6 +338,14 @@ export default function CheckoutPage() {
             </div>
           </div>
         </motion.div>
+
+        {/* ── PAYMENT ERROR ── */}
+        {paymentError && (
+          <div className="bg-red-50 border border-red-200 rounded-2xl p-4 flex items-start gap-3">
+            <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
+            <p className="text-red-700 text-sm font-medium">{paymentError}</p>
+          </div>
+        )}
 
         {/* ── PAY BUTTON ── */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>

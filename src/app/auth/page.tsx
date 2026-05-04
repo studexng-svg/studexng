@@ -487,7 +487,7 @@ export default function AuthPage() {
                   </button>
                 </p>
               )}
-              <p className="text-center text-xs text-stone-400 mt-3">© 2025 StudEx • PAU & FUTO</p>
+              <p className="text-center text-xs text-stone-400 mt-3">© 2026 StudEx</p>
               </div>
             </div>
           </div>

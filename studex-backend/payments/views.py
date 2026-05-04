@@ -284,19 +284,22 @@ def initialize_payment(request):
     checkout_amount = final_amount + SERVICE_FEE
     total_amount_kobo = int(checkout_amount * 100)
 
+    if total_amount_kobo < 10000:  # Paystack minimum is ₦100 (10000 kobo)
+        logger.error(f"Amount too low: {total_amount_kobo} kobo for listing {listing_id}")
+        return Response({"error": "Amount is below the minimum transaction value."}, status=400)
+
     reference = f"STX-{uuid.uuid4().hex[:16].upper()}"
 
     callback_url = (
         request.data.get("callback_url")
         or getattr(settings, "PAYSTACK_CALLBACK_URL", "")
-        or ""
+        or None
     )
 
     payload = {
         "email": buyer.email,
         "amount": total_amount_kobo,
         "reference": reference,
-        "callback_url": callback_url,
         "metadata": {
             "listing_id": listing_id,
             "buyer_id": buyer.id,
@@ -304,6 +307,8 @@ def initialize_payment(request):
             "discount_amount": str(discount_amount),
         },
     }
+    if callback_url:
+        payload["callback_url"] = callback_url
 
     subaccount_code = None
     try:
@@ -342,7 +347,44 @@ def initialize_payment(request):
         logger.error(f"Paystack init error {res.status_code}: {res.text[:300]}")
         return Response({"error": "Payment initialization failed."}, status=500)
 
-    data = res.json().get("data", {})
+    res_json = res.json()
+    # Paystack returns HTTP 200 even for failures — check the body status field
+    if not res_json.get("status"):
+        paystack_msg = res_json.get("message", "Unknown Paystack error")
+        logger.error(f"Paystack init rejected: {paystack_msg} | payload subaccount={payload.get('subaccount')}")
+
+        # If the failure is subaccount-related, retry without subaccount
+        if subaccount_code and any(
+            kw in paystack_msg.lower()
+            for kw in ("subaccount", "split", "invalid", "not found")
+        ):
+            logger.warning(f"Retrying Paystack init without subaccount for listing {listing_id}")
+            payload.pop("subaccount", None)
+            payload.pop("transaction_charge", None)
+            payload.pop("bearer", None)
+            retry_res = requests.post(
+                f"{PAYSTACK_BASE}/transaction/initialize",
+                headers=headers,
+                json=payload,
+                timeout=15,
+            )
+            retry_json = retry_res.json()
+            if retry_res.status_code in [200, 201] and retry_json.get("status"):
+                data = retry_json.get("data", {})
+                return Response({
+                    "authorization_url": data.get("authorization_url"),
+                    "access_code": data.get("access_code"),
+                    "reference": data.get("reference", reference),
+                })
+            logger.error(f"Paystack retry also failed: {retry_json.get('message')}")
+
+        return Response({"error": f"Payment initialization failed: {paystack_msg}"}, status=500)
+
+    data = res_json.get("data", {})
+    if not data.get("access_code"):
+        logger.error(f"Paystack init: no access_code in response data: {data}")
+        return Response({"error": "Payment initialization failed: no access code returned."}, status=500)
+
     return Response({
         "authorization_url": data.get("authorization_url"),
         "access_code": data.get("access_code"),
