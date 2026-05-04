@@ -73,12 +73,20 @@ export default function VendorDashboard() {
               <p className="text-stone-400 text-xs">{user?.username}</p>
             </div>
           </div>
-          <div
-            className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-white text-sm"
-            style={{ background: GRAD }}
-          >
-            {(user?.username?.[0] || "V").toUpperCase()}
-          </div>
+          {user?.profile_image ? (
+            <img
+              src={user.profile_image}
+              alt={user.username}
+              className="w-9 h-9 rounded-full object-cover border border-stone-200 shadow-sm"
+            />
+          ) : (
+            <div
+              className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-white text-sm"
+              style={{ background: GRAD }}
+            >
+              {(user?.username?.[0] || "V").toUpperCase()}
+            </div>
+          )}
         </div>
       </div>
 
@@ -133,6 +141,7 @@ function MessagesTab() {
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [showMobileChat, setShowMobileChat] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -190,8 +199,8 @@ function MessagesTab() {
 
   return (
     <div className="flex gap-3" style={{ height: "calc(100vh - 200px)" }}>
-      {/* Conversations list */}
-      <div className="w-60 flex-shrink-0 bg-white border border-stone-200 rounded-2xl overflow-hidden flex flex-col shadow-sm">
+      {/* Conversations list — full width on mobile, fixed sidebar on desktop */}
+      <div className={`${showMobileChat ? "hidden lg:flex" : "flex"} flex-col w-full lg:w-60 lg:flex-shrink-0 bg-white border border-stone-200 rounded-2xl overflow-hidden shadow-sm`}>
         <div className="px-4 py-3 border-b border-stone-100 flex-shrink-0">
           <h2 className="font-semibold text-stone-800 text-sm">Conversations</h2>
           <p className="text-xs text-stone-400">{conversations.length} chats</p>
@@ -200,7 +209,7 @@ function MessagesTab() {
           {conversations.length === 0 ? (
             <div className="p-6 text-center text-stone-400 text-sm">No messages yet</div>
           ) : conversations.map(conv => (
-            <button key={conv.id} onClick={() => setActiveConv(conv)}
+            <button key={conv.id} onClick={() => { setActiveConv(conv); setShowMobileChat(true); }}
               className={`w-full p-3 text-left border-b border-stone-100 hover:bg-stone-50 transition-colors ${
                 activeConv?.id === conv.id ? "bg-teal-50 border-l-2 border-l-teal-500" : ""
               }`}>
@@ -230,8 +239,8 @@ function MessagesTab() {
         </div>
       </div>
 
-      {/* Chat area */}
-      <div className="flex-1 bg-white border border-stone-200 rounded-2xl flex flex-col overflow-hidden shadow-sm">
+      {/* Chat area — hidden on mobile until a conv is selected */}
+      <div className={`${showMobileChat ? "flex" : "hidden lg:flex"} flex-1 flex-col bg-white border border-stone-200 rounded-2xl overflow-hidden shadow-sm`}>
         {!activeConv ? (
           <div className="flex-1 flex items-center justify-center text-stone-400">
             <div className="text-center">
@@ -243,15 +252,19 @@ function MessagesTab() {
         ) : (
           <>
             <div className="px-4 py-3 border-b border-stone-100 flex items-center gap-3 flex-shrink-0">
+              <button onClick={() => setShowMobileChat(false)}
+                className="lg:hidden p-1.5 -ml-1 hover:bg-stone-100 rounded-full transition flex-shrink-0">
+                <ArrowLeft className="w-4 h-4 text-stone-600" />
+              </button>
               <div
-                className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white"
+                className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
                 style={{ background: GRAD }}
               >
                 {activeConv.buyer_username?.[0]?.toUpperCase() || "?"}
               </div>
-              <div>
-                <p className="font-semibold text-stone-800 text-sm">{activeConv.buyer_username || "Buyer"}</p>
-                <p className="text-xs text-stone-400">{activeConv.listing_title}</p>
+              <div className="min-w-0">
+                <p className="font-semibold text-stone-800 text-sm truncate">{activeConv.buyer_username || "Buyer"}</p>
+                <p className="text-xs text-stone-400 truncate">{activeConv.listing_title}</p>
               </div>
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
@@ -260,7 +273,7 @@ function MessagesTab() {
               )}
               {messages.map(msg => (
                 <div key={msg.id} className={`flex ${msg.is_mine ? "justify-end" : "justify-start"}`}>
-                  <div className={`max-w-[75%] rounded-2xl px-4 py-2.5 ${
+                  <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 ${
                     msg.is_mine
                       ? "text-white rounded-br-sm"
                       : "bg-stone-100 text-stone-800 rounded-bl-sm"
@@ -561,7 +574,7 @@ function ListingsTab() {
 
   const loadCategories = async () => {
     try {
-      const res = await fetch(`${API_URL}/api/services/categories/`);
+      const res = await fetchWithAuth(`${API_URL}/api/services/categories/`);
       const data = await res.json();
       setCategories(toArray(data));
     } catch {}

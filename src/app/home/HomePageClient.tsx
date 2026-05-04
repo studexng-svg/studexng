@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, useState, Suspense, useRef } from "react";
 import { Search, ArrowRight, Heart, X, Sparkles, Star, MapPin, Shield, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
@@ -53,14 +53,14 @@ function VendorAvatar({ src, name }: { src: string | null; name: string }) {
   const initials = (name || "??").slice(0, 2).toUpperCase();
   if (!src || error) {
     return (
-      <div className="w-16 h-16 rounded-full flex items-center justify-center text-white font-bold text-lg flex-shrink-0 shadow-md"
+      <div className="w-16 h-16 rounded-full flex items-center justify-center text-white font-bold text-lg flex-shrink-0"
         style={{ background: GRAD }}>
         {initials}
       </div>
     );
   }
   return (
-    <div className="w-16 h-16 rounded-full overflow-hidden flex-shrink-0 shadow-md">
+    <div className="w-16 h-16 rounded-full overflow-hidden flex-shrink-0">
       <img src={src} alt={name} className="w-full h-full object-cover block" onError={() => setError(true)} />
     </div>
   );
@@ -119,7 +119,9 @@ export default function HomePageClient({ initialVendors, initialListings }: Prop
     }).catch(() => {});
   }, [isHydrated, isLoggedIn, (user as any)?.school]);
 
-  const filters = ["All", "Services", "Products"];
+  const listingsSectionRef = useRef<HTMLDivElement>(null);
+
+  const filters = ["All", "Services"];
   const handleFilter = (filter: string) => {
     setActiveFilter(filter);
     if (filter === "All") { setListings(allListings); return; }
@@ -130,6 +132,9 @@ export default function HomePageClient({ initialVendors, initialListings }: Prop
       return true;
     });
     setListings(filtered);
+    setTimeout(() => {
+      listingsSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
   };
 
   useEffect(() => {
@@ -179,9 +184,12 @@ export default function HomePageClient({ initialVendors, initialListings }: Prop
 
         {/* ── STICKY HEADER ── */}
         <div className="sticky top-0 bg-white/80 backdrop-blur-md z-40 border-b border-stone-100 shadow-sm">
+          <div className="max-w-6xl mx-auto">
           <div className="flex items-center justify-between px-4 py-3 gap-3">
             <Link href="/home" className="flex items-center gap-2 flex-shrink-0">
-              <img src="/images/logo-1.jpg" alt="StudEx" loading="lazy" className="w-9 h-9 rounded-full object-cover shadow-sm" />
+              <div className="w-9 h-9 rounded-full bg-white border border-stone-200 flex items-center justify-center p-1 shadow-sm overflow-hidden flex-shrink-0">
+                <img src="/images/logo-1.jpg" alt="StudEx" loading="lazy" className="w-full h-full object-contain" />
+              </div>
               <span className="font-bold text-lg text-stone-900" style={SERIF}>
                 Stud<span style={GRAD_TEXT}>Ex</span>
               </span>
@@ -257,9 +265,14 @@ export default function HomePageClient({ initialVendors, initialListings }: Prop
               </button>
             ))}
           </div>
+          </div>
         </div>
 
-        <div className="px-4 pt-6 pb-28 space-y-8 max-w-2xl mx-auto">
+        <div className="px-4 pt-6 pb-32 max-w-6xl mx-auto">
+          <div className="lg:grid lg:grid-cols-[1fr_300px] lg:gap-10 lg:items-start">
+
+          {/* ── LEFT / MAIN COLUMN ── */}
+          <div className="space-y-8">
 
           {/* ── GREETING ── */}
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}>
@@ -310,7 +323,8 @@ export default function HomePageClient({ initialVendors, initialListings }: Prop
             </Link>
           </motion.div>
 
-          {/* ── VENDORS ROW ── */}
+          {/* ── VENDORS ROW — mobile only ── */}
+          <div className="lg:hidden">
           <Suspense fallback={<div className="h-20 bg-stone-100 rounded-2xl animate-pulse" />}>
           {vendors.length > 0 && (
             <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
@@ -339,13 +353,17 @@ export default function HomePageClient({ initialVendors, initialListings }: Prop
                           borderRadius: '50%',
                           padding: '3px',
                           background: 'linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)',
-                          display: 'inline-block',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
                         }}>
                           <div style={{
                             borderRadius: '50%',
                             padding: '2px',
                             background: '#FAFAF9',
-                            display: 'inline-block',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
                           }}>
                             <VendorAvatar src={vendor.profile_picture} name={vendor.business_name || vendor.username} />
                           </div>
@@ -373,10 +391,11 @@ export default function HomePageClient({ initialVendors, initialListings }: Prop
             </motion.div>
           )}
           </Suspense>
+          </div>
 
           {/* ── FEATURED LISTINGS ── */}
           <Suspense fallback={<div className="h-40 bg-stone-100 rounded-2xl animate-pulse" />}>
-          <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
+          <motion.div ref={listingsSectionRef} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
             <div className="flex items-center justify-between mb-4">
               <div>
                 <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-bold">Available Now</p>
@@ -404,7 +423,7 @@ export default function HomePageClient({ initialVendors, initialListings }: Prop
             ) : (
               <>
                 {/* ── Vertical card list ── */}
-                <div className="space-y-4">
+                <div className="space-y-4 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-4">
                   {featuredListings.map((listing, i) => {
                     const badge = listing.vendor?.profile?.vendor_badge;
                     const rating = listing.vendor?.profile?.rating;
@@ -528,8 +547,9 @@ export default function HomePageClient({ initialVendors, initialListings }: Prop
           </motion.div>
           </Suspense>
 
-          {/* ── BOTTOM CTA (logged out) ── */}
+          {/* ── BOTTOM CTA (logged out, mobile only) ── */}
           {!isLoggedIn && (
+            <div className="lg:hidden">
             <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
               className="bg-white border border-stone-200 rounded-2xl p-6 text-center shadow-sm relative overflow-hidden">
               <div className="relative z-10">
@@ -549,8 +569,78 @@ export default function HomePageClient({ initialVendors, initialListings }: Prop
                 </Link>
               </div>
             </motion.div>
+            </div>
           )}
 
+          </div>{/* end left column */}
+
+          {/* ── RIGHT SIDEBAR (desktop only) ── */}
+          <div className="hidden lg:flex flex-col gap-6 sticky" style={{ top: "130px" }}>
+
+            {/* Vendors vertical list */}
+            {vendors.length > 0 && (
+              <div className="bg-white rounded-2xl border border-stone-100 shadow-sm p-5" style={{ marginTop: "3rem" }}>
+                <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-bold mb-1">On Campus</p>
+                <h2 className="text-xl font-black italic tracking-tighter uppercase text-stone-900 mb-4"
+                  style={{ fontFamily: "var(--font-jakarta), 'Plus Jakarta Sans', sans-serif" }}>
+                  Vendors
+                </h2>
+                <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1" style={{ scrollbarWidth: "thin", scrollbarColor: "#d1d5db transparent" }}>
+                  {vendors.map(vendor => (
+                    <Link key={vendor.id} href={`/vendor/${vendor.username}`}>
+                      <div className="flex items-center gap-3 hover:bg-stone-50 rounded-xl p-2 transition cursor-pointer">
+                        <div className="relative flex-shrink-0">
+                          <div style={{ borderRadius: "50%", padding: "3px", background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            <div style={{ borderRadius: "50%", padding: "2px", background: "#FAFAF9", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                              <VendorAvatar src={vendor.profile_picture} name={vendor.business_name || vendor.username} />
+                            </div>
+                          </div>
+                          {vendor.vendor_badge && vendor.vendor_badge !== "none" && (
+                            <div className={`absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full border-2 border-white flex items-center justify-center text-[8px] font-bold
+                              ${vendor.vendor_badge === "top" ? "bg-amber-400" : vendor.vendor_badge === "trusted" ? "bg-teal-500" : "bg-purple-500"}`}>
+                              {vendor.vendor_badge === "top" ? "⭐" : vendor.vendor_badge === "trusted" ? "✓" : "↑"}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-stone-900 text-sm truncate">{vendor.business_name || vendor.username}</p>
+                          {vendor.total_reviews > 0 && (
+                            <div className="flex items-center gap-0.5 mt-0.5">
+                              <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                              <span className="text-xs text-stone-400">{vendor.rating} ({vendor.total_reviews})</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* CTA — desktop */}
+            {!isLoggedIn && (
+              <div className="bg-white border border-stone-200 rounded-2xl p-6 text-center shadow-sm">
+                <Shield className="w-8 h-8 mx-auto mb-3 text-teal-600" />
+                <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-bold mb-1">Safe & Secure</p>
+                <h3 className="text-xl font-black italic tracking-tighter uppercase text-stone-900 mb-1"
+                  style={{ fontFamily: "var(--font-jakarta), 'Plus Jakarta Sans', sans-serif" }}>
+                  Ready to book?
+                </h3>
+                <p className="text-stone-400 text-sm mb-4">Create a free account to book any service.</p>
+                <Link href="/auth">
+                  <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+                    className="w-full py-3 text-white font-semibold rounded-full text-sm shadow-lg shadow-teal-200/60 inline-flex items-center justify-center gap-2"
+                    style={{ background: GRAD }}>
+                    Create Account <ArrowRight className="w-4 h-4" />
+                  </motion.button>
+                </Link>
+              </div>
+            )}
+
+          </div>{/* end sidebar */}
+
+          </div>{/* end grid */}
         </div>
       </div>
     </>

@@ -47,7 +47,12 @@ export default function BottomNav() {
   }, [isLoggedIn]);
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 w-full border-t border-white/10 shadow-2xl z-50" style={{ background: "linear-gradient(135deg, #0b1a18 0%, #1a0b2e 100%)" }}>
+    <div className="fixed bottom-4 left-4 right-4 rounded-2xl z-50 max-w-lg mx-auto"
+      style={{
+        background: "#ffffff",
+        border: "1px solid rgba(0,0,0,0.06)",
+        boxShadow: "0 8px 32px rgba(0,0,0,0.10), 0 1.5px 8px rgba(0,0,0,0.06)",
+      }}>
       <div className="flex justify-around items-center px-2 py-3 max-w-full">
         {navItems.map((item) => {
           const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
@@ -57,13 +62,6 @@ export default function BottomNav() {
           return (
             <Link key={item.href} href={item.href} className="flex flex-col items-center justify-center min-w-0 flex-1">
               <motion.div whileTap={{ scale: 0.9 }} className="flex flex-col items-center gap-1 w-full relative">
-                {isActive && (
-                  <motion.div
-                    layoutId="activeTab"
-                    className="absolute inset-0 bg-white/10 rounded-xl -z-10"
-                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                  />
-                )}
                 <motion.div
                   animate={{ scale: isActive ? 1.1 : 1, y: isActive ? -2 : 0 }}
                   transition={{ type: "spring", stiffness: 400, damping: 25 }}
@@ -72,8 +70,8 @@ export default function BottomNav() {
                   <Icon
                     className="w-7 h-7"
                     strokeWidth={isActive ? 2.5 : 2}
-                    stroke={isActive ? "#2dd4bf" : "rgba(255,255,255,0.5)"}
-                    fill={isActive ? "#2dd4bf" : "none"}
+                    stroke={isActive ? "#0D9488" : "rgba(120,113,108,0.6)"}
+                    fill={isActive ? "#0D9488" : "none"}
                   />
                   {isChat && unreadCount > 0 && (
                     <div className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 bg-red-500 rounded-full flex items-center justify-center px-1">
@@ -83,7 +81,7 @@ export default function BottomNav() {
                     </div>
                   )}
                 </motion.div>
-                <span className={`text-xs font-semibold mt-1 ${isActive ? "text-teal-400" : "text-white/50"}`}>
+                <span className={`text-xs font-semibold mt-1 ${isActive ? "text-teal-600" : "text-stone-400"}`}>
                   {item.label}
                 </span>
               </motion.div>
@@ -95,9 +93,14 @@ export default function BottomNav() {
       {/* Floating Logo */}
       <Link
         href="/cart"
-        className="absolute -top-4 left-1/2 -translate-x-1/2 w-14 h-14 rounded-full shadow-2xl border-4 flex items-center justify-center" style={{ background: "#0b1a18", borderColor: "#0b1a18" }}
+        className="absolute -top-4 left-1/2 -translate-x-1/2 w-14 h-14 rounded-full flex items-center justify-center"
+        style={{
+          background: "#ffffff",
+          border: "1px solid rgba(0,0,0,0.06)",
+          boxShadow: "0 4px 16px rgba(0,0,0,0.10)",
+        }}
       >
-        <Image src="/images/logo-1.jpg" alt="StudEx" width={48} height={48} className="w-12 h-12 rounded-full object-cover" />
+        <Image src="/images/logo-1.jpg" alt="StudEx" width={48} height={48} className="w-10 h-10 rounded-full object-cover" />
       </Link>
     </div>
   );

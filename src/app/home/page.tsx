@@ -1,8 +1,25 @@
 // src/app/home/page.tsx
 export const dynamic = 'force-dynamic';
 
+import type { Metadata } from "next";
 import { cookies } from 'next/headers';
 import HomePageClient from "./HomePageClient";
+
+export const metadata: Metadata = {
+  title: { absolute: "StudEx - Campus Marketplace Feed" },
+  description:
+    "Discover services and products from verified student vendors near you. Browse lashes, nails, laundry, food delivery and more on StudEx.",
+  openGraph: {
+    title: "StudEx - Campus Marketplace Feed",
+    description:
+      "Discover services and products from verified student vendors near you on StudEx.",
+  },
+  twitter: {
+    title: "StudEx - Campus Marketplace Feed",
+    description:
+      "Discover services and products from verified student vendors near you on StudEx.",
+  },
+};
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 

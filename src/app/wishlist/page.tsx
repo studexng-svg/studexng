@@ -89,7 +89,7 @@ export default function WishlistPage() {
 
       {/* STICKY HEADER */}
       <div className="sticky top-0 bg-white/80 backdrop-blur-md z-40 border-b border-stone-100 shadow-sm">
-        <div className="flex items-center justify-between px-4 py-3">
+        <div className="flex items-center justify-between px-4 py-3 max-w-2xl mx-auto">
           <button
             onClick={() => router.back()}
             className="p-2.5 bg-white border border-stone-200 hover:border-stone-300 rounded-full shadow-sm transition-all active:scale-95">

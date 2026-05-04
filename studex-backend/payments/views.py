@@ -314,7 +314,7 @@ def initialize_payment(request):
 
     if subaccount_code:
         payload["subaccount"] = subaccount_code
-        payload["transaction_charge"] = 30000  # ₦300 StudEx fee in kobo
+        payload["transaction_charge"] = 20000  # ₦200 StudEx fee in kobo
         payload["bearer"] = "account"  # StudEx bears Paystack transaction fees
     else:
         logger.warning(

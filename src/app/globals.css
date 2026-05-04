@@ -87,11 +87,9 @@
     textarea.h-32 { @apply h-28; }
   }
 
-  /* MAIN CONTENT: Give it space so it never hides under the nav */
-  @media (max-width: 640px) {
-    main {
-      padding-bottom: 6rem !important;
-    }
+  /* MAIN CONTENT: Give it space so it never hides under the floating nav */
+  main {
+    padding-bottom: 7rem !important;
   }
 }
 

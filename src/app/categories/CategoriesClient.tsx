@@ -20,7 +20,7 @@ export default function CategoriesClient({ categories }: { categories: Category[
 
       {/* ── STICKY HEADER ── */}
       <div className="sticky top-0 bg-white/80 backdrop-blur-md z-40 border-b border-stone-100 shadow-sm">
-        <div className="flex items-center justify-between px-4 py-3">
+        <div className="flex items-center justify-between px-4 py-3 max-w-4xl mx-auto">
           <button
             onClick={() => router.push("/home")}
             className="p-2.5 bg-white border border-stone-200 hover:border-stone-300 rounded-full shadow-sm transition-all active:scale-95">
@@ -37,7 +37,7 @@ export default function CategoriesClient({ categories }: { categories: Category[
         </div>
       </div>
 
-      <div className="px-4 pt-6 pb-28 max-w-2xl mx-auto space-y-6">
+      <div className="px-4 pt-6 pb-28 max-w-4xl mx-auto space-y-6">
 
         {/* ── SECTION HEADER ── */}
         <div className="animate-fadeUp">
@@ -58,7 +58,7 @@ export default function CategoriesClient({ categories }: { categories: Category[
           </div>
         ) : (
           /* ── CATEGORIES GRID ── */
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
             {categories.map((cat, i) => (
               <div key={cat.id} className="animate-fadeUp">
                 <Link href={`/category/${cat.slug}`}>

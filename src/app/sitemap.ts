@@ -1,9 +1,8 @@
-// src/app/sitemap.ts
 import { MetadataRoute } from "next";
 
-export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = "https://studex.ng";
+const baseUrl = "https://studex.com.ng";
 
+export default function sitemap(): MetadataRoute.Sitemap {
   return [
     {
       url: baseUrl,
@@ -21,13 +20,25 @@ export default function sitemap(): MetadataRoute.Sitemap {
       url: `${baseUrl}/shop`,
       lastModified: new Date(),
       changeFrequency: "daily",
-      priority: 0.9,
+      priority: 0.8,
     },
     {
-      url: `${baseUrl}/category`,
+      url: `${baseUrl}/categories`,
       lastModified: new Date(),
       changeFrequency: "weekly",
       priority: 0.8,
+    },
+    {
+      url: `${baseUrl}/auth`,
+      lastModified: new Date(),
+      changeFrequency: "monthly",
+      priority: 0.8,
+    },
+    {
+      url: `${baseUrl}/seller/onboarding`,
+      lastModified: new Date(),
+      changeFrequency: "monthly",
+      priority: 0.7,
     },
     {
       url: `${baseUrl}/faq`,
@@ -36,10 +47,22 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.5,
     },
     {
-      url: `${baseUrl}/seller/onboarding`,
+      url: `${baseUrl}/contact`,
       lastModified: new Date(),
       changeFrequency: "monthly",
-      priority: 0.6,
+      priority: 0.5,
+    },
+    {
+      url: `${baseUrl}/terms`,
+      lastModified: new Date(),
+      changeFrequency: "monthly",
+      priority: 0.3,
+    },
+    {
+      url: `${baseUrl}/privacy`,
+      lastModified: new Date(),
+      changeFrequency: "monthly",
+      priority: 0.3,
     },
   ];
 }

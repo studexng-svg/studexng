@@ -161,7 +161,7 @@ export default function OrderConfirmationPage() {
             Order Confirmed!
           </h2>
           <p className="text-sm text-stone-400 mt-1">
-            Your order is in escrow and the seller has been notified.
+            Payment was successful and the seller has been notified.
           </p>
         </div>
 
@@ -218,20 +218,16 @@ export default function OrderConfirmationPage() {
           </div>
         </div>
 
-        {/* ESCROW INFO */}
+        {/* PAYMENT SECURED */}
         <div className="bg-teal-50 border border-teal-100 rounded-2xl p-4 flex items-start gap-3 animate-fadeUp">
           <div className="w-9 h-9 bg-teal-600 rounded-full flex items-center justify-center flex-shrink-0">
             <Shield className="w-4 h-4 text-white" />
           </div>
           <div>
-            <p className="font-semibold text-teal-900 text-sm">Protected by Escrow</p>
+            <p className="font-semibold text-teal-900 text-sm">Payment Secured by Paystack</p>
             <p className="text-xs text-teal-700 mt-0.5 leading-relaxed">
-              Your payment is safely held by StudEx. Funds are released to the seller only after you confirm receipt.
+              Your payment was processed securely. The vendor has been notified and will reach out to confirm your order.
             </p>
-            <div className="flex items-center gap-1.5 mt-2 text-xs text-teal-700 font-semibold">
-              <Clock className="w-3 h-3" />
-              <span>You have 7 days to confirm or dispute</span>
-            </div>
           </div>
         </div>
 

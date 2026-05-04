@@ -39,7 +39,6 @@ export default function CheckoutPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [paystackLoaded, setPaystackLoaded] = useState(false);
 
-  // Poll for Paystack script loaded by layout.tsx; inject fallback if needed
   useEffect(() => {
     if (typeof window === "undefined") return;
     if ((window as any).PaystackPop) { setPaystackLoaded(true); return; }
@@ -106,7 +105,6 @@ export default function CheckoutPage() {
     try {
       const listingId = isServiceBooking ? booking?.providerId : cart[0]?.id;
 
-      // Step 1 — initialize payment on backend (this sets up the subaccount split)
       const initRes = await fetchWithAuth(`${API_URL}/api/payments/initialize/`, {
         method: "POST",
         body: JSON.stringify({ listing_id: listingId }),
@@ -116,7 +114,6 @@ export default function CheckoutPage() {
 
       const { access_code, reference } = initData;
 
-      // Step 2 — open Paystack popup with access_code from backend
       const handler = window.PaystackPop.setup({
         key: paystackKey,
         access_code,
@@ -154,25 +151,24 @@ export default function CheckoutPage() {
     return (
       <div className="min-h-screen bg-[#FAFAF9] flex flex-col items-center justify-center px-6 pb-28"
         style={{ fontFamily: "'DM Sans', sans-serif" }}>
-        <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} className="text-center">
+        <div className="text-center">
           <div className="w-24 h-24 mx-auto mb-6 rounded-2xl flex items-center justify-center"
             style={{ background: GRAD }}>
             <Package className="w-12 h-12 text-white" strokeWidth={1.5} />
           </div>
           <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold mb-2">Empty</p>
-          <h2 className="text-2xl font-bold text-stone-900 mb-2"
-            style={SERIF}>
+          <h2 className="text-2xl font-bold text-stone-900 mb-2" style={SERIF}>
             Nothing to checkout
           </h2>
           <p className="text-stone-400 text-sm mb-8">Go book a service or add items to your cart first.</p>
           <Link href="/home">
-            <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
-              className="px-8 py-3 text-white font-semibold rounded-full shadow-lg shadow-teal-200/60 inline-flex items-center gap-2 text-sm"
+            <button
+              className="px-8 py-3 text-white font-semibold rounded-full shadow-lg shadow-teal-200/60 inline-flex items-center gap-2 text-sm transition active:scale-[0.98]"
               style={{ background: GRAD }}>
               Explore StudEx <ArrowRight className="w-4 h-4" />
-            </motion.button>
+            </button>
           </Link>
-        </motion.div>
+        </div>
       </div>
     );
   }
@@ -182,15 +178,14 @@ export default function CheckoutPage() {
 
       {/* ── STICKY HEADER ── */}
       <div className="sticky top-0 bg-white/80 backdrop-blur-md z-40 border-b border-stone-100 shadow-sm">
-        <div className="flex items-center justify-between px-4 py-3">
+        <div className="flex items-center justify-between px-4 py-3 max-w-2xl mx-auto">
           <Link href={isServiceBooking ? `/listing/${booking?.providerId}` : "/cart"}>
             <button className="p-2.5 bg-white border border-stone-200 hover:border-stone-300 rounded-full shadow-sm transition-all active:scale-95">
               <ChevronLeft className="w-5 h-5 text-stone-600" />
             </button>
           </Link>
           <div className="text-center">
-            <h1 className="text-base font-bold text-stone-900"
-              style={SERIF}>
+            <h1 className="text-base font-bold text-stone-900" style={SERIF}>
               Secure Checkout
             </h1>
             <p className="text-xs text-stone-400 flex items-center gap-1 justify-center mt-0.5">
@@ -208,8 +203,7 @@ export default function CheckoutPage() {
           <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold">
             {isServiceBooking ? "Service Booking" : "Product Order"}
           </p>
-          <h2 className="text-xl font-bold text-stone-900 mt-0.5"
-            style={SERIF}>
+          <h2 className="text-xl font-bold text-stone-900 mt-0.5" style={SERIF}>
             Review your order
           </h2>
         </motion.div>
@@ -219,8 +213,7 @@ export default function CheckoutPage() {
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
             className="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center"
-                style={{ background: GRAD }}>
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: GRAD }}>
                 <Calendar className="w-5 h-5 text-white" />
               </div>
               <div>
@@ -288,10 +281,7 @@ export default function CheckoutPage() {
               <span className="text-stone-700 font-medium">₦{SERVICE_FEE.toLocaleString()}</span>
             </div>
             <div className="border-t border-stone-100 pt-3 flex justify-between items-center">
-              <span className="font-bold text-stone-900"
-                style={SERIF}>
-                Total
-              </span>
+              <span className="font-bold text-stone-900" style={SERIF}>Total</span>
               <span className="text-2xl font-bold" style={GRAD_TEXT}>
                 ₦{finalTotal.toLocaleString()}
               </span>
@@ -311,8 +301,8 @@ export default function CheckoutPage() {
             </div>
             <div className="w-px h-8 bg-stone-100" />
             <div className="flex flex-col items-center gap-1.5">
-              <div className="w-9 h-9 rounded-xl bg-purple-50 flex items-center justify-center">
-                <Lock className="w-4 h-4 text-purple-600" />
+              <div className="w-9 h-9 rounded-xl bg-teal-50 flex items-center justify-center">
+                <Lock className="w-4 h-4 text-teal-600" />
               </div>
               <p className="text-xs font-medium text-stone-500">Encrypted</p>
             </div>

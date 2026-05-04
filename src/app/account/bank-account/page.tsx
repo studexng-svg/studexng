@@ -208,7 +208,7 @@ export default function BankAccountPage() {
     <div className="min-h-screen bg-[#FAFAF9] pb-24" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       {/* HEADER */}
       <div className="sticky top-0 bg-white/80 backdrop-blur-md z-40 border-b border-stone-100 shadow-sm">
-        <div className="flex items-center justify-between px-4 py-3">
+        <div className="flex items-center justify-between px-4 py-3 max-w-2xl mx-auto">
           <Link href="/account">
             <button className="p-2.5 bg-white border border-stone-200 rounded-full shadow-sm active:scale-95 transition-all">
               <ChevronLeft className="w-5 h-5 text-stone-600" />

@@ -17,4 +17,5 @@ urlpatterns = [
     path("check-status/", views.check_payment_status, name="check-payment-status"),
     path("banks/", views.get_banks, name="get-banks"),
     path("preview-price/", views.preview_price, name="preview-price"),
+    path("retry-subaccount/", views.retry_subaccount, name="retry-subaccount"),
 ]

@@ -403,7 +403,7 @@ export default function AuthPage() {
                           <Mail className="w-4 h-4 inline mr-1" /> Email Address
                         </label>
                         <input type="email" value={resetEmail} onChange={e => setResetEmail(e.target.value)}
-                          placeholder="you@pau.edu.ng"
+                          placeholder="you@school.edu.ng"
                           className="w-full px-4 py-3 rounded-xl border border-stone-200 focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 transition text-sm bg-white text-stone-900 placeholder:text-stone-400"
                           required disabled={isLoading} />
                       </div>
@@ -428,7 +428,7 @@ export default function AuthPage() {
                       <Mail className="w-4 h-4 inline mr-1" /> Email
                     </label>
                     <input type="email" value={loginEmail} onChange={e => setLoginEmail(e.target.value)}
-                      placeholder="you@pau.edu.ng"
+                      placeholder="you@school.edu.ng"
                       className="w-full px-4 py-3 rounded-xl border border-stone-200 focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 transition text-sm bg-white text-stone-900 placeholder:text-stone-400"
                       required disabled={isLoading || accountDisabled} />
                   </div>
@@ -532,25 +532,18 @@ export default function AuthPage() {
                       <label className="text-sm font-medium text-stone-700 flex items-center gap-1.5 mb-1.5">
                         <GraduationCap className="w-4 h-4" /> School / University
                       </label>
-                      <div className="flex gap-2">
-                        {SCHOOLS.map(school => (
-                          <button
-                            key={school}
-                            type="button"
-                            onClick={() => {
-                              setSignupForm(prev => ({ ...prev, school, hostel: "", matric_number: "" }));
-                              setTouched(prev => ({ ...prev, school: true }));
-                            }}
-                            className={`flex-1 py-2 md:py-3 rounded-xl border text-sm font-semibold transition-all ${
-                              signupForm.school === school
-                                ? "text-white border-transparent"
-                                : "bg-white text-stone-600 border-stone-200 hover:border-teal-300"
-                            }`}
-                            style={signupForm.school === school ? { background: GRAD } : {}}>
-                            {school}
-                          </button>
-                        ))}
-                      </div>
+                      <select
+                        value={signupForm.school}
+                        onChange={e => {
+                          setSignupForm(prev => ({ ...prev, school: e.target.value, hostel: "", matric_number: "" }));
+                          setTouched(prev => ({ ...prev, school: true }));
+                        }}
+                        className={inputClass("school", !!signupForm.school)}
+                        disabled={isLoading}>
+                        <option value="">Select your university</option>
+                        <option value="PAU">Pan-Atlantic University (PAU)</option>
+                        <option value="FUTO">Federal University of Technology Owerri (FUTO)</option>
+                      </select>
                       {touched.school && !schoolOk && <FieldFeedback ok={false} msg="Please select your school" />}
                     </div>
 

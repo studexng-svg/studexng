@@ -1,12 +1,11 @@
 # wallet/urls.py
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import WalletViewSet, BankAccountViewSet, EscrowViewSet, get_banks
+from .views import WalletViewSet, BankAccountViewSet, get_banks
 from .webhooks import paystack_webhook
 
 router = DefaultRouter()
 router.register(r'', WalletViewSet, basename='wallet')        # was r'wallet' → now r''
-router.register(r'escrow', EscrowViewSet, basename='escrow')
 
 urlpatterns = [
     path('', include(router.urls)),

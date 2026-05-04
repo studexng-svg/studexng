@@ -1,7 +1,28 @@
 // src/app/category/[slug]/page.tsx
 export const revalidate = 60;
 
+import type { Metadata } from "next";
 import CategoryPageClient from "./CategoryPageClient";
+
+function slugToTitle(slug: string) {
+  return slug.split("-").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+}
+
+export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
+  const name = slugToTitle(params.slug);
+  return {
+    title: `${name} Services`,
+    description: `Browse ${name.toLowerCase()} services from verified student vendors on StudEx, the campus marketplace at Pan-Atlantic University.`,
+    openGraph: {
+      title: `${name} Services | StudEx`,
+      description: `Browse ${name.toLowerCase()} services from verified student vendors on StudEx.`,
+    },
+    twitter: {
+      title: `${name} Services | StudEx`,
+      description: `Browse ${name.toLowerCase()} services from verified student vendors on StudEx.`,
+    },
+  };
+}
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 

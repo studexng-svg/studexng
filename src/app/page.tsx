@@ -93,7 +93,7 @@ function ReviewCarousel() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-stone-900 font-semibold text-sm">{reviews[current].name}</p>
-                  <p className="text-stone-400 text-xs mt-0.5">PAU Student</p>
+                  <p className="text-stone-400 text-xs mt-0.5">Student</p>
                 </div>
                 <Stars count={reviews[current].stars} />
               </div>
@@ -126,12 +126,13 @@ export default function LandingPage() {
   const [isLoggedIn] = useState(false);
   const [featuredListings, setFeaturedListings] = useState<any[]>([]);
   const [heroIndex, setHeroIndex] = useState(0);
+  const [listingIndex, setListingIndex] = useState(0);
   const listingCount = 53;
   const vendorCount = 38;
 
   useEffect(() => {
     setMounted(true);
-    document.title = "StudEx — Campus Marketplace for Student Services | PAU";
+    document.title = "StudEx — Campus Marketplace for Student Services";
 
     const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
     fetch(`${API_URL}/api/services/listings/?campus=pau`)
@@ -148,6 +149,12 @@ export default function LandingPage() {
     const t = setInterval(() => setHeroIndex(p => (p + 1) % heroImages.length), 4000);
     return () => clearInterval(t);
   }, []);
+
+  useEffect(() => {
+    if (featuredListings.length < 2) return;
+    const t = setInterval(() => setListingIndex(p => (p + 1) % featuredListings.length), 4000);
+    return () => clearInterval(t);
+  }, [featuredListings.length]);
 
   const navigate = (path: string) => { window.location.href = path; };
 
@@ -175,7 +182,7 @@ export default function LandingPage() {
       <Script id="sd-site" type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(generateStructuredData.website()) }} />
 
       {/* ── HERO ─────────────────────────────────────────── */}
-      <div className="relative min-h-screen h-screen flex flex-col bg-purple-950 overflow-hidden">
+      <div className="relative min-h-screen flex flex-col bg-purple-950 overflow-hidden">
 
         {/* Hero background image */}
         {heroImages.map((img, i) => (
@@ -194,74 +201,84 @@ export default function LandingPage() {
         {/* Overlay */}
         <div className="absolute inset-0" style={{ zIndex: 1, background: "linear-gradient(to bottom, rgba(13,148,136,0.30) 0%, rgba(124,58,237,0.50) 45%, rgba(88,28,135,0.82) 100%)" }} />
 
-        <div className="relative z-10 w-full max-w-7xl mx-auto px-6 lg:px-16 text-white pt-24 pb-16">
-          <div className="grid grid-cols-1 lg:grid-cols-2 lg:gap-20 lg:items-end">
+        {/* Logo bar — top left */}
+        <div className="absolute top-5 left-5 z-20">
+          <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center p-1 shadow-md overflow-hidden">
+            <img src="/images/logo-1.jpg" alt="StudEx logo" className="w-full h-full object-contain" />
+          </div>
+        </div>
 
-            {/* ── Left: badge + headline + subheadline ── */}
-            <div>
-              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-white text-xs font-bold tracking-widest uppercase mb-8">
-                <span className="w-2 h-2 rounded-full bg-teal-400 animate-pulse" />
-                Now Live · PAU & FUTO
+        {/* Content — flex-1 so it fills the min-h-screen and centres vertically */}
+        <div className="relative z-10 flex-1 flex items-center w-full">
+          <div className="w-full max-w-7xl mx-auto px-6 lg:px-16 text-white py-24">
+            <div className="grid grid-cols-1 lg:grid-cols-2 lg:gap-16 lg:items-center">
+
+              {/* ── Left: badge + headline + subheadline ── */}
+              <div>
+                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-white text-xs font-bold tracking-widest uppercase mb-6">
+                  <span className="w-2 h-2 rounded-full bg-teal-400 animate-pulse" />
+                  Now Live
+                </div>
+
+                <h1 className="text-5xl md:text-7xl lg:text-5xl xl:text-6xl font-black leading-[0.95] tracking-tighter italic uppercase mb-6"
+                  style={{ fontFamily: "var(--font-jakarta), 'Plus Jakarta Sans', sans-serif" }}>
+                  THE CAMPUS<br />
+                  <span style={{
+                    background: "linear-gradient(to right, #5eead4, #ffffff, #c4b5fd)",
+                    WebkitBackgroundClip: "text",
+                    WebkitTextFillColor: "transparent",
+                    backgroundClip: "text",
+                  }}>MARKETPLACE</span><span className="text-white/60 text-sm font-bold uppercase tracking-widest"> — At Your Fingertips</span>
+                </h1>
+
+                <p className="text-white/70 text-base lg:text-lg leading-relaxed max-w-md">
+                  Food, beauty, laundry, photography and more, all from verified vendors right on your campus.
+                </p>
               </div>
 
-              <h1 className="text-5xl md:text-7xl lg:text-8xl font-black leading-[0.95] tracking-tighter mb-6 italic uppercase"
-                style={{ fontFamily: "var(--font-jakarta), 'Plus Jakarta Sans', sans-serif" }}>
-                THE CAMPUS<br />
-                <span style={{
-                  background: "linear-gradient(to right, #5eead4, #ffffff, #c4b5fd)",
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                  backgroundClip: "text",
-                }}>MARKETPLACE</span><span className="text-white/60 text-base font-bold uppercase tracking-widest"> — At Your Fingertips</span>
-              </h1>
+              {/* ── Right: pills + CTAs + stats ── */}
+              <div className="mt-10 lg:mt-0">
+                <div className="flex flex-wrap gap-2 mb-6">
+                  {["🍜 Food", "💅 Nails", "🧺 Laundry", "📸 Photography", "👗 Fashion", "💇 Hair"].map(s => (
+                    <span key={s} className="px-3 py-1.5 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 text-white text-xs font-semibold">
+                      {s}
+                    </span>
+                  ))}
+                </div>
 
-              <p className="text-white/70 text-lg leading-relaxed max-w-md">
-                Food, beauty, laundry, photography and more, all from verified vendors right on your campus.
-              </p>
+                <div className="flex flex-row gap-3 mb-8">
+                  <Link href="/auth">
+                    <button className="px-8 py-3 text-white font-semibold rounded-full text-sm uppercase tracking-widest shadow-lg transition-all hover:scale-105 hover:shadow-teal-500/30 active:scale-95"
+                      style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+                      Start Ordering →
+                    </button>
+                  </Link>
+                  <Link href="/home">
+                    <button className="px-8 py-3 text-white/75 font-semibold rounded-full border border-white/25 text-sm uppercase tracking-widest hover:bg-white/10 hover:text-white transition-all active:scale-95">
+                      Browse Services
+                    </button>
+                  </Link>
+                </div>
+
+                <div className="flex items-center gap-8 pt-6 border-t border-white/10">
+                  <div>
+                    <p className="text-3xl font-black text-white">{vendorCount}+</p>
+                    <p className="text-xs text-white/40 font-bold uppercase tracking-wider mt-0.5">Vendors</p>
+                  </div>
+                  <div className="w-px h-10 bg-white/10" />
+                  <div>
+                    <p className="text-3xl font-black text-white">{listingCount}+</p>
+                    <p className="text-xs text-white/40 font-bold uppercase tracking-wider mt-0.5">Services</p>
+                  </div>
+                  <div className="w-px h-10 bg-white/10" />
+                  <div>
+                    <p className="text-3xl font-black text-white">2</p>
+                    <p className="text-xs text-white/40 font-bold uppercase tracking-wider mt-0.5">Campuses</p>
+                  </div>
+                </div>
+              </div>
+
             </div>
-
-            {/* ── Right: pills + CTAs + stats ── */}
-            <div className="mt-10 lg:mt-0 lg:pb-1">
-              <div className="flex flex-wrap gap-2 mb-8">
-                {["🍜 Food", "💅 Nails", "🧺 Laundry", "📸 Photography", "👗 Fashion", "💇 Hair"].map(s => (
-                  <span key={s} className="px-3 py-1.5 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 text-white text-xs font-semibold">
-                    {s}
-                  </span>
-                ))}
-              </div>
-
-              <div className="flex flex-col sm:flex-row gap-3 mb-10">
-                <Link href="/auth">
-                  <button className="px-8 py-4 text-white font-black rounded-full text-sm uppercase tracking-wider shadow-2xl transition-transform hover:scale-105 active:scale-95"
-                    style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
-                    Start Ordering →
-                  </button>
-                </Link>
-                <Link href="/home">
-                  <button className="px-8 py-4 text-white/80 font-bold rounded-full border border-white/20 backdrop-blur-sm text-sm uppercase tracking-wider hover:bg-white/10 transition">
-                    Browse Services
-                  </button>
-                </Link>
-              </div>
-
-              <div className="flex items-center gap-8 pt-8 border-t border-white/10">
-                <div>
-                  <p className="text-3xl font-black text-white">{vendorCount}+</p>
-                  <p className="text-xs text-white/40 font-bold uppercase tracking-wider mt-0.5">Vendors</p>
-                </div>
-                <div className="w-px h-10 bg-white/10" />
-                <div>
-                  <p className="text-3xl font-black text-white">{listingCount}+</p>
-                  <p className="text-xs text-white/40 font-bold uppercase tracking-wider mt-0.5">Services</p>
-                </div>
-                <div className="w-px h-10 bg-white/10" />
-                <div>
-                  <p className="text-3xl font-black text-white">2</p>
-                  <p className="text-xs text-white/40 font-bold uppercase tracking-wider mt-0.5">Campuses</p>
-                </div>
-              </div>
-            </div>
-
           </div>
         </div>
       </div>
@@ -269,7 +286,7 @@ export default function LandingPage() {
       {/* ── WHO IS THIS FOR ──────────────────────────────── */}
       <section className="py-12 px-6 bg-white border-b border-stone-100">
         <div className="max-w-6xl mx-auto">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 gap-4 max-w-lg">
             <Link href="/auth">
               <div className="p-5 rounded-2xl border-2 border-teal-500 bg-teal-50 hover:bg-teal-100 transition cursor-pointer">
                 <p className="text-2xl mb-2">🛍️</p>
@@ -296,7 +313,7 @@ export default function LandingPage() {
           <h2 className="text-4xl md:text-5xl font-black italic tracking-tighter uppercase mb-16 text-center">
             Order in <span style={{ color: "#ccfbf1" }}>3 Steps</span>
           </h2>
-          <div className="grid grid-cols-3 lg:gap-16 gap-6">
+          <div className="max-w-3xl mx-auto grid grid-cols-3 lg:gap-20 gap-6">
             {[
               { num: "01", icon: "🔍", title: "Browse", desc: "Find services from verified vendors on your campus" },
               { num: "02", icon: "💳", title: "Pay", desc: "Secure payment via Paystack — fast and safe" },
@@ -316,28 +333,39 @@ export default function LandingPage() {
       {/* ── CATEGORIES ───────────────────────────────────── */}
       <section className="py-20 px-6 bg-[#FAFAF9]">
         <div className="max-w-6xl mx-auto">
-          <p className="text-teal-700 text-xs tracking-[0.25em] uppercase font-bold mb-2">What&apos;s Available</p>
-          <h2 className="text-4xl font-black italic tracking-tighter uppercase text-stone-900 mb-10"
-            style={{ fontFamily: "var(--font-jakarta), 'Plus Jakarta Sans', sans-serif" }}>
-            Everything<br />You Need
-          </h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            {[
-              { emoji: "🍜", name: "Food & Drinks", desc: "Jollof, pasta, zobo & more", color: "bg-orange-50 border-orange-100" },
-              { emoji: "💅", name: "Beauty", desc: "Nails, lashes, makeup", color: "bg-purple-50 border-purple-100" },
-              { emoji: "🧺", name: "Laundry", desc: "Wash, dry & fold", color: "bg-teal-50 border-teal-100" },
-              { emoji: "📸", name: "Photography", desc: "Shoots & editing", color: "bg-blue-50 border-blue-100" },
-              { emoji: "👗", name: "Fashion", desc: "Tailoring & styling", color: "bg-pink-50 border-pink-100" },
-              { emoji: "💪", name: "Fitness", desc: "Personal trainers", color: "bg-green-50 border-green-100" },
-            ].map((cat) => (
-              <Link key={cat.name} href="/home">
-                <div className={`${cat.color} border rounded-2xl p-4 hover:scale-105 active:scale-95 transition-transform cursor-pointer`}>
-                  <p className="text-3xl mb-2">{cat.emoji}</p>
-                  <p className="font-black text-stone-900 text-sm uppercase tracking-wide">{cat.name}</p>
-                  <p className="text-stone-400 text-xs mt-0.5">{cat.desc}</p>
-                </div>
+          <div className="lg:flex lg:gap-16 lg:items-center">
+            {/* Heading — left col on desktop */}
+            <div className="mb-10 lg:mb-0 lg:w-60 lg:flex-shrink-0">
+              <p className="text-teal-700 text-xs tracking-[0.25em] uppercase font-bold mb-2">What&apos;s Available</p>
+              <h2 className="text-4xl font-black italic tracking-tighter uppercase text-stone-900"
+                style={{ fontFamily: "var(--font-jakarta), 'Plus Jakarta Sans', sans-serif" }}>
+                Everything<br />You Need
+              </h2>
+              <Link href="/home">
+                <button className="mt-6 hidden lg:inline-block px-5 py-2.5 rounded-full border border-stone-300 text-stone-600 text-xs font-bold uppercase tracking-wider hover:bg-stone-100 transition">
+                  Browse All →
+                </button>
               </Link>
-            ))}
+            </div>
+            {/* Grid — right col on desktop */}
+            <div className="flex-1 grid grid-cols-2 md:grid-cols-3 gap-3">
+              {[
+                { emoji: "🍜", name: "Food & Drinks", desc: "Jollof, pasta, zobo & more", color: "bg-orange-50 border-orange-100" },
+                { emoji: "💅", name: "Beauty", desc: "Nails, lashes, makeup", color: "bg-purple-50 border-purple-100" },
+                { emoji: "🧺", name: "Laundry", desc: "Wash, dry & fold", color: "bg-teal-50 border-teal-100" },
+                { emoji: "📸", name: "Photography", desc: "Shoots & editing", color: "bg-blue-50 border-blue-100" },
+                { emoji: "👗", name: "Fashion", desc: "Tailoring & styling", color: "bg-pink-50 border-pink-100" },
+                { emoji: "💪", name: "Fitness", desc: "Personal trainers", color: "bg-green-50 border-green-100" },
+              ].map((cat) => (
+                <Link key={cat.name} href="/home">
+                  <div className={`${cat.color} border rounded-2xl p-4 lg:p-5 hover:scale-105 active:scale-95 transition-transform cursor-pointer`}>
+                    <p className="text-3xl mb-2">{cat.emoji}</p>
+                    <p className="font-black text-stone-900 text-sm uppercase tracking-wide">{cat.name}</p>
+                    <p className="text-stone-400 text-xs mt-0.5">{cat.desc}</p>
+                  </div>
+                </Link>
+              ))}
+            </div>
           </div>
         </div>
       </section>
@@ -345,58 +373,81 @@ export default function LandingPage() {
       {/* ── LIVE LISTINGS ────────────────────────────────── */}
       <section className="py-20 px-6 bg-[#FAFAF9]">
         <div className="max-w-6xl mx-auto">
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <p className="text-teal-700 text-xs tracking-[0.25em] uppercase font-bold mb-1">Live Now</p>
-              <h2 className="text-3xl font-black italic tracking-tighter uppercase text-stone-900"
-                style={{ fontFamily: "var(--font-jakarta), 'Plus Jakarta Sans', sans-serif" }}>
-                {listingCount}+ Services Available
-              </h2>
+          <div className="lg:grid lg:grid-cols-5 lg:gap-12 lg:items-start">
+
+            {/* Left col: heading + CTA (desktop) */}
+            <div className="lg:col-span-2 mb-8 lg:mb-0">
+              <div className="flex items-center justify-between lg:flex-col lg:items-start lg:gap-4 mb-4 lg:mb-8">
+                <div>
+                  <p className="text-teal-700 text-xs tracking-[0.25em] uppercase font-bold mb-1">Live Now</p>
+                  <h2 className="text-3xl font-black italic tracking-tighter uppercase text-stone-900"
+                    style={{ fontFamily: "var(--font-jakarta), 'Plus Jakarta Sans', sans-serif" }}>
+                    {listingCount}+<br className="hidden lg:block" /> Services<br className="hidden lg:block" /> Available
+                  </h2>
+                </div>
+                <Link href="/home">
+                  <button className="px-4 py-2 rounded-full border border-teal-600 text-teal-700 text-xs font-bold uppercase tracking-wider hover:bg-teal-50 transition">
+                    View All →
+                  </button>
+                </Link>
+              </div>
+              {/* CTA box — shown in left col on desktop */}
+              <div className="hidden lg:block p-5 bg-teal-50 border border-teal-100 rounded-2xl">
+                <p className="text-teal-800 font-bold text-sm mb-1">Want to order any of these?</p>
+                <p className="text-teal-600 text-xs mb-4">Create a free account — takes 30 seconds</p>
+                <Link href="/auth">
+                  <button className="w-full py-2.5 text-white font-black rounded-full text-xs uppercase tracking-wider"
+                    style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
+                    Sign Up Free →
+                  </button>
+                </Link>
+              </div>
             </div>
-            <Link href="/home">
-              <button className="px-4 py-2 rounded-full border border-teal-600 text-teal-700 text-xs font-bold uppercase tracking-wider hover:bg-teal-50 transition">
-                View All →
-              </button>
-            </Link>
-          </div>
 
-          {/* Listing cards grid */}
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            {featuredListings.length > 0 ? featuredListings.map((listing: any) => (
-              <Link key={listing.id} href="/auth">
-                <div className="bg-white rounded-2xl overflow-hidden border border-stone-100 shadow-sm hover:shadow-md hover:scale-105 active:scale-95 transition-all cursor-pointer">
-                  <div className="relative w-full h-32 overflow-hidden bg-stone-100">
-                    <img
-                      src={listing.image}
-                      alt={listing.title}
-                      className="w-full h-full object-cover"
-                      loading="lazy"
-                    />
-                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
-                      <p className="text-white font-bold text-xs line-clamp-1">{listing.title}</p>
+            {/* Right col: slideshow */}
+            <div className="lg:col-span-3">
+              <div className="relative rounded-2xl overflow-hidden" style={{ height: "320px" }}>
+                {featuredListings.length > 0 ? featuredListings.map((listing: any, i: number) => (
+                  <Link
+                    key={listing.id}
+                    href="/auth"
+                    className="absolute inset-0 transition-opacity duration-1000"
+                    style={{ opacity: i === listingIndex ? 1 : 0 }}
+                  >
+                    <div className="relative w-full h-full bg-stone-100">
+                      <img
+                        src={listing.image}
+                        alt={listing.title}
+                        className="w-full h-full object-cover"
+                        loading={i === 0 ? "eager" : "lazy"}
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+                      <div className="absolute bottom-0 left-0 right-0 p-4">
+                        <p className="text-white font-bold text-base line-clamp-1">{listing.title}</p>
+                        <p className="text-white/70 text-xs mt-1">@{listing.vendor?.username}</p>
+                      </div>
                     </div>
-                  </div>
-                  <div className="p-3">
-                    <p className="text-xs text-stone-400 mb-1">@{listing.vendor?.username}</p>
-                    <p className="font-black text-stone-900 text-sm">₦{Number(listing.price).toLocaleString()}</p>
-                  </div>
-                </div>
-              </Link>
-            )) : (
-              [1, 2, 3, 4].map(i => (
-                <div key={i} className="bg-white rounded-2xl overflow-hidden border border-stone-100 shadow-sm">
-                  <div className="w-full h-32 bg-stone-100 animate-pulse" />
-                  <div className="p-3 space-y-2">
-                    <div className="h-3 bg-stone-100 rounded-full animate-pulse w-2/3" />
-                    <div className="h-4 bg-stone-100 rounded-full animate-pulse w-1/2" />
-                  </div>
-                </div>
-              ))
-            )}
+                  </Link>
+                )) : (
+                  <div className="absolute inset-0 bg-stone-100 animate-pulse" />
+                )}
+              </div>
+              <div className="flex justify-center gap-2 mt-3">
+                {(featuredListings.length > 0 ? featuredListings : [1,2,3]).map((_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setListingIndex(i)}
+                    className={`rounded-full transition-all duration-300 ${
+                      i === listingIndex ? "w-6 h-1.5 bg-teal-500" : "w-1.5 h-1.5 bg-stone-300 hover:bg-stone-400"
+                    }`}
+                  />
+                ))}
+              </div>
+            </div>
           </div>
 
-          {/* Sign up CTA below listings */}
-          <div className="mt-6 p-4 bg-teal-50 border border-teal-100 rounded-2xl text-center">
+          {/* CTA box — mobile only */}
+          <div className="mt-6 lg:hidden p-4 bg-teal-50 border border-teal-100 rounded-2xl text-center">
             <p className="text-teal-800 font-bold text-sm mb-1">Want to order any of these?</p>
             <p className="text-teal-600 text-xs mb-3">Create a free account — takes 30 seconds</p>
             <Link href="/auth">
@@ -435,6 +486,37 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ── CAMPUSES WE SUPPORT ──────────────────────────── */}
+      <section className="py-16 px-6 bg-white border-b border-stone-100">
+        <div className="max-w-6xl mx-auto text-center">
+          <p className="text-teal-700 text-xs tracking-[0.3em] uppercase font-semibold mb-3">Where We Operate</p>
+          <h2 className="text-3xl md:text-4xl font-black italic tracking-tighter uppercase text-stone-900 mb-12"
+            style={{ fontFamily: "var(--font-jakarta), 'Plus Jakarta Sans', sans-serif" }}>
+            Campuses We Support
+          </h2>
+          <div className="flex flex-wrap justify-center gap-12 md:gap-24">
+            <div className="flex flex-col items-center gap-4">
+              <div className="w-28 h-28 rounded-2xl bg-stone-900 flex items-center justify-center p-4 shadow-md overflow-hidden">
+                <img src="/images/pau-logo.png" alt="Pan-Atlantic University" className="w-full h-full object-contain" />
+              </div>
+              <div>
+                <p className="text-stone-900 font-bold text-sm">Pan-Atlantic University</p>
+                <p className="text-stone-400 text-xs mt-0.5">Ibeju-Lekki, Lagos</p>
+              </div>
+            </div>
+            <div className="flex flex-col items-center gap-4">
+              <div className="w-28 h-28 rounded-2xl bg-white border border-stone-200 flex items-center justify-center p-3 shadow-md overflow-hidden">
+                <img src="/images/futo-logo.png" alt="Federal University of Technology Owerri" className="w-full h-full object-contain" />
+              </div>
+              <div>
+                <p className="text-stone-900 font-bold text-sm">Federal University of Technology Owerri</p>
+                <p className="text-stone-400 text-xs mt-0.5">Owerri, Imo State</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* ── FINAL CTA ────────────────────────────────────── */}
       <section className="py-20 px-6 bg-[#FAFAF9] text-center">
         <div className="max-w-xl mx-auto">
@@ -442,9 +524,9 @@ export default function LandingPage() {
             style={{ fontFamily: "var(--font-jakarta), 'Plus Jakarta Sans', sans-serif" }}>
             Ready to Order?
           </h2>
-          <p className="text-stone-400 text-sm mb-8">Join PAU and FUTO students already using StudEx.</p>
+          <p className="text-stone-400 text-sm mb-8">Join students across campus already using StudEx.</p>
           <Link href="/auth">
-            <button className="w-full px-8 py-4 text-white font-black rounded-full text-sm uppercase tracking-wider shadow-xl transition-transform hover:scale-105 active:scale-95"
+            <button className="w-full md:w-auto md:px-16 px-8 py-4 text-white font-black rounded-full text-sm uppercase tracking-wider shadow-xl transition-transform hover:scale-105 active:scale-95"
               style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
               Create Free Account →
             </button>
@@ -460,9 +542,7 @@ export default function LandingPage() {
             className="text-stone-900 font-bold text-xl"
             style={{ fontFamily: "'Playfair Display', serif" }}
           >
-            StudEx{" "}
-            <span style={GRAD_TEXT}>·</span>{" "}
-            Made in Nigeria 🇳🇬
+            StudEx
           </p>
 
           <div className="flex gap-8 text-sm">
@@ -470,7 +550,7 @@ export default function LandingPage() {
             <button onClick={() => navigate("/privacy-policy")} className="text-stone-400 hover:text-stone-700 transition">Privacy</button>
           </div>
 
-          <p className="text-stone-300 text-sm">© 2025 StudEx. All rights reserved.</p>
+          <p className="text-stone-300 text-sm">© 2026 StudEx. All rights reserved.</p>
         </div>
       </footer>
     </>

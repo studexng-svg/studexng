@@ -1,4 +1,3 @@
-// src/app/robots.ts
 import { MetadataRoute } from "next";
 
 export default function robots(): MetadataRoute.Robots {
@@ -6,19 +5,37 @@ export default function robots(): MetadataRoute.Robots {
     rules: [
       {
         userAgent: "*",
-        allow: ["/", "/home", "/shop", "/category", "/listing", "/faq"],
-        disallow: [
-          "/account",
-          "/vendor",
+        allow: [
+          "/",
+          "/home",
+          "/categories",
+          "/category/",
+          "/listing/",
+          "/vendor/",
+          "/faq",
+          "/terms",
+          "/privacy-policy",
           "/auth",
-          "/api/",
+          "/seller/onboarding",
+        ],
+        disallow: [
+          "/account/",
           "/admin/",
-          "/account/orders",
-          "/account/bookings",
+          "/seller/listings",
+          "/seller/orders",
+          "/seller/payouts",
+          "/seller/add",
+          "/seller/edit/",
+          "/cart",
+          "/checkout",
           "/wishlist",
+          "/chat/",
+          "/api/",
+          "/success",
+          "/order-confirmation/",
         ],
       },
     ],
-    sitemap: "https://studex.ng/sitemap.xml",
+    sitemap: "https://studex.com.ng/sitemap.xml",
   };
 }

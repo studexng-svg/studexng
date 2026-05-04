@@ -202,27 +202,30 @@ export default function CategoryPageClient({ slug, initialListings }: Props) {
 
       {/* Header */}
       <div className="sticky top-0 bg-white/95 backdrop-blur-xl z-40 border-b border-purple-100 shadow-sm">
-        <div className="flex items-center justify-between p-4">
-          <button onClick={() => router.back()} className="p-2 hover:bg-purple-50 rounded-full">
-            <ChevronLeft className="w-6 h-6 text-purple-600" />
-          </button>
-          <h1 className="text-xl font-black bg-gradient-to-r from-purple-600 to-teal-500 bg-clip-text text-transparent">
-            {categoryName}
-          </h1>
-          <div className="w-10" />
-        </div>
-        <div className="px-4 pb-3">
-          <div className="relative">
-            <Search className="absolute left-4 top-3.5 w-4 h-4 text-gray-400" />
-            <input type="text" placeholder={`Search ${categoryName.toLowerCase()}...`}
-              value={search} onChange={e => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 bg-gray-50 rounded-xl text-sm border border-gray-100 focus:outline-none focus:border-purple-300" />
+        <div className="max-w-6xl mx-auto">
+          <div className="flex items-center justify-between p-4">
+            <button onClick={() => router.back()} className="p-2 hover:bg-purple-50 rounded-full">
+              <ChevronLeft className="w-6 h-6 text-purple-600" />
+            </button>
+            <h1 className="text-xl font-black bg-gradient-to-r from-purple-600 to-teal-500 bg-clip-text text-transparent">
+              {categoryName}
+            </h1>
+            <div className="w-10" />
+          </div>
+          <div className="px-4 pb-3">
+            <div className="relative">
+              <Search className="absolute left-4 top-3.5 w-4 h-4 text-gray-400" />
+              <input type="text" placeholder={`Search ${categoryName.toLowerCase()}...`}
+                value={search} onChange={e => setSearch(e.target.value)}
+                className="w-full pl-10 pr-4 py-3 bg-gray-50 rounded-xl text-sm border border-gray-100 focus:outline-none focus:border-purple-300" />
+            </div>
           </div>
         </div>
       </div>
 
       {/* Listings */}
       <div className="pb-32 px-4 pt-4 bg-gradient-to-br from-purple-50 to-teal-50 min-h-screen">
+        <div className="max-w-6xl mx-auto">
         {sortedListings.length === 0 ? (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center py-20">
             <Sparkles className="w-20 h-20 text-gray-200 mx-auto mb-4" />
@@ -231,7 +234,7 @@ export default function CategoryPageClient({ slug, initialListings }: Props) {
             </h2>
           </motion.div>
         ) : (
-          <div className="space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {sortedListings.map((listing, i) => {
               const isOwnListing = !!(user?.id && user.id === listing.vendor.id);
               const imageUrl = listing.image
@@ -362,6 +365,7 @@ export default function CategoryPageClient({ slug, initialListings }: Props) {
             })}
           </div>
         )}
+        </div>
       </div>
     </>
   );
