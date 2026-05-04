@@ -72,6 +72,26 @@ const BADGE_LABELS: Record<string, string> = {
   rising: "↑ Rising",
 };
 
+function ListingSkeletons() {
+  return (
+    <div className="space-y-4 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-4">
+      {[0, 1, 2, 3].map(i => (
+        <div key={i} className="bg-white rounded-2xl border border-stone-100 overflow-hidden animate-pulse">
+          <div className="w-full h-48 bg-stone-100" />
+          <div className="px-4 pt-3 pb-4 space-y-2.5">
+            <div className="h-4 bg-stone-100 rounded-full w-3/4" />
+            <div className="h-3 bg-stone-100 rounded-full w-1/2" />
+            <div className="flex justify-between items-center mt-2">
+              <div className="h-7 bg-stone-100 rounded-full w-20" />
+              <div className="h-9 bg-stone-100 rounded-full w-24" />
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 const BADGE_STYLES: Record<string, string> = {
   top: "bg-amber-50 text-amber-700 border border-amber-200",
   trusted: "bg-teal-50 text-teal-700 border border-teal-200",
@@ -88,6 +108,7 @@ export default function HomePageClient({ initialVendors, initialListings }: Prop
   const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlistStore();
 
   const [mounted, setMounted] = useState(false);
+  const [campusReady, setCampusReady] = useState(false);
   const [toast, setToast] = useState("");
 
   const [vendors, setVendors] = useState<Vendor[]>(initialVendors);
@@ -102,21 +123,53 @@ export default function HomePageClient({ initialVendors, initialListings }: Prop
 
   useEffect(() => setMounted(true), []);
 
-  // After hydration, refetch listings and vendors scoped to the user's campus.
-  // SSR fetched anonymously (defaulting to PAU), so FUTO users need a client-side refetch.
+  // Confirm campus filter before showing any listings.
+  // SSR uses the studex_campus cookie; if stale/missing, the data is wrong for FUTO users.
+  // We hold listings behind a skeleton until we've verified (or corrected) the campus.
   useEffect(() => {
-    if (!isHydrated || !isLoggedIn || !user) return;
+    if (!isHydrated) return;
+
+    if (!isLoggedIn || !user) {
+      // Not logged in — SSR data is fine (no personal campus to enforce)
+      setCampusReady(true);
+      return;
+    }
+
     const campus = ((user as any).school || 'pau').toLowerCase();
-    const cookieCampus = document.cookie.split(';').find(c => c.trim().startsWith('studex_campus='))?.split('=')?.[1]?.toLowerCase() || 'pau';
-    if (cookieCampus === campus) return;
+    const cookieCampus =
+      document.cookie
+        .split(';')
+        .find(c => c.trim().startsWith('studex_campus='))
+        ?.split('=')?.[1]
+        ?.toLowerCase() || 'pau';
+
+    if (cookieCampus === campus) {
+      // Cookie already matches — SSR fetched the right campus
+      setCampusReady(true);
+      return;
+    }
+
+    // Campus mismatch: update cookie and refetch with the correct campus
     document.cookie = `studex_campus=${campus}; path=/; max-age=31536000`;
     Promise.all([
-      fetchWithAuth(`${API_URL}/api/services/listings/`),
-      fetchWithAuth(`${API_URL}/api/auth/vendors/`),
-    ]).then(async ([listRes, vendorRes]) => {
-      if (listRes.ok) { const d = await listRes.json(); const f = d.results||d||[]; setAllListings(f); setListings(f); setActiveFilter("All"); }
-      if (vendorRes.ok) { const d = await vendorRes.json(); setVendors(d.results||d||[]); }
-    }).catch(() => {});
+      fetchWithAuth(`${API_URL}/api/services/listings/?campus=${campus}`),
+      fetchWithAuth(`${API_URL}/api/auth/vendors/?campus=${campus}`),
+    ])
+      .then(async ([listRes, vendorRes]) => {
+        if (listRes.ok) {
+          const d = await listRes.json();
+          const f = d.results || d || [];
+          setAllListings(f);
+          setListings(f);
+          setActiveFilter("All");
+        }
+        if (vendorRes.ok) {
+          const d = await vendorRes.json();
+          setVendors(d.results || d || []);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setCampusReady(true));
   }, [isHydrated, isLoggedIn, (user as any)?.school]);
 
   const listingsSectionRef = useRef<HTMLDivElement>(null);
@@ -411,7 +464,9 @@ export default function HomePageClient({ initialVendors, initialListings }: Prop
               </Link>
             </div>
 
-            {featuredListings.length === 0 ? (
+            {mounted && !campusReady ? (
+              <ListingSkeletons />
+            ) : featuredListings.length === 0 ? (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                 className="bg-white rounded-2xl p-12 text-center border border-stone-100 shadow-sm">
                 <Sparkles className="w-12 h-12 text-stone-200 mx-auto mb-3" />
@@ -430,6 +485,7 @@ export default function HomePageClient({ initialVendors, initialListings }: Prop
                     const totalReviews = listing.vendor?.profile?.total_reviews;
                     const wishlisted = mounted && isInWishlist(listing.id);
                     const isService = (listing.listing_type || "").toLowerCase() === "service";
+                    const isOwnListing = !!(user?.id && user.id === listing.vendor?.id);
 
                     return (
                       <motion.div
@@ -503,7 +559,7 @@ export default function HomePageClient({ initialVendors, initialListings }: Prop
 
                         </Link>
 
-                        {/* ── Price + Book / Order ── */}
+                        {/* ── Price + Book / Order / Manage ── */}
                         <div className="px-4 py-3 flex items-center justify-between">
                           <div>
                             <p className="text-xs text-stone-400 font-medium">Price</p>
@@ -511,13 +567,13 @@ export default function HomePageClient({ initialVendors, initialListings }: Prop
                               ₦{Number(listing.price).toLocaleString()}
                             </p>
                           </div>
-                          <Link href={`/listing/${listing.id}`}>
+                          <Link href={isOwnListing ? "/seller/listings" : `/listing/${listing.id}`}>
                             <motion.button
                               whileHover={{ scale: 1.04 }}
                               whileTap={{ scale: 0.96 }}
                               className="px-6 py-2.5 text-white rounded-full font-black text-sm shadow-sm uppercase tracking-wide transition-opacity hover:opacity-90"
                               style={{ background: GRAD }}>
-                              {isService ? "Book" : "Order"}
+                              {isOwnListing ? "Manage" : isService ? "Book" : "Order"}
                             </motion.button>
                           </Link>
                         </div>

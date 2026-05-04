@@ -89,10 +89,6 @@ class ListingViewSet(viewsets.ModelViewSet):
             qs = Listing.objects.filter(vendor__username=vendor_username)
             return qs.select_related('vendor', 'category')
 
-        # Vendors see only their own listings — no campus filter needed
-        if user.is_authenticated and user.user_type == 'vendor':
-            return Listing.objects.filter(vendor=user).select_related('vendor', 'category')
-
         # For retrieve/update/delete — no campus filter so any listing is accessible
         # by ID regardless of which campus the requester is on (fixes SSR 404 for FUTO listings)
         if self.action != 'list':
