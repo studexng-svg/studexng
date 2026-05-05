@@ -24,7 +24,8 @@
       "Bash(curl -s \"http://127.0.0.1:8000/api/auth/check-username/?username=\")",
       "Bash(curl -s \"http://127.0.0.1:8000/api/auth/check-username/?username=test%40%23%24\")",
       "WebFetch(domain:futo.edu.ng)",
-      "WebFetch(domain:futosite.teneceschoolsupport.com)"
+      "WebFetch(domain:futosite.teneceschoolsupport.com)",
+      "Bash(xargs wc *)"
     ]
   }
 }

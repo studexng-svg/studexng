@@ -4,7 +4,7 @@ import {
   Package, Heart, Settings, HelpCircle, LogOut, ChevronRight,
   Store, Clock, ArrowRight, Banknote, LayoutDashboard,
   Calendar, Gift, Bell, X, CheckCheck, ExternalLink, Camera,
-  Trash2, ZoomIn, Move, MessageCircle
+  Trash2, ZoomIn, Move, MessageCircle, ArrowUpRight
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -21,13 +21,14 @@ const isPendingVendor = (u: any) => u?.user_type === "vendor" && !u?.is_verified
 
 // ── Menu config ───────────────────────────────────────────────────────────────
 const MENU_ITEMS = [
-  { href: "/account/orders",   icon: Package,       label: "My Orders",       sub: "Track your purchases",       bg: "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)" },
-  { href: "/account/bookings", icon: Calendar,      label: "My Bookings",     sub: "View upcoming appointments", bg: "linear-gradient(135deg, #0D9488 0%, #059669 100%)" },
-  { href: "/chat",             icon: MessageCircle, label: "Messages",        sub: "Your conversations",         bg: GRAD },
-  { href: "/account/loyalty",  icon: Gift,          label: "Loyalty Rewards", sub: "Points & exclusive deals",   bg: "linear-gradient(135deg, #f59e0b 0%, #ef4444 100%)" },
-  { href: "/wishlist",         icon: Heart,         label: "Wishlist",        sub: "Saved items",                bg: "linear-gradient(135deg, #ec4899 0%, #f43f5e 100%)" },
-  { href: "/account/address",  icon: Settings,      label: "Address Book",    sub: "Manage delivery addresses",  bg: "linear-gradient(135deg, #3b82f6 0%, #6366f1 100%)" },
-  { href: "/faq",              icon: HelpCircle,    label: "Help & Support",  sub: "FAQs and contact",           bg: "linear-gradient(135deg, #14b8a6 0%, #0ea5e9 100%)" },
+  { href: "/account/orders",         icon: Package,       label: "My Orders",        sub: "Track your purchases",       bg: "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)" },
+  { href: "/account/bookings",       icon: Calendar,      label: "My Bookings",      sub: "View upcoming appointments", bg: "linear-gradient(135deg, #0D9488 0%, #059669 100%)" },
+  { href: "/chat",                   icon: MessageCircle, label: "Messages",         sub: "Your conversations",         bg: GRAD },
+  { href: "/account/notifications",  icon: Bell,          label: "Notifications",    sub: "Your activity & alerts",     bg: "linear-gradient(135deg, #f59e0b 0%, #ef4444 100%)" },
+  { href: "/account/loyalty",        icon: Gift,          label: "Loyalty Rewards",  sub: "Points & exclusive deals",   bg: "linear-gradient(135deg, #10b981 0%, #059669 100%)" },
+  { href: "/wishlist",               icon: Heart,         label: "Wishlist",         sub: "Saved items",                bg: "linear-gradient(135deg, #ec4899 0%, #f43f5e 100%)" },
+  { href: "/account/address",        icon: Settings,      label: "Address Book",     sub: "Manage delivery addresses",  bg: "linear-gradient(135deg, #3b82f6 0%, #6366f1 100%)" },
+  { href: "/faq",                    icon: HelpCircle,    label: "Help & Support",   sub: "FAQs and contact",           bg: "linear-gradient(135deg, #14b8a6 0%, #0ea5e9 100%)" },
 ];
 
 // ── Simple Canvas Crop Component ──────────────────────────────────────────────
@@ -284,6 +285,7 @@ export default function AccountPage() {
     badge: item.href === "/account/orders" ? pendingOrders
          : item.href === "/account/bookings" && !vendorApproved ? pendingBookings
          : item.href === "/chat" ? unreadMessages
+         : item.href === "/account/notifications" ? unreadNotifications
          : 0,
   }));
 
@@ -453,6 +455,13 @@ export default function AccountPage() {
                             </div>
                           </div>
                         ))}
+                      </div>
+                      <div className="border-t border-stone-100">
+                        <Link href="/account/notifications" onClick={() => setShowNotifications(false)}>
+                          <div className="flex items-center justify-center gap-1.5 py-3 text-xs font-semibold text-teal-600 hover:bg-teal-50 transition">
+                            See all notifications <ArrowUpRight className="w-3 h-3" />
+                          </div>
+                        </Link>
                       </div>
                     </motion.div>
                   )}

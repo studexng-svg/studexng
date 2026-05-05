@@ -163,6 +163,12 @@ class UserProfileSerializer(serializers.ModelSerializer):
         """Always return an absolute URL — works with Cloudinary, S3, and local storage."""
         if not obj.profile_image:
             return None
+        # Raw field value — could be a full CDN URL (direct Cloudinary upload path)
+        name = getattr(obj.profile_image, 'name', None)
+        if not name or name == 'profiles/default.jpg':
+            return None
+        if name.startswith('http'):
+            return name
         try:
             url = obj.profile_image.url
             if url and url.startswith('http'):

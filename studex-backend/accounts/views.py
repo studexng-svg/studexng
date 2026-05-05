@@ -199,8 +199,24 @@ def update_user_profile(request):
 
     # ── Profile image — handle separately since serializer field is read-only ──
     if 'profile_image' in request.FILES:
-        user.profile_image = request.FILES['profile_image']
-        user.save(update_fields=['profile_image'])
+        cloud_name = getattr(settings, 'CLOUDINARY_STORAGE', {}).get('CLOUD_NAME', '')
+        if cloud_name:
+            # Upload directly to Cloudinary and store the persistent CDN URL.
+            # This bypasses DEFAULT_FILE_STORAGE so the image survives deploys
+            # even if the env var isn't wired to Django's storage backend.
+            import cloudinary.uploader
+            result = cloudinary.uploader.upload(
+                request.FILES['profile_image'],
+                folder='profiles',
+                public_id=f'user_{user.pk}',
+                overwrite=True,
+                resource_type='image',
+            )
+            User.objects.filter(pk=user.pk).update(profile_image=result['secure_url'])
+            user.refresh_from_db()
+        else:
+            user.profile_image = request.FILES['profile_image']
+            user.save(update_fields=['profile_image'])
     elif data.get('profile_image') is None and 'profile_image' in data:
         # Explicit null → remove profile picture
         user.profile_image = None

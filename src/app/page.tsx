@@ -3,8 +3,10 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowRight, Sparkles, Star, Quote } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Script from "next/script";
 import Link from "next/link";
+import { useAuth } from "@/lib/authStore";
 // REMOVE BEFORE PRODUCTION
 import { generateStructuredData } from "@/lib/metadata";
 import { GRAD_TEXT, SERIF } from "@/lib/tokens";
@@ -122,13 +124,18 @@ function ReviewCarousel() {
 
 /* ─── MAIN PAGE ─────────────────────────────────────────── */
 export default function LandingPage() {
+  const router = useRouter();
+  const { isLoggedIn, isHydrated } = useAuth();
   const [mounted, setMounted] = useState(false);
-  const [isLoggedIn] = useState(false);
   const [featuredListings, setFeaturedListings] = useState<any[]>([]);
   const [heroIndex, setHeroIndex] = useState(0);
   const [listingIndex, setListingIndex] = useState(0);
   const listingCount = 53;
   const vendorCount = 38;
+
+  useEffect(() => {
+    if (isHydrated && isLoggedIn) router.replace("/home");
+  }, [isHydrated, isLoggedIn, router]);
 
   useEffect(() => {
     setMounted(true);

@@ -149,7 +149,7 @@ def my_notifications(request):
     from notifications.models import Notification
     notifications = Notification.objects.filter(
         recipient=request.user
-    ).order_by('-created_at')[:50]
+    ).order_by('-created_at')[:100]
     data = [_serialize_notification(n) for n in notifications]
     unread_count = Notification.objects.filter(
         recipient=request.user, is_read=False

@@ -43,7 +43,7 @@ class User(AbstractUser):
         upload_to='profiles/',
         blank=True,
         null=True,
-        default='profiles/default.jpg',
+        max_length=500,
         validators=[validate_image],
     )
 
