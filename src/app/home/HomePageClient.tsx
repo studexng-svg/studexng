@@ -51,7 +51,12 @@ function SafeImage({ src, alt, className }: {
 function VendorAvatar({ src, name }: { src: string | null; name: string }) {
   const [error, setError] = useState(false);
   const initials = (name || "??").slice(0, 2).toUpperCase();
-  if (!src || error) {
+  const resolvedSrc = src
+    ? src.startsWith("http")
+      ? src
+      : `${API_URL}${src}`
+    : null;
+  if (!resolvedSrc || error) {
     return (
       <div className="w-16 h-16 rounded-full flex items-center justify-center text-white font-bold text-lg flex-shrink-0"
         style={{ background: GRAD }}>
@@ -61,7 +66,7 @@ function VendorAvatar({ src, name }: { src: string | null; name: string }) {
   }
   return (
     <div className="w-16 h-16 rounded-full overflow-hidden flex-shrink-0">
-      <img src={src} alt={name} className="w-full h-full object-cover block" onError={() => setError(true)} />
+      <img src={resolvedSrc} alt={name} className="w-full h-full object-cover block" onError={() => setError(true)} />
     </div>
   );
 }

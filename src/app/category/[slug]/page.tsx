@@ -1,7 +1,8 @@
 // src/app/category/[slug]/page.tsx
-export const revalidate = 60;
+export const dynamic = 'force-dynamic';
 
 import type { Metadata } from "next";
+import { cookies } from 'next/headers';
 import CategoryPageClient from "./CategoryPageClient";
 
 function slugToTitle(slug: string) {
@@ -50,10 +51,12 @@ interface Listing {
 
 export default async function CategoryPage({ params }: { params: { slug: string } }) {
   const { slug } = params;
+  const cookieStore = await cookies();
+  const campus = cookieStore.get('studex_campus')?.value || 'pau';
   let initialListings: Listing[] = [];
   try {
-    const res = await fetch(`${API_URL}/api/services/listings/?category=${slug}`, {
-      next: { revalidate: 60 },
+    const res = await fetch(`${API_URL}/api/services/listings/?category=${slug}&campus=${campus}`, {
+      cache: 'no-store',
       headers: { "Content-Type": "application/json" },
     });
     if (res.ok) {

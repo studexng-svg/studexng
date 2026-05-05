@@ -395,10 +395,10 @@ function BookingsTab() {
                 <div className="bg-teal-50 border border-teal-100 rounded-xl p-3 col-span-2">
                   <p className="text-teal-500 text-xs mb-0.5">Your payout</p>
                   <p className="font-bold text-teal-600 text-lg">
-                    ₦{Math.max(0, Number(booking.listing_price || 0) - 200).toLocaleString()}
+                    ₦{Math.max(0, Number(booking.listing_price || 0) - 205.56).toLocaleString()}
                   </p>
                   <p className="text-stone-400 text-xs mt-0.5">
-                    (₦{Number(booking.listing_price || 0).toLocaleString()} minus ₦200 service fee)
+                    (₦{Number(booking.listing_price || 0).toLocaleString()} minus ₦205.56 service fee)
                   </p>
                 </div>
               </div>
@@ -477,7 +477,7 @@ function EarningsTab() {
     },
     {
       label: "Service Fee",
-      value: "₦200",
+      value: "₦205.56",
       color: "text-stone-600",
       bg: "bg-stone-50 border-stone-100",
       note: "Flat fee per transaction",
@@ -509,7 +509,7 @@ function EarningsTab() {
           </div>
           <div className="flex items-start gap-3 bg-stone-50 border border-stone-100 rounded-xl p-3">
             <span className="text-teal-600 font-bold text-base leading-none">2</span>
-            <p>Paystack instantly splits the payment — <span className="text-stone-800 font-semibold">₦200 goes to StudEx</span> as a flat service fee.</p>
+            <p>Paystack instantly splits the payment — <span className="text-stone-800 font-semibold">₦205.56 goes to StudEx</span> as a flat service fee.</p>
           </div>
           <div className="flex items-start gap-3 bg-stone-50 border border-stone-100 rounded-xl p-3">
             <span className="text-teal-600 font-bold text-base leading-none">3</span>
@@ -809,7 +809,7 @@ function OrdersTab() {
                 <div className="text-right">
                   <p className="text-xs text-stone-400">Your payout</p>
                   <p className="font-bold text-teal-600">
-                    ₦{Math.max(0, Number(order.amount) - 200).toLocaleString()}
+                    ₦{Math.max(0, Number(order.amount) - 205.56).toLocaleString()}
                   </p>
                 </div>
               </div>

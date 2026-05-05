@@ -231,7 +231,7 @@ export default function BankAccountPage() {
           <div>
             <p className="font-semibold text-teal-800 text-sm">How payouts work</p>
             <p className="text-xs text-teal-700 mt-1">
-              Your cut (70–85%) is held for 7 days after an order completes, then automatically sent to this account via Paystack.
+              When a customer pays, your earnings are sent to this account via Paystack's standard settlement cycle (usually 1-2 business days).
             </p>
           </div>
         </div>

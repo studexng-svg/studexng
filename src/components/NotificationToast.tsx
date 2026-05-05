@@ -134,10 +134,11 @@ export function NotificationToastContainer({
     */
     <div
       className="
-        fixed top-4 right-4 z-[9999]
+        fixed top-4 z-[9999]
         flex flex-col gap-2
         pointer-events-none
-        sm:items-end items-center
+        left-1/2 -translate-x-1/2 items-center
+        sm:left-auto sm:right-4 sm:translate-x-0 sm:items-end
         max-h-screen overflow-hidden
       "
     >

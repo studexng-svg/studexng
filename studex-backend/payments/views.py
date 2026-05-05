@@ -20,14 +20,14 @@ logger = logging.getLogger(__name__)
 PAYSTACK_BASE = "https://api.paystack.co"
 
 # ─────────────────────────────────────────
-# ₦200 flat service fee per transaction.
+# ₦205.56 flat service fee per transaction.
 # Paystack splits at payment time via subaccount:
 #   subaccount = vendor's ACCT_xxx code
-#   transaction_charge = 20000 kobo (₦200) → goes to StudEx (main account)
+#   transaction_charge = 20556 kobo (₦205.56) → goes to StudEx (main account)
 #   bearer = "account" → StudEx bears Paystack's processing fee
-#   vendor receives: (amount_in_kobo - 20000) kobo
+#   vendor receives: (amount_in_kobo - 20556) kobo
 # ─────────────────────────────────────────
-SERVICE_FEE = Decimal("200")
+SERVICE_FEE = Decimal("205.56")
 
 
 def _split_amounts(amount: Decimal):
@@ -237,10 +237,10 @@ def get_checkout_config(request):
         "paystack_subaccount_code": subaccount_code,
         "subaccount_ready": bool(subaccount_code),
         # Pass subaccount and transaction_charge into PaystackPop.setup()
-        # transaction_charge = 20000 kobo → StudEx gets ₦200, vendor gets the rest
+        # transaction_charge = 20556 kobo → StudEx gets ₦205.56, vendor gets the rest
         "paystack_split": {
             "subaccount": subaccount_code,
-            "transaction_charge": 20000,
+            "transaction_charge": 20556,
             "bearer": "account",
         } if subaccount_code else None,
     })
@@ -319,7 +319,7 @@ def initialize_payment(request):
 
     if subaccount_code:
         payload["subaccount"] = subaccount_code
-        payload["transaction_charge"] = 20000  # ₦200 StudEx fee in kobo
+        payload["transaction_charge"] = 20556  # ₦205.56 StudEx fee in kobo
         payload["bearer"] = "account"  # StudEx bears Paystack transaction fees
     else:
         logger.warning(
