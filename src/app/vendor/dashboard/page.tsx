@@ -549,6 +549,7 @@ function EarningsTab() {
 
 /* ─── LISTINGS TAB ───────────────────────────────────────────── */
 function ListingsTab() {
+  const { user } = useAuth();
   const [listings, setListings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -562,11 +563,12 @@ function ListingsTab() {
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState("");
 
-  useEffect(() => { loadListings(); loadCategories(); }, []);
+  useEffect(() => { loadListings(); loadCategories(); }, [user]);
 
   const loadListings = async () => {
+    if (!user?.username) return;
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/services/listings/`);
+      const res = await fetchWithAuth(`${API_URL}/api/services/listings/?vendor_username=${user.username}`);
       const data = await res.json();
       setListings(toArray(data));
     } catch {} finally { setLoading(false); }
