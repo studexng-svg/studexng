@@ -341,23 +341,23 @@ class VendorListSerializer(serializers.ModelSerializer):
         ]
 
     def get_profile_picture(self, obj):
-        for field in ['profile_image', 'profile_picture', 'avatar', 'image']:
-            val = getattr(obj, field, None)
-            if val:
-                if hasattr(val, 'url'):
-                    try:
-                        url = val.url
-                        if url and url.startswith('http'):
-                            return url
-                        request = self.context.get('request')
-                        if url and request:
-                            return request.build_absolute_uri(url)
-                        return url or None
-                    except Exception:
-                        continue
-                if isinstance(val, str) and val.startswith('http'):
-                    return val
-        return None
+        if not obj.profile_image:
+            return None
+        name = getattr(obj.profile_image, 'name', None)
+        if not name or name == 'profiles/default.jpg':
+            return None
+        if name.startswith('http'):
+            return name
+        try:
+            url = obj.profile_image.url
+            if url and url.startswith('http'):
+                return url
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(url)
+            return url
+        except Exception:
+            return None
 
     def get_vendor_badge(self, obj):
         try:

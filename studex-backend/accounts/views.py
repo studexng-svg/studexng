@@ -387,6 +387,40 @@ class SellerApplicationViewSet(viewsets.ModelViewSet):
             action_url='/seller',
         )
 
+        try:
+            resend.api_key = settings.RESEND_API_KEY
+            display_name = user.business_name or user.username
+            resend.Emails.send({
+                'from': 'StudEx <noreply@studex.com.ng>',
+                'to': [user.email],
+                'subject': 'You are now a verified vendor on StudEx!',
+                'html': f'''
+                    <div style="font-family: DM Sans, sans-serif; max-width: 520px; margin: 0 auto; padding: 40px 32px; background: #ffffff;">
+                        <h1 style="font-size: 26px; color: #1C1917; margin-bottom: 8px;">Congratulations, {display_name}! 🎉</h1>
+                        <p style="font-size: 16px; color: #44403C; line-height: 1.6;">
+                            We are thrilled to let you know that your vendor application has been <strong>approved</strong>.
+                            You are now officially a verified vendor on <strong>StudEx</strong> and your profile is live on the marketplace.
+                        </p>
+                        <div style="background: linear-gradient(135deg, #0D9488, #7C3AED); border-radius: 16px; padding: 28px 24px; margin: 28px 0; text-align: center;">
+                            <p style="color: #ffffff; font-size: 18px; font-weight: 600; margin: 0 0 6px 0;">You are verified ✓</p>
+                            <p style="color: #e0f2fe; font-size: 14px; margin: 0;">Students on your campus can now discover and book your services.</p>
+                        </div>
+                        <p style="font-size: 15px; color: #44403C; line-height: 1.6;">
+                            Head over to your seller dashboard to create your first listing, set your prices, and start receiving orders.
+                            We built StudEx to help talented people like you grow, and we are excited to see what you bring to the community.
+                        </p>
+                        <a href="{settings.FRONTEND_BASE_URL}/seller" style="display: inline-block; margin-top: 20px; padding: 14px 28px; background: #0D9488; color: #ffffff; text-decoration: none; border-radius: 10px; font-size: 15px; font-weight: 600;">
+                            Go to Seller Dashboard
+                        </a>
+                        <p style="margin-top: 36px; font-size: 13px; color: #A8A29E;">
+                            If you have any questions, reach out to us anytime. Welcome to the StudEx vendor family!
+                        </p>
+                    </div>
+                ''',
+            })
+        except Exception as e:
+            print(f"Resend vendor approval email error: {e}")
+
         return Response({
             'message': f'{user.username} has been approved as a seller.',
             'status': 'approved',

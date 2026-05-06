@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ChevronLeft, Star, Sparkles } from "lucide-react";
+import { ChevronLeft, Star, Sparkles, MapPin } from "lucide-react";
 import Link from "next/link";
 import { fetchWithAuth } from "@/lib/authStore";
 import { GRAD, GRAD_TEXT, SERIF } from "@/lib/tokens";
@@ -112,6 +112,12 @@ export default function VendorProfilePage() {
                   <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
                   <span className="text-xs text-stone-600 font-medium">{vendor.rating}</span>
                   <span className="text-xs text-stone-400">({vendor.total_reviews} reviews)</span>
+                </div>
+              )}
+              {vendor.hostel && (
+                <div className="flex items-center gap-1 mt-1">
+                  <MapPin className="w-3 h-3 text-teal-500" />
+                  <span className="text-xs text-stone-400">{vendor.hostel}</span>
                 </div>
               )}
             </div>
