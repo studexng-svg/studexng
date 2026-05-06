@@ -423,7 +423,7 @@ export default function HomePageClient({ initialVendors, initialListings }: Prop
                             alignItems: 'center',
                             justifyContent: 'center',
                           }}>
-                            <VendorAvatar src={vendor.profile_picture} name={vendor.business_name || vendor.username} />
+                            <VendorAvatar src={vendor.username === user?.username && user?.profile_image ? user.profile_image : vendor.profile_picture} name={vendor.business_name || vendor.username} />
                           </div>
                         </div>
                         {vendor.vendor_badge && vendor.vendor_badge !== "none" && (
@@ -653,7 +653,7 @@ export default function HomePageClient({ initialVendors, initialListings }: Prop
                         <div className="relative flex-shrink-0">
                           <div style={{ borderRadius: "50%", padding: "3px", background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                             <div style={{ borderRadius: "50%", padding: "2px", background: "#FAFAF9", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                              <VendorAvatar src={vendor.profile_picture} name={vendor.business_name || vendor.username} />
+                              <VendorAvatar src={vendor.username === user?.username && user?.profile_image ? user.profile_image : vendor.profile_picture} name={vendor.business_name || vendor.username} />
                             </div>
                           </div>
                           {vendor.vendor_badge && vendor.vendor_badge !== "none" && (

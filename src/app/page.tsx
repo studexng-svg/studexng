@@ -2,7 +2,12 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowRight, Sparkles, Star, Quote } from "lucide-react";
+import {
+  MagnifyingGlass, CreditCard, CheckCircle, ShoppingBag, Briefcase,
+  ShieldCheck, Lightning, ForkKnife, Sparkle, Drop, Camera, TShirt, Barbell,
+} from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
+import type { Icon as PhosphorIcon } from "@phosphor-icons/react";
 import { useRouter } from "next/navigation";
 import Script from "next/script";
 import Link from "next/link";
@@ -43,6 +48,54 @@ function Stars({ count }: { count: number }) {
           className={`w-4 h-4 ${i < count ? "fill-amber-400 text-amber-400" : "text-stone-200"}`}
         />
       ))}
+    </div>
+  );
+}
+
+/* ─── 3-D GLOSSY ICON ───────────────────────────────────── */
+function Icon3D({
+  icon: IconComp,
+  from,
+  to,
+  glow,
+  px = 56,
+  iconPx = 28,
+  radius = 16,
+}: {
+  icon: PhosphorIcon;
+  from: string;
+  to: string;
+  glow: string;
+  px?: number;
+  iconPx?: number;
+  radius?: number;
+}) {
+  return (
+    <div
+      className="relative flex items-center justify-center flex-shrink-0 overflow-hidden"
+      style={{
+        width: px,
+        height: px,
+        borderRadius: radius,
+        background: `linear-gradient(145deg, ${from} 0%, ${to} 100%)`,
+        boxShadow: [
+          `0 12px 32px ${glow}`,
+          "0 2px 6px rgba(0,0,0,0.18)",
+          "inset 0 1px 0 rgba(255,255,255,0.55)",
+          "inset 0 -1px 0 rgba(0,0,0,0.14)",
+        ].join(", "),
+      }}
+    >
+      {/* Specular gloss highlight — top */}
+      <div
+        className="absolute inset-x-0 top-0 pointer-events-none"
+        style={{
+          height: "55%",
+          borderRadius: `${radius}px ${radius}px 60% 60% / ${radius}px ${radius}px 50% 50%`,
+          background: "linear-gradient(180deg, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.05) 100%)",
+        }}
+      />
+      <IconComp weight="fill" size={iconPx} color="white" style={{ filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.3))" }} />
     </div>
   );
 }
@@ -296,7 +349,9 @@ export default function LandingPage() {
           <div className="grid grid-cols-2 gap-4 max-w-lg">
             <Link href="/auth">
               <div className="p-5 rounded-2xl border-2 border-teal-500 bg-teal-50 hover:bg-teal-100 transition cursor-pointer">
-                <p className="text-2xl mb-2">🛍️</p>
+                <div className="mb-3">
+                  <Icon3D icon={ShoppingBag} from="#5eead4" to="#0f766e" glow="rgba(13,148,136,0.45)" px={44} iconPx={22} radius={12} />
+                </div>
                 <p className="font-black text-stone-900 text-sm uppercase tracking-wide">I&apos;m a Student</p>
                 <p className="text-stone-500 text-xs mt-1">Browse and order services on campus</p>
                 <p className="text-teal-600 font-bold text-xs mt-3">Start Ordering →</p>
@@ -304,7 +359,9 @@ export default function LandingPage() {
             </Link>
             <Link href="/auth">
               <div className="p-5 rounded-2xl border-2 border-purple-500 bg-purple-50 hover:bg-purple-100 transition cursor-pointer">
-                <p className="text-2xl mb-2">💼</p>
+                <div className="mb-3">
+                  <Icon3D icon={Briefcase} from="#d8b4fe" to="#7c3aed" glow="rgba(124,58,237,0.45)" px={44} iconPx={22} radius={12} />
+                </div>
                 <p className="font-black text-stone-900 text-sm uppercase tracking-wide">I&apos;m a Vendor</p>
                 <p className="text-stone-500 text-xs mt-1">List your services and earn on campus</p>
                 <p className="text-purple-600 font-bold text-xs mt-3">Start Selling →</p>
@@ -322,13 +379,15 @@ export default function LandingPage() {
           </h2>
           <div className="max-w-3xl mx-auto grid grid-cols-3 lg:gap-20 gap-6">
             {[
-              { num: "01", icon: "🔍", title: "Browse", desc: "Find services from verified vendors on your campus" },
-              { num: "02", icon: "💳", title: "Pay", desc: "Secure payment via Paystack — fast and safe" },
-              { num: "03", icon: "✅", title: "Receive", desc: "Confirm delivery and release payment to vendor" },
+              { num: "01", Icon: MagnifyingGlass, from: "#5eead4", to: "#0f766e", glow: "rgba(13,148,136,0.45)", title: "Browse",  desc: "Find services from verified vendors on your campus" },
+              { num: "02", Icon: CreditCard,     from: "#d8b4fe", to: "#7c3aed", glow: "rgba(124,58,237,0.45)", title: "Pay",     desc: "Secure payment via Paystack — fast and safe" },
+              { num: "03", Icon: CheckCircle,    from: "#86efac", to: "#16a34a", glow: "rgba(22,163,74,0.40)",  title: "Receive", desc: "Confirm delivery and release payment to vendor" },
             ].map((step) => (
-              <div key={step.num} className="text-center">
-                <p className="text-5xl font-black text-white/30 mb-2">{step.num}</p>
-                <p className="text-3xl mb-3">{step.icon}</p>
+              <div key={step.num} className="text-center flex flex-col items-center">
+                <p className="text-5xl font-black text-white/30 mb-3">{step.num}</p>
+                <div className="mb-3">
+                  <Icon3D icon={step.Icon} from={step.from} to={step.to} glow={step.glow} px={56} iconPx={28} radius={16} />
+                </div>
                 <p className="font-black text-white text-sm uppercase tracking-wider mb-1">{step.title}</p>
                 <p className="text-white/85 text-xs leading-relaxed">{step.desc}</p>
               </div>
@@ -357,16 +416,18 @@ export default function LandingPage() {
             {/* Grid — right col on desktop */}
             <div className="flex-1 grid grid-cols-2 md:grid-cols-3 gap-3">
               {[
-                { emoji: "🍜", name: "Food & Drinks", desc: "Jollof, pasta, zobo & more", color: "bg-orange-50 border-orange-100" },
-                { emoji: "💅", name: "Beauty", desc: "Nails, lashes, makeup", color: "bg-purple-50 border-purple-100" },
-                { emoji: "🧺", name: "Laundry", desc: "Wash, dry & fold", color: "bg-teal-50 border-teal-100" },
-                { emoji: "📸", name: "Photography", desc: "Shoots & editing", color: "bg-blue-50 border-blue-100" },
-                { emoji: "👗", name: "Fashion", desc: "Tailoring & styling", color: "bg-pink-50 border-pink-100" },
-                { emoji: "💪", name: "Fitness", desc: "Personal trainers", color: "bg-green-50 border-green-100" },
+                { Icon: ForkKnife, from: "#fed7aa", to: "#ea580c", glow: "rgba(234,88,12,0.40)",   name: "Food & Drinks", desc: "Jollof, pasta, zobo & more", color: "bg-orange-50 border-orange-100" },
+                { Icon: Sparkle,  from: "#d8b4fe", to: "#7c3aed", glow: "rgba(124,58,237,0.40)", name: "Beauty",        desc: "Nails, lashes, makeup",       color: "bg-purple-50 border-purple-100" },
+                { Icon: Drop,     from: "#5eead4", to: "#0f766e", glow: "rgba(13,148,136,0.40)",  name: "Laundry",       desc: "Wash, dry & fold",            color: "bg-teal-50 border-teal-100" },
+                { Icon: Camera,   from: "#bfdbfe", to: "#2563eb", glow: "rgba(37,99,235,0.40)",   name: "Photography",   desc: "Shoots & editing",            color: "bg-blue-50 border-blue-100" },
+                { Icon: TShirt,   from: "#fbcfe8", to: "#db2777", glow: "rgba(219,39,119,0.40)",  name: "Fashion",       desc: "Tailoring & styling",         color: "bg-pink-50 border-pink-100" },
+                { Icon: Barbell,  from: "#bbf7d0", to: "#16a34a", glow: "rgba(22,163,74,0.40)",   name: "Fitness",       desc: "Personal trainers",           color: "bg-green-50 border-green-100" },
               ].map((cat) => (
                 <Link key={cat.name} href="/home">
                   <div className={`${cat.color} border rounded-2xl p-4 lg:p-5 hover:scale-105 active:scale-95 transition-transform cursor-pointer`}>
-                    <p className="text-3xl mb-2">{cat.emoji}</p>
+                    <div className="mb-3">
+                      <Icon3D icon={cat.Icon} from={cat.from} to={cat.to} glow={cat.glow} px={44} iconPx={22} radius={12} />
+                    </div>
                     <p className="font-black text-stone-900 text-sm uppercase tracking-wide">{cat.name}</p>
                     <p className="text-stone-400 text-xs mt-0.5">{cat.desc}</p>
                   </div>
@@ -478,11 +539,11 @@ export default function LandingPage() {
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {[
-              { icon: "✅", title: "Verified Vendors Only", desc: "Every vendor submits valid ID before listing on StudEx" },
-              { icon: "⚡", title: "Campus-Fast", desc: "Everything is on campus — no long waits or delivery fees" },
+              { Icon: ShieldCheck, from: "#a7f3d0", to: "#059669", glow: "rgba(5,150,105,0.5)",  title: "Verified Vendors Only", desc: "Every vendor submits valid ID before listing on StudEx" },
+              { Icon: Lightning,   from: "#fde68a", to: "#d97706", glow: "rgba(217,119,6,0.45)", title: "Campus-Fast",           desc: "Everything is on campus — no long waits or delivery fees" },
             ].map((item) => (
               <div key={item.title} className="flex items-start gap-4 p-5 rounded-2xl bg-white/15 border border-white/25 hover:bg-white/25 transition">
-                <span className="text-2xl flex-shrink-0">{item.icon}</span>
+                <Icon3D icon={item.Icon} from={item.from} to={item.to} glow={item.glow} px={48} iconPx={24} radius={14} />
                 <div>
                   <p className="font-black text-white text-sm uppercase tracking-wide">{item.title}</p>
                   <p className="text-white/90 text-xs mt-0.5 leading-relaxed">{item.desc}</p>

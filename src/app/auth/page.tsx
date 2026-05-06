@@ -128,7 +128,6 @@ export default function AuthPage() {
   const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
   const [resetSent, setResetSent] = useState(false);
-  const [resetLink, setResetLink] = useState("");
   const [accountDisabled, setAccountDisabled] = useState(false);
 
   const [loginEmail, setLoginEmail] = useState("");
@@ -238,8 +237,8 @@ export default function AuthPage() {
     if (!resetEmail || !resetEmail.includes("@")) { setLoginError("Please enter a valid email address"); return; }
     setIsLoading(true); setLoginError("");
     try {
-      const result = await api.forgotPassword(resetEmail);
-      setResetLink((result as any).reset_url || ""); setResetSent(true);
+      await api.forgotPassword(resetEmail);
+      setResetSent(true);
     } catch (err: any) { setLoginError(err.message || "Something went wrong."); }
     finally { setIsLoading(false); }
   };
@@ -379,19 +378,12 @@ export default function AuthPage() {
                         <Mail className="w-8 h-8 text-teal-600" />
                       </div>
                       <div>
-                        <h3 className="text-lg font-bold text-stone-900"
-                          style={SERIF}>Link Ready!</h3>
-                        <p className="text-sm text-stone-400 mt-1">Reset link for</p>
+                        <h3 className="text-lg font-bold text-stone-900" style={SERIF}>Check your inbox!</h3>
+                        <p className="text-sm text-stone-400 mt-1">We sent a reset link to</p>
                         <p className="font-semibold text-teal-600 mt-0.5 text-sm">{resetEmail}</p>
+                        <p className="text-xs text-stone-400 mt-2">Can&apos;t find it? Check your spam or junk folder.</p>
                       </div>
-                      {resetLink && (
-                        <a href={resetLink}
-                          className="block w-full py-3.5 rounded-full text-white font-semibold text-sm text-center shadow-lg shadow-teal-200/60"
-                          style={{ background: GRAD }}>
-                          Reset My Password →
-                        </a>
-                      )}
-                      <button type="button" onClick={() => { setIsForgotPassword(false); setResetSent(false); setResetEmail(""); setResetLink(""); setLoginError(""); }}
+                      <button type="button" onClick={() => { setIsForgotPassword(false); setResetSent(false); setResetEmail(""); setLoginError(""); }}
                         className="w-full text-center text-teal-600 font-medium text-sm hover:underline">
                         Back to Login
                       </button>

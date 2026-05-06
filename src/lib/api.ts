@@ -140,8 +140,8 @@ class API {
 
   logout() {}
 
-  async forgotPassword(email: string): Promise<{ detail: string; reset_url?: string }> {
-    const response = await fetch(`${this.baseURL}/api/auth/forgot-password/`, {
+  async forgotPassword(email: string): Promise<{ detail: string }> {
+    const response = await fetch("/api/forgot-password", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email }),
