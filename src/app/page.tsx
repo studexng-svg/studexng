@@ -1,13 +1,13 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowRight, Sparkles, Star, Quote } from "lucide-react";
 import {
-  MagnifyingGlass, CreditCard, CheckCircle, ShoppingBag, Briefcase,
-  ShieldCheck, Lightning, ForkKnife, Sparkle, Drop, Camera, TShirt, Barbell,
-} from "@phosphor-icons/react";
+  ArrowRight, Sparkles, Star, Quote,
+  Search, CreditCard, CheckCircle, GraduationCap, Store,
+  ShieldCheck, Zap, Utensils, Droplets, Camera, Shirt, Dumbbell,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { useEffect, useState } from "react";
-import type { Icon as PhosphorIcon } from "@phosphor-icons/react";
 import { useRouter } from "next/navigation";
 import Script from "next/script";
 import Link from "next/link";
@@ -52,24 +52,26 @@ function Stars({ count }: { count: number }) {
   );
 }
 
-/* ─── 3-D GLOSSY ICON ───────────────────────────────────── */
+/* ─── GLASS ICON ─────────────────────────────────────────── */
 function Icon3D({
   icon: IconComp,
-  from,
-  to,
-  glow,
-  px = 56,
-  iconPx = 28,
-  radius = 16,
+  color = "#374151",
+  px = 48,
+  iconPx = 22,
+  radius = 14,
+  glint = false,
+  glintDelay = 0,
 }: {
-  icon: PhosphorIcon;
-  from: string;
-  to: string;
-  glow: string;
+  icon: LucideIcon;
+  color?: string;
   px?: number;
   iconPx?: number;
   radius?: number;
+  glint?: boolean;
+  glintDelay?: number;
 }) {
+  const onDark = color === "white";
+
   return (
     <div
       className="relative flex items-center justify-center flex-shrink-0 overflow-hidden"
@@ -77,25 +79,26 @@ function Icon3D({
         width: px,
         height: px,
         borderRadius: radius,
-        background: `linear-gradient(145deg, ${from} 0%, ${to} 100%)`,
-        boxShadow: [
-          `0 12px 32px ${glow}`,
-          "0 2px 6px rgba(0,0,0,0.18)",
-          "inset 0 1px 0 rgba(255,255,255,0.55)",
-          "inset 0 -1px 0 rgba(0,0,0,0.14)",
-        ].join(", "),
+        background: onDark ? "rgba(255,255,255,0.14)" : "rgba(255,255,255,0.78)",
+        backdropFilter: "blur(12px)",
+        WebkitBackdropFilter: "blur(12px)",
+        border: `1px solid ${onDark ? "rgba(255,255,255,0.22)" : "rgba(0,0,0,0.08)"}`,
+        boxShadow: onDark
+          ? "0 2px 14px rgba(0,0,0,0.14), inset 0 1px 0 rgba(255,255,255,0.22)"
+          : "0 2px 10px rgba(0,0,0,0.07), inset 0 1px 0 rgba(255,255,255,0.95)",
       }}
     >
-      {/* Specular gloss highlight — top */}
-      <div
-        className="absolute inset-x-0 top-0 pointer-events-none"
-        style={{
-          height: "55%",
-          borderRadius: `${radius}px ${radius}px 60% 60% / ${radius}px ${radius}px 50% 50%`,
-          background: "linear-gradient(180deg, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.05) 100%)",
-        }}
-      />
-      <IconComp weight="fill" size={iconPx} color="white" style={{ filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.3))" }} />
+      {glint && (
+        <motion.div
+          animate={{ x: ["-120%", "220%"] }}
+          transition={{ duration: 1.4, repeat: Infinity, repeatDelay: 3.7, ease: "easeInOut", delay: glintDelay }}
+          style={{
+            position: "absolute", inset: 0, zIndex: 10, pointerEvents: "none",
+            background: "linear-gradient(108deg, transparent 20%, rgba(255,255,255,0.44) 50%, transparent 80%)",
+          }}
+        />
+      )}
+      <IconComp size={iconPx} strokeWidth={1.75} color={color} style={{ position: "relative", zIndex: 1 }} />
     </div>
   );
 }
@@ -350,7 +353,7 @@ export default function LandingPage() {
             <Link href="/auth">
               <div className="p-5 rounded-2xl border-2 border-teal-500 bg-teal-50 hover:bg-teal-100 transition cursor-pointer">
                 <div className="mb-3">
-                  <Icon3D icon={ShoppingBag} from="#5eead4" to="#0f766e" glow="rgba(13,148,136,0.45)" px={44} iconPx={22} radius={12} />
+                  <Icon3D icon={GraduationCap} px={44} iconPx={22} radius={12} color="#0D9488" />
                 </div>
                 <p className="font-black text-stone-900 text-sm uppercase tracking-wide">I&apos;m a Student</p>
                 <p className="text-stone-500 text-xs mt-1">Browse and order services on campus</p>
@@ -360,7 +363,7 @@ export default function LandingPage() {
             <Link href="/auth">
               <div className="p-5 rounded-2xl border-2 border-purple-500 bg-purple-50 hover:bg-purple-100 transition cursor-pointer">
                 <div className="mb-3">
-                  <Icon3D icon={Briefcase} from="#d8b4fe" to="#7c3aed" glow="rgba(124,58,237,0.45)" px={44} iconPx={22} radius={12} />
+                  <Icon3D icon={Store} px={44} iconPx={22} radius={12} color="#7C3AED" />
                 </div>
                 <p className="font-black text-stone-900 text-sm uppercase tracking-wide">I&apos;m a Vendor</p>
                 <p className="text-stone-500 text-xs mt-1">List your services and earn on campus</p>
@@ -379,14 +382,14 @@ export default function LandingPage() {
           </h2>
           <div className="max-w-3xl mx-auto grid grid-cols-3 lg:gap-20 gap-6">
             {[
-              { num: "01", Icon: MagnifyingGlass, from: "#5eead4", to: "#0f766e", glow: "rgba(13,148,136,0.45)", title: "Browse",  desc: "Find services from verified vendors on your campus" },
-              { num: "02", Icon: CreditCard,     from: "#d8b4fe", to: "#7c3aed", glow: "rgba(124,58,237,0.45)", title: "Pay",     desc: "Secure payment via Paystack — fast and safe" },
-              { num: "03", Icon: CheckCircle,    from: "#86efac", to: "#16a34a", glow: "rgba(22,163,74,0.40)",  title: "Receive", desc: "Confirm delivery and release payment to vendor" },
+              { num: "01", Icon: Search,      title: "Browse",  desc: "Find services from verified vendors on your campus" },
+              { num: "02", Icon: CreditCard,  title: "Pay",     desc: "Secure payment via Paystack, fast and safe" },
+              { num: "03", Icon: CheckCircle, title: "Receive", desc: "Confirm delivery and release payment to vendor" },
             ].map((step) => (
               <div key={step.num} className="text-center flex flex-col items-center">
                 <p className="text-5xl font-black text-white/30 mb-3">{step.num}</p>
                 <div className="mb-3">
-                  <Icon3D icon={step.Icon} from={step.from} to={step.to} glow={step.glow} px={56} iconPx={28} radius={16} />
+                  <Icon3D icon={step.Icon} px={52} iconPx={24} radius={16} color="white" />
                 </div>
                 <p className="font-black text-white text-sm uppercase tracking-wider mb-1">{step.title}</p>
                 <p className="text-white/85 text-xs leading-relaxed">{step.desc}</p>
@@ -416,17 +419,17 @@ export default function LandingPage() {
             {/* Grid — right col on desktop */}
             <div className="flex-1 grid grid-cols-2 md:grid-cols-3 gap-3">
               {[
-                { Icon: ForkKnife, from: "#fed7aa", to: "#ea580c", glow: "rgba(234,88,12,0.40)",   name: "Food & Drinks", desc: "Jollof, pasta, zobo & more", color: "bg-orange-50 border-orange-100" },
-                { Icon: Sparkle,  from: "#d8b4fe", to: "#7c3aed", glow: "rgba(124,58,237,0.40)", name: "Beauty",        desc: "Nails, lashes, makeup",       color: "bg-purple-50 border-purple-100" },
-                { Icon: Drop,     from: "#5eead4", to: "#0f766e", glow: "rgba(13,148,136,0.40)",  name: "Laundry",       desc: "Wash, dry & fold",            color: "bg-teal-50 border-teal-100" },
-                { Icon: Camera,   from: "#bfdbfe", to: "#2563eb", glow: "rgba(37,99,235,0.40)",   name: "Photography",   desc: "Shoots & editing",            color: "bg-blue-50 border-blue-100" },
-                { Icon: TShirt,   from: "#fbcfe8", to: "#db2777", glow: "rgba(219,39,119,0.40)",  name: "Fashion",       desc: "Tailoring & styling",         color: "bg-pink-50 border-pink-100" },
-                { Icon: Barbell,  from: "#bbf7d0", to: "#16a34a", glow: "rgba(22,163,74,0.40)",   name: "Fitness",       desc: "Personal trainers",           color: "bg-green-50 border-green-100" },
+                { Icon: Utensils, iconColor: "#ea580c", name: "Food & Drinks", desc: "Jollof, pasta, zobo & more" },
+                { Icon: Sparkles, iconColor: "#7c3aed", name: "Beauty",        desc: "Nails, lashes, makeup"      },
+                { Icon: Droplets, iconColor: "#0D9488", name: "Laundry",       desc: "Wash, dry & fold"           },
+                { Icon: Camera,   iconColor: "#2563eb", name: "Photography",   desc: "Shoots & editing"           },
+                { Icon: Shirt,    iconColor: "#db2777", name: "Fashion",       desc: "Tailoring & styling"        },
+                { Icon: Dumbbell, iconColor: "#16a34a", name: "Fitness",       desc: "Personal trainers"          },
               ].map((cat) => (
                 <Link key={cat.name} href="/home">
-                  <div className={`${cat.color} border rounded-2xl p-4 lg:p-5 hover:scale-105 active:scale-95 transition-transform cursor-pointer`}>
+                  <div className="bg-stone-50 border border-stone-200 rounded-2xl p-4 lg:p-5 hover:scale-105 active:scale-95 transition-transform cursor-pointer">
                     <div className="mb-3">
-                      <Icon3D icon={cat.Icon} from={cat.from} to={cat.to} glow={cat.glow} px={44} iconPx={22} radius={12} />
+                      <Icon3D icon={cat.Icon} px={44} iconPx={22} radius={12} color={cat.iconColor} />
                     </div>
                     <p className="font-black text-stone-900 text-sm uppercase tracking-wide">{cat.name}</p>
                     <p className="text-stone-400 text-xs mt-0.5">{cat.desc}</p>
@@ -539,11 +542,11 @@ export default function LandingPage() {
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {[
-              { Icon: ShieldCheck, from: "#a7f3d0", to: "#059669", glow: "rgba(5,150,105,0.5)",  title: "Verified Vendors Only", desc: "Every vendor submits valid ID before listing on StudEx" },
-              { Icon: Lightning,   from: "#fde68a", to: "#d97706", glow: "rgba(217,119,6,0.45)", title: "Campus-Fast",           desc: "Everything is on campus — no long waits or delivery fees" },
+              { Icon: ShieldCheck, title: "Verified Vendors Only", desc: "Every vendor submits valid ID before listing on StudEx" },
+              { Icon: Zap,         title: "Campus-Fast",           desc: "Everything is on campus, no long waits or delivery fees" },
             ].map((item) => (
               <div key={item.title} className="flex items-start gap-4 p-5 rounded-2xl bg-white/15 border border-white/25 hover:bg-white/25 transition">
-                <Icon3D icon={item.Icon} from={item.from} to={item.to} glow={item.glow} px={48} iconPx={24} radius={14} />
+                <Icon3D icon={item.Icon} px={48} iconPx={22} radius={14} color="white" glint />
                 <div>
                   <p className="font-black text-white text-sm uppercase tracking-wide">{item.title}</p>
                   <p className="text-white/90 text-xs mt-0.5 leading-relaxed">{item.desc}</p>

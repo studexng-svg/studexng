@@ -3,7 +3,7 @@ from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
-from studex.validators import validate_image
+from studex.validators import validate_image, validate_document
 
 
 class User(AbstractUser):
@@ -117,16 +117,25 @@ class SellerApplication(models.Model):
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='seller_application')
 
-    # ✅ UPDATED: Front and back of ID card only (removed admission_letter)
+    # Option A: both sides of student ID card
     id_front = models.ImageField(
         upload_to='seller_verification/id_front/',
         validators=[validate_image],
-        help_text="Front of student ID card"
+        help_text="Front of student ID card",
+        blank=True, null=True,
     )
     id_back = models.ImageField(
         upload_to='seller_verification/id_back/',
         validators=[validate_image],
-        help_text="Back of student ID card"
+        help_text="Back of student ID card",
+        blank=True, null=True,
+    )
+    # Option B: admission letter / proof of enrollment (PDF or image)
+    admission_letter = models.FileField(
+        upload_to='seller_verification/admission/',
+        validators=[validate_document],
+        help_text="Admission letter or proof of enrollment (PDF, JPG, PNG)",
+        blank=True, null=True,
     )
 
     business_age_confirmed = models.BooleanField(default=False)
@@ -147,16 +156,28 @@ class SellerApplication(models.Model):
     def __str__(self):
         return f"{self.user.username} - {self.get_status_display()}"
 
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        has_id_card = self.id_front and self.id_back
+        has_letter = bool(self.admission_letter)
+        if not has_id_card and not has_letter:
+            raise ValidationError(
+                "Upload either both sides of your ID card, or an admission letter."
+            )
+
     def id_front_url(self):
-        """Return full URL for id_front image"""
         if self.id_front:
             return self.id_front.url
         return None
 
     def id_back_url(self):
-        """Return full URL for id_back image"""
         if self.id_back:
             return self.id_back.url
+        return None
+
+    def admission_letter_url(self):
+        if self.admission_letter:
+            return self.admission_letter.url
         return None
 
 

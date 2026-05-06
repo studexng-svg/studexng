@@ -253,15 +253,14 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class SellerApplicationSerializer(serializers.ModelSerializer):
-    # ✅ UPDATED: id_front and id_back only
-    id_front = serializers.ImageField(required=True)
-    id_back = serializers.ImageField(required=True)
+    id_front = serializers.ImageField(required=False, allow_null=True)
+    id_back = serializers.ImageField(required=False, allow_null=True)
+    admission_letter = serializers.FileField(required=False, allow_null=True)
 
-    # ✅ Read-only URL fields so admin frontend can display the images
     id_front_url = serializers.SerializerMethodField()
     id_back_url = serializers.SerializerMethodField()
+    admission_letter_url = serializers.SerializerMethodField()
 
-    # ✅ Applicant info for admin panel display
     applicant_name = serializers.SerializerMethodField()
     applicant_email = serializers.SerializerMethodField()
     applicant_matric = serializers.SerializerMethodField()
@@ -272,8 +271,10 @@ class SellerApplicationSerializer(serializers.ModelSerializer):
             'id',
             'id_front',
             'id_back',
+            'admission_letter',
             'id_front_url',
             'id_back_url',
+            'admission_letter_url',
             'business_age_confirmed',
             'status',
             'submitted_at',
@@ -284,17 +285,20 @@ class SellerApplicationSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['status', 'submitted_at', 'notes']
 
-    def get_id_front_url(self, obj):
+    def _abs_url(self, file_field):
         request = self.context.get('request')
-        if obj.id_front and request:
-            return request.build_absolute_uri(obj.id_front.url)
+        if file_field and request:
+            return request.build_absolute_uri(file_field.url)
         return None
 
+    def get_id_front_url(self, obj):
+        return self._abs_url(obj.id_front)
+
     def get_id_back_url(self, obj):
-        request = self.context.get('request')
-        if obj.id_back and request:
-            return request.build_absolute_uri(obj.id_back.url)
-        return None
+        return self._abs_url(obj.id_back)
+
+    def get_admission_letter_url(self, obj):
+        return self._abs_url(obj.admission_letter)
 
     def get_applicant_name(self, obj):
         return obj.user.get_full_name() or obj.user.username
@@ -305,15 +309,19 @@ class SellerApplicationSerializer(serializers.ModelSerializer):
     def get_applicant_matric(self, obj):
         return obj.user.matric_number or ''
 
+    def validate(self, data):
+        has_id_card = data.get('id_front') and data.get('id_back')
+        has_letter = bool(data.get('admission_letter'))
+        if not has_id_card and not has_letter:
+            raise serializers.ValidationError(
+                "Upload either both sides of your ID card, or an admission letter."
+            )
+        return data
+
     def create(self, validated_data):
         user = validated_data.pop('user', None) or self.context['request'].user
-        # Delete any previous application (one per user)
         SellerApplication.objects.filter(user=user).delete()
-        application = SellerApplication.objects.create(user=user, **validated_data)
-        return application
-
-    def validate(self, data):
-        return data
+        return SellerApplication.objects.create(user=user, **validated_data)
 
 
 class VendorListSerializer(serializers.ModelSerializer):

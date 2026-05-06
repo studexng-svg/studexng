@@ -2,6 +2,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils import timezone
+from django.utils.html import format_html
 from django.http import HttpResponse
 import csv
 from .models import User, Profile, SellerApplication
@@ -110,14 +111,50 @@ class SellerApplicationAdmin(admin.ModelAdmin):
     list_display = ['user', 'status', 'submitted_at', 'business_age_confirmed']
     list_filter = ['status', 'submitted_at', 'business_age_confirmed']
     search_fields = ['user__username', 'user__email']
-    readonly_fields = ['id', 'user', 'id_front', 'id_back', 'submitted_at']
+    readonly_fields = [
+        'id', 'user', 'submitted_at',
+        'preview_id_front', 'preview_id_back', 'preview_admission_letter',
+    ]
 
     fieldsets = (
         ('Application Info', {'fields': ('id', 'user', 'status', 'submitted_at')}),
-        ('ID Card Documents', {'fields': ('id_front', 'id_back')}),
+        ('Documents', {'fields': ('preview_id_front', 'preview_id_back', 'preview_admission_letter')}),
         ('Verification', {'fields': ('business_age_confirmed',)}),
         ('Admin Notes', {'fields': ('notes',)}),
     )
+
+    def _file_preview(self, file_field, label):
+        if not file_field:
+            return format_html('<span style="color:#9ca3af;">Not uploaded</span>')
+        try:
+            url = file_field.url
+        except Exception:
+            return format_html('<span style="color:#ef4444;">File not accessible</span>')
+        name = str(file_field).lower()
+        if name.endswith('.pdf') or name.endswith('.doc') or name.endswith('.docx'):
+            return format_html(
+                '<a href="{}" target="_blank" style="color:#0d9488;font-weight:600;">📄 View {}</a>',
+                url, label,
+            )
+        return format_html(
+            '<a href="{url}" target="_blank">'
+            '<img src="{url}" style="max-height:240px;max-width:480px;'
+            'object-fit:contain;border-radius:8px;border:1px solid #e5e7eb;" />'
+            '</a>',
+            url=url,
+        )
+
+    def preview_id_front(self, obj):
+        return self._file_preview(obj.id_front, 'ID Front')
+    preview_id_front.short_description = 'ID Card — Front'
+
+    def preview_id_back(self, obj):
+        return self._file_preview(obj.id_back, 'ID Back')
+    preview_id_back.short_description = 'ID Card — Back'
+
+    def preview_admission_letter(self, obj):
+        return self._file_preview(obj.admission_letter, 'Admission Letter')
+    preview_admission_letter.short_description = 'Admission Letter'
 
     actions = ['approve_applications', 'reject_applications']
 
