@@ -247,6 +247,7 @@ SIMPLE_JWT = {
 # RESEND EMAIL
 # =======================================
 RESEND_API_KEY = config('RESEND_API_KEY', default='')
+FRONTEND_BASE_URL = config('FRONTEND_BASE_URL', default='https://studex.com.ng')
 
 # =======================================
 # PAYSTACK
