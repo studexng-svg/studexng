@@ -1,11 +1,17 @@
-# studex/firebase_admin_init.py
 import firebase_admin
 from firebase_admin import credentials
-from django.conf import settings
 import os
+import json
 
-# Build absolute path to the JSON file
-service_account_path = os.path.join(settings.BASE_DIR, '..', 'firebase_service_account.json')
 
-cred = credentials.Certificate(service_account_path)
-firebase_admin.initialize_app(cred)
+def initialize_firebase():
+    if firebase_admin._apps:
+        return
+    service_account_json = os.environ.get('FIREBASE_SERVICE_ACCOUNT_JSON', '')
+    if not service_account_json:
+        return
+    cred = credentials.Certificate(json.loads(service_account_json))
+    firebase_admin.initialize_app(cred)
+
+
+initialize_firebase()

@@ -54,12 +54,8 @@ def send_notification(
             import firebase_admin
             from firebase_admin import messaging as fcm_messaging
             if not firebase_admin._apps:
-                from firebase_admin import credentials as fb_cred
-                from django.conf import settings as django_settings
-                import os
-                sa_path = os.path.join(django_settings.BASE_DIR, '..', 'firebase_service_account.json')
-                fb_cred_obj = fb_cred.Certificate(sa_path)
-                firebase_admin.initialize_app(fb_cred_obj)
+                from studex.firebase_admin_init import initialize_firebase
+                initialize_firebase()
             from notifications.models import FCMToken
             tokens = list(FCMToken.objects.filter(user=recipient).values_list('token', flat=True))
             if tokens:
