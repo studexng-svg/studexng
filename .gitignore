@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
@@ -20,10 +19,12 @@
 
 # production
 /build
+dist/
 
 # misc
 .DS_Store
 *.pem
+Thumbs.db
 
 # debug
 npm-debug.log*
@@ -31,8 +32,9 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files
 .env*
+!.env.example
 
 # vercel
 .vercel
@@ -40,25 +42,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-=======
-# Environment variables
-.env
-.env.*
-!.env.example
 
-# Dependencies
-node_modules/
-
-# Builds
-.next/
-dist/
-build/
-
-# Logs
-npm-debug.log*
-yarn-debug.log*
-
-# OS
-.DS_Store
-Thumbs.db
->>>>>>> 8e835d14bbfa5391b90afb39a919dc5b33e5fc88
+# Firebase service account keys — never commit these
+*firebase-adminsdk*.json
+firebase_service_account.json
