@@ -85,10 +85,24 @@ class API {
     headers.set("Content-Type", "application/json");
     if (token) headers.set("Authorization", `Bearer ${token}`);
 
-    const response = await fetch(`${this.baseURL}${endpoint}`, {
-      ...options,
-      headers,
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 20_000);
+
+    let response: Response;
+    try {
+      response = await fetch(`${this.baseURL}${endpoint}`, {
+        ...options,
+        headers,
+        signal: controller.signal,
+      });
+    } catch (err: any) {
+      if (err?.name === "AbortError") {
+        throw new Error("Request timed out — the server is waking up, please try again in a moment.");
+      }
+      throw new Error("Network error — check your connection and try again.");
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     const data = await response.json().catch(() => ({}));
 
