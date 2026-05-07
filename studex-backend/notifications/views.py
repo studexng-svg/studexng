@@ -178,3 +178,14 @@ def mark_all_read(request):
         recipient=request.user, is_read=False
     ).update(is_read=True)
     return Response({'message': 'All notifications marked as read'})
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def register_fcm_token(request):
+    from notifications.models import FCMToken
+    token = request.data.get('token', '').strip()
+    if not token:
+        return Response({'error': 'Token is required'}, status=400)
+    FCMToken.objects.update_or_create(token=token, defaults={'user': request.user})
+    return Response({'message': 'Token registered'})

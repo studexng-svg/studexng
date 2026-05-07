@@ -8,9 +8,11 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import { useEffect, useState } from "react";
 import { useNotifications } from "@/hooks/useNotifications";
 import { NotificationToastContainer } from "@/components/NotificationToast";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 
 function NotificationProvider({ children }: { children: React.ReactNode }) {
   const { toasts, dismissToast } = useNotifications();
+  usePushNotifications();
   return (
     <>
       {children}

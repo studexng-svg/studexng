@@ -1,10 +1,11 @@
 // src/lib/firebase.ts
 import { initializeApp } from "firebase/app";
-import { 
-  getAuth, 
-  setPersistence, 
-  browserLocalPersistence 
+import {
+  getAuth,
+  setPersistence,
+  browserLocalPersistence
 } from "firebase/auth";
+import { getMessaging, isSupported } from "firebase/messaging";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -33,3 +34,9 @@ export const auth = getAuth(app);
 setPersistence(auth, browserLocalPersistence)
   .then(() => console.log("Firebase persistence set to LOCAL"))
   .catch((err) => console.error("Persistence error:", err));
+
+export const getFirebaseMessaging = async () => {
+  const supported = await isSupported();
+  if (!supported) return null;
+  return getMessaging(app);
+};

@@ -49,6 +49,33 @@ def send_notification(
         except Exception:
             pass  # SSE push failure must never break the main flow
 
+        # Send FCM push notification to all registered devices
+        try:
+            import firebase_admin
+            from firebase_admin import messaging as fcm_messaging
+            if not firebase_admin._apps:
+                from firebase_admin import credentials as fb_cred
+                from django.conf import settings as django_settings
+                import os
+                sa_path = os.path.join(django_settings.BASE_DIR, '..', 'firebase_service_account.json')
+                fb_cred_obj = fb_cred.Certificate(sa_path)
+                firebase_admin.initialize_app(fb_cred_obj)
+            from notifications.models import FCMToken
+            tokens = list(FCMToken.objects.filter(user=recipient).values_list('token', flat=True))
+            if tokens:
+                fcm_msg = fcm_messaging.MulticastMessage(
+                    notification=fcm_messaging.Notification(title=title, body=message),
+                    tokens=tokens,
+                    data={'action_url': action_url or ''},
+                )
+                response = fcm_messaging.send_each_for_multicast(fcm_msg)
+                if response.failure_count > 0:
+                    invalid = [tokens[i] for i, r in enumerate(response.responses) if not r.success]
+                    if invalid:
+                        FCMToken.objects.filter(token__in=invalid).delete()
+        except Exception:
+            pass  # FCM failure must never break the main flow
+
         return n
     except Exception as e:
         import logging

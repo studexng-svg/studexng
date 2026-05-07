@@ -11,4 +11,7 @@ urlpatterns = [
     path('', views.my_notifications, name='my-notifications'),
     path('<int:notification_id>/read/', views.mark_notification_read, name='mark-read'),
     path('read-all/', views.mark_all_read, name='mark-all-read'),
+
+    # FCM push notification token registration
+    path('fcm-token/', views.register_fcm_token, name='register-fcm-token'),
 ]
