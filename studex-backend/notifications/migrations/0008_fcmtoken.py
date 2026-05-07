@@ -6,7 +6,7 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('notifications', '0005_alter_notification_notification_type'),
+        ('notifications', '0007_notification_notificatio_recipie_4e3567_idx_and_more'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
