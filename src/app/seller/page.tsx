@@ -1,7 +1,7 @@
 // src/app/seller/page.tsx
 "use client";
 
-import { Package, DollarSign, TrendingUp, Plus, FileText, ChevronRight, Store, ArrowUpRight, ArrowDownRight, Eye, EyeOff, Wallet, Clock, Bell, Star } from "lucide-react";
+import { Package, DollarSign, TrendingUp, Plus, FileText, ChevronRight, Store, ArrowUpRight, ArrowDownRight, Eye, EyeOff, Wallet, Clock, Bell, Star, Link2, Share2, Check } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -37,6 +37,8 @@ export default function SellerDashboard() {
   const [totalWithdrawn, setTotalWithdrawn] = useState(0);
 
   const [pendingOrders, setPendingOrders] = useState<Order[]>([]);
+
+  const [linkCopied, setLinkCopied] = useState(false);
 
   const [vendorFeedbackRating, setVendorFeedbackRating] = useState(0);
   const [vendorFeedbackHovered, setVendorFeedbackHovered] = useState(0);
@@ -386,6 +388,48 @@ export default function SellerDashboard() {
             </motion.div>
           ))}
         </div>
+
+        {/* SHARE PROFILE */}
+        {authUser?.username && (
+          <div className="bg-white border border-stone-200 rounded-2xl p-4 shadow-sm">
+            <p className="text-xs font-semibold text-stone-500 mb-3 uppercase tracking-wide">Share your store</p>
+            <div className="flex items-center gap-2 bg-stone-50 border border-stone-200 rounded-xl px-3 py-2.5 mb-3">
+              <Link2 className="w-4 h-4 text-teal-500 flex-shrink-0" />
+              <p className="text-sm text-stone-700 truncate flex-1 font-medium">
+                studex.com.ng/vendor/{authUser.username}
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(`https://studex.com.ng/vendor/${authUser.username}`);
+                  setLinkCopied(true);
+                  setTimeout(() => setLinkCopied(false), 2000);
+                }}
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-full border border-stone-200 text-stone-700 font-semibold text-sm hover:border-teal-400 hover:text-teal-600 transition-all active:scale-95"
+              >
+                {linkCopied ? <Check className="w-4 h-4 text-teal-500" /> : <Link2 className="w-4 h-4" />}
+                {linkCopied ? "Copied!" : "Copy Link"}
+              </button>
+              {typeof navigator !== "undefined" && "share" in navigator && (
+                <button
+                  onClick={() => {
+                    navigator.share({
+                      title: `${authUser.username} on StudEx`,
+                      text: `Check out my store on StudEx`,
+                      url: `https://studex.com.ng/vendor/${authUser.username}`,
+                    }).catch(() => {});
+                  }}
+                  className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-full text-white font-semibold text-sm active:scale-95 transition-all"
+                  style={{ background: GRAD }}
+                >
+                  <Share2 className="w-4 h-4" />
+                  Share
+                </button>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* MINI EARNINGS CHART */}
         {walletBalance > 0 && (
