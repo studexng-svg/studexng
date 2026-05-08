@@ -314,7 +314,6 @@ export default function ChatRoomPage() {
         </div>
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-stone-900">@{otherUser}</p>
-          {listingTitle && <p className="text-xs text-teal-600 truncate">{listingTitle}</p>}
         </div>
       </div>
 

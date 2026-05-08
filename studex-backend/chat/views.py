@@ -188,6 +188,14 @@ class MessageViewSet(viewsets.ReadOnlyModelViewSet):
         if participants.issubset(deleted_for_ids):
             # ✅ Both sides deleted — hard delete the row
             message.delete()
+            latest = conv.messages.order_by('-created_at').first()
+            if latest:
+                conv.last_message = '📷 Image' if latest.message_type == 'image' else latest.content[:100]
+                conv.last_message_at = latest.created_at
+            else:
+                conv.last_message = ''
+                conv.last_message_at = None
+            conv.save(update_fields=['last_message', 'last_message_at'])
             return Response({'success': True, 'deleted': 'hard', 'message': 'Message fully deleted'})
 
         return Response({'success': True, 'deleted': 'for_me', 'message': 'Message deleted for you'})

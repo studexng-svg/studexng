@@ -392,7 +392,6 @@ export default function ChatWindow({
           </div>
           <div className="flex-1 min-w-0">
             <p className="font-semibold text-stone-900 text-sm">@{sellerName}</p>
-            <p className="text-xs text-teal-600 truncate">{productName}</p>
           </div>
           <button onClick={onClose} className="p-1.5 hover:bg-stone-100 rounded-full transition flex-shrink-0">
             <X className="w-4 h-4 text-stone-400" />
