@@ -49,7 +49,7 @@ class ConversationSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         if not request:
             return 0
-        return obj.messages.filter(is_read=False).exclude(sender=request.user).count()
+        return obj.messages.filter(is_read=False).exclude(sender=request.user).exclude(deleted_for=request.user).count()
 
     def get_other_user(self, obj):
         request = self.context.get('request')

@@ -217,8 +217,34 @@ class MessageViewSet(viewsets.ReadOnlyModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+        conv = message.conversation
+
         # ✅ Hard delete
         message.delete()
+
+        # Update conversation's last_message to the new latest message (or clear it)
+        latest = conv.messages.order_by('-created_at').first()
+        if latest:
+            conv.last_message = '📷 Image' if latest.message_type == 'image' else latest.content[:100]
+            conv.last_message_at = latest.created_at
+        else:
+            conv.last_message = ''
+            conv.last_message_at = None
+        conv.save(update_fields=['last_message', 'last_message_at'])
+
+        # Clean up the notification sent for this message so recipient isn't misled
+        try:
+            from notifications.models import Notification
+            recipient = conv.seller if user == conv.buyer else conv.buyer
+            Notification.objects.filter(
+                recipient=recipient,
+                notification_type='message',
+                action_url=f'/chat/{conv.id}',
+                is_read=False,
+            ).delete()
+        except Exception:
+            pass
+
         return Response({'success': True, 'deleted': 'for_everyone', 'message': 'Message deleted for everyone'})
 
     @action(detail=True, methods=['patch'])

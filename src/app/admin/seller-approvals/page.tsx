@@ -2,8 +2,8 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  Check, X, Eye, Calendar, Clock, Zap,
-  CreditCard, FlipHorizontal, ZoomIn, Loader2, RefreshCw,
+  Check, X, Eye, Calendar, Clock,
+  CreditCard, FlipHorizontal, ZoomIn, Loader2, RefreshCw, FileText, ExternalLink,
 } from "lucide-react";
 import AdminTopBar from "@/components/layout/AdminTopBar";
 import { useState, useEffect, useCallback } from "react";
@@ -22,16 +22,20 @@ interface Application {
   status: "pending" | "approved" | "rejected";
   id_front_url: string | null;
   id_back_url: string | null;
+  admission_letter_url: string | null;
   notes: string | null;
 }
 
+const isPdf = (url: string) => url.toLowerCase().includes('.pdf');
+
 // ─── Image Preview Modal ───────────────────────────────────────────────────────
 
-function ImagePreviewModal({
+function DocumentPreviewModal({
   url, label, onClose,
 }: {
   url: string; label: string; onClose: () => void;
 }) {
+  const pdf = isPdf(url);
   return (
     <AnimatePresence>
       <motion.div
@@ -46,28 +50,47 @@ function ImagePreviewModal({
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.85, opacity: 0 }}
           transition={{ type: "spring", stiffness: 300, damping: 25 }}
-          className="relative max-w-2xl w-full bg-slate-900 rounded-3xl overflow-hidden border border-white/10 shadow-2xl"
+          className="relative max-w-3xl w-full bg-slate-900 rounded-3xl overflow-hidden border border-white/10 shadow-2xl"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="flex items-center justify-between p-5 border-b border-white/10">
             <p className="text-white font-bold text-lg">{label}</p>
-            <button
-              onClick={onClose}
-              className="p-2 rounded-xl bg-white/10 hover:bg-white/20 transition text-white"
-            >
-              <X className="w-5 h-5" />
-            </button>
+            <div className="flex items-center gap-2">
+              <a
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-2 rounded-xl bg-white/10 hover:bg-white/20 transition text-white flex items-center gap-1.5 text-sm"
+              >
+                <ExternalLink className="w-4 h-4" /> Open
+              </a>
+              <button
+                onClick={onClose}
+                className="p-2 rounded-xl bg-white/10 hover:bg-white/20 transition text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
           </div>
           <div className="p-4">
-            <img
-              src={url}
-              alt={label}
-              className="w-full rounded-2xl object-contain max-h-[70vh]"
-              onError={(e) => {
-                (e.target as HTMLImageElement).src =
-                  "https://via.placeholder.com/600x400?text=Image+Not+Found";
-              }}
-            />
+            {pdf ? (
+              <iframe
+                src={url}
+                title={label}
+                className="w-full rounded-2xl border border-white/10"
+                style={{ height: "70vh" }}
+              />
+            ) : (
+              <img
+                src={url}
+                alt={label}
+                className="w-full rounded-2xl object-contain max-h-[70vh]"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src =
+                    "https://via.placeholder.com/600x400?text=Image+Not+Found";
+                }}
+              />
+            )}
           </div>
         </motion.div>
       </motion.div>
@@ -204,7 +227,7 @@ function AdminSellerApprovals() {
   return (
     <>
       {previewImage && (
-        <ImagePreviewModal
+        <DocumentPreviewModal
           url={previewImage.url}
           label={previewImage.label}
           onClose={() => setPreviewImage(null)}
@@ -357,6 +380,84 @@ function AdminSellerApprovals() {
                   })}
                 </div>
               </div>
+
+              {/* ADMISSION LETTER */}
+              {app.admission_letter_url && (
+                <div className="space-y-4">
+                  <h4 className="text-lg font-bold text-white flex items-center gap-2">
+                    <FileText className="w-5 h-5 text-purple-400" />
+                    Admission Letter
+                  </h4>
+                  <div className="bg-white/10 rounded-2xl overflow-hidden border border-white/20 hover:border-purple-500/50 transition-all">
+                    {isPdf(app.admission_letter_url) ? (
+                      <div className="p-5 flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-4">
+                          <div className="w-14 h-14 bg-gradient-to-br from-red-600 to-pink-600 rounded-2xl flex items-center justify-center flex-shrink-0">
+                            <FileText className="w-7 h-7 text-white" />
+                          </div>
+                          <div>
+                            <p className="text-white font-bold">PDF Document</p>
+                            <p className="text-white/50 text-xs mt-0.5">Admission letter uploaded as PDF</p>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setPreviewImage({ url: app.admission_letter_url!, label: "Admission Letter" })}
+                            className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl transition text-white text-sm flex items-center gap-2"
+                          >
+                            <Eye className="w-4 h-4" /> Preview
+                          </button>
+                          <a
+                            href={app.admission_letter_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-4 py-2 bg-purple-600/50 hover:bg-purple-600/70 rounded-xl transition text-white text-sm flex items-center gap-2"
+                          >
+                            <ExternalLink className="w-4 h-4" /> Open
+                          </a>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="relative group">
+                        <img
+                          src={app.admission_letter_url}
+                          alt="Admission Letter"
+                          className="w-full h-44 object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src =
+                              "https://via.placeholder.com/400x220?text=Image+Not+Found";
+                          }}
+                        />
+                        <button
+                          onClick={() => setPreviewImage({ url: app.admission_letter_url!, label: "Admission Letter" })}
+                          className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100"
+                        >
+                          <div className="bg-white/20 backdrop-blur-md p-3 rounded-full border border-white/30">
+                            <ZoomIn className="w-6 h-6 text-white" />
+                          </div>
+                        </button>
+                        <div className="p-4 flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-teal-600 rounded-xl flex items-center justify-center flex-shrink-0">
+                              <FileText className="w-5 h-5 text-white" />
+                            </div>
+                            <div>
+                              <p className="text-white font-bold text-sm">Admission Letter</p>
+                              <p className="text-white/50 text-xs">Image document</p>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => setPreviewImage({ url: app.admission_letter_url!, label: "Admission Letter" })}
+                            className="p-2 bg-white/10 hover:bg-white/20 rounded-xl transition"
+                          >
+                            <Eye className="w-4 h-4 text-white" />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* ACTION BUTTONS */}
               {app.status === "pending" && (

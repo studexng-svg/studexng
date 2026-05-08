@@ -2,12 +2,13 @@
 
 import { useState, useEffect, useRef } from "react";
 import {
-  X, Send, User, Loader, ImageIcon,
+  X, Send, Loader, ImageIcon,
   Pin, PinOff, Pencil, Trash2, Check,
-  UserX, Users, ChevronDown
+  UserX, Users, ChevronDown, ChevronLeft,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { fetchWithAuth, getToken, useAuth } from "@/lib/authStore";
+import { GRAD } from "@/lib/tokens";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
 const DELETE_EVERYONE_LIMIT_HOURS = 60;
@@ -93,7 +94,6 @@ export default function ChatWindow({
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
 
-  // WhatsApp features
   const [actionMenu, setActionMenu] = useState<ActionMenu | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState("");
@@ -106,7 +106,6 @@ export default function ChatWindow({
   const editInputRef = useRef<HTMLInputElement>(null);
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  const chatContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
   useEffect(() => { if (editingId) editInputRef.current?.focus(); }, [editingId]);
@@ -183,21 +182,11 @@ export default function ChatWindow({
     } catch {}
   };
 
-  // ── Long press ─────────────────────────────────────────────────────────────
-
   const handlePressStart = (e: React.TouchEvent | React.MouseEvent, msg: Message) => {
     if (msg.isSystem) return;
     longPressTimer.current = setTimeout(() => {
       const clientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
       const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
-
-      // Position menu — flip up if near bottom
-      const containerRect = chatContainerRef.current?.getBoundingClientRect();
-      const relY = containerRect ? clientY - containerRect.top : clientY;
-      const menuY = relY > (containerRect?.height || window.innerHeight) * 0.6
-        ? clientY - 220
-        : clientY;
-
       setActionMenu({
         messageId: msg.id,
         is_mine: !!msg.is_mine,
@@ -205,7 +194,7 @@ export default function ChatWindow({
         is_pinned: !!msg.is_pinned,
         created_at: msg.created_at || '',
         showDeleteOptions: false,
-        y: menuY,
+        y: clientY > window.innerHeight * 0.65 ? clientY - 220 : clientY - 10,
         x: clientX,
       });
     }, 500);
@@ -214,8 +203,6 @@ export default function ChatWindow({
   const handlePressEnd = () => {
     if (longPressTimer.current) clearTimeout(longPressTimer.current);
   };
-
-  // ── Delete for me ──────────────────────────────────────────────────────────
 
   const deleteForMe = async (id: string) => {
     setActionMenu(null);
@@ -229,8 +216,6 @@ export default function ChatWindow({
       setError("Failed to delete"); setTimeout(() => setError(""), 3000);
     }
   };
-
-  // ── Delete for everyone ────────────────────────────────────────────────────
 
   const deleteForEveryone = async (id: string) => {
     setActionMenu(null);
@@ -248,8 +233,6 @@ export default function ChatWindow({
       setError("Failed to delete"); setTimeout(() => setError(""), 3000);
     }
   };
-
-  // ── Edit ───────────────────────────────────────────────────────────────────
 
   const startEdit = (msg: Message) => {
     setActionMenu(null);
@@ -278,8 +261,6 @@ export default function ChatWindow({
     }
   };
 
-  // ── Pin ────────────────────────────────────────────────────────────────────
-
   const togglePin = async (id: string) => {
     setActionMenu(null);
     try {
@@ -295,8 +276,6 @@ export default function ChatWindow({
     }
   };
 
-  // ── Image ──────────────────────────────────────────────────────────────────
-
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -309,8 +288,6 @@ export default function ChatWindow({
     setImageFile(null); setImagePreview(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
-
-  // ── Send ───────────────────────────────────────────────────────────────────
 
   const handleSend = async () => {
     if ((!message.trim() && !imageFile) || !conversationId || sending) return;
@@ -385,104 +362,103 @@ export default function ChatWindow({
   return (
     <>
       {/* Backdrop */}
-      <div className="fixed inset-0 bg-black/70 z-50" onClick={onClose} />
+      <div className="fixed inset-0 bg-black/40 z-50" onClick={onClose} />
 
       <div
-        ref={chatContainerRef}
         className="
           fixed left-0 right-0 bottom-[70px] h-[calc(100vh-70px)]
-          bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900
-          rounded-t-3xl z-50
+          bg-[#FAFAF9] rounded-t-3xl z-50
           md:left-auto md:right-4 md:bottom-4 md:top-20
-          md:w-96 md:h-[calc(100vh-6rem)]
-          md:rounded-3xl
+          md:w-[400px] md:h-[calc(100vh-6rem)]
+          md:rounded-3xl md:shadow-2xl
           overflow-hidden flex flex-col
+          border border-stone-200
         "
+        style={{ fontFamily: "'DM Sans', sans-serif" }}
       >
-        {/* Header */}
-        <div className="bg-gradient-to-r from-purple-800 to-teal-800 p-4 flex items-center justify-between flex-shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
-              <User className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <p className="font-bold text-white">{sellerName}</p>
-              <p className="text-white/70 text-xs">{productName}</p>
-            </div>
+        {/* ── HEADER ── */}
+        <div className="bg-white border-b border-stone-100 px-4 py-3 flex items-center gap-3 flex-shrink-0 shadow-sm">
+          <button
+            onClick={onClose}
+            className="p-2 bg-white border border-stone-200 rounded-full shadow-sm active:scale-95 transition-all flex-shrink-0"
+          >
+            <ChevronLeft className="w-4 h-4 text-stone-600" />
+          </button>
+          <div
+            className="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0 shadow-sm"
+            style={{ background: GRAD }}
+          >
+            {sellerName?.[0]?.toUpperCase() || "?"}
           </div>
-          <button onClick={onClose} className="p-1 hover:bg-white/10 rounded-full transition">
-            <X className="w-6 h-6 text-white" />
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-stone-900 text-sm">@{sellerName}</p>
+            <p className="text-xs text-teal-600 truncate">{productName}</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 hover:bg-stone-100 rounded-full transition flex-shrink-0">
+            <X className="w-4 h-4 text-stone-400" />
           </button>
         </div>
 
-        {/* Warning Banner */}
-        <div className="bg-red-600 text-white text-xs p-2 text-center font-bold flex-shrink-0">
-          Bargain only • No outside payments • Violators banned instantly
-        </div>
-
-        {/* ✅ Pinned message banner */}
+        {/* ── PINNED BANNER ── */}
         <AnimatePresence>
           {pinnedMessages.length > 0 && showPinnedBanner && (
             <motion.div
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
-              className="bg-purple-800/60 border-b border-purple-600/40 flex-shrink-0 overflow-hidden"
+              className="bg-teal-50 border-b border-teal-100 flex-shrink-0 overflow-hidden"
             >
-              <div className="flex items-center gap-2 px-3 py-2">
-                <Pin className="w-3 h-3 text-purple-300 flex-shrink-0" />
+              <div className="flex items-center gap-2 px-4 py-2">
+                <Pin className="w-3.5 h-3.5 text-teal-500 flex-shrink-0" />
                 <button onClick={() => scrollToPinned(pinnedIndex)} className="flex-1 min-w-0 text-left">
-                  <p className="text-xs font-bold text-purple-300">
+                  <p className="text-xs font-semibold text-teal-600">
                     Pinned {pinnedMessages.length > 1 ? `(${pinnedIndex + 1}/${pinnedMessages.length})` : ''}
                   </p>
-                  <p className="text-xs text-white/70 truncate">
+                  <p className="text-xs text-stone-500 truncate">
                     {pinnedMessages[pinnedIndex]?.text || '📷 Image'}
                   </p>
                 </button>
                 {pinnedMessages.length > 1 && (
-                  <button onClick={() => scrollToPinned((pinnedIndex + 1) % pinnedMessages.length)} className="p-1 text-purple-400">
-                    <ChevronDown className="w-3.5 h-3.5" />
+                  <button onClick={() => scrollToPinned((pinnedIndex + 1) % pinnedMessages.length)} className="p-1 text-teal-400 hover:text-teal-600">
+                    <ChevronDown className="w-4 h-4" />
                   </button>
                 )}
-                <button onClick={() => setShowPinnedBanner(false)} className="p-1 text-white/40 hover:text-white/70">
-                  <X className="w-3 h-3" />
+                <button onClick={() => setShowPinnedBanner(false)} className="p-1 text-stone-400 hover:text-stone-600">
+                  <X className="w-3.5 h-3.5" />
                 </button>
               </div>
             </motion.div>
           )}
         </AnimatePresence>
 
-        {/* Error */}
+        {/* ── ERROR ── */}
         {error && (
-          <div className="bg-red-500/90 text-white text-xs p-2 text-center font-bold flex-shrink-0">{error}</div>
+          <div className="bg-red-500 text-white text-xs px-4 py-2 text-center font-semibold flex-shrink-0">
+            {error}
+          </div>
         )}
 
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 relative">
+        {/* ── MESSAGES ── */}
+        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-1">
           {loading ? (
             <div className="flex items-center justify-center h-full">
-              <Loader className="w-8 h-8 text-white animate-spin" />
+              <Loader className="w-7 h-7 text-teal-500 animate-spin" />
             </div>
           ) : messages.length === 0 ? (
-            <p className="text-center text-white/50 text-sm mt-10">
-              Start bargaining with {sellerName} • e.g. "4k last"
+            <p className="text-center text-stone-400 text-sm mt-10">
+              No messages yet. Say hello! 👋
             </p>
           ) : (
             messages.map(msg => (
               <div
                 key={msg.id}
                 id={`cw-msg-${msg.id}`}
-                className={msg.isSystem ? "mx-auto max-w-xs" : msg.is_mine ? "ml-auto max-w-[80%]" : "mr-auto max-w-[80%]"}
+                className={`flex ${msg.isSystem ? "justify-center" : msg.is_mine ? "justify-end" : "justify-start"}`}
               >
                 {msg.isSystem ? (
-                  <div className="bg-gradient-to-r from-teal-600/20 to-purple-600/20 border border-teal-500/50 rounded-2xl p-4 text-center shadow-lg">
-                    <p className="text-white font-black text-lg">₦{msg.amount?.toLocaleString()}</p>
-                    <p className="text-white/80 text-sm">Offer for {productName}</p>
-                    <div className="flex gap-2 mt-3 justify-center">
-                      <button className="px-4 py-1.5 bg-teal-600 rounded-xl text-white font-bold text-sm">Accept</button>
-                      <button className="px-4 py-1.5 bg-amber-600 rounded-xl text-white font-bold text-sm">Counter</button>
-                      <button className="px-4 py-1.5 bg-red-600 rounded-xl text-white font-bold text-sm">Decline</button>
-                    </div>
+                  <div className="bg-teal-50 border border-teal-200 rounded-2xl px-4 py-3 text-center shadow-sm max-w-[85%]">
+                    <p className="font-bold text-teal-700">₦{msg.amount?.toLocaleString()}</p>
+                    <p className="text-teal-600 text-xs mt-0.5">Offer for {productName}</p>
                   </div>
                 ) : (
                   <div
@@ -492,26 +468,29 @@ export default function ChatWindow({
                     onTouchStart={(e) => handlePressStart(e, msg)}
                     onTouchEnd={handlePressEnd}
                     onContextMenu={(e) => { e.preventDefault(); handlePressStart(e, msg); }}
-                    className="select-none"
+                    className="relative max-w-[75%] select-none"
                   >
-                    {/* Pin indicator */}
                     {msg.is_pinned && (
                       <div className={`flex items-center gap-1 mb-0.5 ${msg.is_mine ? 'justify-end' : 'justify-start'}`}>
-                        <Pin className="w-2.5 h-2.5 text-purple-300" />
-                        <span className="text-xs text-purple-300">Pinned</span>
+                        <Pin className="w-3 h-3 text-teal-400" />
+                        <span className="text-xs text-teal-400">Pinned</span>
                       </div>
                     )}
 
-                    <div className={`rounded-2xl px-4 py-2.5 ${
-                      msg.is_mine
-                        ? 'bg-purple-600 text-white rounded-br-sm'
-                        : 'bg-white/10 text-white rounded-bl-sm'
-                    } ${msg.is_pinned ? 'ring-2 ring-purple-400/40' : ''}`}>
+                    <motion.div
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className={`rounded-2xl px-4 py-2.5 ${
+                        msg.is_mine
+                          ? "text-white rounded-br-sm"
+                          : "bg-white text-stone-900 shadow-sm rounded-bl-sm border border-stone-100"
+                      } ${msg.is_pinned ? 'ring-2 ring-teal-400/40' : ''}`}
+                      style={msg.is_mine ? { background: GRAD } : {}}
+                    >
                       {!msg.is_mine && (
-                        <p className="text-xs text-white/60 mb-1">{msg.sender || sellerName}</p>
+                        <p className="text-xs font-semibold text-teal-600 mb-1">{msg.sender || sellerName}</p>
                       )}
 
-                      {/* ✅ Inline edit mode */}
                       {editingId === msg.id ? (
                         <div className="flex items-center gap-2 min-w-[160px]">
                           <input
@@ -522,20 +501,23 @@ export default function ChatWindow({
                               if (e.key === 'Enter') submitEdit(msg.id);
                               if (e.key === 'Escape') { setEditingId(null); setEditContent(""); }
                             }}
-                            className="flex-1 bg-white/20 text-white rounded-lg px-2 py-1 text-sm outline-none border border-white/30"
+                            className="flex-1 bg-white/20 text-white placeholder-white/60 rounded-lg px-2 py-1 text-sm outline-none border border-white/40"
                           />
-                          <button onClick={() => submitEdit(msg.id)} className="p-1 bg-white/20 rounded-lg">
-                            <Check className="w-3.5 h-3.5 text-white" />
+                          <button onClick={() => submitEdit(msg.id)} className="p-1 bg-white/20 rounded-lg hover:bg-white/30">
+                            <Check className="w-4 h-4 text-white" />
                           </button>
                           <button onClick={() => { setEditingId(null); setEditContent(""); }} className="p-1 bg-white/10 rounded-lg">
-                            <X className="w-3.5 h-3.5 text-white/60" />
+                            <X className="w-4 h-4 text-white/70" />
                           </button>
                         </div>
                       ) : msg.image_url ? (
                         <div>
                           <a href={msg.image_url} target="_blank" rel="noopener noreferrer">
-                            <img src={msg.image_url} alt="shared image"
-                              className="rounded-xl max-w-[200px] max-h-[200px] object-cover mb-1 cursor-pointer hover:opacity-90 transition" />
+                            <img
+                              src={msg.image_url}
+                              alt="shared"
+                              className="rounded-xl max-w-[200px] max-h-[200px] object-cover mb-1 cursor-pointer hover:opacity-90 transition"
+                            />
                           </a>
                           {msg.text && msg.text !== "📷 Image" && (
                             <p className="text-sm mt-1 leading-relaxed">{msg.text}</p>
@@ -545,16 +527,17 @@ export default function ChatWindow({
                         <p className="text-sm leading-relaxed">{msg.text}</p>
                       )}
 
-                      {/* Timestamp + edited */}
                       {msg.created_at && editingId !== msg.id && (
                         <div className="flex items-center justify-end gap-1.5 mt-1">
-                          {msg.is_edited && <span className="text-xs italic text-white/40">edited</span>}
-                          <p className="text-xs opacity-50">
+                          {msg.is_edited && (
+                            <span className={`text-xs italic ${msg.is_mine ? 'text-white/50' : 'text-stone-400'}`}>edited</span>
+                          )}
+                          <p className={`text-xs ${msg.is_mine ? "text-white/60" : "text-stone-400"}`}>
                             {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </p>
                         </div>
                       )}
-                    </div>
+                    </motion.div>
                   </div>
                 )}
               </div>
@@ -563,44 +546,48 @@ export default function ChatWindow({
           <div ref={bottomRef} />
         </div>
 
-        {/* Image preview */}
+        {/* ── IMAGE PREVIEW ── */}
         {imagePreview && (
-          <div className="bg-slate-800/90 border-t border-white/10 px-4 py-2 flex items-center gap-3 flex-shrink-0">
+          <div className="bg-white border-t border-stone-100 px-4 py-2 flex items-center gap-3 flex-shrink-0">
             <div className="relative flex-shrink-0">
-              <img src={imagePreview} alt="preview" className="h-14 w-14 object-cover rounded-xl border-2 border-purple-400" />
-              <button onClick={cancelImage} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-black">×</button>
+              <img src={imagePreview} alt="preview" className="h-14 w-14 object-cover rounded-xl border-2 border-teal-400" />
+              <button onClick={cancelImage} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center">
+                <X className="w-3 h-3" />
+              </button>
             </div>
-            <p className="text-white/60 text-xs">Add a caption below (optional)</p>
+            <p className="text-xs text-stone-400">Add a caption below (optional)</p>
           </div>
         )}
 
-        {/* Input */}
-        <div className="bg-slate-900/90 border-t border-white/10 p-4 flex gap-2 flex-shrink-0">
+        {/* ── INPUT BAR ── */}
+        <div className="bg-white border-t border-stone-100 px-4 py-3 flex items-center gap-2 flex-shrink-0">
           <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageSelect} />
-          <button onClick={() => fileInputRef.current?.click()} className="p-3 bg-white/10 hover:bg-white/20 rounded-xl transition flex-shrink-0">
-            <ImageIcon className="w-5 h-5 text-white" />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="p-2.5 bg-teal-50 text-teal-600 rounded-xl hover:bg-teal-100 transition flex-shrink-0"
+          >
+            <ImageIcon className="w-5 h-5" />
           </button>
           <input
             type="text"
             value={message}
             onChange={e => setMessage(e.target.value)}
             onKeyDown={e => e.key === "Enter" && !e.shiftKey && (e.preventDefault(), handleSend())}
-            placeholder={imageFile ? 'Add a caption (optional)...' : 'Type your offer... e.g. "4k last"'}
-            className="flex-1 bg-white/10 border border-white/20 rounded-2xl px-4 py-3 text-white placeholder-white/40 text-sm focus:outline-none focus:border-purple-500 transition"
+            placeholder={imageFile ? 'Add a caption (optional)...' : 'Type a message...'}
+            className="flex-1 px-4 py-2.5 bg-stone-50 text-stone-900 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/30 border border-stone-200 placeholder-stone-400 transition"
           />
-          <button onClick={handleSend}
+          <button
+            onClick={handleSend}
             disabled={sending || !conversationId || (!message.trim() && !imageFile)}
-            className={`p-3 rounded-xl transition flex-shrink-0 ${
-              sending || !conversationId || (!message.trim() && !imageFile)
-                ? 'bg-gray-600 cursor-not-allowed'
-                : 'bg-gradient-to-r from-teal-600 to-cyan-600'
-            }`}>
-            {sending ? <Loader className="w-5 h-5 text-white animate-spin" /> : <Send className="w-5 h-5 text-white" />}
+            className="p-2.5 text-white rounded-xl disabled:opacity-40 flex-shrink-0 transition active:scale-95"
+            style={{ background: GRAD }}
+          >
+            {sending ? <Loader className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
           </button>
         </div>
       </div>
 
-      {/* ✅ WhatsApp-style action menu — rendered outside chat panel so it's never clipped */}
+      {/* ── ACTION MENU ── */}
       <AnimatePresence>
         {actionMenu && (
           <>
@@ -617,72 +604,69 @@ export default function ChatWindow({
                 left: Math.min(Math.max(actionMenu.x - 90, 8), window.innerWidth - 210),
                 zIndex: 70,
               }}
-              className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-700 overflow-hidden min-w-[200px]"
+              className="bg-white rounded-2xl shadow-2xl border border-stone-100 overflow-hidden min-w-[200px]"
             >
-              {/* Pin / Unpin */}
               <button
                 onClick={() => togglePin(actionMenu.messageId)}
-                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition text-left"
+                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-stone-50 transition text-left"
               >
                 {actionMenu.is_pinned
-                  ? <><PinOff className="w-4 h-4 text-purple-500" /><span className="text-sm font-medium text-gray-800 dark:text-gray-200">Unpin</span></>
-                  : <><Pin className="w-4 h-4 text-purple-500" /><span className="text-sm font-medium text-gray-800 dark:text-gray-200">Pin</span></>
+                  ? <><PinOff className="w-4 h-4 text-teal-500" /><span className="text-sm font-medium text-stone-800">Unpin</span></>
+                  : <><Pin className="w-4 h-4 text-teal-500" /><span className="text-sm font-medium text-stone-800">Pin</span></>
                 }
               </button>
 
-              {/* Edit — sender only, text only */}
               {actionMenu.is_mine && actionMenu.message_type !== 'image' && (
                 <button
                   onClick={() => {
                     const msg = messages.find(m => m.id === actionMenu.messageId);
                     if (msg) startEdit(msg);
                   }}
-                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 transition text-left border-t border-gray-50 dark:border-gray-700"
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-stone-50 transition text-left border-t border-stone-50"
                 >
                   <Pencil className="w-4 h-4 text-blue-500" />
-                  <span className="text-sm font-medium text-gray-800 dark:text-gray-200">Edit</span>
+                  <span className="text-sm font-medium text-stone-800">Edit</span>
                 </button>
               )}
 
-              {/* Delete */}
               {!actionMenu.showDeleteOptions ? (
                 <button
                   onClick={() => setActionMenu(prev => prev ? { ...prev, showDeleteOptions: true } : null)}
-                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-red-50 dark:hover:bg-red-900/20 transition text-left border-t border-gray-50 dark:border-gray-700"
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-red-50 transition text-left border-t border-stone-50"
                 >
                   <Trash2 className="w-4 h-4 text-red-500" />
                   <span className="text-sm font-medium text-red-600">Delete</span>
                 </button>
               ) : (
                 <>
-                  <div className="px-4 py-2 border-t border-gray-50 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50">
-                    <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">Delete message</p>
+                  <div className="px-4 py-2 border-t border-stone-50 bg-stone-50">
+                    <p className="text-xs font-semibold text-stone-400 uppercase tracking-wide">Delete message</p>
                   </div>
                   <button
                     onClick={() => deleteForMe(actionMenu.messageId)}
-                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-red-50 dark:hover:bg-red-900/20 transition text-left"
+                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-red-50 transition text-left"
                   >
                     <UserX className="w-4 h-4 text-orange-500" />
                     <div>
-                      <p className="text-sm font-medium text-gray-800 dark:text-gray-200">Delete for me</p>
-                      <p className="text-xs text-gray-400">Only you won't see this</p>
+                      <p className="text-sm font-medium text-stone-800">Delete for me</p>
+                      <p className="text-xs text-stone-400">Only you won't see this</p>
                     </div>
                   </button>
                   {actionMenu.is_mine && canDeleteForEveryone(actionMenu.created_at) && (
                     <button
                       onClick={() => deleteForEveryone(actionMenu.messageId)}
-                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-red-50 dark:hover:bg-red-900/20 transition text-left border-t border-gray-50 dark:border-gray-700"
+                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-red-50 transition text-left border-t border-stone-50"
                     >
                       <Users className="w-4 h-4 text-red-500" />
                       <div>
                         <p className="text-sm font-medium text-red-600">Delete for everyone</p>
-                        <p className="text-xs text-gray-400">Removes for all participants</p>
+                        <p className="text-xs text-stone-400">Removes for all participants</p>
                       </div>
                     </button>
                   )}
                   <button
                     onClick={() => setActionMenu(prev => prev ? { ...prev, showDeleteOptions: false } : null)}
-                    className="w-full flex items-center justify-center px-4 py-2.5 text-xs text-gray-400 hover:text-gray-600 border-t border-gray-50 dark:border-gray-700 transition"
+                    className="w-full flex items-center justify-center px-4 py-2.5 text-xs text-stone-400 hover:text-stone-600 border-t border-stone-50 transition"
                   >
                     ← Back
                   </button>
