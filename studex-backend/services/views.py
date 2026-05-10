@@ -124,6 +124,9 @@ class ListingViewSet(viewsets.ModelViewSet):
         return qs.select_related('vendor', 'category')
 
     def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if instance.vendor != request.user and not request.user.is_staff:
+            return Response({"error": "You do not have permission to edit this listing."}, status=403)
         # Vendors cannot change is_available — only admin can via Django Admin
         if 'is_available' in request.data and not request.user.is_staff:
             try:

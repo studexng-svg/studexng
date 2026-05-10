@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from django.contrib.auth import authenticate
 from django.contrib.auth import get_user_model
 from django.contrib.auth.tokens import default_token_generator
@@ -16,6 +17,21 @@ from django.utils import timezone
 import resend
 import random
 import string
+
+
+# ─── Auth cookie helpers ─────────────────────────────────────────────────────
+
+def _set_auth_cookies(response, access_token: str, refresh_token: str):
+    secure = not settings.DEBUG
+    samesite = 'None' if not settings.DEBUG else 'Lax'
+    common = dict(httponly=True, secure=secure, samesite=samesite, path='/')
+    response.set_cookie('access_token', access_token, max_age=7 * 24 * 60 * 60, **common)
+    response.set_cookie('refresh_token', refresh_token, max_age=30 * 24 * 60 * 60, **common)
+
+
+def _clear_auth_cookies(response):
+    response.delete_cookie('access_token', path='/')
+    response.delete_cookie('refresh_token', path='/')
 from .serializers import (
     UserRegistrationSerializer,
     UserLoginSerializer,
@@ -39,6 +55,18 @@ def send_otp(request):
     email = request.data.get('email', '').strip().lower()
     if not email:
         return Response({'error': 'Email is required'}, status=400)
+
+    # Rate limit by email+IP combined: max 3 requests per email per 5 minutes
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    ip = (x_forwarded_for.split(',')[0].strip() if x_forwarded_for else request.META.get('REMOTE_ADDR', ''))
+    otp_rate_key = f'otp_rate:{email}:{ip}'
+    attempts = cache.get(otp_rate_key, 0)
+    if attempts >= 3:
+        return Response(
+            {'error': 'Too many OTP requests. Please wait a few minutes before trying again.'},
+            status=429,
+        )
+    cache.set(otp_rate_key, attempts + 1, 300)  # 5-minute window
 
     otp = generate_otp()
     cache.set(f'otp_{email}', otp, timeout=600)
@@ -124,14 +152,17 @@ def register_user(request):
         )
 
         refresh = RefreshToken.for_user(user)
-        return Response({
+        access = str(refresh.access_token)
+        response = Response({
             'message': 'User registered successfully',
             'user': UserProfileSerializer(user, context={'request': request}).data,
             'tokens': {
                 'refresh': str(refresh),
-                'access': str(refresh.access_token),
+                'access': access,
             }
         }, status=status.HTTP_201_CREATED)
+        _set_auth_cookies(response, access, str(refresh))
+        return response
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -143,14 +174,17 @@ def login_user(request):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     user = serializer.validated_data['user']
     refresh = RefreshToken.for_user(user)
-    return Response({
+    access = str(refresh.access_token)
+    response = Response({
         'message': 'Login successful',
         'user': UserProfileSerializer(user, context={'request': request}).data,
         'tokens': {
             'refresh': str(refresh),
-            'access': str(refresh.access_token),
+            'access': access,
         }
     }, status=status.HTTP_200_OK)
+    _set_auth_cookies(response, access, str(refresh))
+    return response
 
 
 @api_view(['GET'])
@@ -272,13 +306,35 @@ def check_profile_completion(request):
 @permission_classes([IsAuthenticated])
 def logout_user(request):
     try:
-        refresh_token = request.data.get('refresh')
+        refresh_token = request.COOKIES.get('refresh_token') or request.data.get('refresh')
         if refresh_token:
             token = RefreshToken(refresh_token)
             token.blacklist()
-        return Response({'message': 'Logged out successfully'}, status=status.HTTP_200_OK)
-    except Exception as e:
-        return Response({'error': f'Logout failed: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception:
+        pass
+    response = Response({'message': 'Logged out successfully'}, status=status.HTTP_200_OK)
+    _clear_auth_cookies(response)
+    return response
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def cookie_token_refresh(request):
+    refresh_token = request.COOKIES.get('refresh_token')
+    if not refresh_token:
+        return Response({'error': 'No refresh token cookie'}, status=status.HTTP_401_UNAUTHORIZED)
+    serializer = TokenRefreshSerializer(data={'refresh': refresh_token})
+    try:
+        serializer.is_valid(raise_exception=True)
+    except Exception:
+        response = Response({'error': 'Invalid or expired refresh token'}, status=status.HTTP_401_UNAUTHORIZED)
+        _clear_auth_cookies(response)
+        return response
+    new_access = str(serializer.validated_data['access'])
+    new_refresh = str(serializer.validated_data.get('refresh', refresh_token))
+    response = Response({'access': new_access, 'refresh': new_refresh})
+    _set_auth_cookies(response, new_access, new_refresh)
+    return response
 
 
 @api_view(['GET'])

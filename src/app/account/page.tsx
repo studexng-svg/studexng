@@ -202,7 +202,12 @@ export default function AccountPage() {
     return () => { cancelled = true; if (pollTimer.current) clearInterval(pollTimer.current); };
   }, [isHydrated, isLoggedIn, pollStatus]);
 
-  const handleLogout = () => { if (pollTimer.current) clearInterval(pollTimer.current); logout(); router.push("/auth"); };
+  const handleLogout = async () => {
+    if (pollTimer.current) clearInterval(pollTimer.current);
+    try { await fetchWithAuth(`${API_URL}/api/auth/logout/`, { method: 'POST' }); } catch {}
+    logout();
+    router.push("/auth");
+  };
 
   const markAllRead = async () => {
     try {

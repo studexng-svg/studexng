@@ -152,7 +152,8 @@ export default function CategoryPageClient({ slug, initialListings }: Props) {
     }
 
     const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
-    document.cookie = `studex_campus=${campus}; path=/; max-age=31536000`;
+    const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
+    document.cookie = `studex_campus=${campus}; path=/; max-age=31536000; SameSite=Lax${isHttps ? '; Secure' : ''}`;
     fetchWithAuth(`${API_URL}/api/services/listings/?category=${slug}&campus=${campus}`)
       .then(async (res) => {
         if (res.ok) {

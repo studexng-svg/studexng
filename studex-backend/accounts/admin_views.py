@@ -150,7 +150,18 @@ class AdminUserDetailView(APIView):
                 user.is_staff = request.data['is_staff']
 
             if 'user_type' in request.data:
-                user.user_type = request.data['user_type']
+                new_type = request.data['user_type']
+                if new_type == 'vendor' and not user.is_verified_vendor:
+                    from accounts.models import SellerApplication
+                    has_approved = SellerApplication.objects.filter(
+                        user=user, status='approved'
+                    ).exists()
+                    if not has_approved:
+                        return Response(
+                            {'error': 'User must have an approved seller application before being promoted to vendor.'},
+                            status=status.HTTP_400_BAD_REQUEST,
+                        )
+                user.user_type = new_type
 
             user.save()
 

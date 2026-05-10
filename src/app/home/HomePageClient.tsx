@@ -155,7 +155,8 @@ export default function HomePageClient({ initialVendors, initialListings }: Prop
     }
 
     // Campus mismatch: update cookie and refetch with the correct campus
-    document.cookie = `studex_campus=${campus}; path=/; max-age=31536000`;
+    const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
+    document.cookie = `studex_campus=${campus}; path=/; max-age=31536000; SameSite=Lax${isHttps ? '; Secure' : ''}`;
     Promise.all([
       fetchWithAuth(`${API_URL}/api/services/listings/?campus=${campus}`),
       fetchWithAuth(`${API_URL}/api/auth/vendors/?campus=${campus}`),

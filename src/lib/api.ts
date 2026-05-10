@@ -93,6 +93,7 @@ class API {
       response = await fetch(`${this.baseURL}${endpoint}`, {
         ...options,
         headers,
+        credentials: "include",
         signal: controller.signal,
       });
     } catch (err: any) {

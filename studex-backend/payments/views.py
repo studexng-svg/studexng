@@ -7,6 +7,7 @@ import logging
 import json
 from decimal import Decimal
 from django.conf import settings
+from django.core.cache import cache
 from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse
 from rest_framework.decorators import api_view, permission_classes
@@ -117,7 +118,7 @@ def seller_bank_account(request):
             return Response({
                 "bank_code": account.bank_code,
                 "bank_name": account.bank_name,
-                "account_number": account.account_number,
+                "account_number": "••••••" + account.account_number[-4:],
                 "account_name": account.account_name,
                 "paystack_subaccount_code": account.paystack_subaccount_code,
                 "subaccount_ready": bool(account.paystack_subaccount_code),
@@ -289,6 +290,8 @@ def initialize_payment(request):
         return Response({"error": "Amount is below the minimum transaction value."}, status=400)
 
     reference = f"STX-{uuid.uuid4().hex[:16].upper()}"
+    # Store expected amount so verify_payment can confirm Paystack paid the right sum
+    cache.set(f'pay_init:{reference}', total_amount_kobo, 3600)
 
     callback_url = (
         request.data.get("callback_url")
@@ -353,31 +356,21 @@ def initialize_payment(request):
         paystack_msg = res_json.get("message", "Unknown Paystack error")
         logger.error(f"Paystack init rejected: {paystack_msg} | payload subaccount={payload.get('subaccount')}")
 
-        # If the failure is subaccount-related, retry without subaccount
+        # If the failure is subaccount-related, do NOT retry without the split.
+        # Retrying without the subaccount would silently cut the vendor out of their payout.
         if subaccount_code and any(
             kw in paystack_msg.lower()
             for kw in ("subaccount", "split", "invalid", "not found")
         ):
-            logger.warning(f"Retrying Paystack init without subaccount for listing {listing_id}")
-            payload.pop("subaccount", None)
-            payload.pop("transaction_charge", None)
-            payload.pop("bearer", None)
-            retry_res = requests.post(
-                f"{PAYSTACK_BASE}/transaction/initialize",
-                headers=headers,
-                json=payload,
-                timeout=15,
+            logger.error(
+                f"initialize_payment: subaccount error for vendor {listing.vendor.username} "
+                f"(listing {listing_id}): {paystack_msg}"
             )
-            retry_json = retry_res.json()
-            if retry_res.status_code in [200, 201] and retry_json.get("status"):
-                data = retry_json.get("data", {})
-                return Response({
-                    "authorization_url": data.get("authorization_url"),
-                    "access_code": data.get("access_code"),
-                    "reference": data.get("reference", reference),
-                    "amount_kobo": total_amount_kobo,
-                })
-            logger.error(f"Paystack retry also failed: {retry_json.get('message')}")
+            return Response(
+                {"error": "Payment could not be initialized — vendor payout configuration issue. "
+                          "Please contact support."},
+                status=500,
+            )
 
         return Response({"error": f"Payment initialization failed: {paystack_msg}"}, status=500)
 
@@ -478,6 +471,33 @@ def verify_payment(request):
 
     paystack_data = verify_data["data"]
     actual_listing_id = listing_id or (items[0]["listing_id"] if items else None)
+
+    # ── Amount integrity check ────────────────────────────────────────────────
+    # Compare what Paystack actually charged against what we initialised.
+    # Prevents a buyer from paying less than the listing price.
+    actual_kobo = int(paystack_data.get("amount", 0))
+    expected_kobo = cache.get(f'pay_init:{ref_key}')
+
+    if expected_kobo is None and actual_listing_id:
+        # Cache miss (server restart / expired) — recalculate floor from listing price.
+        # Use the most buyer-friendly assumption (5% discount applied) as the floor
+        # so a legitimately discounted payment is never rejected.
+        try:
+            from services.models import Listing
+            _listing = Listing.objects.get(id=actual_listing_id)
+            _base = Decimal(str(_listing.price))
+            _max_discount = (_base * Decimal("0.05")).quantize(Decimal("0.01"))
+            expected_kobo = int((_base - _max_discount + SERVICE_FEE) * 100)
+        except Exception:
+            expected_kobo = None
+
+    if expected_kobo is not None and actual_kobo < expected_kobo - 1:
+        logger.warning(
+            f"verify_payment: amount mismatch on {ref_key} — "
+            f"Paystack confirmed {actual_kobo} kobo, expected >= {expected_kobo} kobo"
+        )
+        return Response({"error": "Payment amount does not match the order amount."}, status=400)
+    # ─────────────────────────────────────────────────────────────────────────
 
     order_id, error = _create_order_from_paystack_data(
         paystack_data=paystack_data,
@@ -644,18 +664,21 @@ def paystack_webhook(request):
     if request.method != "POST":
         return HttpResponse(status=405)
 
-    # Verify HMAC-SHA512 signature
-    webhook_secret = getattr(settings, "PAYSTACK_WEBHOOK_SECRET", "")
-    if webhook_secret:
-        signature = request.headers.get("x-paystack-signature", "")
-        computed = hmac.new(
-            webhook_secret.encode("utf-8"),
-            request.body,
-            hashlib.sha512,
-        ).hexdigest()
-        if signature != computed:
-            logger.warning("Paystack webhook: invalid signature")
-            return HttpResponse(status=400)
+    # Verify HMAC-SHA512 signature — always required, never skipped
+    webhook_secret = (getattr(settings, "PAYSTACK_WEBHOOK_SECRET", "") or "").strip()
+    if not webhook_secret:
+        logger.error("Paystack webhook: PAYSTACK_WEBHOOK_SECRET is not configured — rejecting request")
+        return HttpResponse(status=401)
+
+    signature = request.headers.get("x-paystack-signature", "")
+    computed = hmac.new(
+        webhook_secret.encode("utf-8"),
+        request.body,
+        hashlib.sha512,
+    ).hexdigest()
+    if not hmac.compare_digest(signature, computed):
+        logger.warning("Paystack webhook: invalid signature")
+        return HttpResponse(status=400)
 
     try:
         payload = json.loads(request.body)

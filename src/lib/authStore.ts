@@ -50,7 +50,9 @@ export const useAuth = create<AuthState>()(
         set({ user: userData, isLoggedIn: true, accessToken, refreshToken, isAuthReady: true });
         // Persist campus to cookie so SSR fetches the right campus on next page load
         if (typeof document !== 'undefined') {
-          document.cookie = `studex_campus=${((userData as any).school || 'pau').toLowerCase()}; path=/; max-age=31536000`;
+          const isHttps = window.location.protocol === 'https:';
+          const extra = isHttps ? '; Secure; SameSite=Lax' : '; SameSite=Lax';
+          document.cookie = `studex_campus=${((userData as any).school || 'pau').toLowerCase()}; path=/; max-age=31536000${extra}`;
         }
         // Sync cart and wishlist from backend on login
         try {
@@ -108,11 +110,11 @@ export const useAuth = create<AuthState>()(
     }),
     {
       name: "auth-storage",
+      // Tokens are intentionally excluded — they live in httpOnly cookies, not localStorage.
+      // Only user profile data and login state are persisted for UI continuity.
       partialize: (state) => ({
         user: state.user,
         isLoggedIn: state.isLoggedIn,
-        accessToken: state.accessToken,
-        refreshToken: state.refreshToken,
       }),
       onRehydrateStorage: () => (state) => {
         if (!state) return;
@@ -140,32 +142,21 @@ export const useAuth = create<AuthState>()(
 );
 
 // ─────────────────────────────────────────
-// getToken — reads from Zustand store (in-memory first, then localStorage)
+// getToken — reads access token from in-memory store.
+// Tokens are no longer persisted to localStorage; they live in httpOnly cookies.
+// This returns the in-memory copy set after login or cookie-refresh.
 // ─────────────────────────────────────────
 export const getToken = (): string | null => {
   try {
-    const storeToken = useAuth.getState().accessToken;
-    if (storeToken) return storeToken;
-    const stored = localStorage.getItem("auth-storage");
-    return stored ? JSON.parse(stored)?.state?.accessToken ?? null : null;
-  } catch {
-    return null;
-  }
-};
-
-const getRefreshToken = (): string | null => {
-  try {
-    const storeToken = useAuth.getState().refreshToken;
-    if (storeToken) return storeToken;
-    const stored = localStorage.getItem("auth-storage");
-    return stored ? JSON.parse(stored)?.state?.refreshToken ?? null : null;
+    return useAuth.getState().accessToken;
   } catch {
     return null;
   }
 };
 
 // ─────────────────────────────────────────
-// refreshAccessToken — calls Django /api/auth/token/refresh/
+// refreshAccessToken — uses the httpOnly refresh_token cookie.
+// No token body needed; the cookie is sent automatically.
 // ─────────────────────────────────────────
 let isRefreshing = false;
 let refreshPromise: Promise<string | null> | null = null;
@@ -176,13 +167,9 @@ const refreshAccessToken = async (): Promise<string | null> => {
   isRefreshing = true;
   refreshPromise = (async () => {
     try {
-      const refresh = getRefreshToken();
-      if (!refresh) return null;
-
-      const res = await fetch(`${API_BASE_URL}/api/auth/token/refresh/`, {
+      const res = await fetch(`${API_BASE_URL}/api/auth/token/cookie-refresh/`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ refresh }),
+        credentials: "include",
       });
 
       if (!res.ok) {
@@ -192,10 +179,12 @@ const refreshAccessToken = async (): Promise<string | null> => {
 
       const data = await res.json();
       const newAccessToken = data.access;
-      const newRefreshToken = data.refresh || refresh;
+      const newRefreshToken = data.refresh || null;
 
-      useAuth.getState().updateTokens(newAccessToken, newRefreshToken);
-      return newAccessToken;
+      if (newAccessToken) {
+        useAuth.getState().updateTokens(newAccessToken, newRefreshToken || "");
+      }
+      return newAccessToken || null;
     } catch {
       return null;
     } finally {
@@ -209,7 +198,9 @@ const refreshAccessToken = async (): Promise<string | null> => {
 
 // ─────────────────────────────────────────
 // fetchWithAuth — use instead of fetch() for all authenticated API calls.
-// Automatically refreshes expired tokens and retries once.
+// Sends httpOnly cookies automatically via credentials:'include'.
+// Falls back to Authorization header if in-memory token is available.
+// Automatically refreshes via cookie on 401 and retries once.
 // ─────────────────────────────────────────
 export const fetchWithAuth = async (
   url: string,
@@ -223,7 +214,7 @@ export const fetchWithAuth = async (
     if (!headers.has("Content-Type") && !(options.body instanceof FormData)) {
       headers.set("Content-Type", "application/json");
     }
-    return fetch(url, { ...options, headers });
+    return fetch(url, { ...options, headers, credentials: "include" });
   };
 
   let response = await makeRequest(token);
