@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   ChevronLeft, Star, MessageCircle, ShoppingCart, Calendar,
   Clock, FileText, CheckCircle, AlertCircle,
-  ChevronDown, ChevronUp, Send, MapPin, Sparkles
+  ChevronDown, ChevronUp, Send, MapPin, Sparkles, ZoomIn, X as XIcon
 } from "lucide-react";
 import { useAuth, fetchWithAuth } from "@/lib/authStore";
 import { useCartStore } from "@/lib/cartStore";
@@ -89,6 +89,7 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
   const [bookingStep, setBookingStep] = useState<"form" | "confirming" | "done">("form");
   const [bookingError, setBookingError] = useState("");
   const [toast, setToast] = useState("");
+  const [imageOpen, setImageOpen] = useState(false);
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -240,7 +241,10 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
         <div className="pb-28 max-w-2xl mx-auto">
 
           {/* ── HERO IMAGE ── */}
-          <div className="relative h-64 w-full bg-stone-100">
+          <div
+            className={`relative h-64 w-full bg-stone-100 ${listing.image?.startsWith("http") ? "cursor-zoom-in" : ""}`}
+            onClick={() => listing.image?.startsWith("http") && setImageOpen(true)}
+          >
             {listing.image?.startsWith("http") ? (
               <img
                 src={listing.image}
@@ -257,12 +261,50 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
             {/* Gradient overlay */}
             <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
 
+            {/* Zoom hint */}
+            {listing.image?.startsWith("http") && listing.is_available && (
+              <div className="absolute bottom-3 right-3 bg-black/40 backdrop-blur-sm rounded-full p-1.5">
+                <ZoomIn className="w-4 h-4 text-white" />
+              </div>
+            )}
+
             {!listing.is_available && (
               <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
                 <span className="bg-red-500 text-white font-bold px-6 py-2 rounded-full text-sm">Unavailable</span>
               </div>
             )}
           </div>
+
+          {/* ── IMAGE LIGHTBOX ── */}
+          <AnimatePresence>
+            {imageOpen && listing.image?.startsWith("http") && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4"
+                onClick={() => setImageOpen(false)}
+              >
+                <button
+                  onClick={() => setImageOpen(false)}
+                  className="absolute top-4 right-4 w-10 h-10 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center transition z-10"
+                >
+                  <XIcon className="w-5 h-5 text-white" />
+                </button>
+                <motion.img
+                  initial={{ scale: 0.9, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.9, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  src={listing.image}
+                  alt={listing.title}
+                  className="max-w-full max-h-full object-contain rounded-xl shadow-2xl"
+                  onClick={(e) => e.stopPropagation()}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           <div className="px-4 pt-4 space-y-4">
 

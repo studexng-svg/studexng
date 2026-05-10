@@ -218,15 +218,18 @@ export default function HomePageClient({ initialVendors, initialListings }: Prop
     setTimeout(() => setToast(""), 2000);
   };
 
-  const BADGE_WEIGHT: Record<string, number> = { top: 3, trusted: 2, rising: 1, none: 0 };
-  const sortedListings = [...listings].sort((a, b) => {
-    const aBadge = BADGE_WEIGHT[a.vendor?.profile?.vendor_badge || "none"];
-    const bBadge = BADGE_WEIGHT[b.vendor?.profile?.vendor_badge || "none"];
-    if (bBadge !== aBadge) return bBadge - aBadge;
-    return (b.vendor?.profile?.completion_rate || 0) - (a.vendor?.profile?.completion_rate || 0);
-  });
+  const [shuffledListings, setShuffledListings] = useState<any[]>(initialListings);
 
-  const featuredListings = sortedListings;
+  useEffect(() => {
+    const arr = [...listings];
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    setShuffledListings(arr);
+  }, [listings]);
+
+  const featuredListings = shuffledListings;
 
   return (
     <>
