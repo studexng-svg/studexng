@@ -253,13 +253,15 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class SellerApplicationSerializer(serializers.ModelSerializer):
-    id_front = serializers.ImageField(required=False, allow_null=True)
-    id_back = serializers.ImageField(required=False, allow_null=True)
+    id_front = serializers.FileField(required=False, allow_null=True)
+    id_back = serializers.FileField(required=False, allow_null=True)
     admission_letter = serializers.FileField(required=False, allow_null=True)
+    nin_document = serializers.FileField(required=False, allow_null=True)
 
     id_front_url = serializers.SerializerMethodField()
     id_back_url = serializers.SerializerMethodField()
     admission_letter_url = serializers.SerializerMethodField()
+    nin_document_url = serializers.SerializerMethodField()
 
     applicant_name = serializers.SerializerMethodField()
     applicant_email = serializers.SerializerMethodField()
@@ -272,9 +274,11 @@ class SellerApplicationSerializer(serializers.ModelSerializer):
             'id_front',
             'id_back',
             'admission_letter',
+            'nin_document',
             'id_front_url',
             'id_back_url',
             'admission_letter_url',
+            'nin_document_url',
             'business_age_confirmed',
             'status',
             'submitted_at',
@@ -286,10 +290,16 @@ class SellerApplicationSerializer(serializers.ModelSerializer):
         read_only_fields = ['status', 'submitted_at', 'notes']
 
     def _abs_url(self, file_field):
-        request = self.context.get('request')
-        if file_field and request:
-            return request.build_absolute_uri(file_field.url)
-        return None
+        if not file_field:
+            return None
+        try:
+            url = file_field.url
+            request = self.context.get('request')
+            if request and url.startswith('/'):
+                return request.build_absolute_uri(url)
+            return url
+        except Exception:
+            return None
 
     def get_id_front_url(self, obj):
         return self._abs_url(obj.id_front)
@@ -299,6 +309,9 @@ class SellerApplicationSerializer(serializers.ModelSerializer):
 
     def get_admission_letter_url(self, obj):
         return self._abs_url(obj.admission_letter)
+
+    def get_nin_document_url(self, obj):
+        return self._abs_url(obj.nin_document)
 
     def get_applicant_name(self, obj):
         return obj.user.get_full_name() or obj.user.username
@@ -312,9 +325,10 @@ class SellerApplicationSerializer(serializers.ModelSerializer):
     def validate(self, data):
         has_id_card = data.get('id_front') and data.get('id_back')
         has_letter = bool(data.get('admission_letter'))
-        if not has_id_card and not has_letter:
+        has_nin = bool(data.get('nin_document'))
+        if not has_id_card and not has_letter and not has_nin:
             raise serializers.ValidationError(
-                "Upload either both sides of your ID card, or an admission letter."
+                "Upload either both sides of your ID card, an admission letter, or your NIN document."
             )
         return data
 

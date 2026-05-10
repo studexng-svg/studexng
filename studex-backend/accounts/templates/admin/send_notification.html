@@ -1,0 +1,66 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block content %}
+<h1>Send Custom Notification</h1>
+
+<p>This notification will be sent to the following <strong>{{ users.count }}</strong> user(s):</p>
+
+<ul style="margin-bottom:1.5rem;">
+  {% for user in users %}
+    <li><strong>{{ user.username }}</strong> — {{ user.email }}{% if user.business_name %} ({{ user.business_name }}){% endif %}</li>
+  {% endfor %}
+</ul>
+
+<form method="post" style="max-width:640px;">
+  {% csrf_token %}
+
+  <!-- Pass selected user IDs back so Django admin knows which queryset to use -->
+  {% for user in users %}
+    <input type="hidden" name="{{ action_checkbox_name }}" value="{{ user.pk }}">
+  {% endfor %}
+  <input type="hidden" name="action" value="send_custom_notification">
+  <input type="hidden" name="apply" value="1">
+
+  <div class="form-row" style="margin-bottom:1rem;">
+    <label for="notification_title" style="display:block;font-weight:600;margin-bottom:.4rem;">
+      Notification Title <span style="color:#ef4444;">*</span>
+    </label>
+    <input
+      type="text"
+      id="notification_title"
+      name="notification_title"
+      required
+      maxlength="200"
+      placeholder="e.g. Action Required: Add Your First Listing"
+      style="width:100%;padding:.5rem .75rem;border:1px solid #d1d5db;border-radius:6px;font-size:1rem;"
+    >
+  </div>
+
+  <div class="form-row" style="margin-bottom:1.5rem;">
+    <label for="notification_message" style="display:block;font-weight:600;margin-bottom:.4rem;">
+      Message <span style="color:#ef4444;">*</span>
+    </label>
+    <textarea
+      id="notification_message"
+      name="notification_message"
+      required
+      rows="5"
+      placeholder="Write your message here..."
+      style="width:100%;padding:.5rem .75rem;border:1px solid #d1d5db;border-radius:6px;font-size:1rem;resize:vertical;"
+    ></textarea>
+  </div>
+
+  <div style="display:flex;gap:.75rem;align-items:center;">
+    <button
+      type="submit"
+      style="background:#0d9488;color:#fff;padding:.5rem 1.25rem;border:none;border-radius:6px;font-size:1rem;cursor:pointer;font-weight:600;"
+    >
+      Send Notification
+    </button>
+    <a href="{% url 'admin:accounts_user_changelist' %}" style="color:#6b7280;text-decoration:none;">
+      Cancel
+    </a>
+  </div>
+</form>
+{% endblock %}

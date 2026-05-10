@@ -1,6 +1,8 @@
 # accounts/admin.py
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+from django.contrib.admin import helpers
+from django.template.response import TemplateResponse
 from django.utils import timezone
 from django.utils.html import format_html
 from django.http import HttpResponse
@@ -48,7 +50,35 @@ class UserAdmin(BaseUserAdmin):
     )
 
     ordering = ['-created_at']
-    actions = ['approve_vendors', 'unverify_vendors', 'export_to_csv']
+    actions = ['approve_vendors', 'unverify_vendors', 'export_to_csv', 'send_custom_notification']
+
+    def send_custom_notification(self, request, queryset):
+        if 'apply' in request.POST:
+            title = request.POST.get('notification_title', '').strip()
+            message = request.POST.get('notification_message', '').strip()
+            if not title or not message:
+                self.message_user(request, "Title and message are required.", level='error')
+                return None
+            count = 0
+            for user in queryset:
+                send_notification(
+                    recipient=user,
+                    notification_type='admin_message',
+                    title=title,
+                    message=message,
+                )
+                count += 1
+            self.message_user(request, f"Notification sent to {count} user(s).")
+            return None
+
+        return TemplateResponse(request, 'admin/send_notification.html', {
+            'users': queryset,
+            'action_checkbox_name': helpers.ACTION_CHECKBOX_NAME,
+            'title': 'Send Custom Notification',
+            'opts': self.model._meta,
+            'media': self.media,
+        })
+    send_custom_notification.short_description = "Send custom notification to selected users"
 
     def approve_vendors(self, request, queryset):
         approved_count = 0
@@ -113,12 +143,12 @@ class SellerApplicationAdmin(admin.ModelAdmin):
     search_fields = ['user__username', 'user__email']
     readonly_fields = [
         'id', 'user', 'submitted_at',
-        'preview_id_front', 'preview_id_back', 'preview_admission_letter',
+        'preview_id_front', 'preview_id_back', 'preview_admission_letter', 'preview_nin_document',
     ]
 
     fieldsets = (
         ('Application Info', {'fields': ('id', 'user', 'status', 'submitted_at')}),
-        ('Documents', {'fields': ('preview_id_front', 'preview_id_back', 'preview_admission_letter')}),
+        ('Documents', {'fields': ('preview_id_front', 'preview_id_back', 'preview_admission_letter', 'preview_nin_document')}),
         ('Verification', {'fields': ('business_age_confirmed',)}),
         ('Admin Notes', {'fields': ('notes',)}),
     )
@@ -155,6 +185,10 @@ class SellerApplicationAdmin(admin.ModelAdmin):
     def preview_admission_letter(self, obj):
         return self._file_preview(obj.admission_letter, 'Admission Letter')
     preview_admission_letter.short_description = 'Admission Letter'
+
+    def preview_nin_document(self, obj):
+        return self._file_preview(obj.nin_document, 'NIN Document')
+    preview_nin_document.short_description = 'NIN Document'
 
     actions = ['approve_applications', 'reject_applications']
 

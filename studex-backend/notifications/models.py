@@ -23,6 +23,7 @@ class Notification(models.Model):
         ('seller_rejected', 'Seller Application Rejected'),
         ('seller_revoked', 'Seller Status Revoked'),
         ('message', 'New Message'),
+        ('admin_message', 'Message from Admin'),
     )
 
     recipient = models.ForeignKey(

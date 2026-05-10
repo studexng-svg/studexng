@@ -111,6 +111,22 @@ def validate_image(file):
     return validator(file)
 
 
+def validate_id_document(file):
+    """Validate ID card / NIN uploads — accepts images AND PDFs"""
+    allowed_extensions = ['jpg', 'jpeg', 'png', 'pdf']
+    allowed_mimetypes = [
+        'image/jpeg',
+        'image/png',
+        'application/pdf',
+    ]
+    validator = FileValidator(
+        max_size_mb=getattr(settings, 'MAX_UPLOAD_SIZE_MB', 10),
+        allowed_extensions=allowed_extensions,
+        allowed_mimetypes=allowed_mimetypes,
+    )
+    return validator(file)
+
+
 def validate_document(file):
     """Validate document uploads (pdf, doc, docx)"""
     allowed_extensions = getattr(

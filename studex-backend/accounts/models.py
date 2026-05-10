@@ -3,7 +3,7 @@ from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
-from studex.validators import validate_image, validate_document
+from studex.validators import validate_image, validate_document, validate_id_document
 
 
 class User(AbstractUser):
@@ -117,17 +117,17 @@ class SellerApplication(models.Model):
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='seller_application')
 
-    # Option A: both sides of student ID card
-    id_front = models.ImageField(
+    # Option A: both sides of student ID card (images or PDFs)
+    id_front = models.FileField(
         upload_to='seller_verification/id_front/',
-        validators=[validate_image],
-        help_text="Front of student ID card",
+        validators=[validate_id_document],
+        help_text="Front of student ID card (JPG, PNG, or PDF)",
         blank=True, null=True,
     )
-    id_back = models.ImageField(
+    id_back = models.FileField(
         upload_to='seller_verification/id_back/',
-        validators=[validate_image],
-        help_text="Back of student ID card",
+        validators=[validate_id_document],
+        help_text="Back of student ID card (JPG, PNG, or PDF)",
         blank=True, null=True,
     )
     # Option B: admission letter / proof of enrollment (PDF or image)
@@ -135,6 +135,13 @@ class SellerApplication(models.Model):
         upload_to='seller_verification/admission/',
         validators=[validate_document],
         help_text="Admission letter or proof of enrollment (PDF, JPG, PNG)",
+        blank=True, null=True,
+    )
+    # Option C: NIN document (slip or card scan)
+    nin_document = models.FileField(
+        upload_to='seller_verification/nin/',
+        validators=[validate_id_document],
+        help_text="NIN slip or NIN card (JPG, PNG, or PDF)",
         blank=True, null=True,
     )
 
@@ -160,9 +167,10 @@ class SellerApplication(models.Model):
         from django.core.exceptions import ValidationError
         has_id_card = self.id_front and self.id_back
         has_letter = bool(self.admission_letter)
-        if not has_id_card and not has_letter:
+        has_nin = bool(self.nin_document)
+        if not has_id_card and not has_letter and not has_nin:
             raise ValidationError(
-                "Upload either both sides of your ID card, or an admission letter."
+                "Upload either both sides of your ID card, an admission letter, or your NIN document."
             )
 
     def id_front_url(self):

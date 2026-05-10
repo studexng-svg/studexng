@@ -1,13 +1,13 @@
 "use client";
 
-import { Store, ChevronLeft, CheckCircle, X, Shield, ArrowRight, CreditCard, FlipHorizontal, FileText } from "lucide-react";
+import { Store, ChevronLeft, CheckCircle, X, Shield, ArrowRight, CreditCard, FlipHorizontal, FileText, IdCard } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth, fetchWithAuth } from "@/lib/authStore";
 import { GRAD, SERIF } from "@/lib/tokens";
 
-type DocType = "id_card" | "admission_letter";
+type DocType = "id_card" | "admission_letter" | "nin";
 
 export default function SellerOnboarding() {
   const [step, setStep] = useState(1);
@@ -17,11 +17,13 @@ export default function SellerOnboarding() {
     idFront: null as File | null,
     idBack: null as File | null,
     admissionLetter: null as File | null,
+    ninDocument: null as File | null,
   });
   const [previews, setPreviews] = useState({
     idFront: null as string | null,
     idBack: null as string | null,
     admissionLetter: null as string | null,
+    ninDocument: null as string | null,
   });
 
   const [businessAge, setBusinessAge] = useState(false);
@@ -51,7 +53,9 @@ export default function SellerOnboarding() {
   const isStep2Complete =
     docType === "id_card"
       ? !!(files.idFront && files.idBack && businessAge)
-      : !!(files.admissionLetter && businessAge);
+      : docType === "admission_letter"
+      ? !!(files.admissionLetter && businessAge)
+      : !!(files.ninDocument && businessAge);
 
   const handleSubmit = async () => {
     if (!isStep2Complete) {
@@ -73,8 +77,10 @@ export default function SellerOnboarding() {
     if (docType === "id_card") {
       formData.append("id_front", files.idFront!);
       formData.append("id_back", files.idBack!);
-    } else {
+    } else if (docType === "admission_letter") {
       formData.append("admission_letter", files.admissionLetter!);
+    } else {
+      formData.append("nin_document", files.ninDocument!);
     }
     formData.append("business_age_confirmed", "true");
 
@@ -165,30 +171,30 @@ export default function SellerOnboarding() {
           <div className="animate-fadeUp space-y-6">
             <div>
               <h2 className="text-xl font-bold text-stone-900" style={SERIF}>Verify Your Identity</h2>
-              <p className="text-sm text-stone-500 mt-1">Choose how you'd like to verify</p>
+              <p className="text-sm text-stone-500 mt-1">Choose a document to verify your identity</p>
             </div>
 
-            {/* DOC TYPE TOGGLE */}
-            <div className="grid grid-cols-2 gap-3">
-              {([
-                { key: "id_card" as DocType,          label: "Student ID Card",     sub: "Front & back",          Icon: CreditCard },
-                { key: "admission_letter" as DocType, label: "Admission Letter",    sub: "PDF, JPG or PNG",       Icon: FileText },
-              ]).map(({ key, label, sub, Icon }) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => { setDocType(key); setError(""); }}
-                  className={`p-4 rounded-2xl border-2 text-left transition-all ${
-                    docType === key
-                      ? "border-teal-500 bg-teal-50"
-                      : "border-stone-200 bg-white hover:border-stone-300"
-                  }`}
+            {/* DOC TYPE DROPDOWN */}
+            <div>
+              <label className="block text-xs font-semibold text-stone-500 uppercase tracking-wide mb-2">
+                Verification Document
+              </label>
+              <div className="relative">
+                <select
+                  value={docType}
+                  onChange={(e) => { setDocType(e.target.value as DocType); setError(""); }}
+                  className="w-full appearance-none bg-white border-2 border-stone-200 rounded-2xl px-4 py-3.5 pr-10 text-sm font-semibold text-stone-800 focus:outline-none focus:border-teal-500 transition-colors cursor-pointer"
                 >
-                  <Icon className={`w-5 h-5 mb-2 ${docType === key ? "text-teal-600" : "text-stone-400"}`} />
-                  <p className={`text-sm font-bold ${docType === key ? "text-teal-800" : "text-stone-700"}`}>{label}</p>
-                  <p className={`text-xs mt-0.5 ${docType === key ? "text-teal-600" : "text-stone-400"}`}>{sub}</p>
-                </button>
-              ))}
+                  <option value="id_card">🪪  Student ID Card (front &amp; back)</option>
+                  <option value="admission_letter">📄  Admission Letter</option>
+                  <option value="nin">🆔  NIN Document (National ID Number)</option>
+                </select>
+                <div className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-stone-400">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </div>
             </div>
 
             {error && (
@@ -204,34 +210,51 @@ export default function SellerOnboarding() {
                 { key: "idBack"  as const, label: "ID Card — Back",  hint: "Shows expiry date, barcode or institution seal", Icon: FlipHorizontal },
               ]).map(({ key, label, hint, Icon }) => (
                 <label key={key} className="block cursor-pointer">
-                  {previews[key] ? (
-                    <div className="relative rounded-2xl overflow-hidden border-2 border-teal-500">
-                      <img src={previews[key]!} alt={label} className="w-full h-44 object-cover" />
-                      <div className="absolute bottom-0 left-0 right-0 bg-black/50 backdrop-blur-sm px-4 py-2 flex items-center justify-between">
-                        <p className="text-white text-sm font-semibold flex items-center gap-2">
-                          <CheckCircle className="w-4 h-4 text-emerald-400" /> {label}
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() => removeFile(key)}
-                          className="p-1.5 bg-red-500/80 hover:bg-red-600 rounded-full transition"
-                        >
-                          <X className="w-3.5 h-3.5 text-white" />
-                        </button>
-                      </div>
+                  {files[key] ? (
+                    <div className={`rounded-2xl border-2 border-teal-500 ${previews[key] ? "overflow-hidden" : "bg-teal-50 p-4 flex items-center justify-between"}`}>
+                      {previews[key] ? (
+                        <>
+                          <img src={previews[key]!} alt={label} className="w-full h-44 object-cover" />
+                          <div className="absolute bottom-0 left-0 right-0 bg-black/50 backdrop-blur-sm px-4 py-2 flex items-center justify-between">
+                            <p className="text-white text-sm font-semibold flex items-center gap-2">
+                              <CheckCircle className="w-4 h-4 text-emerald-400" /> {label}
+                            </p>
+                            <button type="button" onClick={() => removeFile(key)} className="p-1.5 bg-red-500/80 hover:bg-red-600 rounded-full transition">
+                              <X className="w-3.5 h-3.5 text-white" />
+                            </button>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-teal-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                              <Icon className="w-5 h-5 text-teal-600" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-semibold text-teal-800 flex items-center gap-1.5">
+                                <CheckCircle className="w-4 h-4 text-emerald-500" /> {label}
+                              </p>
+                              <p className="text-xs text-teal-600 mt-0.5 truncate max-w-[180px]">{files[key]!.name}</p>
+                            </div>
+                          </div>
+                          <button type="button" onClick={() => removeFile(key)} className="p-1.5 bg-red-100 hover:bg-red-200 rounded-full transition">
+                            <X className="w-3.5 h-3.5 text-red-600" />
+                          </button>
+                        </>
+                      )}
                     </div>
                   ) : (
-                    <div className="border-2 border-dashed border-stone-300 rounded-2xl p-6 text-center hover:border-teal-400 hover:bg-teal-50/30 transition-all">
+                    <div className="relative border-2 border-dashed border-stone-300 rounded-2xl p-6 text-center hover:border-teal-400 hover:bg-teal-50/30 transition-all">
                       <div className="w-12 h-12 mx-auto mb-3 bg-stone-100 rounded-2xl flex items-center justify-center">
                         <Icon className="w-6 h-6 text-stone-400" />
                       </div>
                       <p className="text-sm font-semibold text-stone-700">{label}</p>
                       <p className="text-xs text-stone-400 mt-1">{hint}</p>
-                      <p className="text-xs text-teal-600 mt-2 font-medium">Tap to upload · JPG or PNG</p>
+                      <p className="text-xs text-teal-600 mt-2 font-medium">Tap to upload · JPG, PNG or PDF</p>
                       <input
                         type="file"
                         className="hidden"
-                        accept=".jpg,.jpeg,.png"
+                        accept="image/*,application/pdf"
                         onChange={(e) => handleFile(key, e.target.files?.[0] || null)}
                       />
                     </div>
@@ -276,8 +299,53 @@ export default function SellerOnboarding() {
                       <input
                         type="file"
                         className="hidden"
-                        accept=".pdf,.jpg,.jpeg,.png"
+                        accept="image/*,application/pdf"
                         onChange={(e) => handleFile("admissionLetter", e.target.files?.[0] || null)}
+                      />
+                    </div>
+                  )}
+                </label>
+              )}
+
+              {/* NIN OPTION */}
+              {docType === "nin" && (
+                <label className="block cursor-pointer">
+                  {files.ninDocument ? (
+                    <div className="rounded-2xl border-2 border-teal-500 bg-teal-50 p-4 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-teal-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                          <IdCard className="w-5 h-5 text-teal-600" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-teal-800 flex items-center gap-1.5">
+                            <CheckCircle className="w-4 h-4 text-emerald-500" /> NIN uploaded
+                          </p>
+                          <p className="text-xs text-teal-600 mt-0.5 truncate max-w-[180px]">
+                            {files.ninDocument.name}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeFile("ninDocument")}
+                        className="p-1.5 bg-red-100 hover:bg-red-200 rounded-full transition"
+                      >
+                        <X className="w-3.5 h-3.5 text-red-600" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="border-2 border-dashed border-stone-300 rounded-2xl p-8 text-center hover:border-teal-400 hover:bg-teal-50/30 transition-all">
+                      <div className="w-14 h-14 mx-auto mb-3 bg-stone-100 rounded-2xl flex items-center justify-center">
+                        <IdCard className="w-7 h-7 text-stone-400" />
+                      </div>
+                      <p className="text-sm font-semibold text-stone-700">NIN Document</p>
+                      <p className="text-xs text-stone-400 mt-1">Your NIN slip or National ID card scan</p>
+                      <p className="text-xs text-teal-600 mt-2 font-medium">Tap to upload · PDF, JPG or PNG</p>
+                      <input
+                        type="file"
+                        className="hidden"
+                        accept="image/*,application/pdf"
+                        onChange={(e) => handleFile("ninDocument", e.target.files?.[0] || null)}
                       />
                     </div>
                   )}
@@ -334,25 +402,39 @@ export default function SellerOnboarding() {
               <div className="grid grid-cols-2 gap-3 text-left">
                 {docType === "id_card" ? (
                   <>
-                    {previews.idFront && (
+                    {(previews.idFront || files.idFront) && (
                       <div className="rounded-2xl overflow-hidden border border-stone-200 shadow-sm">
-                        <img src={previews.idFront} alt="ID Front" className="w-full h-28 object-cover" />
-                        <p className="text-xs font-medium text-stone-500 p-2 bg-stone-50">ID Front</p>
+                        {previews.idFront
+                          ? <img src={previews.idFront} alt="ID Front" className="w-full h-28 object-cover" />
+                          : <div className="w-full h-28 bg-teal-50 flex items-center justify-center"><FileText className="w-8 h-8 text-teal-400" /></div>
+                        }
+                        <p className="text-xs font-medium text-stone-500 p-2 bg-stone-50 truncate">{files.idFront?.name || "ID Front"}</p>
                       </div>
                     )}
-                    {previews.idBack && (
+                    {(previews.idBack || files.idBack) && (
                       <div className="rounded-2xl overflow-hidden border border-stone-200 shadow-sm">
-                        <img src={previews.idBack} alt="ID Back" className="w-full h-28 object-cover" />
-                        <p className="text-xs font-medium text-stone-500 p-2 bg-stone-50">ID Back</p>
+                        {previews.idBack
+                          ? <img src={previews.idBack} alt="ID Back" className="w-full h-28 object-cover" />
+                          : <div className="w-full h-28 bg-teal-50 flex items-center justify-center"><FileText className="w-8 h-8 text-teal-400" /></div>
+                        }
+                        <p className="text-xs font-medium text-stone-500 p-2 bg-stone-50 truncate">{files.idBack?.name || "ID Back"}</p>
                       </div>
                     )}
                   </>
-                ) : (
+                ) : docType === "admission_letter" ? (
                   <div className="col-span-2 rounded-2xl border border-teal-200 bg-teal-50 p-4 flex items-center gap-3">
                     <FileText className="w-8 h-8 text-teal-600 flex-shrink-0" />
                     <div>
                       <p className="text-sm font-semibold text-teal-800">Admission Letter</p>
                       <p className="text-xs text-teal-600 truncate">{files.admissionLetter?.name}</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="col-span-2 rounded-2xl border border-teal-200 bg-teal-50 p-4 flex items-center gap-3">
+                    <IdCard className="w-8 h-8 text-teal-600 flex-shrink-0" />
+                    <div>
+                      <p className="text-sm font-semibold text-teal-800">NIN Document</p>
+                      <p className="text-xs text-teal-600 truncate">{files.ninDocument?.name}</p>
                     </div>
                   </div>
                 )}
