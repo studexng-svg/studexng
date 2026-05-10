@@ -112,19 +112,65 @@ def validate_image(file):
 
 
 def validate_id_document(file):
-    """Validate ID card / NIN uploads — accepts images AND PDFs"""
-    allowed_extensions = ['jpg', 'jpeg', 'png', 'pdf']
-    allowed_mimetypes = [
-        'image/jpeg',
-        'image/png',
-        'application/pdf',
-    ]
-    validator = FileValidator(
-        max_size_mb=getattr(settings, 'MAX_UPLOAD_SIZE_MB', 10),
-        allowed_extensions=allowed_extensions,
-        allowed_mimetypes=allowed_mimetypes,
-    )
-    return validator(file)
+    """Validate ID card / NIN uploads — accepts images AND PDFs.
+
+    Checks applied in order:
+    1. Hard 10MB size limit
+    2. Extension whitelist (jpg, jpeg, png, pdf)
+    3. PDF magic-bytes header (%PDF-)
+    4. MIME type via python-magic when available
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+
+    _MAX_SIZE = 10 * 1024 * 1024  # 10MB
+    _ALLOWED_EXT = {'jpg', 'jpeg', 'png', 'pdf'}
+    _ALLOWED_MIME = {'image/jpeg', 'image/png', 'application/pdf'}
+
+    if file.size > _MAX_SIZE:
+        logger.warning(
+            "[security] id_doc rejected: size=%d name=%s", file.size, file.name
+        )
+        raise ValidationError(
+            f"File size exceeds 10MB. Your file is {file.size / (1024 * 1024):.1f}MB."
+        )
+
+    ext = os.path.splitext(file.name)[1][1:].lower()
+    if ext not in _ALLOWED_EXT:
+        logger.warning(
+            "[security] id_doc rejected: ext=.%s name=%s", ext, file.name
+        )
+        raise ValidationError(
+            f'File type ".{ext}" is not allowed. Use JPG, PNG, or PDF.'
+        )
+
+    # Read the first 8 bytes to check file signature
+    file.seek(0)
+    header = file.read(8)
+    file.seek(0)
+
+    if ext == 'pdf' and not header.startswith(b'%PDF-'):
+        logger.warning(
+            "[security] id_doc rejected: invalid PDF header name=%s", file.name
+        )
+        raise ValidationError(
+            'File does not appear to be a valid PDF (bad file header).'
+        )
+
+    if HAS_MAGIC:
+        mime_checker = magic.Magic(mime=True)
+        file.seek(0)
+        detected = mime_checker.from_buffer(file.read(2048))
+        file.seek(0)
+        if detected not in _ALLOWED_MIME:
+            logger.warning(
+                "[security] id_doc rejected: mime=%s name=%s", detected, file.name
+            )
+            raise ValidationError(
+                f'File content type "{detected}" is not permitted.'
+            )
+
+    return file
 
 
 def validate_document(file):

@@ -25,6 +25,7 @@ interface AuthState {
   refreshToken: string | null;
   isHydrated: boolean;
   isAuthReady: boolean;
+  walletBalance: string | null;
 
   login: (userData: UserProfile, accessToken: string, refreshToken: string) => void;
   logout: () => void;
@@ -34,6 +35,7 @@ interface AuthState {
   setAuthReady: (ready: boolean) => void;
   updateTokens: (accessToken: string, refreshToken: string) => void;
   refreshProfile: () => Promise<void>;
+  fetchWalletBalance: () => Promise<void>;
 }
 
 export const useAuth = create<AuthState>()(
@@ -45,6 +47,7 @@ export const useAuth = create<AuthState>()(
       refreshToken: null,
       isHydrated: false,
       isAuthReady: false,
+      walletBalance: null,
 
       login: (userData, accessToken, refreshToken) => {
         set({ user: userData, isLoggedIn: true, accessToken, refreshToken, isAuthReady: true });
@@ -107,13 +110,26 @@ export const useAuth = create<AuthState>()(
           }));
         } catch {}
       },
+
+      fetchWalletBalance: async () => {
+        try {
+          const res = await fetchWithAuth(`${API_BASE_URL}/api/wallet/balance/`);
+          if (!res.ok) return;
+          const data = await res.json();
+          if (data.balance !== undefined) {
+            set({ walletBalance: String(data.balance) });
+          }
+        } catch {}
+      },
     }),
     {
       name: "auth-storage",
-      // Tokens are intentionally excluded — they live in httpOnly cookies, not localStorage.
-      // Only user profile data and login state are persisted for UI continuity.
+      // Tokens and wallet balance are intentionally excluded from localStorage.
+      // Tokens live in httpOnly cookies; wallet balance must always be fetched fresh.
       partialize: (state) => ({
-        user: state.user,
+        user: state.user
+          ? (({ wallet_balance, ...rest }) => rest)(state.user as any)
+          : null,
         isLoggedIn: state.isLoggedIn,
       }),
       onRehydrateStorage: () => (state) => {

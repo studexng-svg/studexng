@@ -238,12 +238,14 @@ def update_user_profile(request):
             # Upload directly to Cloudinary and store the persistent CDN URL.
             # This bypasses DEFAULT_FILE_STORAGE so the image survives deploys
             # even if the env var isn't wired to Django's storage backend.
+            import uuid
             import cloudinary.uploader
+            public_id = f"profile_{user.pk}_{uuid.uuid4().hex[:8]}"
             result = cloudinary.uploader.upload(
                 request.FILES['profile_image'],
                 folder='profiles',
-                public_id=f'user_{user.pk}',
-                overwrite=True,
+                public_id=public_id,
+                overwrite=False,
                 resource_type='image',
             )
             User.objects.filter(pk=user.pk).update(profile_image=result['secure_url'])

@@ -13,7 +13,11 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # =======================================
 # SECURITY
 # =======================================
-SECRET_KEY = config('SECRET_KEY', default='django-insecure-change-me-in-production')
+_SECRET_KEY = config('SECRET_KEY', default='')
+if not _SECRET_KEY:
+    raise ValueError("SECRET_KEY environment variable is not set. Refusing to start.")
+SECRET_KEY = _SECRET_KEY
+
 DEBUG = config('DEBUG', default='False') == 'True'
 
 ALLOWED_HOSTS = config(
@@ -196,16 +200,17 @@ STORAGES = {
 AUTH_USER_MODEL = 'accounts.User'
 
 # =======================================
-# CORS
+# CORS — explicit allowlist in all environments (no wildcard)
 # =======================================
-if DEBUG:
-    CORS_ALLOW_ALL_ORIGINS = True
-else:
-    CORS_ALLOW_ALL_ORIGINS = False
-    CORS_ALLOWED_ORIGINS = config(
-        'CORS_ALLOWED_ORIGINS',
-        default='http://localhost:3000,https://studexng.vercel.app',
-    ).split(',')
+_DEFAULT_ORIGINS = (
+    'http://localhost:3000,'
+    'http://127.0.0.1:3000,'
+    'https://studex.com.ng,'
+    'https://www.studex.com.ng,'
+    'https://studexng.vercel.app'
+)
+CORS_ALLOWED_ORIGINS = config('CORS_ALLOWED_ORIGINS', default=_DEFAULT_ORIGINS).split(',')
+CORS_ALLOW_ALL_ORIGINS = False
 
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_HEADERS = [

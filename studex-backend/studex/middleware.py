@@ -86,12 +86,12 @@ class SecurityHeadersMiddleware(MiddlewareMixin):
         if not settings.DEBUG:
             response['Content-Security-Policy'] = (
                 "default-src 'self'; "
-                "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.paystack.co; "
+                "script-src 'self' 'unsafe-inline' https://js.paystack.co https://checkout.paystack.com; "
                 "style-src 'self' 'unsafe-inline'; "
-                "img-src 'self' data: https:; "
+                "img-src 'self' data: https://res.cloudinary.com; "
                 "font-src 'self' data:; "
-                "connect-src 'self' https://api.paystack.co; "
-                "frame-src 'self' https://checkout.paystack.com;"
+                "connect-src 'self' https://api.studex.com.ng https://api.paystack.co; "
+                "frame-src https://checkout.paystack.com;"
             )
 
         if not settings.DEBUG and request.is_secure():

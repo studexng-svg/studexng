@@ -323,6 +323,19 @@ class SellerApplicationSerializer(serializers.ModelSerializer):
         return obj.user.matric_number or ''
 
     def validate(self, data):
+        import logging
+        logger = logging.getLogger(__name__)
+        request = self.context.get('request')
+        user_id = getattr(getattr(request, 'user', None), 'pk', 'anonymous')
+
+        for field in ('id_front', 'id_back', 'admission_letter', 'nin_document'):
+            f = data.get(field)
+            if f:
+                logger.info(
+                    "[audit] seller_doc_upload: field=%s user=%s name=%s size=%d",
+                    field, user_id, f.name, f.size,
+                )
+
         has_id_card = data.get('id_front') and data.get('id_back')
         has_letter = bool(data.get('admission_letter'))
         has_nin = bool(data.get('nin_document'))
