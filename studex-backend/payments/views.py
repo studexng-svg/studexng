@@ -210,19 +210,6 @@ def get_checkout_config(request):
     final_amount = amount - discount_amount
     checkout_amount = final_amount + SERVICE_FEE
 
-    subaccount_code = None
-    try:
-        bank = SellerBankAccount.objects.get(user=vendor)
-        subaccount_code = bank.paystack_subaccount_code or None
-    except SellerBankAccount.DoesNotExist:
-        pass
-
-    if not subaccount_code:
-        logger.warning(
-            f"No Paystack subaccount for vendor {vendor.username} on listing {listing_id}. "
-            f"Full payment will go to StudEx settlement account."
-        )
-
     return Response({
         "listing_id": listing.id,
         "listing_title": listing.title,
@@ -231,19 +218,12 @@ def get_checkout_config(request):
         "vendor_receives": float(final_amount),
         "service_fee": float(SERVICE_FEE),
         "checkout_amount": float(checkout_amount),
-        # Paystack amounts in kobo for inline JS
         "checkout_amount_kobo": int(checkout_amount * 100),
         "currency": "NGN",
         "vendor_username": vendor.username,
-        "paystack_subaccount_code": subaccount_code,
-        "subaccount_ready": bool(subaccount_code),
-        # Pass subaccount and transaction_charge into PaystackPop.setup()
-        # transaction_charge = 20556 kobo → StudEx gets ₦205.56, vendor gets the rest
-        "paystack_split": {
-            "subaccount": subaccount_code,
-            "transaction_charge": 20556,
-            "bearer": "account",
-        } if subaccount_code else None,
+        # No subaccount split — full amount goes to StudEx balance;
+        # vendor payout is handled via Transfer API after charge.success webhook.
+        "paystack_split": None,
     })
 
 
@@ -439,6 +419,30 @@ def verify_payment(request):
     paystack_data = verify_data["data"]
     actual_listing_id = listing_id or (items[0]["listing_id"] if items else None)
 
+    # ── Ownership check ───────────────────────────────────────────────────────
+    # The email Paystack recorded for this transaction must match the caller.
+    # Prevents a scammer from submitting another user's reference or a sequential
+    # Paystack transaction_id to claim someone else's payment as their own order.
+    paystack_email = paystack_data.get("customer", {}).get("email", "")
+    if paystack_email.lower() != request.user.email.lower():
+        logger.warning(
+            f"verify_payment: email mismatch on {ref_key} — "
+            f"Paystack customer={paystack_email}, requester={request.user.email}"
+        )
+        return Response({"error": "Payment was not made by this account."}, status=403)
+
+    # ── Listing integrity check ───────────────────────────────────────────────
+    # Confirm the listing_id in Paystack's metadata matches what the client sent.
+    # Prevents redirecting a payment to a different listing/vendor after the fact.
+    meta_listing_id = str((paystack_data.get("metadata") or {}).get("listing_id", "") or "")
+    if meta_listing_id and actual_listing_id and meta_listing_id != str(actual_listing_id):
+        logger.warning(
+            f"verify_payment: listing_id mismatch on {ref_key} — "
+            f"Paystack metadata={meta_listing_id}, request={actual_listing_id}"
+        )
+        return Response({"error": "Payment reference does not match this listing."}, status=400)
+    # ─────────────────────────────────────────────────────────────────────────
+
     # ── Amount integrity check ────────────────────────────────────────────────
     # Compare what Paystack actually charged against what we initialised.
     # Prevents a buyer from paying less than the listing price.
@@ -595,6 +599,18 @@ def refund_payment(request):
         return Response({"error": "Not authorized."}, status=403)
     if txn.status == "refunded":
         return Response({"error": "Already refunded."}, status=400)
+    # Vendor has already been paid via Transfer API — reversing without clawing
+    # back the transfer would leave StudEx covering both sides of the payment.
+    # Require admin intervention in this case.
+    if txn.transfer_reference:
+        logger.warning(
+            f"refund_payment: blocked self-service refund on {reference} — "
+            f"vendor transfer {txn.transfer_reference} already sent"
+        )
+        return Response({
+            "error": "The vendor has already been paid for this order. "
+                     "Please contact support to arrange a refund."
+        }, status=400)
     try:
         # Paystack refund: POST /refund with transaction reference
         # Amount in kobo (naira × 100)
@@ -939,6 +955,9 @@ def _transfer_to_vendor(txn, listing_title):
         "amount": vendor_amount_kobo,
         "recipient": recipient_code,
         "reason": f"StudEx payout for order #{txn.order_id} - {listing_title}",
+        # Stable reference tied to the charge reference — Paystack deduplicates
+        # on this field, so a webhook retry cannot create a second transfer.
+        "reference": f"PAYOUT-{txn.reference}",
     }
 
     try:
