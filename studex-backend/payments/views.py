@@ -50,17 +50,25 @@ def _normalize_order_type(raw_type: str) -> str:
 # GET BANKS
 # ─────────────────────────────────────────
 
+_BANK_LIST_CACHE_KEY = "paystack_bank_list"
+_BANK_LIST_CACHE_TTL = 86400  # 24 hours — bank list changes rarely
+
+
 @api_view(["GET"])
-@permission_classes([AllowAny])
+@permission_classes([IsAuthenticated])
 def get_banks(request):
+    cached = cache.get(_BANK_LIST_CACHE_KEY)
+    if cached is not None:
+        return Response({"data": cached}, status=200)
+
     try:
         secret_key = (getattr(settings, "PAYSTACK_SECRET_KEY", "") or "").strip()
         headers = {"Authorization": f"Bearer {secret_key}", "Content-Type": "application/json"}
         res = requests.get(f"{PAYSTACK_BASE}/bank?country=NG&perPage=100", headers=headers, timeout=10)
         if res.status_code == 200:
-            data = res.json()
-            # Paystack returns { status: true, data: [...] }
-            return Response({"data": data.get("data", [])}, status=200)
+            data = res.json().get("data", [])
+            cache.set(_BANK_LIST_CACHE_KEY, data, _BANK_LIST_CACHE_TTL)
+            return Response({"data": data}, status=200)
         return Response({"data": []}, status=200)
     except Exception as e:
         logger.error(f"get_banks error: {e}")
@@ -74,6 +82,16 @@ def get_banks(request):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def verify_bank_account(request):
+    # 10 lookups per user per minute — prevents automated account enumeration
+    _rate_key = f"bank_verify_rate:{request.user.id}"
+    _count = cache.get(_rate_key, 0)
+    if _count >= 10:
+        return Response(
+            {"error": "Too many verification attempts. Please wait a minute and try again."},
+            status=429,
+        )
+    cache.set(_rate_key, _count + 1, 60)
+
     account_number = request.data.get("account_number")
     bank_code = request.data.get("bank_code")
     if not account_number or not bank_code:
