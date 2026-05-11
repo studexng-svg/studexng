@@ -12,8 +12,10 @@ class SellerBankAccount(models.Model):
     bank_name = models.CharField(max_length=100)
     account_number = models.CharField(max_length=20)
     account_name = models.CharField(max_length=200)
-    # Paystack subaccount code — format: ACCT_xxxxxxxxxx
+    # Paystack subaccount code — format: ACCT_xxxxxxxxxx (kept for backwards compatibility)
     paystack_subaccount_code = models.CharField(max_length=100, blank=True, null=True)
+    # Paystack transfer recipient code — format: RCP_xxx (used for instant vendor payouts)
+    paystack_recipient_code = models.CharField(max_length=100, blank=True, null=True)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -83,6 +85,10 @@ class PaymentTransaction(models.Model):
     order_id = models.IntegerField(null=True, blank=True)
 
     paystack_response = models.JSONField(null=True, blank=True)
+
+    # Populated after a Transfer API call to pay out the vendor
+    transfer_reference = models.CharField(max_length=200, blank=True, null=True)
+    transfer_status = models.CharField(max_length=50, blank=True, null=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

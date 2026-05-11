@@ -22,11 +22,9 @@ PAYSTACK_BASE = "https://api.paystack.co"
 
 # ─────────────────────────────────────────
 # ₦205.56 flat service fee per transaction.
-# Paystack splits at payment time via subaccount:
-#   subaccount = vendor's ACCT_xxx code
-#   transaction_charge = 20556 kobo (₦205.56) → goes to StudEx (main account)
-#   bearer = "account" → StudEx bears Paystack's processing fee
-#   vendor receives: (amount_in_kobo - 20556) kobo
+# Full payment goes to StudEx balance (no subaccount split at charge time).
+# After charge.success webhook, StudEx immediately transfers vendor_amount
+# to the vendor's bank via the Paystack Transfer API using their RCP_xxx code.
 # ─────────────────────────────────────────
 SERVICE_FEE = Decimal("205.56")
 
@@ -121,7 +119,9 @@ def seller_bank_account(request):
                 "account_number": "••••••" + account.account_number[-4:],
                 "account_name": account.account_name,
                 "paystack_subaccount_code": account.paystack_subaccount_code,
+                "paystack_recipient_code": account.paystack_recipient_code,
                 "subaccount_ready": bool(account.paystack_subaccount_code),
+                "recipient_ready": bool(account.paystack_recipient_code),
             })
         except SellerBankAccount.DoesNotExist:
             return Response({"subaccount_ready": False}, status=200)
@@ -136,11 +136,11 @@ def seller_bank_account(request):
     if not all([bank_code, account_number, account_name]):
         return Response({"error": "bank_code, account_number, and account_name are required."}, status=400)
 
-    subaccount_code, error_detail = _create_or_update_paystack_subaccount(
+    recipient_code, error_detail = _create_or_update_transfer_recipient(
         request.user, bank_code, account_number, account_name
     )
 
-    if not subaccount_code:
+    if not recipient_code:
         SellerBankAccount.objects.update_or_create(
             user=request.user,
             defaults={
@@ -148,12 +148,12 @@ def seller_bank_account(request):
                 "bank_name": bank_name,
                 "account_number": account_number,
                 "account_name": account_name,
-                "paystack_subaccount_code": "",
+                "paystack_recipient_code": "",
             }
         )
         return Response({
-            "error": f"Bank details saved but Paystack subaccount setup failed: {error_detail}",
-            "subaccount_ready": False,
+            "error": f"Bank details saved but transfer recipient setup failed: {error_detail}",
+            "recipient_ready": False,
         }, status=400)
 
     account, _ = SellerBankAccount.objects.update_or_create(
@@ -163,16 +163,16 @@ def seller_bank_account(request):
             "bank_name": bank_name,
             "account_number": account_number,
             "account_name": account_name,
-            "paystack_subaccount_code": subaccount_code,
+            "paystack_recipient_code": recipient_code,
         }
     )
-    logger.info(f"Paystack subaccount saved for {request.user.username}: {subaccount_code}")
+    logger.info(f"Paystack transfer recipient saved for {request.user.username}: {recipient_code}")
     return Response({
-        "message": "Bank account saved and payout subaccount created successfully.",
+        "message": "Bank account saved and transfer recipient created successfully.",
         "account_name": account.account_name,
         "bank_name": account.bank_name,
-        "paystack_subaccount_code": subaccount_code,
-        "subaccount_ready": True,
+        "paystack_recipient_code": recipient_code,
+        "recipient_ready": True,
     }, status=201)
 
 
@@ -257,8 +257,9 @@ def get_checkout_config(request):
 def initialize_payment(request):
     """
     POST /api/payments/initialize/
-    Calls Paystack /transaction/initialize with subaccount split and returns
-    { authorization_url, access_code, reference }.
+    Calls Paystack /transaction/initialize. Full amount goes to StudEx balance;
+    vendor payout is handled via Transfer API after charge.success webhook.
+    Returns { authorization_url, access_code, reference }.
     """
     listing_id = request.data.get("listing_id")
     if not listing_id:
@@ -313,23 +314,6 @@ def initialize_payment(request):
     if callback_url:
         payload["callback_url"] = callback_url
 
-    subaccount_code = None
-    try:
-        bank_account = SellerBankAccount.objects.get(user=listing.vendor)
-        subaccount_code = bank_account.paystack_subaccount_code or None
-    except SellerBankAccount.DoesNotExist:
-        pass
-
-    if subaccount_code:
-        payload["subaccount"] = subaccount_code
-        payload["transaction_charge"] = 20556  # ₦205.56 StudEx fee in kobo
-        payload["bearer"] = "account"  # StudEx bears Paystack transaction fees
-    else:
-        logger.warning(
-            f"initialize_payment: no subaccount for vendor {listing.vendor.username} "
-            f"(listing {listing_id}). Full amount goes to StudEx settlement account."
-        )
-
     secret_key = (getattr(settings, "PAYSTACK_SECRET_KEY", "") or "").strip()
     if not secret_key:
         return Response({"error": "Payment gateway not configured."}, status=503)
@@ -354,24 +338,7 @@ def initialize_payment(request):
     # Paystack returns HTTP 200 even for failures — check the body status field
     if not res_json.get("status"):
         paystack_msg = res_json.get("message", "Unknown Paystack error")
-        logger.error(f"Paystack init rejected: {paystack_msg} | payload subaccount={payload.get('subaccount')}")
-
-        # If the failure is subaccount-related, do NOT retry without the split.
-        # Retrying without the subaccount would silently cut the vendor out of their payout.
-        if subaccount_code and any(
-            kw in paystack_msg.lower()
-            for kw in ("subaccount", "split", "invalid", "not found")
-        ):
-            logger.error(
-                f"initialize_payment: subaccount error for vendor {listing.vendor.username} "
-                f"(listing {listing_id}): {paystack_msg}"
-            )
-            return Response(
-                {"error": "Payment could not be initialized — vendor payout configuration issue. "
-                          "Please contact support."},
-                status=500,
-            )
-
+        logger.error(f"Paystack init rejected: {paystack_msg}")
         return Response({"error": f"Payment initialization failed: {paystack_msg}"}, status=500)
 
     data = res_json.get("data", {})
@@ -695,6 +662,19 @@ def paystack_webhook(request):
         if PaymentTransaction.objects.filter(reference=reference, status="success").exists():
             existing = PaymentTransaction.objects.get(reference=reference, status="success")
             if existing.order_id:
+                if not existing.transfer_reference:
+                    # Order was created by verify_payment before this webhook arrived.
+                    # Transfer hasn't been sent yet — do it now.
+                    try:
+                        listing_title = ""
+                        try:
+                            order = Order.objects.select_related("listing").get(id=existing.order_id)
+                            listing_title = order.listing.title
+                        except Exception:
+                            pass
+                        _transfer_to_vendor(existing, listing_title)
+                    except Exception as te:
+                        logger.error(f"Transfer to vendor failed for {reference}: {te}", exc_info=True)
                 return HttpResponse(status=200)
 
         customer_email = data.get("customer", {}).get("email", "")
@@ -721,6 +701,17 @@ def paystack_webhook(request):
                 logger.error(f"Webhook order creation failed: {error}")
             else:
                 logger.info(f"Webhook created order {order_id} for {reference}")
+                try:
+                    txn = PaymentTransaction.objects.get(reference=reference)
+                    listing_title = ""
+                    try:
+                        from services.models import Listing
+                        listing_title = Listing.objects.get(id=listing_id).title
+                    except Exception:
+                        pass
+                    _transfer_to_vendor(txn, listing_title)
+                except Exception as te:
+                    logger.error(f"Transfer to vendor failed for {reference}: {te}", exc_info=True)
         else:
             # Paystack amount is in kobo — convert to naira
             amount = Decimal(str(data.get("amount", 0))) / 100
@@ -852,6 +843,124 @@ def _create_order_from_paystack_data(paystack_data, buyer, listing_id, order_typ
 # ─────────────────────────────────────────
 # HELPERS
 # ─────────────────────────────────────────
+
+def _create_or_update_transfer_recipient(user, bank_code, account_number, account_name):
+    """
+    Creates a Paystack transfer recipient (RCP_xxx) for instant vendor payouts.
+    Returns (recipient_code, error_message).
+    """
+    try:
+        secret_key = (getattr(settings, "PAYSTACK_SECRET_KEY", "") or "").strip()
+        if not secret_key:
+            msg = "PAYSTACK_SECRET_KEY is not configured."
+            logger.error(msg)
+            return None, msg
+
+        headers = {"Authorization": f"Bearer {secret_key}", "Content-Type": "application/json"}
+        payload = {
+            "type": "nuban",
+            "name": account_name,
+            "account_number": str(account_number),
+            "bank_code": str(bank_code),
+            "currency": "NGN",
+        }
+
+        logger.info(f"Paystack transfer recipient for {user.username}: bank={bank_code}, acct=****{account_number[-4:]}")
+        res = requests.post(
+            f"{PAYSTACK_BASE}/transferrecipient",
+            headers=headers,
+            json=payload,
+            timeout=15,
+        )
+        logger.info(f"Paystack transferrecipient → {res.status_code}: {res.text[:300]}")
+
+        if res.status_code in [200, 201]:
+            data = res.json().get("data", {})
+            recipient_code = data.get("recipient_code")
+            if recipient_code:
+                logger.info(f"Paystack transfer recipient created: {recipient_code}")
+                return str(recipient_code), None
+            msg = f"Paystack returned success but no recipient_code: {data}"
+            logger.error(msg)
+            return None, msg
+        else:
+            try:
+                error_body = res.json()
+            except Exception:
+                error_body = res.text
+            msg = f"Paystack transferrecipient failed ({res.status_code}): {error_body}"
+            logger.error(msg)
+            return None, str(msg)[:300]
+
+    except requests.exceptions.Timeout:
+        return None, "Paystack API timed out."
+    except Exception as e:
+        logger.error(f"Transfer recipient exception: {e}", exc_info=True)
+        return None, str(e)
+
+
+def _transfer_to_vendor(txn, listing_title):
+    """
+    Initiates a Paystack transfer to the vendor's bank account.
+    Updates txn.transfer_reference / txn.transfer_status on success.
+    Never raises — webhook must always return 200.
+    """
+    seller = txn.seller
+    if not seller:
+        logger.error(f"_transfer_to_vendor: no seller on txn {txn.reference}")
+        return
+
+    try:
+        bank_account = SellerBankAccount.objects.get(user=seller)
+    except SellerBankAccount.DoesNotExist:
+        logger.error(
+            f"_transfer_to_vendor: no bank account for {seller.username} "
+            f"(order {txn.order_id}) — manual payout required"
+        )
+        return
+
+    recipient_code = bank_account.paystack_recipient_code
+    if not recipient_code:
+        logger.error(
+            f"_transfer_to_vendor: no recipient_code for {seller.username} "
+            f"(order {txn.order_id}) — manual payout required"
+        )
+        return
+
+    vendor_amount_kobo = int(txn.seller_amount * 100)
+    secret_key = (getattr(settings, "PAYSTACK_SECRET_KEY", "") or "").strip()
+    if not secret_key:
+        logger.error("_transfer_to_vendor: PAYSTACK_SECRET_KEY not configured")
+        return
+
+    headers = {"Authorization": f"Bearer {secret_key}", "Content-Type": "application/json"}
+    payload = {
+        "source": "balance",
+        "amount": vendor_amount_kobo,
+        "recipient": recipient_code,
+        "reason": f"StudEx payout for order #{txn.order_id} - {listing_title}",
+    }
+
+    try:
+        res = requests.post(f"{PAYSTACK_BASE}/transfer", headers=headers, json=payload, timeout=15)
+        res_json = res.json()
+        if res.status_code in [200, 201] and res_json.get("status"):
+            transfer_data = res_json.get("data", {})
+            txn.transfer_reference = transfer_data.get("reference", "")
+            txn.transfer_status = transfer_data.get("status", "pending")
+            txn.save(update_fields=["transfer_reference", "transfer_status"])
+            logger.info(
+                f"Transfer initiated for order {txn.order_id}: "
+                f"ref={txn.transfer_reference}, status={txn.transfer_status}"
+            )
+        else:
+            logger.error(
+                f"Transfer failed for order {txn.order_id} (seller: {seller.username}): "
+                f"{res.status_code} — {res_json}"
+            )
+    except Exception as e:
+        logger.error(f"Transfer exception for order {txn.order_id}: {e}", exc_info=True)
+
 
 def _create_or_update_paystack_subaccount(user, bank_code, account_number, account_name, force_update=False):
     """

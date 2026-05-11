@@ -25,11 +25,11 @@ class PaymentTransactionAdmin(admin.ModelAdmin):
     list_display = [
         'reference', 'buyer', 'seller', 'amount_display',
         'seller_amount_display', 'platform_amount_display',
-        'order_type', 'colored_status', 'created_at'
+        'order_type', 'colored_status', 'transfer_status', 'transfer_reference', 'created_at'
     ]
-    list_filter = ['status', 'order_type', 'created_at']
-    search_fields = ['reference', 'buyer__username', 'seller__username', 'buyer_email']
-    readonly_fields = ['created_at', 'updated_at', 'paystack_response']
+    list_filter = ['status', 'transfer_status', 'order_type', 'created_at']
+    search_fields = ['reference', 'buyer__username', 'seller__username', 'buyer_email', 'transfer_reference']
+    readonly_fields = ['created_at', 'updated_at', 'paystack_response', 'transfer_reference', 'transfer_status']
     ordering = ['-created_at']
     date_hierarchy = 'created_at'
     list_per_page = 50
