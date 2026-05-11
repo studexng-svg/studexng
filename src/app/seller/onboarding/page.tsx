@@ -211,40 +211,36 @@ export default function SellerOnboarding() {
               ]).map(({ key, label, hint, Icon }) => (
                 <label key={key} className="block cursor-pointer">
                   {files[key] ? (
-                    <div className={`rounded-2xl border-2 border-teal-500 ${previews[key] ? "overflow-hidden" : "bg-teal-50 p-4 flex items-center justify-between"}`}>
-                      {previews[key] ? (
-                        <>
-                          <img src={previews[key]!} alt={label} className="w-full h-44 object-cover" />
-                          <div className="absolute bottom-0 left-0 right-0 bg-black/50 backdrop-blur-sm px-4 py-2 flex items-center justify-between">
-                            <p className="text-white text-sm font-semibold flex items-center gap-2">
-                              <CheckCircle className="w-4 h-4 text-emerald-400" /> {label}
-                            </p>
-                            <button type="button" onClick={() => removeFile(key)} className="p-1.5 bg-red-500/80 hover:bg-red-600 rounded-full transition">
-                              <X className="w-3.5 h-3.5 text-white" />
-                            </button>
+                    <div className="rounded-2xl border-2 border-teal-500 bg-teal-50 p-4 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        {previews[key] && previews[key]!.startsWith("data:image") ? (
+                          <img
+                            src={previews[key]!}
+                            alt={label}
+                            className="w-14 h-14 rounded-xl object-cover flex-shrink-0 border border-teal-200"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 bg-teal-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                            <Icon className="w-5 h-5 text-teal-600" />
                           </div>
-                        </>
-                      ) : (
-                        <>
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-teal-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                              <Icon className="w-5 h-5 text-teal-600" />
-                            </div>
-                            <div>
-                              <p className="text-sm font-semibold text-teal-800 flex items-center gap-1.5">
-                                <CheckCircle className="w-4 h-4 text-emerald-500" /> {label}
-                              </p>
-                              <p className="text-xs text-teal-600 mt-0.5 truncate max-w-[180px]">{files[key]!.name}</p>
-                            </div>
-                          </div>
-                          <button type="button" onClick={() => removeFile(key)} className="p-1.5 bg-red-100 hover:bg-red-200 rounded-full transition">
-                            <X className="w-3.5 h-3.5 text-red-600" />
-                          </button>
-                        </>
-                      )}
+                        )}
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-teal-800 flex items-center gap-1.5">
+                            <CheckCircle className="w-4 h-4 text-emerald-500 flex-shrink-0" /> {label}
+                          </p>
+                          <p className="text-xs text-teal-600 mt-0.5 truncate">{files[key]!.name}</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); removeFile(key); }}
+                        className="p-1.5 bg-red-100 hover:bg-red-200 rounded-full transition flex-shrink-0"
+                      >
+                        <X className="w-3.5 h-3.5 text-red-600" />
+                      </button>
                     </div>
                   ) : (
-                    <div className="relative border-2 border-dashed border-stone-300 rounded-2xl p-6 text-center hover:border-teal-400 hover:bg-teal-50/30 transition-all">
+                    <div className="border-2 border-dashed border-stone-300 rounded-2xl p-6 text-center hover:border-teal-400 hover:bg-teal-50/30 transition-all">
                       <div className="w-12 h-12 mx-auto mb-3 bg-stone-100 rounded-2xl flex items-center justify-center">
                         <Icon className="w-6 h-6 text-stone-400" />
                       </div>

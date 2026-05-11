@@ -21,8 +21,21 @@ class CategoryImageForm(forms.ModelForm):
             self.fields['image_file'].help_text = f'Current: <a href="{self.instance.image}" target="_blank">View image</a>'
 
 
-class ListingImageForm(forms.ModelForm):
+_ORDER_TYPE_CHOICES = [
+    ('service', 'Service (Booking)'),
+    ('product', 'Product (Order)'),
+    ('food',    'Food (Order)'),
+]
+
+
+class ListingAdminForm(forms.ModelForm):
+    """Detail-view form: custom order-type labels + image upload field."""
     image_file = forms.ImageField(required=False, label='Upload Image')
+    listing_type = forms.ChoiceField(
+        choices=_ORDER_TYPE_CHOICES,
+        label='Order Type',
+        help_text='Controls whether a purchase creates a Booking (Service) or a direct Order (Product / Food).',
+    )
 
     class Meta:
         model = Listing
@@ -31,7 +44,18 @@ class ListingImageForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if self.instance and self.instance.image:
-            self.fields['image_file'].help_text = f'Current: <a href="{self.instance.image}" target="_blank">View image</a>'
+            self.fields['image_file'].help_text = (
+                f'Current: <a href="{self.instance.image}" target="_blank">View image</a>'
+            )
+
+
+class ListingChangelistForm(forms.ModelForm):
+    """Minimal form used by list_editable — just overrides the dropdown labels."""
+    listing_type = forms.ChoiceField(choices=_ORDER_TYPE_CHOICES)
+
+    class Meta:
+        model = Listing
+        fields = ['listing_type']
 
 
 @admin.register(Category)
@@ -94,20 +118,23 @@ class CategoryAdmin(admin.ModelAdmin):
 
 @admin.register(Listing)
 class ListingAdmin(admin.ModelAdmin):
+    form = ListingAdminForm
+
     list_display = (
         'title', 'vendor', 'campus', 'vendor_status', 'category',
-        'price_display', 'availability_badge', 'order_count', 'created_at'
+        'price_display', 'listing_type', 'availability_badge', 'order_count', 'created_at'
     )
-    list_filter = ('campus', 'is_available', 'listing_type', 'category', 'vendor__is_verified_vendor', 'vendor__user_type', 'created_at')
-    search_fields = ('title', 'description', 'vendor__username', 'vendor__business_name')
+    list_editable = ('listing_type',)
+    list_filter = ('listing_type', 'campus', 'is_available', 'category', 'vendor__is_verified_vendor', 'vendor__user_type', 'created_at')
+    search_fields = ('title', 'description', 'vendor__username', 'vendor__business_name', 'listing_type')
     readonly_fields = ('campus', 'created_at', 'updated_at', 'get_total_orders', 'get_total_revenue')
     raw_id_fields = ('vendor',)
     date_hierarchy = 'created_at'
     list_per_page = 50
 
     fieldsets = (
-        ('Product Info', {
-            'fields': ('title', 'description', 'price', 'image', 'category')
+        ('Listing Info', {
+            'fields': ('title', 'description', 'price', 'image', 'category', 'listing_type')
         }),
         ('Vendor & Availability', {
             'fields': ('vendor', 'campus', 'is_available')
@@ -123,6 +150,10 @@ class ListingAdmin(admin.ModelAdmin):
     )
 
     actions = ['mark_available', 'mark_unavailable', 'export_to_csv']
+
+    def get_changelist_form(self, request, **kwargs):
+        kwargs.setdefault('form', ListingChangelistForm)
+        return super().get_changelist_form(request, **kwargs)
 
     def vendor_status(self, obj):
         if obj.vendor.is_verified_vendor:

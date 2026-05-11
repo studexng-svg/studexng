@@ -1,5 +1,5 @@
 // lib/api.ts
-// Central API service for communicating with Django backend
+import { fetchWithAuth, useAuth } from "@/lib/authStore";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
@@ -65,16 +65,6 @@ export interface VerifyEmailOtpRequest {
   code: string;
 }
 
-// ================= HELPERS =================
-
-const getAuthHeaders = () => {
-  const token = localStorage.getItem("access_token");
-  return {
-    "Content-Type": "application/json",
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  };
-};
-
 // ================= API CLASS =================
 
 class API {
@@ -84,6 +74,7 @@ class API {
     const response = await fetch(`${API_BASE_URL}/api/auth/register/`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      credentials: "include",
       body: JSON.stringify(data),
     });
 
@@ -93,11 +84,7 @@ class API {
     }
 
     const result = await response.json();
-
-    localStorage.setItem("access_token", result.tokens.access);
-    localStorage.setItem("refresh_token", result.tokens.refresh);
-    localStorage.setItem("user", JSON.stringify(result.user));
-
+    useAuth.getState().login(result.user, result.tokens.access, result.tokens.refresh);
     return result;
   }
 
@@ -105,6 +92,7 @@ class API {
     const response = await fetch(`${API_BASE_URL}/api/auth/login/`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      credentials: "include",
       body: JSON.stringify(data),
     });
 
@@ -114,11 +102,7 @@ class API {
     }
 
     const result = await response.json();
-
-    localStorage.setItem("access_token", result.tokens.access);
-    localStorage.setItem("refresh_token", result.tokens.refresh);
-    localStorage.setItem("user", JSON.stringify(result.user));
-
+    useAuth.getState().login(result.user, result.tokens.access, result.tokens.refresh);
     return result;
   }
 
@@ -134,22 +118,17 @@ class API {
       throw new Error(error.detail || error.email?.[0] || "Failed to send reset link");
     }
 
-    return response.json(); // returns { detail, reset_url }
+    return response.json();
   }
 
   // ---------- EMAIL OTP ----------
 
-  async sendEmailOtp(
-    data: EmailOtpRequest
-  ): Promise<{ message: string }> {
-    const response = await fetch(
-      `${API_BASE_URL}/api/auth/email/send-otp/`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      }
-    );
+  async sendEmailOtp(data: EmailOtpRequest): Promise<{ message: string }> {
+    const response = await fetch(`${API_BASE_URL}/api/auth/email/send-otp/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
 
     if (!response.ok) {
       const error = await response.json();
@@ -159,17 +138,12 @@ class API {
     return response.json();
   }
 
-  async verifyEmailOtp(
-    data: VerifyEmailOtpRequest
-  ): Promise<{ message: string }> {
-    const response = await fetch(
-      `${API_BASE_URL}/api/auth/email/verify-otp/`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      }
-    );
+  async verifyEmailOtp(data: VerifyEmailOtpRequest): Promise<{ message: string }> {
+    const response = await fetch(`${API_BASE_URL}/api/auth/email/verify-otp/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
 
     if (!response.ok) {
       const error = await response.json();
@@ -183,83 +157,37 @@ class API {
 
   async logout(): Promise<void> {
     try {
-      await fetch(`${API_BASE_URL}/api/auth/logout/`, {
-        method: "POST",
-        headers: getAuthHeaders(),
-      });
+      await fetchWithAuth(`${API_BASE_URL}/api/auth/logout/`, { method: "POST" });
     } finally {
-      localStorage.removeItem("access_token");
-      localStorage.removeItem("refresh_token");
-      localStorage.removeItem("user");
+      useAuth.getState().logout();
     }
   }
 
   async getProfile(): Promise<UserProfile> {
-    const response = await fetch(`${API_BASE_URL}/api/auth/profile/`, {
-      headers: getAuthHeaders(),
-    });
-
-    if (!response.ok) {
-      if (response.status === 401) {
-        await this.refreshToken();
-        return this.getProfile();
-      }
-      throw new Error("Failed to fetch profile");
-    }
-
+    const response = await fetchWithAuth(`${API_BASE_URL}/api/auth/profile/`);
+    if (!response.ok) throw new Error("Failed to fetch profile");
     return response.json();
   }
 
-  async updateProfile(
-    data: Partial<UserProfile>
-  ): Promise<AuthResponse> {
-    const response = await fetch(
-      `${API_BASE_URL}/api/auth/profile/update/`,
-      {
-        method: "PATCH",
-        headers: getAuthHeaders(),
-        body: JSON.stringify(data),
-      }
-    );
+  async updateProfile(data: Partial<UserProfile>): Promise<AuthResponse> {
+    const response = await fetchWithAuth(`${API_BASE_URL}/api/auth/profile/update/`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    });
 
-    if (!response.ok) {
-      throw new Error("Failed to update profile");
-    }
+    if (!response.ok) throw new Error("Failed to update profile");
 
     const result = await response.json();
-    localStorage.setItem("user", JSON.stringify(result.user));
+    useAuth.getState().setUser(result.user);
     return result;
   }
 
-  async refreshToken(): Promise<void> {
-    const refreshToken = localStorage.getItem("refresh_token");
-    if (!refreshToken) throw new Error("No refresh token available");
-
-    const response = await fetch(
-      `${API_BASE_URL}/api/auth/token/refresh/`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ refresh: refreshToken }),
-      }
-    );
-
-    if (!response.ok) {
-      this.logout();
-      throw new Error("Session expired. Please login again.");
-    }
-
-    const result = await response.json();
-    localStorage.setItem("access_token", result.access);
-  }
-
   isAuthenticated(): boolean {
-    return !!localStorage.getItem("access_token");
+    return useAuth.getState().isLoggedIn;
   }
 
   getCurrentUser(): UserProfile | null {
-    const userStr = localStorage.getItem("user");
-    return userStr ? JSON.parse(userStr) : null;
+    return useAuth.getState().user as UserProfile | null;
   }
 }
 

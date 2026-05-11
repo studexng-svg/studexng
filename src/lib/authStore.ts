@@ -190,6 +190,9 @@ const refreshAccessToken = async (): Promise<string | null> => {
 
       if (!res.ok) {
         useAuth.getState().logout();
+        if (typeof window !== "undefined") {
+          window.location.replace("/auth");
+        }
         return null;
       }
 
