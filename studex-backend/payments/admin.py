@@ -4,6 +4,7 @@ from django.utils.html import format_html
 from django.http import HttpResponse
 import csv
 from .models import SellerBankAccount, PaymentTransaction
+from .views import _transfer_to_vendor
 
 
 @admin.register(SellerBankAccount)
@@ -62,7 +63,36 @@ class PaymentTransactionAdmin(admin.ModelAdmin):
         )
     colored_status.short_description = 'Status'
 
-    actions = ['export_to_csv']
+    actions = ['retry_transfer', 'export_to_csv']
+
+    def retry_transfer(self, request, queryset):
+        sent = 0
+        skipped = 0
+        for txn in queryset.filter(status='success'):
+            if txn.transfer_reference:
+                skipped += 1
+                continue
+            if not txn.seller:
+                skipped += 1
+                continue
+            listing_title = ''
+            try:
+                from orders.models import Order
+                order = Order.objects.select_related('listing').get(id=txn.order_id)
+                listing_title = order.listing.title
+            except Exception:
+                pass
+            _transfer_to_vendor(txn, listing_title)
+            txn.refresh_from_db(fields=['transfer_reference'])
+            if txn.transfer_reference:
+                sent += 1
+            else:
+                skipped += 1
+        self.message_user(
+            request,
+            f"Transfer initiated for {sent} transaction(s). {skipped} skipped (already paid or no bank account)."
+        )
+    retry_transfer.short_description = "Retry vendor payout transfer"
 
     def export_to_csv(self, request, queryset):
         response = HttpResponse(content_type='text/csv')

@@ -502,6 +502,22 @@ def verify_payment(request):
             status=500,
         )
 
+    # Trigger vendor payout immediately from here — don't rely solely on the webhook.
+    # The transfer is idempotent (PAYOUT-{reference} key), so if the webhook also fires
+    # later, Paystack deduplicates and no double-payment occurs.
+    try:
+        txn = PaymentTransaction.objects.get(reference=ref_key, status="success")
+        if not txn.transfer_reference:
+            listing_title = ""
+            try:
+                from services.models import Listing
+                listing_title = Listing.objects.get(id=actual_listing_id).title
+            except Exception:
+                pass
+            _transfer_to_vendor(txn, listing_title)
+    except Exception as te:
+        logger.error(f"verify_payment: post-order transfer failed for {ref_key}: {te}", exc_info=True)
+
     return Response({"order_id": order_id, "message": "Payment verified. Order created."})
 
 
@@ -782,7 +798,23 @@ def _create_order_from_paystack_data(paystack_data, buyer, listing_id, order_typ
     paystack_transaction_id = paystack_data.get("id")
     buyer_email = paystack_data.get("customer", {}).get("email", buyer.email if buyer else "")
 
-    vendor_amount, platform_amount = _split_amounts(amount_paid)
+    # Resolve listing early so vendor_amount = listing.price exactly.
+    # amount_paid may be grossed up by Paystack's "pass fees to customer" setting,
+    # or reduced by a StudEx profile-bonus discount. In both cases the vendor
+    # must receive their listed price — StudEx absorbs any difference.
+    listing = None
+    if listing_id:
+        try:
+            listing = Listing.objects.get(id=listing_id)
+        except Exception:
+            pass
+
+    if listing is not None:
+        vendor_amount = Decimal(str(listing.price))
+        platform_amount = max(amount_paid - vendor_amount, Decimal("0"))
+    else:
+        vendor_amount, platform_amount = _split_amounts(amount_paid)
+
     seller = _get_seller_from_listing(listing_id)
 
     txn, created = PaymentTransaction.objects.get_or_create(
@@ -808,8 +840,7 @@ def _create_order_from_paystack_data(paystack_data, buyer, listing_id, order_typ
     order_id = None
 
     try:
-        if listing_id:
-            listing = Listing.objects.get(id=listing_id)
+        if listing is not None:
             order = Order.objects.create(
                 buyer=buyer,
                 listing=listing,
@@ -839,8 +870,8 @@ def _create_order_from_paystack_data(paystack_data, buyer, listing_id, order_typ
                     notification_type='new_order',
                     title=f'💰 Payment Received — {listing.title}',
                     message=(
-                        f'{buyer.username} just paid ₦{amount_paid:,.0f} for "{listing.title}". '
-                        f'Your payout of ₦{vendor_amount:,.0f} will be transferred to your bank by Paystack.'
+                        f'{buyer.username} just paid for "{listing.title}". '
+                        f'Your payout of ₦{vendor_amount:,.0f} will be transferred to your bank shortly.'
                     ),
                     action_url='/vendor/dashboard',
                 )
