@@ -17,7 +17,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 type Tab = "messages" | "bookings" | "earnings" | "listings" | "orders" | "reviews";
 
 export default function VendorDashboard() {
-  const { user, isLoggedIn } = useAuth();
+  const { user, isLoggedIn, isHydrated } = useAuth();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<Tab>("messages");
   const [linkCopied, setLinkCopied] = useState(false);
@@ -44,9 +44,10 @@ export default function VendorDashboard() {
   }, [user]);
 
   useEffect(() => {
+    if (!isHydrated) return;
     if (!isLoggedIn) { router.push("/auth"); return; }
     if (!user?.is_verified_vendor) { router.push("/home"); return; }
-  }, [isLoggedIn, user]);
+  }, [isHydrated, isLoggedIn, user]);
 
   const tabs: { id: Tab; label: string; icon: any; badge?: number }[] = [
     { id: "messages", label: "Messages", icon: MessageCircle, badge: msgBadge },
@@ -491,10 +492,10 @@ function BookingsTab() {
                 <div className="bg-teal-50 border border-teal-100 rounded-xl p-3 col-span-2">
                   <p className="text-teal-500 text-xs mb-0.5">Your payout</p>
                   <p className="font-bold text-teal-600 text-lg">
-                    ₦{Math.max(0, Number(booking.listing_price || 0) - 205.56).toLocaleString()}
+                    ₦{Number(booking.listing_price || 0).toLocaleString()}
                   </p>
                   <p className="text-stone-400 text-xs mt-0.5">
-                    (₦{Number(booking.listing_price || 0).toLocaleString()} minus ₦205.56 service fee)
+                    Your full listing price (₦215.56 service fee charged to buyer)
                   </p>
                 </div>
               </div>
@@ -573,7 +574,7 @@ function EarningsTab() {
     },
     {
       label: "Service Fee",
-      value: "₦205.56",
+      value: "₦215.56",
       color: "text-stone-600",
       bg: "bg-stone-50 border-stone-100",
       note: "Flat fee per transaction",
@@ -605,7 +606,7 @@ function EarningsTab() {
           </div>
           <div className="flex items-start gap-3 bg-stone-50 border border-stone-100 rounded-xl p-3">
             <span className="text-teal-600 font-bold text-base leading-none">2</span>
-            <p>Paystack instantly splits the payment — <span className="text-stone-800 font-semibold">₦205.56 goes to StudEx</span> as a flat service fee.</p>
+            <p>StudEx collects a flat <span className="text-stone-800 font-semibold">₦215.56 service fee</span> from the buyer — your listing price is transferred to your bank in full.</p>
           </div>
           <div className="flex items-start gap-3 bg-stone-50 border border-stone-100 rounded-xl p-3">
             <span className="text-teal-600 font-bold text-base leading-none">3</span>
@@ -907,7 +908,7 @@ function OrdersTab() {
                 <div className="text-right">
                   <p className="text-xs text-stone-400">Your payout</p>
                   <p className="font-bold text-teal-600">
-                    ₦{Math.max(0, Number(order.amount) - 205.56).toLocaleString()}
+                    ₦{Math.max(0, Number(order.amount) - 215.56).toLocaleString()}
                   </p>
                 </div>
               </div>

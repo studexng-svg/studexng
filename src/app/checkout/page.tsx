@@ -31,7 +31,7 @@ export default function CheckoutPage() {
   const isServiceBooking = !!booking && cart.length === 0;
   const isFoodOrder = cart.length > 0;
 
-  const SERVICE_FEE = 205.56;
+  const SERVICE_FEE = 215.56;
   const foodTotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const serviceTotal = booking?.total || 0;
   const finalTotal = (isServiceBooking ? serviceTotal : foodTotal) + SERVICE_FEE;
@@ -333,7 +333,7 @@ export default function CheckoutPage() {
             <div>
               <p className="font-semibold text-teal-800 text-sm">Transparent Pricing</p>
               <p className="text-xs text-teal-600 mt-0.5 leading-relaxed">
-                A flat <strong>₦205.56 service fee</strong> is included in your total.
+                A flat <strong>₦215.56 service fee</strong> is included in your total.
                 The vendor receives their full listed price.
                 Refunds are processed back to your original payment method.
               </p>

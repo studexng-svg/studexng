@@ -33,10 +33,48 @@ class OrderViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        return self.queryset.filter(buyer=user).order_by('-created_at')
+        from services.models import Listing
+        vendor_listing_ids = Listing.objects.filter(vendor=user).values_list('id', flat=True)
+        return self.queryset.filter(
+            models.Q(buyer=user) | models.Q(listing__id__in=vendor_listing_ids)
+        ).order_by('-created_at')
 
     def perform_create(self, serializer):
         serializer.save(buyer=self.request.user)
+
+    @action(detail=False, methods=['get'], url_path='vendor-orders')
+    def vendor_orders(self, request):
+        """Returns paid/in-progress orders for this vendor's listings."""
+        from services.models import Listing
+        vendor_listing_ids = Listing.objects.filter(vendor=request.user).values_list('id', flat=True)
+        qs = Order.objects.filter(
+            listing__id__in=vendor_listing_ids,
+            status__in=['paid', 'seller_completed'],
+        ).select_related('buyer', 'listing').order_by('-created_at')
+        serializer = self.get_serializer(qs, many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['patch'], url_path='mark-complete')
+    def mark_complete(self, request, pk=None):
+        """Vendor marks their order as seller_completed."""
+        order = self.get_object()
+        if order.listing.vendor != request.user:
+            return Response({"detail": "You are not the vendor for this order."}, status=403)
+        if order.status not in ['paid']:
+            return Response({"detail": f"Cannot mark an order with status '{order.status}' as complete."}, status=400)
+        order.status = 'seller_completed'
+        order.save()
+        _notify(
+            recipient=order.buyer,
+            notification_type='order_update',
+            title=f'📦 Order Ready — {order.listing.title}',
+            message=(
+                f'{request.user.username} has completed your order for '
+                f'"{order.listing.title}". Please confirm receipt to release payment.'
+            ),
+            action_url='/account/orders',
+        )
+        return Response({"message": "Order marked as complete.", "order": self.get_serializer(order).data})
 
     @action(detail=True, methods=['post'])
     def confirm(self, request, pk=None):

@@ -35,7 +35,7 @@ export default function SellerListings() {
 
     const fetchListings = async () => {
       try {
-        const res = await fetchWithAuth(`${API_URL}/api/listings/`);
+        const res = await fetchWithAuth(`${API_URL}/api/services/listings/`);
 
         if (!res.ok) {
           if (res.status === 401) {

@@ -48,7 +48,7 @@ export default function SellerPayouts() {
         const profileData = await profileRes.json();
         setWalletBalance(parseFloat(profileData.wallet_balance || "0"));
 
-        const txRes = await fetchWithAuth(`${API_URL}/api/transactions/`);
+        const txRes = await fetchWithAuth(`${API_URL}/api/services/transactions/`);
         if (!txRes.ok) throw new Error("Failed to load transactions");
 
         const txData = await txRes.json();

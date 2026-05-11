@@ -59,6 +59,7 @@ export default function ProfilePage() {
   const [hostelError, setHostelError] = useState("");
 
   const [stats, setStats] = useState({ sold: 0, bought: 0, wishlist: 0 });
+  const [memberSince, setMemberSince] = useState("");
 
   const [profile, setProfile] = useState<Profile>({
     name: "",
@@ -104,6 +105,10 @@ export default function ProfilePage() {
           dob: parsed.dob || "",
           gender: parsed.gender || "",
         });
+        if (djangoUser.date_joined) {
+          const d = new Date(djangoUser.date_joined);
+          setMemberSince(d.toLocaleDateString("en-US", { month: "long", year: "numeric" }));
+        }
         if (djangoUser.profile_bonus_eligible || djangoUser.profile_bonus_used) {
           setBonusGranted(true);
         }
@@ -658,7 +663,7 @@ export default function ProfilePage() {
         </div>
 
         <p className="text-center text-xs text-stone-400 mt-4">
-          Member since 2025 • {profile.school || "StudEx"} • Version 1.0.0
+          {memberSince ? `Member since ${memberSince} • ` : ""}{profile.school || "StudEx"} • Version 1.0.0
         </p>
       </div>
     </div>

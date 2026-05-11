@@ -377,6 +377,7 @@ def me(request):
         'hostel': user.hostel or '',
         'matric_number': user.matric_number or '',
         'school': user.school or '',
+        'date_joined': user.date_joined.isoformat(),
         'unread_notifications': unread_notifications,
         **profile_data,
     })

@@ -46,7 +46,7 @@ export default function SellerOrderDetailPage() {
   useEffect(() => {
     const fetchOrder = async () => {
       try {
-        const res = await fetchWithAuth(`${API_URL}/api/orders/${id}/`);
+        const res = await fetchWithAuth(`${API_URL}/api/orders/orders/${id}/`);
 
         if (!res.ok) {
           if (res.status === 404) {
@@ -77,7 +77,7 @@ export default function SellerOrderDetailPage() {
     if (!order) return;
     setCompleting(true);
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/orders/${order.id}/mark_complete/`, {
+      const res = await fetchWithAuth(`${API_URL}/api/orders/orders/${order.id}/mark-complete/`, {
         method: "PATCH",
       });
       if (!res.ok) {

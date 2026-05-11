@@ -64,7 +64,7 @@ const STATUS_CONFIG = {
 };
 
 export default function MyBookingsPage() {
-  const { isLoggedIn } = useAuth();
+  const { isLoggedIn, isHydrated } = useAuth();
   const { setBooking } = useBookingStore();
   const router = useRouter();
 
@@ -87,9 +87,10 @@ export default function MyBookingsPage() {
   };
 
   useEffect(() => {
+    if (!isHydrated) return;
     if (!isLoggedIn) { router.push("/auth"); return; }
     fetchBookings();
-  }, [isLoggedIn]);
+  }, [isHydrated, isLoggedIn]);
 
   const handlePayNow = (b: ApiBooking) => {
     setBooking({

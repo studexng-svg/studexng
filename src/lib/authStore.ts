@@ -135,6 +135,7 @@ export const useAuth = create<AuthState>()(
       onRehydrateStorage: () => (state) => {
         if (!state) return;
         state.setHydrated(true);
+        state.setAuthReady(true);
         // On page refresh: re-sync profile, cart, and wishlist from backend
         if (state.isLoggedIn && state.user) {
           setTimeout(() => {

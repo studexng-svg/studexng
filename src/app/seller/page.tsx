@@ -6,7 +6,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { api } from "../../../lib/api";
 import { useAuth, fetchWithAuth } from "@/lib/authStore";
 import { GRAD, SERIF } from "@/lib/tokens";
 
@@ -26,7 +25,7 @@ interface Order {
 
 export default function SellerDashboard() {
   const router = useRouter();
-  const { user: authUser } = useAuth();
+  const { user: authUser, isHydrated } = useAuth();
   const [isSeller, setIsSeller] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -65,75 +64,73 @@ export default function SellerDashboard() {
   };
 
   useEffect(() => {
-    const accessToken = localStorage.getItem("accessToken");
-
-    if (!accessToken) {
+    if (!isHydrated) return;
+    if (!authUser) {
       router.push("/auth");
       return;
     }
 
-    api.getProfile()
-      .then(async (profile) => {
-        if (profile.is_verified_vendor) {
-          setIsSeller(true);
-          setWalletBalance(parseFloat(profile.wallet_balance || "0"));
-
-          const token = localStorage.getItem("access_token");
-
-          try {
-            const ordersRes = await fetch(`${API_URL}/api/orders/orders/?status=pending_confirmation`, {
-              headers: { Authorization: `Bearer ${token}` }
-            });
-
-            if (ordersRes.ok) {
-              const ordersData = await ordersRes.json();
-              const orders = ordersData.results || ordersData || [];
-
-              const mappedOrders = orders.map((order: any) => ({
-                id: order.id.toString(),
-                buyerName: order.buyer?.username || order.buyer?.email || "Unknown",
-                sellerName: profile.username,
-                amount: parseFloat(order.amount || 0),
-                date: order.created_at,
-                status: order.status,
-                type: "service" as const,
-                serviceDetails: { serviceName: order.listing?.title || "Service" }
-              }));
-
-              setPendingOrders(mappedOrders);
-              const escrowAmount = mappedOrders.reduce((sum: number, o: Order) => sum + o.amount, 0);
-              setInEscrow(escrowAmount);
-            }
-
-            const allOrdersRes = await fetch(`${API_URL}/api/orders/orders/`, {
-              headers: { Authorization: `Bearer ${token}` }
-            });
-
-            if (allOrdersRes.ok) {
-              const allOrdersData = await allOrdersRes.json();
-              const allOrders = allOrdersData.results || allOrdersData || [];
-
-              const completedOrders = allOrders.filter((o: any) => o.status === "completed");
-              const earnedAmount = completedOrders.reduce((sum: number, o: any) => sum + parseFloat(o.amount || 0), 0);
-              setTotalEarned(earnedAmount);
-
-            }
-
-            setTotalWithdrawn(0);
-          } catch (err) {
-            setPendingOrders([]);
-            setInEscrow(0);
-            setTotalEarned(0);
-            setTotalWithdrawn(0);
-          }
-        } else {
+    const loadDashboard = async () => {
+      try {
+        if (!authUser.is_verified_vendor) {
           setIsSeller(false);
           router.push("/seller/onboarding");
+          setLoading(false);
+          return;
         }
-      })
-      .catch(() => router.push("/auth"))
-      .finally(() => setLoading(false));
-  }, [authUser, router]);
+
+        setIsSeller(true);
+
+        try {
+          const wRes = await fetchWithAuth(`${API_URL}/api/wallet/balance/`);
+          if (wRes.ok) {
+            const wData = await wRes.json();
+            setWalletBalance(parseFloat(wData.balance || "0"));
+          }
+        } catch {}
+
+        const [ordersRes, allOrdersRes] = await Promise.all([
+          fetchWithAuth(`${API_URL}/api/orders/orders/vendor-orders/`),
+          fetchWithAuth(`${API_URL}/api/orders/orders/`),
+        ]);
+
+        if (ordersRes.ok) {
+          const ordersData = await ordersRes.json();
+          const orders = ordersData.results || ordersData || [];
+          const mappedOrders = orders.map((order: any) => ({
+            id: order.id.toString(),
+            buyerName: order.buyer?.username || order.buyer?.email || "Unknown",
+            sellerName: authUser.username,
+            amount: parseFloat(order.amount || 0),
+            date: order.created_at,
+            status: order.status,
+            type: "service" as const,
+            serviceDetails: { serviceName: order.listing?.title || "Service" }
+          }));
+          setPendingOrders(mappedOrders);
+          setInEscrow(mappedOrders.reduce((sum: number, o: Order) => sum + o.amount, 0));
+        }
+
+        if (allOrdersRes.ok) {
+          const allOrdersData = await allOrdersRes.json();
+          const allOrders = allOrdersData.results || allOrdersData || [];
+          const completedOrders = allOrders.filter((o: any) => o.status === "completed");
+          setTotalEarned(completedOrders.reduce((sum: number, o: any) => sum + parseFloat(o.amount || 0), 0));
+        }
+
+        setTotalWithdrawn(0);
+      } catch {
+        setPendingOrders([]);
+        setInEscrow(0);
+        setTotalEarned(0);
+        setTotalWithdrawn(0);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadDashboard();
+  }, [isHydrated, authUser, router]);
 
   if (loading) {
     return (

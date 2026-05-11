@@ -13,7 +13,7 @@ import { useAuth, fetchWithAuth } from "@/lib/authStore";
 import { GRAD, SERIF, toArray } from "@/lib/tokens";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
-const SERVICE_FEE = 205.56;
+const SERVICE_FEE = 215.56;
 
 interface Booking {
   id: number;
@@ -260,7 +260,7 @@ export default function BuyerBookingsPage() {
       amount: totalWithFee * 100,
       currency: "NGN",
       ref: txRef,
-      // Vendor subaccount split: StudEx keeps ₦205.56 flat (20556 kobo)
+      // StudEx service fee: ₦215.56 flat (21556 kobo) — vendor receives listing price via Transfer API
       ...(subaccountCode && subaccountCode.startsWith("ACCT_") ? {
         subaccount: subaccountCode,
         transaction_charge: 20556,

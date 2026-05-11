@@ -21,12 +21,12 @@ logger = logging.getLogger(__name__)
 PAYSTACK_BASE = "https://api.paystack.co"
 
 # ─────────────────────────────────────────
-# ₦205.56 flat service fee per transaction.
+# ₦215.56 flat service fee per transaction.
 # Full payment goes to StudEx balance (no subaccount split at charge time).
 # After charge.success webhook, StudEx immediately transfers vendor_amount
 # to the vendor's bank via the Paystack Transfer API using their RCP_xxx code.
 # ─────────────────────────────────────────
-SERVICE_FEE = Decimal("205.56")
+SERVICE_FEE = Decimal("215.56")
 
 
 def _split_amounts(amount: Decimal):
@@ -289,8 +289,21 @@ def initialize_payment(request):
         return Response({"error": "Amount is below the minimum transaction value."}, status=400)
 
     reference = f"STX-{uuid.uuid4().hex[:16].upper()}"
-    # Store expected amount so verify_payment can confirm Paystack paid the right sum
-    cache.set(f'pay_init:{reference}', total_amount_kobo, 3600)
+
+    # Calculate the gross amount Paystack will charge the customer when
+    # "pass fees to customer" is enabled (1.5%, +₦100 flat above ₦2,500).
+    # This is the EXACT amount that will appear in Paystack's checkout modal.
+    _rate = Decimal("0.015")
+    _flat = Decimal("100") if checkout_amount >= Decimal("2500") else Decimal("0")
+    _gross = ((checkout_amount + _flat) / (1 - _rate)).quantize(Decimal("0.01"))
+    _gross_kobo = int(_gross * 100)
+
+    # Store both bounds so verify_payment can enforce the exact checkout amount.
+    # 50 kobo tolerance covers Paystack's internal rounding.
+    cache.set(f'pay_init:{reference}', {
+        'min_kobo': total_amount_kobo,
+        'max_kobo': _gross_kobo + 50,
+    }, 3600)
 
     callback_url = (
         request.data.get("callback_url")
@@ -462,30 +475,55 @@ def verify_payment(request):
     # ─────────────────────────────────────────────────────────────────────────
 
     # ── Amount integrity check ────────────────────────────────────────────────
-    # Compare what Paystack actually charged against what we initialised.
-    # Prevents a buyer from paying less than the listing price.
+    # Enforce that Paystack charged exactly what our checkout showed.
+    # min_kobo = net checkout amount we initialised (before Paystack grosses up).
+    # max_kobo = gross amount Paystack charged the customer + 50 kobo rounding buffer.
+    # Rejects both underpayment and any amount above what checkout displayed.
     actual_kobo = int(paystack_data.get("amount", 0))
-    expected_kobo = cache.get(f'pay_init:{ref_key}')
+    pay_init = cache.get(f'pay_init:{ref_key}')
 
-    if expected_kobo is None and actual_listing_id:
-        # Cache miss (server restart / expired) — recalculate floor from listing price.
-        # Use the most buyer-friendly assumption (5% discount applied) as the floor
-        # so a legitimately discounted payment is never rejected.
+    if isinstance(pay_init, dict):
+        min_kobo = pay_init.get('min_kobo')
+        max_kobo = pay_init.get('max_kobo')
+    elif isinstance(pay_init, int):
+        # Backward compat: old cache format stored only the net amount
+        min_kobo = pay_init
+        max_kobo = None
+    else:
+        min_kobo = None
+        max_kobo = None
+
+    if min_kobo is None and actual_listing_id:
+        # Cache miss (server restart / TTL expired) — recalculate from listing price.
+        # Assume max discount applied so a legitimately discounted payment isn't rejected.
         try:
             from services.models import Listing
             _listing = Listing.objects.get(id=actual_listing_id)
             _base = Decimal(str(_listing.price))
             _max_discount = (_base * Decimal("0.05")).quantize(Decimal("0.01"))
-            expected_kobo = int((_base - _max_discount + SERVICE_FEE) * 100)
+            _net = _base - _max_discount + SERVICE_FEE
+            _rate = Decimal("0.015")
+            _flat = Decimal("100") if _net >= Decimal("2500") else Decimal("0")
+            _gross = ((_net + _flat) / (1 - _rate)).quantize(Decimal("0.01"))
+            min_kobo = int(_net * 100)
+            max_kobo = int(_gross * 100) + 50
         except Exception:
-            expected_kobo = None
+            min_kobo = None
+            max_kobo = None
 
-    if expected_kobo is not None and actual_kobo < expected_kobo - 1:
+    if min_kobo is not None and actual_kobo < min_kobo - 1:
         logger.warning(
-            f"verify_payment: amount mismatch on {ref_key} — "
-            f"Paystack confirmed {actual_kobo} kobo, expected >= {expected_kobo} kobo"
+            f"verify_payment: underpayment on {ref_key} — "
+            f"paid {actual_kobo} kobo, min expected {min_kobo} kobo"
         )
-        return Response({"error": "Payment amount does not match the order amount."}, status=400)
+        return Response({"error": "Payment amount is less than the order amount."}, status=400)
+
+    if max_kobo is not None and actual_kobo > max_kobo:
+        logger.warning(
+            f"verify_payment: overpayment on {ref_key} — "
+            f"paid {actual_kobo} kobo, max expected {max_kobo} kobo"
+        )
+        return Response({"error": "Payment amount does not match the checkout amount."}, status=400)
     # ─────────────────────────────────────────────────────────────────────────
 
     order_id, error = _create_order_from_paystack_data(

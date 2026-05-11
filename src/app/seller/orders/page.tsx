@@ -47,7 +47,7 @@ export default function SellerOrdersPage() {
 
     const fetchOrders = async () => {
       try {
-        const res = await fetchWithAuth(`${API_URL}/api/orders/pending/`);
+        const res = await fetchWithAuth(`${API_URL}/api/orders/orders/vendor-orders/`);
 
         if (!res.ok) {
           if (res.status === 401) {
