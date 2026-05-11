@@ -714,10 +714,19 @@ def refund_payment(request):
 # PAYSTACK WEBHOOK
 # ─────────────────────────────────────────
 
+PAYSTACK_WEBHOOK_IPS = {"52.31.139.75", "52.49.173.169", "52.214.14.220"}
+
+
 @csrf_exempt
 def paystack_webhook(request):
     if request.method != "POST":
         return HttpResponse(status=405)
+
+    # Optional IP whitelist — uncomment if your hosting correctly forwards the real client IP
+    # client_ip = request.META.get("HTTP_X_FORWARDED_FOR", request.META.get("REMOTE_ADDR", "")).split(",")[0].strip()
+    # if client_ip not in PAYSTACK_WEBHOOK_IPS:
+    #     logger.warning(f"Paystack webhook: rejected unknown IP {client_ip}")
+    #     return HttpResponse(status=403)
 
     # Verify HMAC-SHA512 signature — always required, never skipped
     webhook_secret = (getattr(settings, "PAYSTACK_WEBHOOK_SECRET", "") or "").strip()
@@ -819,6 +828,75 @@ def paystack_webhook(request):
                     "paystack_response": data,
                 }
             )
+
+    elif event == "transfer.success":
+        transfer_ref = data.get("reference", "")
+        try:
+            txn = PaymentTransaction.objects.filter(transfer_reference=transfer_ref).first()
+            if txn:
+                txn.transfer_status = "success"
+                txn.save(update_fields=["transfer_status"])
+                logger.info(f"Paystack webhook: transfer confirmed {transfer_ref} — order {txn.order_id}")
+        except Exception as e:
+            logger.error(f"transfer.success handler error: {e}")
+
+    elif event == "transfer.failed":
+        transfer_ref = data.get("reference", "")
+        try:
+            txn = PaymentTransaction.objects.filter(transfer_reference=transfer_ref).first()
+            if txn:
+                txn.transfer_status = "failed"
+                txn.save(update_fields=["transfer_status"])
+                logger.error(
+                    f"Paystack webhook: transfer FAILED {transfer_ref} — "
+                    f"order {txn.order_id}, seller {txn.seller.username if txn.seller else 'unknown'}, "
+                    f"amount ₦{txn.seller_amount}"
+                )
+                if txn.seller:
+                    try:
+                        from accounts.utils import send_notification
+                        send_notification(
+                            recipient=txn.seller,
+                            notification_type='payout_failed',
+                            title='⚠️ Payout Failed',
+                            message=(
+                                f'Your payout of ₦{txn.seller_amount:,.0f} for order #{txn.order_id} '
+                                f'could not be processed. Please contact StudEx support.'
+                            ),
+                            action_url='/vendor/dashboard',
+                        )
+                    except Exception as ne:
+                        logger.warning(f"Payout-failed notification error: {ne}")
+        except Exception as e:
+            logger.error(f"transfer.failed handler error: {e}")
+
+    elif event == "transfer.reversed":
+        transfer_ref = data.get("reference", "")
+        try:
+            txn = PaymentTransaction.objects.filter(transfer_reference=transfer_ref).first()
+            if txn:
+                txn.transfer_status = "reversed"
+                txn.save(update_fields=["transfer_status"])
+                logger.warning(
+                    f"Paystack webhook: transfer REVERSED {transfer_ref} — order {txn.order_id}"
+                )
+        except Exception as e:
+            logger.error(f"transfer.reversed handler error: {e}")
+
+    elif event == "refund.processed":
+        ref = ((data.get("transaction") or {}).get("reference") or data.get("reference") or "")
+        try:
+            txn = PaymentTransaction.objects.filter(reference=ref).first()
+            if txn and txn.status != "refunded":
+                txn.status = "refunded"
+                txn.save(update_fields=["status"])
+                logger.info(f"Paystack webhook: refund confirmed for {ref}")
+        except Exception as e:
+            logger.error(f"refund.processed handler error: {e}")
+
+    elif event == "refund.failed":
+        ref = ((data.get("transaction") or {}).get("reference") or data.get("reference") or "")
+        logger.error(f"Paystack webhook: refund FAILED for {ref} — manual action required")
 
     return HttpResponse(status=200)
 
