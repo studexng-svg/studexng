@@ -1,13 +1,23 @@
 # studex/urls.py
+import os
 from django.http import JsonResponse
-
 from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from services.views import WalletBalanceView
 
+
+def maintenance_check(request):
+    is_maintenance = os.environ.get("MAINTENANCE_MODE", "false").lower() == "true"
+    return JsonResponse({
+        "maintenance": is_maintenance,
+        "message": os.environ.get("MAINTENANCE_MESSAGE", "We're upgrading StudEx for you. We'll be back shortly."),
+    })
+
+
 urlpatterns = [
+    path('api/health/maintenance/', maintenance_check, name='maintenance-check'),
     path('admin/', admin.site.urls),
     path('api/auth/', include('accounts.urls')),
     path('api/admin/', include('accounts.admin_urls')),
