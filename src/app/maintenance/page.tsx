@@ -224,7 +224,7 @@ export default function MaintenancePage() {
         </div>
 
         <p style={{ marginTop: "28px", fontSize: "12px", color: "#9ca3af" }}>
-          © 2025 StudEx. Nigeria&apos;s campus marketplace.
+          © 2026 StudEx. Nigeria&apos;s campus marketplace.
         </p>
       </div>
     </>
