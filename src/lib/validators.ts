@@ -49,3 +49,9 @@ export const validateMatric = (v: string) => {
   if (year < 2015 || year > new Date().getFullYear()) return { ok: false, msg: "Enter a valid admission year" };
   return { ok: true, msg: "Valid matric number ✓" };
 };
+
+export const validateNIN = (v: string) => {
+  if (!v) return { ok: false, msg: "" };
+  if (!/^\d{11}$/.test(v)) return { ok: false, msg: "NIN must be exactly 11 digits" };
+  return { ok: true, msg: "Valid NIN ✓" };
+};

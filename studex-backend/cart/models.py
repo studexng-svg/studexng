@@ -8,6 +8,7 @@ class CartItem(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='cart_items')
     listing = models.ForeignKey('services.Listing', on_delete=models.CASCADE, related_name='cart_items')
     quantity = models.PositiveIntegerField(default=1)
+    reserved_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

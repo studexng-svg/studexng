@@ -31,16 +31,24 @@ class ListingSerializer(serializers.ModelSerializer):
     )
     image = serializers.SerializerMethodField()
     image_upload = serializers.CharField(required=False, allow_null=True, allow_blank=True, write_only=True, source='image')
+    is_reserved = serializers.SerializerMethodField()
 
     class Meta:
         model = Listing
         fields = [
             'id', 'title', 'description', 'price', 'image', 'image_upload',
             'is_available', 'listing_type', 'track_inventory', 'stock_quantity',
+            'is_reserved',
             'category', 'vendor', 'vendor_is_verified',
             'created_at', 'updated_at'
         ]
         read_only_fields = ['vendor', 'vendor_is_verified', 'created_at', 'updated_at']
+
+    def get_is_reserved(self, obj):
+        if not (obj.track_inventory and obj.stock_quantity == 1):
+            return False
+        from django.core.cache import cache
+        return cache.get(f'reserved:{obj.pk}') is not None
 
     def get_image(self, obj):
         """Return image URL as-is — could be Cloudinary URL or local path."""

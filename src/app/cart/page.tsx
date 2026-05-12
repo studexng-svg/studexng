@@ -1,19 +1,52 @@
 // src/app/cart/page.tsx
 "use client";
 
-import { Plus, Minus, Trash2, ShoppingBag, ArrowRight, Sparkles, AlertCircle, ChevronLeft } from "lucide-react";
+import { Plus, Minus, Trash2, ShoppingBag, ArrowRight, Sparkles, AlertCircle, ChevronLeft, Clock } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCartStore } from "@/lib/cartStore";
-import { useEffect, useState } from "react";
+import { useAuth, fetchWithAuth } from "@/lib/authStore";
+import { useEffect, useState, useMemo } from "react";
 import { GRAD, GRAD_TEXT, SERIF } from "@/lib/tokens";
+
+function CountdownTimer({ reservedAt }: { reservedAt: string }) {
+  const expiresAt = useMemo(() => new Date(reservedAt).getTime() + 10 * 60 * 1000, [reservedAt]);
+  const [remaining, setRemaining] = useState(() => Math.max(0, Math.floor((expiresAt - Date.now()) / 1000)));
+
+  useEffect(() => {
+    if (remaining <= 0) return;
+    const interval = setInterval(() => {
+      setRemaining(Math.max(0, Math.floor((expiresAt - Date.now()) / 1000)));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [expiresAt]);
+
+  if (remaining <= 0) {
+    return (
+      <p className="text-red-500 text-xs font-medium flex items-center gap-1 mt-1">
+        <Clock className="w-3 h-3" /> Reservation expired
+      </p>
+    );
+  }
+
+  const mins = Math.floor(remaining / 60);
+  const secs = remaining % 60;
+  const isUrgent = remaining < 120;
+
+  return (
+    <p className={`text-xs font-medium flex items-center gap-1 mt-1 ${isUrgent ? "text-red-500 animate-pulse" : "text-amber-500"}`}>
+      <Clock className="w-3 h-3" /> Reserved for {mins}:{String(secs).padStart(2, "0")}
+    </p>
+  );
+}
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 export default function CartPage() {
   const router = useRouter();
   const { cart, removeFromCart, updateQuantity, clearCart } = useCartStore();
+  const { isLoggedIn } = useAuth();
 
   const handleBack = () => {
     try {
@@ -25,6 +58,7 @@ export default function CartPage() {
 
   const [unavailableIds, setUnavailableIds] = useState<Set<number>>(new Set());
   const [stockLimits, setStockLimits] = useState<Record<number, number>>({});
+  const [reservedAt, setReservedAt] = useState<Record<number, string>>({});
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
@@ -49,10 +83,24 @@ export default function CartPage() {
         const item = cart.find(i => i.id === id);
         if (item && item.quantity > max) updateQuantity(id, max);
       });
+
+      // Fetch reserved_at times for countdown timers
+      if (isLoggedIn) {
+        try {
+          const cartRes = await fetchWithAuth(`${API_URL}/api/cart/`);
+          if (cartRes.ok) {
+            const cartData: Array<{ listing_id: number; reserved_at: string | null }> = await cartRes.json();
+            const reservations: Record<number, string> = {};
+            cartData.forEach(i => { if (i.reserved_at) reservations[i.listing_id] = i.reserved_at; });
+            setReservedAt(reservations);
+          }
+        } catch {}
+      }
+
       setChecking(false);
     };
     checkAvailability();
-  }, [cart.length]);
+  }, [cart.length, isLoggedIn]);
 
   const availableItems = cart.filter(item => !unavailableIds.has(item.id));
   const total = availableItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
@@ -176,6 +224,7 @@ export default function CartPage() {
                         {item.quantity >= stockLimits[item.id] && " · Limit reached"}
                       </p>
                     )}
+                    {reservedAt[item.id] && <CountdownTimer reservedAt={reservedAt[item.id]} />}
                   </>
                 )}
               </div>

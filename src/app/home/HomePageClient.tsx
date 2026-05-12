@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, Suspense, useRef } from "react";
-import { Search, ArrowRight, Heart, X, Sparkles, Star, MapPin, Shield, ChevronRight } from "lucide-react";
+import { Search, ArrowRight, Heart, X, Sparkles, Star, MapPin, Shield, ChevronRight, Clock } from "lucide-react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth, fetchWithAuth } from "@/lib/authStore";
@@ -495,6 +495,7 @@ export default function HomePageClient({ initialVendors, initialListings }: Prop
                     const wishlisted = mounted && isInWishlist(listing.id);
                     const isService = (listing.listing_type || "").toLowerCase() === "service";
                     const isOwnListing = !!(user?.id && user.id === listing.vendor?.id);
+                    const isReserved = !isService && !isOwnListing && !!listing.is_reserved;
 
                     return (
                       <motion.div
@@ -576,15 +577,21 @@ export default function HomePageClient({ initialVendors, initialListings }: Prop
                               ₦{Number(listing.price).toLocaleString()}
                             </p>
                           </div>
-                          <Link href={isOwnListing ? "/seller/listings" : `/listing/${listing.id}`}>
-                            <motion.button
-                              whileHover={{ scale: 1.04 }}
-                              whileTap={{ scale: 0.96 }}
-                              className="px-6 py-2.5 text-white rounded-full font-black text-sm shadow-sm uppercase tracking-wide transition-opacity hover:opacity-90"
-                              style={{ background: GRAD }}>
-                              {isOwnListing ? "Manage" : isService ? "Book" : "Order"}
-                            </motion.button>
-                          </Link>
+                          {isReserved ? (
+                            <div className="flex items-center gap-1.5 px-4 py-2.5 bg-stone-100 border border-stone-200 rounded-full text-stone-400 font-semibold text-xs uppercase tracking-wide cursor-not-allowed select-none">
+                              <Clock className="w-3.5 h-3.5" /> Reserved
+                            </div>
+                          ) : (
+                            <Link href={isOwnListing ? "/seller/listings" : `/listing/${listing.id}`}>
+                              <motion.button
+                                whileHover={{ scale: 1.04 }}
+                                whileTap={{ scale: 0.96 }}
+                                className="px-6 py-2.5 text-white rounded-full font-black text-sm shadow-sm uppercase tracking-wide transition-opacity hover:opacity-90"
+                                style={{ background: GRAD }}>
+                                {isOwnListing ? "Manage" : isService ? "Book" : "Order"}
+                              </motion.button>
+                            </Link>
+                          )}
                         </div>
                       </motion.div>
                     );

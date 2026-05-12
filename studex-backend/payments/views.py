@@ -270,7 +270,13 @@ def initialize_payment(request):
         return Response({"error": "Listing not found."}, status=404)
 
     buyer = request.user
-    amount = Decimal(str(listing.price))
+    # cart_amount lets the frontend pass the true multi-item cart total so the
+    # discount base is correct; fall back to the single listing price otherwise.
+    cart_amount = request.data.get("cart_amount")
+    try:
+        amount = Decimal(str(cart_amount)) if cart_amount else Decimal(str(listing.price))
+    except Exception:
+        amount = Decimal(str(listing.price))
 
     discount_amount = Decimal("0")
     try:
@@ -540,6 +546,18 @@ def verify_payment(request):
             status=500,
         )
 
+    # Mark profile bonus as used if a discount was applied on this payment
+    try:
+        meta = paystack_data.get("metadata") or {}
+        discount_in_meta = Decimal(str(meta.get("discount_amount", "0") or "0"))
+        if discount_in_meta > 0:
+            buyer_profile = request.user.profile
+            if buyer_profile.profile_bonus_eligible and not buyer_profile.profile_bonus_used:
+                buyer_profile.profile_bonus_used = True
+                buyer_profile.save(update_fields=["profile_bonus_used"])
+    except Exception:
+        pass
+
     # Trigger vendor payout immediately from here — don't rely solely on the webhook.
     # The transfer is idempotent (PAYOUT-{reference} key), so if the webhook also fires
     # later, Paystack deduplicates and no double-payment occurs.
@@ -798,6 +816,16 @@ def paystack_webhook(request):
                 logger.error(f"Webhook order creation failed: {error}")
             else:
                 logger.info(f"Webhook created order {order_id} for {reference}")
+                # Mark profile bonus as used if a discount was applied
+                try:
+                    discount_in_meta = Decimal(str((meta or {}).get("discount_amount", "0") or "0"))
+                    if discount_in_meta > 0:
+                        buyer_profile = buyer.profile
+                        if buyer_profile.profile_bonus_eligible and not buyer_profile.profile_bonus_used:
+                            buyer_profile.profile_bonus_used = True
+                            buyer_profile.save(update_fields=["profile_bonus_used"])
+                except Exception:
+                    pass
                 try:
                     txn = PaymentTransaction.objects.get(reference=reference)
                     listing_title = ""

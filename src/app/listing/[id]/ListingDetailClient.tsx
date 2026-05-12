@@ -40,6 +40,7 @@ interface Listing {
   price: number;
   image: string;
   is_available: boolean;
+  is_reserved: boolean;
   listing_type: string;
   track_inventory?: boolean;
   stock_quantity?: number;
@@ -75,7 +76,7 @@ interface Props {
 export default function ListingDetailClient({ id, initialListing, initialReviews }: Props) {
   const router = useRouter();
   const { isLoggedIn } = useAuth();
-  const { addToCart } = useCartStore();
+  const { fetchCart } = useCartStore();
 
   const [listing, setListing] = useState<Listing | null>(initialListing);
   const [reviews] = useState<Review[]>(initialReviews);
@@ -98,18 +99,33 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
 
   const handleAddToCart = async () => {
     if (!listing) return;
+    if (!isLoggedIn) { router.push("/auth"); return; }
+
     try {
-      const res = await fetch(`${API_URL}/api/services/listings/${listing.id}/`);
-      if (res.ok) {
-        const fresh = await res.json();
-        if (!fresh.is_available) { showToast("Sorry, this item is no longer available!"); setListing(fresh); return; }
-        if (fresh.track_inventory && fresh.stock_quantity === 0) { showToast("Sorry, this item is out of stock!"); setListing(fresh); return; }
-        if (fresh.track_inventory && fresh.stock_quantity <= 3) setStockWarning(`Only ${fresh.stock_quantity} left!`);
+      const res = await fetchWithAuth(`${API_URL}/api/cart/add/`, {
+        method: "POST",
+        body: JSON.stringify({ listing_id: listing.id, quantity: 1 }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        const msg: string = data.error || data.detail || "Could not add to cart";
+        if (msg.toLowerCase().includes("reserved")) {
+          setListing(prev => prev ? { ...prev, is_reserved: true } : prev);
+          showToast("This item is currently reserved by another user");
+        } else {
+          showToast(msg);
+        }
+        return;
       }
-    } catch {}
-    addToCart({ id: listing.id, title: listing.title, price: listing.price, img: listing.image });
-    try { sessionStorage.setItem("cart-referrer", window.location.pathname); } catch {}
-    showToast("Added to cart!");
+
+      const isSingleStock = listing.track_inventory && listing.stock_quantity === 1;
+      showToast(isSingleStock ? "Item reserved for 10 minutes!" : "Added to cart!");
+      try { sessionStorage.setItem("cart-referrer", window.location.pathname); } catch {}
+      await fetchCart();
+    } catch {
+      showToast("Could not add to cart. Please try again.");
+    }
   };
 
   const handleBooking = async () => {
@@ -308,11 +324,13 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
 
           <div className="px-4 pt-4 space-y-4">
 
-            {/* ── STOCK WARNING ── */}
-            {stockWarning && (
-              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0" />
-                <p className="text-amber-700 text-sm font-medium">{stockWarning}</p>
+            {/* ── STOCK WARNING / RESERVED ── */}
+            {(stockWarning || listing.is_reserved) && (
+              <div className={`border rounded-2xl p-3 flex items-center gap-2 ${listing.is_reserved ? "bg-stone-50 border-stone-200" : "bg-amber-50 border-amber-200"}`}>
+                <AlertCircle className={`w-4 h-4 flex-shrink-0 ${listing.is_reserved ? "text-stone-400" : "text-amber-500"}`} />
+                <p className={`text-sm font-medium ${listing.is_reserved ? "text-stone-500" : "text-amber-700"}`}>
+                  {listing.is_reserved ? "This item is currently reserved by another user" : stockWarning}
+                </p>
               </div>
             )}
 
@@ -377,13 +395,19 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
 
             {/* ── ADD TO CART — products only ── */}
             {!isService && listing.is_available && (
-              <motion.button
-                whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
-                onClick={handleAddToCart}
-                className="w-full py-4 text-white font-semibold rounded-full flex items-center justify-center gap-2 text-base shadow-lg shadow-teal-200/60"
-                style={{ background: GRAD }}>
-                <ShoppingCart className="w-5 h-5" /> Add to Cart
-              </motion.button>
+              listing.is_reserved ? (
+                <div className="w-full py-4 bg-stone-100 border border-stone-200 rounded-full flex items-center justify-center gap-2 text-stone-400 font-semibold text-base cursor-not-allowed select-none">
+                  <Clock className="w-5 h-5" /> Reserved
+                </div>
+              ) : (
+                <motion.button
+                  whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
+                  onClick={handleAddToCart}
+                  className="w-full py-4 text-white font-semibold rounded-full flex items-center justify-center gap-2 text-base shadow-lg shadow-teal-200/60"
+                  style={{ background: GRAD }}>
+                  <ShoppingCart className="w-5 h-5" /> Add to Cart
+                </motion.button>
+              )
             )}
 
             {/* ── TRUST BADGES ── */}

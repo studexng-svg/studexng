@@ -14,11 +14,14 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             'id', 'username', 'email', 'phone', 'password', 'password2',
-            'user_type', 'matric_number', 'hostel', 'school'
+            'user_type', 'matric_number', 'nin', 'verification_type', 'hostel', 'school'
         ]
         extra_kwargs = {
             'email': {'required': True},
             'username': {'required': True},
+            'matric_number': {'required': False, 'allow_blank': True, 'allow_null': True},
+            'nin': {'required': False, 'allow_blank': True, 'allow_null': True},
+            'verification_type': {'required': False, 'allow_blank': True, 'allow_null': True},
         }
 
     # ✅ USERNAME VALIDATION (ADDED PROPERLY)
@@ -97,17 +100,31 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({"password": "Passwords do not match"})
         return data
 
-    # ✅ MATRIC VALIDATION (UNCHANGED BUT CLEANED)
     def validate_matric_number(self, value):
         if value:
             if User.objects.filter(matric_number=value).exists():
                 raise serializers.ValidationError("This matriculation number is already registered")
         return value
 
-    # ✅ CREATE USER (SAFE + STANDARD)
+    def validate_nin(self, value):
+        if value:
+            import re
+            if not re.match(r'^\d{11}$', value):
+                raise serializers.ValidationError("NIN must be exactly 11 digits")
+            if User.objects.filter(nin=value).exists():
+                raise serializers.ValidationError("This NIN is already registered")
+        return value
+
     def create(self, validated_data):
         validated_data.pop('password2')
         password = validated_data.pop('password')
+
+        # Auto-set verification_type if not explicitly provided
+        if not validated_data.get('verification_type'):
+            if validated_data.get('matric_number'):
+                validated_data['verification_type'] = 'matric'
+            elif validated_data.get('nin'):
+                validated_data['verification_type'] = 'nin'
 
         user = User.objects.create_user(**validated_data)
         user.set_password(password)
@@ -152,7 +169,8 @@ class UserProfileSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             'id', 'username', 'email', 'phone', 'user_type',
-            'matric_number', 'hostel', 'school', 'business_name', 'is_verified_vendor',
+            'matric_number', 'nin', 'verification_type', 'hostel', 'school',
+            'business_name', 'is_verified_vendor',
             'bio', 'profile_image', 'wallet_balance', 'created_at', 'profile',
             'is_staff', 'is_superuser',
             'whatsapp', 'instagram',
@@ -196,6 +214,15 @@ class UserProfileSerializer(serializers.ModelSerializer):
             }
         except Profile.DoesNotExist:
             return None
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        # Hide verification fields for PAU (verified by email); keep for FUTO and non-students
+        school = (instance.school or '').lower()
+        if school and school != 'futo':
+            data.pop('nin', None)
+            data.pop('verification_type', None)
+        return data
 
     def update(self, instance, validated_data):
         whatsapp = validated_data.pop('whatsapp', None)

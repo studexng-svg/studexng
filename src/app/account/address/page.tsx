@@ -25,7 +25,11 @@ const PAU_HOSTELS = [
 const FUTO_HOSTELS = [
   "Tetfund Boys", "Tetfund Girls", "NDDC Hostel",
   "Hostel A", "Hostel B", "Hostel C", "Hostel D", "Hostel E",
-  "Umuchima", "Eziobodo", "Off-Campus",
+  "Umuchima", "PG Hostel", "Eziobodo", "Ihiagwa", "Off-Campus",
+];
+
+const NON_STUDENT_LOCATIONS = [
+  "Umuchima", "Eziobodo", "Ihiagwa", "Off-Campus",
 ];
 
 interface Profile {
@@ -39,6 +43,7 @@ interface Profile {
   school: string;
   campus: string;
   matric_number: string;
+  nin: string;
   avatar: string;
   dob: string;
   gender: string;
@@ -52,6 +57,7 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [savedMsg, setSavedMsg] = useState("");
   const [bonusGranted, setBonusGranted] = useState(false);
+  const [bonusUsed, setBonusUsed] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [usernameError, setUsernameError] = useState("");
   const [hostelSaving, setHostelSaving] = useState(false);
@@ -72,6 +78,7 @@ export default function ProfilePage() {
     school: "",
     campus: "",
     matric_number: "",
+    nin: "",
     avatar: "",
     dob: "",
     gender: "",
@@ -101,6 +108,7 @@ export default function ProfilePage() {
           school: djangoUser.school || schoolFromEmail,
           campus: djangoUser.hostel || "",
           matric_number: djangoUser.matric_number || "",
+          nin: djangoUser.nin || "",
           avatar: parsed.avatar || "",
           dob: parsed.dob || "",
           gender: parsed.gender || "",
@@ -109,9 +117,8 @@ export default function ProfilePage() {
           const d = new Date(djangoUser.date_joined);
           setMemberSince(d.toLocaleDateString("en-US", { month: "long", year: "numeric" }));
         }
-        if (djangoUser.profile_bonus_eligible || djangoUser.profile_bonus_used) {
-          setBonusGranted(true);
-        }
+        if (djangoUser.profile_bonus_eligible) setBonusGranted(true);
+        if (djangoUser.profile_bonus_used) setBonusUsed(true);
         return;
       }
     } catch (e) {
@@ -129,6 +136,7 @@ export default function ProfilePage() {
       school: schoolFromEmail,
       campus: "",
       matric_number: "",
+      nin: "",
       avatar: parsed.avatar || "",
       dob: parsed.dob || "",
       gender: parsed.gender || "",
@@ -399,12 +407,12 @@ export default function ProfilePage() {
           </div>
         )}
 
-        {bonusGranted && completionPct === 100 && (
+        {bonusGranted && !bonusUsed && completionPct === 100 && (
           <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-center gap-3 animate-fadeUp">
             <CheckCircle2 className="w-6 h-6 text-emerald-600 flex-shrink-0" />
             <div>
               <p className="font-semibold text-emerald-800 text-sm">Profile Complete!</p>
-              <p className="text-xs text-emerald-700">5% discount applied to your first order</p>
+              <p className="text-xs text-emerald-700">5% discount active on your next order</p>
             </div>
           </div>
         )}
@@ -438,7 +446,7 @@ export default function ProfilePage() {
             {profile.name || "Student"}
           </h2>
           <p className="text-sm text-stone-500 flex items-center justify-center gap-1 mt-1">
-            {profile.school ? `Verified ${profile.school} Student` : "Verified Student"} <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+            {profile.school === "PAU" ? "Verified PAU Student" : profile.school === "FUTO" ? "Verified FUTO Student" : "StudEx Member"} <CheckCircle2 className="w-4 h-4 text-emerald-500" />
           </p>
         </div>
 
@@ -526,18 +534,20 @@ export default function ProfilePage() {
               <GraduationCap className="w-5 h-5 text-teal-600" />
             </div>
             <div className="flex-1">
-              <p className="text-xs font-semibold text-stone-500 uppercase tracking-wide mb-1">School</p>
+              <p className="text-xs font-semibold text-stone-500 uppercase tracking-wide mb-1">Account Type</p>
               <div className="flex items-center gap-2 flex-wrap">
-                {profile.school ? (
-                  <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                    profile.school === "PAU"
-                      ? "bg-teal-100 text-teal-700"
-                      : "bg-purple-100 text-purple-700"
-                  }`}>
-                    {profile.school === "PAU" ? "Pan-Atlantic University" : "Federal University of Technology Owerri"}
+                {profile.school === "PAU" ? (
+                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-teal-100 text-teal-700">
+                    Pan-Atlantic University
+                  </span>
+                ) : profile.school === "FUTO" ? (
+                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-purple-100 text-purple-700">
+                    Federal University of Technology Owerri
                   </span>
                 ) : (
-                  <span className="text-stone-400 italic text-sm">Unknown</span>
+                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-stone-100 text-stone-600">
+                    Non-Student
+                  </span>
                 )}
                 <span className="text-xs text-stone-400 flex items-center gap-1">
                   <Lock className="w-3 h-3" /> permanent
@@ -546,7 +556,7 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          {/* Matric — read-only, FUTO only */}
+          {/* Matric — read-only, FUTO students only */}
           {profile.school === "FUTO" && (
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-purple-50 rounded-xl flex items-center justify-center flex-shrink-0">
@@ -566,14 +576,34 @@ export default function ProfilePage() {
             </div>
           )}
 
-          {/* Hostel — editable */}
+          {/* NIN — read-only, non-students only */}
+          {!profile.school && (
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-purple-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                <Hash className="w-5 h-5 text-purple-600" />
+              </div>
+              <div className="flex-1">
+                <p className="text-xs font-semibold text-stone-500 uppercase tracking-wide mb-1">NIN</p>
+                <div className="flex items-center gap-2">
+                  <p className={`font-semibold text-base ${profile.nin ? "text-stone-900" : "text-stone-400 italic"}`}>
+                    {profile.nin || "Not set"}
+                  </p>
+                  <span className="text-xs text-stone-400 flex items-center gap-1">
+                    <Lock className="w-3 h-3" /> permanent
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Hostel / Location — editable */}
           <div className="flex items-start gap-3">
             <div className="w-10 h-10 bg-teal-50 rounded-xl flex items-center justify-center flex-shrink-0 mt-1">
               <MapPin className="w-5 h-5 text-teal-600" />
             </div>
             <div className="flex-1">
               <p className="text-xs font-semibold text-stone-500 uppercase tracking-wide mb-1.5">
-                {profile.school === "FUTO" ? "Hostel / Hall" : "Hostel / Location"}
+                {profile.school === "FUTO" ? "Hostel / Hall" : profile.school === "PAU" ? "Hostel / Location" : "Location"}
               </p>
               <select
                 value={profile.campus}
@@ -584,15 +614,22 @@ export default function ProfilePage() {
                 }}
                 className="w-full px-4 py-3 rounded-xl border-2 border-teal-400 bg-white text-stone-900 font-medium focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-200 transition text-sm appearance-none"
               >
-                <option value="">Select your hostel</option>
-                {(profile.school === "FUTO" ? FUTO_HOSTELS : PAU_HOSTELS).map(h => (
+                <option value="">
+                  {profile.school === "FUTO" ? "Select your hostel" : profile.school === "PAU" ? "Select your hostel" : "Select your area"}
+                </option>
+                {(profile.school === "FUTO"
+                  ? FUTO_HOSTELS
+                  : profile.school === "PAU"
+                  ? PAU_HOSTELS
+                  : NON_STUDENT_LOCATIONS
+                ).map(h => (
                   <option key={h} value={h}>{h}</option>
                 ))}
               </select>
 
               {hostelSaved && (
                 <p className="text-xs text-teal-600 font-semibold mt-2 flex items-center gap-1">
-                  <CheckCircle2 className="w-3.5 h-3.5" /> Hostel updated!
+                  <CheckCircle2 className="w-3.5 h-3.5" /> {profile.school ? "Hostel" : "Location"} updated!
                 </p>
               )}
               {hostelError && (
@@ -606,7 +643,7 @@ export default function ProfilePage() {
                 style={{ background: GRAD }}
               >
                 <Save className="w-4 h-4" />
-                {hostelSaving ? "Saving..." : "Update Hostel"}
+                {hostelSaving ? "Saving..." : profile.school ? "Update Hostel" : "Update Location"}
               </button>
             </div>
           </div>

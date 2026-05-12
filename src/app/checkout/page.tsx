@@ -34,11 +34,38 @@ export default function CheckoutPage() {
   const SERVICE_FEE = 215.56;
   const foodTotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const serviceTotal = booking?.total || 0;
-  const finalTotal = (isServiceBooking ? serviceTotal : foodTotal) + SERVICE_FEE;
+  const baseTotal = isServiceBooking ? serviceTotal : foodTotal;
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [paystackLoaded, setPaystackLoaded] = useState(false);
   const [paymentError, setPaymentError] = useState("");
+  const [discount, setDiscount] = useState<{
+    hasDiscount: boolean;
+    discountAmount: number;
+    finalBase: number;
+  } | null>(null);
+
+  const discountedBase = discount ? discount.finalBase : baseTotal;
+  const finalTotal = discountedBase + SERVICE_FEE;
+
+  useEffect(() => {
+    if (!isLoggedIn || !isHydrated || baseTotal <= 0) return;
+    fetchWithAuth(`${API_URL}/api/payments/preview-price/`, {
+      method: "POST",
+      body: JSON.stringify({ amount: baseTotal }),
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data) {
+          setDiscount({
+            hasDiscount: data.discount_eligible,
+            discountAmount: parseFloat(data.discount_amount),
+            finalBase: parseFloat(data.final_amount),
+          });
+        }
+      })
+      .catch(() => {});
+  }, [isLoggedIn, isHydrated, baseTotal]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -113,7 +140,11 @@ export default function CheckoutPage() {
     try {
       const initRes = await fetchWithAuth(`${API_URL}/api/payments/initialize/`, {
         method: "POST",
-        body: JSON.stringify({ listing_id: listingId }),
+        body: JSON.stringify({
+          listing_id: listingId,
+          // Pass the full cart total so the discount base is correct for multi-item orders
+          ...(isFoodOrder && cart.length > 1 ? { cart_amount: foodTotal } : {}),
+        }),
       });
       const initData = await initRes.json();
       if (!initRes.ok) throw new Error(initData.error || "Failed to initialize payment");
@@ -153,7 +184,7 @@ export default function CheckoutPage() {
       setPaymentError(err.message || "Payment failed. Please try again.");
       setIsProcessing(false);
     }
-  }, [finalTotal, user, isFoodOrder, isServiceBooking, booking, cart, paystackLoaded]);
+  }, [finalTotal, foodTotal, user, isFoodOrder, isServiceBooking, booking, cart, paystackLoaded]);
 
   // ── EMPTY STATE ──────────────────────────────────────────────────────────
   if (!isFoodOrder && !isServiceBooking) {
@@ -281,10 +312,20 @@ export default function CheckoutPage() {
               <span className="text-stone-500">
                 {isServiceBooking ? "Service price" : "Items total"}
               </span>
-              <span className="text-stone-700 font-medium">
-                ₦{(finalTotal - SERVICE_FEE).toLocaleString()}
+              <span className={`font-medium ${discount?.hasDiscount ? "line-through text-stone-400" : "text-stone-700"}`}>
+                ₦{baseTotal.toLocaleString()}
               </span>
             </div>
+            {discount?.hasDiscount && (
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-emerald-600 font-medium flex items-center gap-1">
+                  🎉 Profile bonus (5% off)
+                </span>
+                <span className="text-emerald-600 font-semibold">
+                  -₦{discount.discountAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+            )}
             <div className="flex justify-between items-center text-sm">
               <span className="text-stone-500">Service fee</span>
               <span className="text-stone-700 font-medium">₦{SERVICE_FEE.toLocaleString()}</span>
@@ -292,7 +333,7 @@ export default function CheckoutPage() {
             <div className="border-t border-stone-100 pt-3 flex justify-between items-center">
               <span className="font-bold text-stone-900" style={SERIF}>Total</span>
               <span className="text-2xl font-bold" style={GRAD_TEXT}>
-                ₦{finalTotal.toLocaleString()}
+                ₦{finalTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
           </div>
@@ -335,7 +376,8 @@ export default function CheckoutPage() {
               <p className="text-xs text-teal-600 mt-0.5 leading-relaxed">
                 A flat <strong>₦215.56 service fee</strong> is included in your total.
                 The vendor receives their full listed price.
-                Refunds are processed back to your original payment method.
+                {discount?.hasDiscount && " Your 5% profile completion bonus has been applied and will be used on this order."}
+                {" "}Refunds are processed back to your original payment method.
               </p>
             </div>
           </div>

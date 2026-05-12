@@ -32,6 +32,17 @@ class User(AbstractUser):
     )
 
     matric_number = models.CharField(max_length=50, blank=True, null=True)
+    nin = models.CharField(max_length=11, blank=True, null=True)
+    VERIFICATION_TYPE_CHOICES = [
+        ('matric', 'Matric Number'),
+        ('nin', 'NIN'),
+    ]
+    verification_type = models.CharField(
+        max_length=10,
+        choices=VERIFICATION_TYPE_CHOICES,
+        blank=True,
+        null=True,
+    )
     hostel = models.CharField(max_length=100, blank=True, null=True)
     school = models.CharField(max_length=20, blank=True, null=True)
 

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Search, ChevronLeft, Sparkles, Heart, Star, MessageCircle, X,
-  ChevronRight, ArrowRight, Shield,
+  ChevronRight, ArrowRight, Shield, Clock,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useCartStore } from "@/lib/cartStore";
@@ -33,7 +33,10 @@ interface Listing {
   };
   category: { id: number; title: string };
   is_available: boolean;
+  is_reserved?: boolean;
   listing_type?: string;
+  track_inventory?: boolean;
+  stock_quantity?: number;
 }
 
 interface ActiveChat {
@@ -104,7 +107,7 @@ function ListingSkeletons() {
 
 export default function CategoryPageClient({ slug, initialListings }: Props) {
   const router = useRouter();
-  const { addToCart } = useCartStore();
+  const { fetchCart } = useCartStore();
   const { isLoggedIn, user, isHydrated } = useAuth();
   const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlistStore();
 
@@ -170,10 +173,36 @@ export default function CategoryPageClient({ slug, initialListings }: Props) {
     setTimeout(() => setToast(""), 2000);
   };
 
-  const handleAddToCart = (listing: Listing) => {
-    addToCart({ id: listing.id, title: listing.title, price: listing.price, img: listing.image });
-    try { sessionStorage.setItem("cart-referrer", window.location.pathname); } catch {}
-    showToast("Added to cart!");
+  const API_URL_LOCAL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+
+  const handleAddToCart = async (listing: Listing) => {
+    if (!isLoggedIn) { router.push("/auth"); return; }
+
+    try {
+      const res = await fetchWithAuth(`${API_URL_LOCAL}/api/cart/add/`, {
+        method: "POST",
+        body: JSON.stringify({ listing_id: listing.id, quantity: 1 }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        const msg: string = data.error || data.detail || "Could not add to cart";
+        if (msg.toLowerCase().includes("reserved")) {
+          setListings(prev => prev.map(l => l.id === listing.id ? { ...l, is_reserved: true } : l));
+          showToast("This item is currently reserved by another user");
+        } else {
+          showToast(msg);
+        }
+        return;
+      }
+
+      const isSingleStock = listing.track_inventory && listing.stock_quantity === 1;
+      showToast(isSingleStock ? "Item reserved for 10 minutes!" : "Added to cart!");
+      try { sessionStorage.setItem("cart-referrer", window.location.pathname); } catch {}
+      await fetchCart();
+    } catch {
+      showToast("Could not add to cart. Please try again.");
+    }
   };
 
   const handleOpenChat = (listing: Listing) => {
@@ -364,6 +393,7 @@ export default function CategoryPageClient({ slug, initialListings }: Props) {
                   const totalReviews = listing.vendor.profile?.total_reviews;
                   const isService = (listing.listing_type || "").toLowerCase() === "service";
                   const isOwnListing = !!(user?.id && user.id === listing.vendor.id);
+                  const isReserved = !isService && !isOwnListing && !!listing.is_reserved;
                   const wishlisted = mounted && isInWishlist(listing.id);
                   const imageUrl = listing.image?.startsWith("http") ? listing.image : null;
 
@@ -472,6 +502,10 @@ export default function CategoryPageClient({ slug, initialListings }: Props) {
                                 Manage
                               </motion.button>
                             </Link>
+                          ) : isReserved ? (
+                            <div className="flex items-center gap-1.5 px-4 py-2.5 bg-stone-100 border border-stone-200 rounded-full text-stone-400 font-semibold text-xs uppercase tracking-wide cursor-not-allowed select-none">
+                              <Clock className="w-3.5 h-3.5" /> Reserved
+                            </div>
                           ) : listing.is_available && !isService ? (
                             <motion.button
                               whileHover={{ scale: 1.04 }}

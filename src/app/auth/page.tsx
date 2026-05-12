@@ -19,7 +19,11 @@ const PAU_HOSTELS = [
 const FUTO_HOSTELS = [
   "Tetfund Boys", "Tetfund Girls", "NDDC Hostel",
   "Hostel A", "Hostel B", "Hostel C", "Hostel D", "Hostel E",
-  "Umuchima", "PG Hostel","Eziobodo", "Off-Campus",
+  "Umuchima", "PG Hostel", "Eziobodo", "Ihiagwa", "Off-Campus",
+];
+
+const NON_STUDENT_LOCATIONS = [
+  "Umuchima", "Eziobodo", "Ihiagwa", "Off-Campus",
 ];
 
 const SCHOOLS = ["PAU", "FUTO"];
@@ -56,6 +60,12 @@ const validateMatric = (v: string) => {
   const currentYear = new Date().getFullYear();
   if (year < 2015 || year > currentYear) return { ok: false, msg: "Enter a valid admission year" };
   return { ok: true, msg: "Valid matric number ✓" };
+};
+
+const validateNIN = (v: string) => {
+  if (!v) return { ok: false, msg: "" };
+  if (!/^\d{11}$/.test(v)) return { ok: false, msg: "NIN must be exactly 11 digits" };
+  return { ok: true, msg: "Valid NIN ✓" };
 };
 
 const validatePhone = (v: string) => {
@@ -135,7 +145,8 @@ export default function AuthPage() {
   const [loginError, setLoginError] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
 
-  const [signupForm, setSignupForm] = useState({ username: "", email: "", phone: "", hostel: "", password: "", school: "", matric_number: "" });
+  const [signupCategory, setSignupCategory] = useState<"student" | "non_student">("student");
+  const [signupForm, setSignupForm] = useState({ username: "", email: "", phone: "", hostel: "", password: "", school: "", matric_number: "", nin: "" });
   const [touched, setTouched] = useState({ username: false, email: false, phone: false, hostel: false, password: false, school: false });
   const [usernameChecking, setUsernameChecking] = useState(false);
   const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
@@ -187,17 +198,25 @@ export default function AuthPage() {
     return () => { if (usernameTimer.current) clearTimeout(usernameTimer.current); };
   }, [signupForm.username]);
 
+  const isNonStudent = signupCategory === "non_student";
   const usernameVal = validateUsername(signupForm.username);
-  const emailVal = validateEmail(signupForm.email, signupForm.school);
+  const emailVal = isNonStudent
+    ? (() => {
+        if (!signupForm.email) return { ok: false, msg: "" };
+        const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(signupForm.email);
+        return { ok: valid, msg: valid ? "Valid email ✓" : "Enter a valid email address" };
+      })()
+    : validateEmail(signupForm.email, signupForm.school);
   const phoneVal = validatePhone(signupForm.phone);
   const passwordVal = validatePassword(signupForm.password);
   const hostelOk = !!signupForm.hostel;
   const matricVal = validateMatric(signupForm.matric_number || "");
+  const ninVal = validateNIN(signupForm.nin || "");
   const isFUTO = signupForm.school === "FUTO";
-  const schoolOk = !!signupForm.school;
+  const schoolOk = isNonStudent ? true : !!signupForm.school;
   const step1Valid = usernameVal.ok && usernameAvailable !== false && emailVal.ok &&
     phoneVal.ok && hostelOk && passwordVal.ok && schoolOk &&
-    (!isFUTO || matricVal.ok);
+    (isNonStudent ? ninVal.ok : matricVal.ok);
 
   const handleSignupChange = (e: any) => {
     const { name, value } = e.target;
@@ -280,9 +299,11 @@ export default function AuthPage() {
         const result = await api.register({
           username: signupForm.username, email: signupForm.email, phone: signupForm.phone,
           password: signupForm.password, password2: signupForm.password, user_type: "student",
-          hostel: signupForm.hostel, school: signupForm.school,
-          matric_number: signupForm.matric_number || "",
-          campus: signupForm.school.toLowerCase(),
+          hostel: signupForm.hostel || "",
+          school: isNonStudent ? "" : signupForm.school,
+          campus: isNonStudent ? "" : signupForm.school.toLowerCase(),
+          ...(signupForm.matric_number ? { matric_number: signupForm.matric_number } : {}),
+          ...(signupForm.nin ? { nin: signupForm.nin } : {}),
         });
         storeLogin(result.user, result.tokens.access, result.tokens.refresh);
         setMessage("Welcome to StudEx!");
@@ -519,7 +540,42 @@ export default function AuthPage() {
               <form onSubmit={handleSignupSubmit} className="space-y-3 md:space-y-4">
                 {step === 1 ? (
                   <>
-                    {/* SCHOOL */}
+                    {/* STUDENT / NON-STUDENT TOGGLE */}
+                    <div>
+                      <label className="text-sm font-medium text-stone-700 mb-1.5 block">Account Type</label>
+                      <div className="flex rounded-xl border border-stone-200 p-1 bg-stone-50 gap-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSignupCategory("student");
+                            setSignupForm(prev => ({ ...prev, nin: "" }));
+                          }}
+                          className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-semibold transition-all ${
+                            !isNonStudent ? "bg-white text-teal-700 shadow-sm border border-stone-100" : "text-stone-400 hover:text-stone-600"
+                          }`}
+                          disabled={isLoading}
+                        >
+                          <GraduationCap className="w-4 h-4" /> Student
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSignupCategory("non_student");
+                            setSignupForm(prev => ({ ...prev, matric_number: "", school: "", hostel: "" }));
+                            setTouched(prev => ({ ...prev, school: false, hostel: false }));
+                          }}
+                          className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-semibold transition-all ${
+                            isNonStudent ? "bg-white text-teal-700 shadow-sm border border-stone-100" : "text-stone-400 hover:text-stone-600"
+                          }`}
+                          disabled={isLoading}
+                        >
+                          <User className="w-4 h-4" /> Non-Student
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* SCHOOL — students only */}
+                    {!isNonStudent && (
                     <div>
                       <label className="text-sm font-medium text-stone-700 flex items-center gap-1.5 mb-1.5">
                         <GraduationCap className="w-4 h-4" /> School / University
@@ -538,6 +594,7 @@ export default function AuthPage() {
                       </select>
                       {touched.school && !schoolOk && <FieldFeedback ok={false} msg="Please select your school" />}
                     </div>
+                    )}
 
                     {/* USERNAME */}
                     <div>
@@ -567,16 +624,16 @@ export default function AuthPage() {
                     {/* EMAIL */}
                     <div>
                       <label className="text-sm font-medium text-stone-700 flex items-center gap-1.5 mb-1.5">
-                        <Mail className="w-4 h-4" /> Student Email
+                        <Mail className="w-4 h-4" /> {isNonStudent ? "Email Address" : "Student Email"}
                       </label>
                       <input type="email" name="email" value={signupForm.email}
                         onChange={handleSignupChange}
-                        placeholder={isFUTO ? "you@futo.edu.ng or gmail" : "john.doe@pau.edu.ng"}
+                        placeholder={isNonStudent ? "you@gmail.com" : isFUTO ? "you@futo.edu.ng or gmail" : "john.doe@pau.edu.ng"}
                         className={inputClass("email", emailVal.ok)} disabled={isLoading} />
                       {touched.email && signupForm.email && <FieldFeedback ok={emailVal.ok} msg={emailVal.msg} />}
                       {!touched.email && (
                         <p className="text-xs text-stone-400 mt-1">
-                          {isFUTO ? "Use your @futo.edu.ng or Gmail address" : signupForm.school === "PAU" ? "Must be your @pau.edu.ng email" : "Select your school above first"}
+                          {isNonStudent ? "Use your Gmail or any valid email address" : isFUTO ? "Use your @futo.edu.ng or Gmail address" : signupForm.school === "PAU" ? "Must be your @pau.edu.ng email" : "Select your school above first"}
                         </p>
                       )}
                     </div>
@@ -593,8 +650,8 @@ export default function AuthPage() {
                       {!touched.phone && <p className="text-xs text-stone-400 mt-1">11-digit Nigerian number</p>}
                     </div>
 
-                    {/* MATRIC — FUTO only */}
-                    {isFUTO && (
+                    {/* MATRIC — students only, required */}
+                    {!isNonStudent && (
                       <div>
                         <label className="text-sm font-medium text-stone-700 flex items-center gap-1.5 mb-1.5">
                           <Hash className="w-4 h-4" /> Matric Number
@@ -607,15 +664,70 @@ export default function AuthPage() {
                           placeholder="e.g. 20241430493"
                           maxLength={11}
                           inputMode="numeric"
-                          className={inputClass("matric_number" as any, matricVal.ok)}
+                          className="w-full px-4 py-2.5 rounded-xl border border-stone-200 focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 transition-all text-sm bg-white text-stone-900 placeholder:text-stone-400"
                           disabled={isLoading}
                         />
-                        {signupForm.matric_number && <FieldFeedback ok={matricVal.ok} msg={matricVal.msg} />}
-                        {!signupForm.matric_number && <p className="text-xs text-stone-400 mt-1">Your 11-digit FUTO matric number</p>}
+                        {signupForm.matric_number
+                          ? <FieldFeedback ok={matricVal.ok} msg={matricVal.msg} />
+                          : <p className="text-xs text-stone-400 mt-1">Your 11-digit matriculation number</p>
+                        }
                       </div>
                     )}
 
-                    {/* HOSTEL */}
+                    {/* NIN — non-students only, required */}
+                    {isNonStudent && (
+                      <div>
+                        <label className="text-sm font-medium text-stone-700 flex items-center gap-1.5 mb-1.5">
+                          <Hash className="w-4 h-4" /> NIN (National Identification Number)
+                        </label>
+                        <input
+                          type="text"
+                          name="nin"
+                          value={signupForm.nin || ""}
+                          onChange={handleSignupChange}
+                          placeholder="11-digit NIN"
+                          maxLength={11}
+                          inputMode="numeric"
+                          className="w-full px-4 py-2.5 rounded-xl border border-stone-200 focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 transition-all text-sm bg-white text-stone-900 placeholder:text-stone-400"
+                          disabled={isLoading}
+                        />
+                        {signupForm.nin
+                          ? <FieldFeedback ok={ninVal.ok} msg={ninVal.msg} />
+                          : <p className="text-xs text-stone-400 mt-1">Required for identity verification</p>
+                        }
+                      </div>
+                    )}
+
+                    {/* LOCATION — non-students only */}
+                    {isNonStudent && (
+                      <div>
+                        <label className="text-sm font-medium text-stone-700 flex items-center gap-1.5 mb-1.5">
+                          <MapPin className="w-4 h-4" /> Location
+                        </label>
+                        <select
+                          name="hostel"
+                          value={signupForm.hostel}
+                          onChange={handleSignupChange}
+                          className={`w-full px-4 py-2.5 rounded-xl border focus:outline-none focus:ring-2 transition-all text-sm bg-white text-stone-900 appearance-none ${
+                            touched.hostel && !hostelOk
+                              ? "border-red-300 focus:ring-red-200 focus:border-red-400"
+                              : hostelOk
+                              ? "border-teal-400 focus:ring-teal-200 focus:border-teal-500"
+                              : "border-stone-200 focus:ring-teal-500/30 focus:border-teal-500"
+                          }`}
+                          disabled={isLoading}
+                        >
+                          <option value="">Select your area</option>
+                          {NON_STUDENT_LOCATIONS.map(l => (
+                            <option key={l} value={l}>{l}</option>
+                          ))}
+                        </select>
+                        {touched.hostel && !hostelOk && <FieldFeedback ok={false} msg="Please select your location" />}
+                      </div>
+                    )}
+
+                    {/* HOSTEL — students only */}
+                    {!isNonStudent && (
                     <div>
                       <label className="text-sm font-medium text-stone-700 flex items-center gap-1.5 mb-1.5">
                         <MapPin className="w-4 h-4" /> {isFUTO ? "Hostel / Hall" : "Hostel / Location"}
@@ -635,6 +747,7 @@ export default function AuthPage() {
                       </select>
                       {touched.hostel && !hostelOk && <FieldFeedback ok={false} msg="Please select your hostel" />}
                     </div>
+                    )}
 
                     {/* PASSWORD */}
                     <div>
