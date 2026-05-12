@@ -15,12 +15,19 @@ async function isMaintenanceActive(): Promise<boolean> {
       signal: AbortSignal.timeout(3000),
       cache: "no-store",
     });
+
+    // Render maintenance mode returns 503 before Django even runs
+    if (res.status === 503) {
+      cache = { down: true, at: now };
+      return true;
+    }
+
     const data = await res.json();
     const down = data.maintenance === true;
     cache = { down, at: now };
     return down;
   } catch {
-    // If API is unreachable, treat as maintenance
+    // Network error or timeout — treat as maintenance
     cache = { down: true, at: now };
     return true;
   }
