@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StudEx — Under Maintenance</title>
+  <link rel="icon" href="/favicon.ico" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --purple: #7C3AED;
+      --purple-light: #EDE9FE;
+      --purple-dark: #5B21B6;
+      --cream: #FFF8F0;
+      --text: #1a1a2e;
+      --muted: #6b7280;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: var(--cream);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      color: var(--text);
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 24px;
+      padding: 56px 48px;
+      max-width: 520px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 20px 60px -10px rgba(124,58,237,0.12);
+      border: 1px solid rgba(124,58,237,0.08);
+    }
+
+    /* Animated icon */
+    .icon-wrap {
+      width: 88px;
+      height: 88px;
+      background: var(--purple-light);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 32px;
+      animation: pulse 2.4s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(124,58,237,0.3); }
+      50%       { transform: scale(1.05); box-shadow: 0 0 0 14px rgba(124,58,237,0); }
+    }
+
+    .icon-wrap svg {
+      animation: spin-slow 8s linear infinite;
+    }
+
+    @keyframes spin-slow {
+      from { transform: rotate(0deg); }
+      to   { transform: rotate(360deg); }
+    }
+
+    /* Logo */
+    .logo {
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--purple);
+      margin-bottom: 6px;
+    }
+
+    h1 {
+      font-size: 28px;
+      font-weight: 800;
+      color: var(--text);
+      line-height: 1.25;
+      margin-bottom: 12px;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: var(--muted);
+      line-height: 1.6;
+      margin-bottom: 36px;
+    }
+
+    /* Status pill */
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--purple-light);
+      color: var(--purple-dark);
+      font-size: 13px;
+      font-weight: 600;
+      padding: 8px 18px;
+      border-radius: 100px;
+      margin-bottom: 36px;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      background: var(--purple);
+      border-radius: 50%;
+      animation: blink 1.4s ease-in-out infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.3; }
+    }
+
+    /* Divider */
+    .divider {
+      height: 1px;
+      background: linear-gradient(90deg, transparent, #e5e7eb, transparent);
+      margin: 0 0 28px;
+    }
+
+    .contact {
+      font-size: 13.5px;
+      color: var(--muted);
+    }
+
+    .contact a {
+      color: var(--purple);
+      font-weight: 500;
+      text-decoration: none;
+    }
+
+    .contact a:hover { text-decoration: underline; }
+
+    footer {
+      margin-top: 32px;
+      font-size: 12px;
+      color: #9ca3af;
+    }
+
+    @media (max-width: 480px) {
+      .card { padding: 40px 28px; }
+      h1    { font-size: 24px; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="card">
+
+    <div class="icon-wrap">
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16z" fill="#7C3AED" opacity="0.25"/>
+        <path d="M12 6v6l4 2-1 1.73-5-2.73V6H12z" fill="#7C3AED"/>
+        <path d="M19.07 4.93a1 1 0 0 1 0 1.41l-1.41 1.42a1 1 0 1 1-1.42-1.42l1.42-1.41a1 1 0 0 1 1.41 0z" fill="#7C3AED" opacity="0.5"/>
+      </svg>
+    </div>
+
+    <p class="logo">StudEx</p>
+    <h1>We'll be right back!</h1>
+    <p class="subtitle">
+      StudEx is currently undergoing scheduled maintenance.<br />
+      We're working hard to improve your experience and will be back shortly.
+    </p>
+
+    <div class="status">
+      <span class="dot"></span>
+      Maintenance in progress
+    </div>
+
+    <div class="divider"></div>
+
+    <p class="contact">
+      Urgent? Reach us at&nbsp;
+      <a href="mailto:studex.ng@gmail.com">studex.ng@gmail.com</a>
+    </p>
+
+  </div>
+
+  <footer>© 2025 StudEx. Nigeria's campus marketplace.</footer>
+
+</body>
+</html>
