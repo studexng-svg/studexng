@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import { headers } from "next/headers";
 import "./globals.css";
 import LayoutClient from "./LayoutClient";
 
@@ -77,14 +78,17 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const headersList = await headers();
+  const isMaintenance = headersList.get("x-maintenance-page") === "1";
+
   return (
     <html lang="en" suppressHydrationWarning className="bg-[#FFF8F0] dark:bg-gray-950">
       <head>
         <meta name="theme-color" content="#7C3AED" />
       </head>
       <body className={`${inter.className} bg-[#FFF8F0] dark:bg-gray-950 text-gray-900 dark:text-gray-100`}>
-        <LayoutClient>{children}</LayoutClient>
+        {isMaintenance ? children : <LayoutClient>{children}</LayoutClient>}
       </body>
     </html>
   );

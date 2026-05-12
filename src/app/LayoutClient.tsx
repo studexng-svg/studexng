@@ -32,6 +32,7 @@ export default function LayoutClient({ children }: { children: React.ReactNode }
   const hideNav =
     pathname === "/" ||
     pathname === "/auth" ||
+    pathname === "/maintenance" ||
     pathname?.startsWith("/admin");
 
   if (!mounted) {

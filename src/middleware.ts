@@ -28,7 +28,6 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (
-    pathname === "/maintenance" ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/api") ||
     pathname === "/favicon.ico" ||
@@ -38,6 +37,13 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith("/icons")
   ) {
     return NextResponse.next();
+  }
+
+  // Tag the maintenance page request so the root layout can skip LayoutClient
+  if (pathname === "/maintenance") {
+    const reqHeaders = new Headers(request.headers);
+    reqHeaders.set("x-maintenance-page", "1");
+    return NextResponse.next({ request: { headers: reqHeaders } });
   }
 
   if (await isMaintenanceOn()) {
