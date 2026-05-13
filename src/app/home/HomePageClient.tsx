@@ -83,7 +83,7 @@ function ListingSkeletons() {
     <div className="grid grid-cols-2 gap-3 lg:gap-4">
       {[0, 1, 2, 3].map(i => (
         <div key={i} className="bg-white rounded-2xl border border-stone-100 overflow-hidden animate-pulse">
-          <div className="w-full h-32 sm:h-44 lg:h-48 bg-stone-100" />
+          <div className="w-full h-40 sm:h-44 lg:h-48 bg-stone-100" />
           <div className="px-2.5 pt-2 pb-3 sm:px-4 sm:pt-3 sm:pb-4 space-y-2">
             <div className="h-3 bg-stone-100 rounded-full w-3/4" />
             <div className="h-2.5 bg-stone-100 rounded-full w-1/2" />
@@ -513,7 +513,7 @@ export default function HomePageClient({ initialVendors, initialListings }: Prop
                         <Link href={`/listing/${listing.id}`} className="block">
 
                         {/* ── Image with overlays ── */}
-                        <div className="relative w-full h-32 sm:h-44 lg:h-48 overflow-hidden">
+                        <div className="relative w-full h-40 sm:h-44 lg:h-48 overflow-hidden">
                           <SafeImage
                             src={listing.image?.startsWith("http") ? listing.image : null}
                             alt={listing.title}
