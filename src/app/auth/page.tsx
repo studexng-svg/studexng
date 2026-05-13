@@ -216,7 +216,7 @@ export default function AuthPage() {
   const schoolOk = isNonStudent ? true : !!signupForm.school;
   const step1Valid = usernameVal.ok && usernameAvailable !== false && emailVal.ok &&
     phoneVal.ok && hostelOk && passwordVal.ok && schoolOk &&
-    (isNonStudent ? ninVal.ok : matricVal.ok);
+    (isNonStudent ? ninVal.ok : isFUTO ? matricVal.ok : true);
 
   const handleSignupChange = (e: any) => {
     const { name, value } = e.target;
@@ -650,8 +650,8 @@ export default function AuthPage() {
                       {!touched.phone && <p className="text-xs text-stone-400 mt-1">11-digit Nigerian number</p>}
                     </div>
 
-                    {/* MATRIC — students only, required */}
-                    {!isNonStudent && (
+                    {/* MATRIC — FUTO students only */}
+                    {!isNonStudent && isFUTO && (
                       <div>
                         <label className="text-sm font-medium text-stone-700 flex items-center gap-1.5 mb-1.5">
                           <Hash className="w-4 h-4" /> Matric Number
