@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState, Suspense, useRef } from "react";
-import { Search, ArrowRight, Heart, X, Sparkles, Star, MapPin, Shield, ChevronRight, Clock } from "lucide-react";
+import { Search, ArrowRight, Heart, X, Sparkles, Star, MapPin, Shield, ChevronRight, Clock, Plus } from "lucide-react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth, fetchWithAuth } from "@/lib/authStore";
 import { useWishlistStore } from "@/lib/wishlistStore";
+import { useCart } from "@/lib/cartStore";
 import { GRAD, GRAD_TEXT, SERIF } from "@/lib/tokens";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
@@ -111,6 +112,7 @@ interface Props {
 export default function HomePageClient({ initialVendors, initialListings }: Props) {
   const { isLoggedIn, user, isHydrated } = useAuth();
   const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlistStore();
+  const { addToCart, cart } = useCart();
 
   const [mounted, setMounted] = useState(false);
   const [campusReady, setCampusReady] = useState(false);
@@ -496,6 +498,7 @@ export default function HomePageClient({ initialVendors, initialListings }: Prop
                     const isService = (listing.listing_type || "").toLowerCase() === "service";
                     const isOwnListing = !!(user?.id && user.id === listing.vendor?.id);
                     const isReserved = !isService && !isOwnListing && !!listing.is_reserved;
+                    const inCart = cart.some((i) => i.id === listing.id);
 
                     return (
                       <motion.div
@@ -545,6 +548,21 @@ export default function HomePageClient({ initialVendors, initialListings }: Prop
                             className="absolute top-3 right-3 w-8 h-8 bg-white/90 backdrop-blur-sm rounded-full shadow flex items-center justify-center z-10">
                             <Heart className={`w-4 h-4 transition-colors ${wishlisted ? "fill-red-500 text-red-500" : "text-stone-400"}`} />
                           </motion.button>
+
+                          {/* Add to cart — bottom-right */}
+                          {!isOwnListing && (
+                            <motion.button
+                              onClick={(e) => {
+                                e.preventDefault(); e.stopPropagation();
+                                addToCart({ id: listing.id, title: listing.title, price: listing.price, img: listing.image || "" });
+                                showToast(inCart ? "Cart updated" : "Added to cart");
+                              }}
+                              whileTap={{ scale: 0.85 }}
+                              className="absolute bottom-3 right-3 w-8 h-8 rounded-full shadow-lg flex items-center justify-center z-10 transition-opacity hover:opacity-90"
+                              style={{ background: GRAD }}>
+                              <Plus className="w-4 h-4 text-white" />
+                            </motion.button>
+                          )}
 
                           {/* Title + vendor gradient overlay — bottom of image */}
                           <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent pt-8 pb-3 px-4">
@@ -598,22 +616,6 @@ export default function HomePageClient({ initialVendors, initialListings }: Prop
                   })}
                 </div>
 
-                {/* See all button */}
-                <Link href="/categories">
-                  <motion.div whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }}
-                    className="mt-4 bg-white border border-stone-200 hover:border-teal-300 rounded-2xl p-5 flex items-center justify-between shadow-sm hover:shadow-md transition-all cursor-pointer">
-                    <div>
-                      <p className="font-semibold text-stone-900" style={SERIF}>
-                        See all services
-                      </p>
-                      <p className="text-stone-400 text-sm">{allListings.length} listings available</p>
-                    </div>
-                    <div className="w-10 h-10 rounded-full flex items-center justify-center"
-                      style={{ background: GRAD }}>
-                      <ArrowRight className="w-5 h-5 text-white" />
-                    </div>
-                  </motion.div>
-                </Link>
               </>
             )}
           </motion.div>
