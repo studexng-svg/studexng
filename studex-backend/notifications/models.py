@@ -24,6 +24,7 @@ class Notification(models.Model):
         ('seller_revoked', 'Seller Status Revoked'),
         ('message', 'New Message'),
         ('admin_message', 'Message from Admin'),
+        ('bank_account_added', 'Bank Account Added'),
     )
 
     recipient = models.ForeignKey(

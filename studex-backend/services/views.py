@@ -3,11 +3,18 @@ from rest_framework import viewsets, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
+from rest_framework.pagination import PageNumberPagination
 from django.db.models import Q
 from .models import Category, Listing, Transaction
 from .serializers import CategorySerializer, ListingSerializer, TransactionSerializer
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
+
+
+class ListingPagination(PageNumberPagination):
+    page_size = 20
+    page_size_query_param = 'page_size'
+    max_page_size = 500
 
 
 class WalletBalanceView(APIView):
@@ -68,6 +75,7 @@ class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
 class ListingViewSet(viewsets.ModelViewSet):
     queryset = Listing.objects.all()
     serializer_class = ListingSerializer
+    pagination_class = ListingPagination
     filterset_fields = ['is_available']
     search_fields = ['title', 'description', 'vendor__username', 'vendor__business_name']
     ordering_fields = ['price', 'created_at', 'title']

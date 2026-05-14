@@ -6,6 +6,7 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from services.views import WalletBalanceView
+from notifications.admin_api import admin_notifications, mark_notifications_read
 
 
 def maintenance_check(request):
@@ -31,6 +32,11 @@ urlpatterns = [
     path('api/cart/', include('cart.urls')),
     path('api/wishlist/', include('wishlist.urls')),
     path('api/wallet/balance/', WalletBalanceView.as_view(), name='wallet-balance'),
+
+    # Admin notification bell
+    path('api/admin-notifications/', admin_notifications, name='admin-notifications'),
+    path('api/admin-notifications/mark-read/', mark_notifications_read, name='admin-notifications-mark-all'),
+    path('api/admin-notifications/mark-read/<int:notification_id>/', mark_notifications_read, name='admin-notifications-mark-one'),
 ]
 
 # ← NEW: Serve media files during development (DEBUG = True)

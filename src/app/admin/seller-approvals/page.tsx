@@ -26,7 +26,15 @@ interface Application {
   notes: string | null;
 }
 
-const isPdf = (url: string) => url.toLowerCase().includes('.pdf');
+const IMAGE_EXTENSIONS = /\.(jpe?g|png|gif|webp|svg|bmp|avif|tiff?)(\?|$)/i;
+
+const isPdf = (url: string) => {
+  if (url.toLowerCase().includes('.pdf')) return true;
+  // django-cloudinary-storage (MediaCloudinaryStorage) strips extensions from PDFs.
+  // A Cloudinary URL with no recognizable image extension is a non-image document.
+  if (url.includes('res.cloudinary.com') && !IMAGE_EXTENSIONS.test(url)) return true;
+  return false;
+};
 
 // ─── Image Preview Modal ───────────────────────────────────────────────────────
 

@@ -6,6 +6,18 @@ from django.dispatch import receiver
 from studex.validators import validate_image, validate_document, validate_id_document
 
 
+def _raw_storage():
+    """Use RawMediaCloudinaryStorage when Cloudinary is configured so that
+    document uploads (PDF, DOCX) preserve their file extension in the URL.
+    Falls back to default storage in local dev."""
+    from django.conf import settings
+    if getattr(settings, '_use_cloudinary', False):
+        from cloudinary_storage.storage import RawMediaCloudinaryStorage
+        return RawMediaCloudinaryStorage()
+    from django.core.files.storage import default_storage
+    return default_storage
+
+
 class User(AbstractUser):
     """Custom User model for StudEx"""
 
@@ -131,12 +143,14 @@ class SellerApplication(models.Model):
     # Option A: both sides of student ID card (images or PDFs)
     id_front = models.FileField(
         upload_to='seller_verification/id_front/',
+        storage=_raw_storage,
         validators=[validate_id_document],
         help_text="Front of student ID card (JPG, PNG, or PDF)",
         blank=True, null=True,
     )
     id_back = models.FileField(
         upload_to='seller_verification/id_back/',
+        storage=_raw_storage,
         validators=[validate_id_document],
         help_text="Back of student ID card (JPG, PNG, or PDF)",
         blank=True, null=True,
@@ -144,6 +158,7 @@ class SellerApplication(models.Model):
     # Option B: admission letter / proof of enrollment (PDF or image)
     admission_letter = models.FileField(
         upload_to='seller_verification/admission/',
+        storage=_raw_storage,
         validators=[validate_document],
         help_text="Admission letter or proof of enrollment (PDF, JPG, PNG)",
         blank=True, null=True,
@@ -151,6 +166,7 @@ class SellerApplication(models.Model):
     # Option C: NIN document (slip or card scan)
     nin_document = models.FileField(
         upload_to='seller_verification/nin/',
+        storage=_raw_storage,
         validators=[validate_id_document],
         help_text="NIN slip or NIN card (JPG, PNG, or PDF)",
         blank=True, null=True,

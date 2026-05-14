@@ -1,0 +1,261 @@
+{% extends "admin/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }} | StudEx Admin{% endblock %}
+
+{% block branding %}
+<h1 id="site-name"><a href="{% url 'admin:index' %}">StudEx Admin</a></h1>
+{% endblock %}
+
+{% block extrahead %}
+{{ block.super }}
+<link rel="icon" type="image/x-icon" href="{% static 'img/favicon.ico' %}">
+<link rel="icon" type="image/png" sizes="32x32" href="{% static 'img/favicon-32x32.png' %}">
+<link rel="icon" type="image/png" sizes="16x16" href="{% static 'img/favicon-16x16.png' %}">
+<link rel="apple-touch-icon" href="{% static 'img/apple-touch-icon.png' %}">
+<style>
+  #sx-notif-wrap {
+    display: inline-flex;
+    align-items: center;
+    margin-right: 14px;
+    position: relative;
+  }
+  #sx-notif-btn {
+    position: relative;
+    cursor: pointer;
+    padding: 6px;
+    border-radius: 8px;
+    transition: background 0.15s;
+    color: #fff;
+    display: flex;
+    align-items: center;
+  }
+  #sx-notif-btn:hover { background: rgba(255,255,255,0.15); }
+  #sx-notif-badge {
+    display: none;
+    position: absolute;
+    top: 0; right: 0;
+    background: #e74c3c;
+    color: #fff;
+    border-radius: 10px;
+    min-width: 18px;
+    height: 18px;
+    font-size: 10px;
+    font-weight: 700;
+    text-align: center;
+    line-height: 18px;
+    padding: 0 4px;
+    pointer-events: none;
+  }
+  #sx-notif-dropdown {
+    display: none;
+    position: fixed;
+    top: 46px; right: 16px;
+    width: 340px;
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.14);
+    z-index: 99999;
+    overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  #sx-notif-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    border-bottom: 1px solid #f0f0f0;
+    background: #fafafa;
+  }
+  #sx-notif-header strong { font-size: 14px; color: #111; }
+  #sx-notif-mark-all {
+    font-size: 12px;
+    color: #7c3aed;
+    cursor: pointer;
+    text-decoration: none;
+    font-weight: 600;
+  }
+  #sx-notif-mark-all:hover { text-decoration: underline; }
+  #sx-notif-list { max-height: 420px; overflow-y: auto; }
+  .sx-notif-item {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    padding: 12px 16px;
+    border-bottom: 1px solid #f5f5f5;
+    cursor: pointer;
+    transition: background 0.1s;
+    text-decoration: none;
+  }
+  .sx-notif-item:hover { background: #f8f4ff; }
+  .sx-notif-item.unread { background: #faf5ff; }
+  .sx-notif-item.unread:hover { background: #f3e8ff; }
+  .sx-notif-icon {
+    width: 36px; height: 36px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+  .sx-notif-body { flex: 1; min-width: 0; }
+  .sx-notif-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #111;
+    margin-bottom: 2px;
+    line-height: 1.3;
+  }
+  .sx-notif-msg {
+    font-size: 12px;
+    color: #666;
+    line-height: 1.4;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .sx-notif-time { font-size: 11px; color: #aaa; margin-top: 3px; }
+  .sx-notif-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: #7c3aed;
+    flex-shrink: 0;
+    margin-top: 5px;
+  }
+  #sx-notif-empty {
+    padding: 32px 16px;
+    text-align: center;
+    color: #aaa;
+    font-size: 13px;
+  }
+</style>
+{% endblock %}
+
+{% block usertools %}
+{% if has_permission %}
+<div id="sx-notif-wrap">
+  <div id="sx-notif-btn" onclick="sxToggleNotif()" title="Notifications">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+      <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+    </svg>
+    <span id="sx-notif-badge">0</span>
+  </div>
+
+  <div id="sx-notif-dropdown">
+    <div id="sx-notif-header">
+      <strong>Notifications</strong>
+      <a id="sx-notif-mark-all" href="#" onclick="sxMarkAll(event)">Mark all read</a>
+    </div>
+    <div id="sx-notif-list">
+      <div id="sx-notif-empty">No notifications yet</div>
+    </div>
+  </div>
+</div>
+{% endif %}
+{{ block.super }}
+
+<script>
+(function () {
+  const ICONS = {
+    vendor_application: { emoji: '📋', bg: '#ede9fe' },
+    bank_account_added: { emoji: '🏦', bg: '#d1fae5' },
+    new_listing:        { emoji: '🛍️', bg: '#fef3c7' },
+    payment_received:   { emoji: '💳', bg: '#dcfce7' },
+    order_confirmed:    { emoji: '🛒', bg: '#dbeafe' },
+    default:            { emoji: '🔔', bg: '#f3f4f6' },
+  };
+
+  function getCookie(name) {
+    const v = `; ${document.cookie}`;
+    const p = v.split(`; ${name}=`);
+    if (p.length === 2) return p.pop().split(';').shift();
+    return '';
+  }
+
+  function sxFetch() {
+    fetch('/api/admin-notifications/', { credentials: 'same-origin' })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data) sxRender(data); })
+      .catch(() => {});
+  }
+
+  function sxRender(data) {
+    const badge = document.getElementById('sx-notif-badge');
+    const list  = document.getElementById('sx-notif-list');
+    const empty = document.getElementById('sx-notif-empty');
+    if (!badge || !list) return;
+
+    const count = data.unread_count || 0;
+    badge.textContent = count > 99 ? '99+' : count;
+    badge.style.display = count > 0 ? 'block' : 'none';
+
+    const items = data.notifications || [];
+    if (items.length === 0) {
+      list.innerHTML = '<div id="sx-notif-empty">No notifications yet</div>';
+      return;
+    }
+
+    list.innerHTML = items.map(n => {
+      const ic = ICONS[n.type] || ICONS.default;
+      const href = n.action_url || '#';
+      const unreadClass = n.is_read ? '' : ' unread';
+      const dot = n.is_read ? '' : '<div class="sx-notif-dot"></div>';
+      return `
+        <a class="sx-notif-item${unreadClass}" href="${href}" onclick="sxMarkOne(event,${n.id},'${href}')">
+          <div class="sx-notif-icon" style="background:${ic.bg}">${ic.emoji}</div>
+          <div class="sx-notif-body">
+            <div class="sx-notif-title">${n.title}</div>
+            <div class="sx-notif-msg">${n.message}</div>
+            <div class="sx-notif-time">${n.time_ago}</div>
+          </div>
+          ${dot}
+        </a>`;
+    }).join('');
+  }
+
+  window.sxToggleNotif = function () {
+    const d = document.getElementById('sx-notif-dropdown');
+    if (!d) return;
+    d.style.display = d.style.display === 'block' ? 'none' : 'block';
+  };
+
+  window.sxMarkAll = function (e) {
+    e.preventDefault();
+    fetch('/api/admin-notifications/mark-read/', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'X-CSRFToken': getCookie('csrftoken') },
+    }).then(() => sxFetch()).catch(() => {});
+    document.getElementById('sx-notif-dropdown').style.display = 'none';
+  };
+
+  window.sxMarkOne = function (e, id, href) {
+    e.preventDefault();
+    fetch(`/api/admin-notifications/mark-read/${id}/`, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'X-CSRFToken': getCookie('csrftoken') },
+    }).then(() => {
+      sxFetch();
+      if (href && href !== '#') window.location.href = href;
+    }).catch(() => {});
+    document.getElementById('sx-notif-dropdown').style.display = 'none';
+  };
+
+  // Close on outside click
+  document.addEventListener('click', function (e) {
+    const wrap = document.getElementById('sx-notif-wrap');
+    const drop = document.getElementById('sx-notif-dropdown');
+    if (wrap && drop && !wrap.contains(e.target)) {
+      drop.style.display = 'none';
+    }
+  });
+
+  // Initial fetch + poll every 30s
+  sxFetch();
+  setInterval(sxFetch, 30000);
+})();
+</script>
+{% endblock %}

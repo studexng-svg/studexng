@@ -29,6 +29,7 @@ export default async function HomePage() {
 
   let initialVendors: any[] = [];
   let initialListings: any[] = [];
+  let initialCategories: any[] = [];
 
   try {
     const res = await fetch(`${API_URL}/api/auth/vendors/?campus=${campus}`, {
@@ -42,7 +43,7 @@ export default async function HomePage() {
   } catch {}
 
   try {
-    const res = await fetch(`${API_URL}/api/services/listings/?campus=${campus}`, {
+    const res = await fetch(`${API_URL}/api/services/listings/?campus=${campus}&page_size=500`, {
       cache: 'no-store',
       headers: { "Content-Type": "application/json" },
     });
@@ -52,5 +53,22 @@ export default async function HomePage() {
     }
   } catch {}
 
-  return <HomePageClient initialVendors={initialVendors} initialListings={initialListings} />;
+  try {
+    const res = await fetch(`${API_URL}/api/services/categories/?campus=${campus}`, {
+      cache: 'no-store',
+      headers: { "Content-Type": "application/json" },
+    });
+    if (res.ok) {
+      const data = await res.json();
+      initialCategories = data.results || data || [];
+    }
+  } catch {}
+
+  return (
+    <HomePageClient
+      initialVendors={initialVendors}
+      initialListings={initialListings}
+      initialCategories={initialCategories}
+    />
+  );
 }
