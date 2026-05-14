@@ -253,6 +253,7 @@ SIMPLE_JWT = {
 # RESEND EMAIL
 # =======================================
 RESEND_API_KEY = config('RESEND_API_KEY', default='')
+ADMIN_EMAIL = config('ADMIN_EMAIL', default='studex.ng@gmail.com')
 FRONTEND_BASE_URL = config('FRONTEND_BASE_URL', default='https://studex.com.ng')
 
 # =======================================

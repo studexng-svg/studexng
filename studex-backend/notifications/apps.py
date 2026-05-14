@@ -13,6 +13,9 @@ class NotificationsConfig(AppConfig):
         The `os.environ` guard prevents it running twice in dev
         (Django's autoreloader spawns a child process).
         """
+        # Signals must always be registered — no guard here.
+        import notifications.admin_notify  # noqa: F401
+
         import os
         if os.environ.get("RUN_MAIN") != "true":
             # Only run in the reloader child process (or in production where
