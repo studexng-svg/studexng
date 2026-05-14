@@ -153,6 +153,8 @@ class SellerApplicationAdmin(admin.ModelAdmin):
         ('Admin Notes', {'fields': ('notes',)}),
     )
 
+    _IMAGE_EXTS = ('.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp', '.avif')
+
     def _file_preview(self, file_field, label):
         if not file_field:
             return format_html('<span style="color:#9ca3af;">Not uploaded</span>')
@@ -160,12 +162,30 @@ class SellerApplicationAdmin(admin.ModelAdmin):
             url = file_field.url
         except Exception:
             return format_html('<span style="color:#ef4444;">File not accessible</span>')
+
         name = str(file_field).lower()
-        if name.endswith('.pdf') or name.endswith('.doc') or name.endswith('.docx'):
-            return format_html(
-                '<a href="{}" target="_blank" style="color:#0d9488;font-weight:600;">📄 View {}</a>',
-                url, label,
+        url_lower = url.lower()
+
+        # Treat as a document if the stored name has a doc extension, or if it's a
+        # Cloudinary URL with no recognisable image extension (extension was stripped
+        # by MediaCloudinaryStorage during upload).
+        is_doc = (
+            any(name.endswith(ext) for ext in ('.pdf', '.doc', '.docx'))
+            or (
+                'res.cloudinary.com' in url
+                and not any(url_lower.endswith(ext) or f'{ext}?' in url_lower for ext in self._IMAGE_EXTS)
             )
+        )
+
+        if is_doc:
+            from urllib.parse import quote
+            viewer_url = f'https://docs.google.com/viewer?url={quote(url, safe="")}'
+            return format_html(
+                '📄 <a href="{}" target="_blank" style="color:#0d9488;font-weight:600;">View {}</a>'
+                '&nbsp;&nbsp;<a href="{}" target="_blank" style="color:#9ca3af;font-size:12px;">[Download]</a>',
+                viewer_url, label, url,
+            )
+
         return format_html(
             '<a href="{url}" target="_blank">'
             '<img src="{url}" style="max-height:240px;max-width:480px;'
