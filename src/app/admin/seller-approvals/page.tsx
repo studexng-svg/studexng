@@ -83,7 +83,7 @@ function DocumentPreviewModal({
           <div className="p-4">
             {pdf ? (
               <iframe
-                src={url}
+                src={`https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`}
                 title={label}
                 className="w-full rounded-2xl border border-white/10"
                 style={{ height: "70vh" }}
