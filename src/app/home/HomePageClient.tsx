@@ -130,13 +130,38 @@ export default function HomePageClient({ initialVendors, initialListings, initia
   const [allListings, setAllListings] = useState<any[]>(initialListings);
   const [categories, setCategories] = useState<Category[]>(initialCategories);
   const [activeFilter, setActiveFilter] = useState("All");
+  const [currentCampus, setCurrentCampus] = useState<'pau' | 'futo'>('pau');
 
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [searching, setSearching] = useState(false);
   const [showResults, setShowResults] = useState(false);
 
-  useEffect(() => setMounted(true), []);
+  useEffect(() => {
+    setMounted(true);
+    const c = document.cookie.split(';').find(s => s.trim().startsWith('studex_campus='))?.split('=')?.[1]?.toLowerCase();
+    if (c === 'pau' || c === 'futo') setCurrentCampus(c);
+  }, []);
+
+  const switchCampus = async (campus: 'pau' | 'futo') => {
+    if (campus === currentCampus) return;
+    const isHttps = window.location.protocol === 'https:';
+    document.cookie = `studex_campus=${campus}; path=/; max-age=31536000; SameSite=Lax${isHttps ? '; Secure' : ''}`;
+    setCurrentCampus(campus);
+    setCampusReady(false);
+    setActiveFilter('All');
+    try {
+      const [listRes, vendorRes, catRes] = await Promise.all([
+        fetch(`${API_URL}/api/services/listings/?campus=${campus}&page_size=500`),
+        fetch(`${API_URL}/api/auth/vendors/?campus=${campus}`),
+        fetch(`${API_URL}/api/services/categories/?campus=${campus}`),
+      ]);
+      if (listRes.ok) { const d = await listRes.json(); setAllListings(d.results || d || []); }
+      if (vendorRes.ok) { const d = await vendorRes.json(); setVendors(d.results || d || []); }
+      if (catRes.ok) { const d = await catRes.json(); setCategories(d.results || d || []); }
+    } catch {}
+    finally { setCampusReady(true); }
+  };
 
   useEffect(() => {
     if (!isHydrated) return;
@@ -449,6 +474,24 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                 </button>
               ))}
             </div>
+
+            {/* Campus toggle — only shown when user has no campus (admin / guest) */}
+            {mounted && (!isLoggedIn || !(user as any)?.school) && (
+              <div className="flex items-center gap-2 px-4 pb-3">
+                <span className="text-[11px] text-stone-400 font-medium">Campus:</span>
+                {(['pau', 'futo'] as const).map(c => (
+                  <button
+                    key={c}
+                    onClick={() => switchCampus(c)}
+                    className={`px-3 py-1 rounded-full text-xs font-bold transition-all uppercase tracking-wide ${
+                      currentCampus === c ? 'text-white shadow-sm' : 'bg-stone-100 text-stone-500 hover:bg-stone-200'
+                    }`}
+                    style={currentCampus === c ? { background: GRAD } : {}}>
+                    {c}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
