@@ -2,302 +2,190 @@
 "use client";
 
 import {
-  Users,
-  Package,
-  DollarSign,
-  Store,
-  FileText,
-  TrendingUp,
-  AlertCircle,
-  ChevronRight,
-  Wallet,
-  AlertTriangle,
-  CheckCircle,
+  Users, Package, DollarSign, Store, FileText,
+  ChevronRight, AlertCircle, CheckCircle, Clock,
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import AdminTopBar from "@/components/layout/AdminTopBar";
 import { fetchWithAuth } from "@/lib/authStore";
+import { GRAD, SERIF } from "@/lib/tokens";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
-export default function AdminDashboard() {
-  const [stats, setStats] = useState([
-    { label: "Total Users", value: "1,284", change: "+12%", icon: Users, color: "from-purple-500 to-purple-600" },
-    { label: "Active Sellers", value: "87", change: "+8%", icon: Store, color: "from-teal-500 to-teal-600" },
-    { label: "Total Orders", value: "342", change: "+23%", icon: Package, color: "from-amber-500 to-amber-600" },
-    { label: "Platform Revenue", value: "₦2.4M", change: "+41%", icon: DollarSign, color: "from-emerald-500 to-emerald-600" },
-  ]);
+interface DashStats {
+  users: {
+    total_users: number;
+    active_users: number;
+    vendors: number;
+    verified_vendors: number;
+    pending_vendors: number;
+    new_users_30d: number;
+  };
+  listings: {
+    total_listings: number;
+    published_listings: number;
+    draft_listings: number;
+  };
+  orders: {
+    total_orders: number;
+    pending_orders: number;
+    completed_orders: number;
+    total_revenue: number;
+    revenue_30d: number;
+  };
+}
 
-  const [escrowData, setEscrowData] = useState({
-    inEscrow: 0,
-    pendingDisputes: 0,
-    pendingWithdrawals: 0,
-    pendingApprovals: 0,
-    completedOrders: 0,
-    totalRevenue: 0,
-  });
+function StatCard({ label, value, sub, icon: Icon, accent }: {
+  label: string; value: string | number; sub?: string;
+  icon: React.ElementType; accent: string;
+}) {
+  return (
+    <div className="bg-white border border-stone-200 rounded-2xl p-4 shadow-sm">
+      <div className="flex items-center justify-between mb-3">
+        <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+          style={{ background: accent + "20" }}>
+          <Icon className="w-4.5 h-4.5" style={{ color: accent }} />
+        </div>
+        {sub && <span className="text-xs text-stone-400 font-medium">{sub}</span>}
+      </div>
+      <p className="text-2xl font-bold text-stone-900">{value}</p>
+      <p className="text-xs text-stone-500 mt-0.5">{label}</p>
+    </div>
+  );
+}
+
+const QUICK_LINKS = [
+  { label: "Seller Approvals", href: "/admin/seller-approvals", icon: FileText, desc: "Review pending applications" },
+  { label: "All Users",        href: "/admin/users",            icon: Users,    desc: "Manage registered users" },
+  { label: "Vendors",          href: "/admin/sellers",          icon: Store,    desc: "View verified vendors" },
+  { label: "Orders",           href: "/admin/orders",           icon: Package,  desc: "Monitor all orders" },
+];
+
+export default function AdminDashboard() {
+  const [stats, setStats] = useState<DashStats | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchDashboardData = async () => {
-      try {
-        const res = await fetchWithAuth(`${API_URL}/api/admin/dashboard/`);
-        if (!res.ok) throw new Error("Failed to fetch stats");
-        const data = await res.json();
-
-        // Update stats with real backend data
-        setStats([
-          {
-            label: "Total Users",
-            value: data.users.total_users.toString(),
-            change: `+${data.users.new_users_30d}`,
-            icon: Users,
-            color: "from-purple-500 to-purple-600"
-          },
-          {
-            label: "Active Sellers",
-            value: data.users.verified_vendors.toString(),
-            change: `${data.users.pending_vendors} pending`,
-            icon: Store,
-            color: "from-teal-500 to-teal-600"
-          },
-          {
-            label: "Total Orders",
-            value: data.orders.total_orders.toString(),
-            change: `${data.orders.pending_orders} pending`,
-            icon: Package,
-            color: "from-amber-500 to-amber-600"
-          },
-          {
-            label: "Platform Revenue",
-            value: `₦${data.orders.total_revenue.toLocaleString()}`,
-            change: `₦${data.orders.revenue_30d.toLocaleString()} (30d)`,
-            icon: DollarSign,
-            color: "from-emerald-500 to-emerald-600"
-          },
-        ]);
-
-        // Update escrow data (for now using mock data for escrow, disputes, withdrawals)
-        // These would need separate endpoints in the backend
-        const inEscrow = parseFloat(localStorage.getItem("walletInEscrow") || "0");
-        const disputes = JSON.parse(localStorage.getItem("disputes") || "[]");
-        const openDisputes = disputes.filter((d: any) => d.status === "open").length;
-        const withdrawals = JSON.parse(localStorage.getItem("withdrawalRequests") || "[]");
-        const pendingWithds = withdrawals.filter((w: any) => w.status === "pending").length;
-        const apps = JSON.parse(localStorage.getItem("sellerApplication") || "{}");
-        const hasPendingApp = apps?.id ? 1 : 0;
-
-        setEscrowData({
-          inEscrow,
-          pendingDisputes: openDisputes,
-          pendingWithdrawals: pendingWithds,
-          pendingApprovals: data.users.pending_vendors,
-          completedOrders: data.orders.completed_orders,
-          totalRevenue: data.orders.total_revenue,
-        });
-      } catch {
-        // Keep default values if fetch fails
-      }
-    };
-
-    fetchDashboardData();
+    fetchWithAuth(`${API_URL}/api/admin/dashboard/`)
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(d => setStats(d))
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, []);
 
-  const quickActions = [
-    { 
-      label: "Pending Disputes", 
-      href: "/admin/disputes", 
-      icon: AlertTriangle, 
-      badge: escrowData.pendingDisputes,
-      color: "from-red-600 to-orange-600",
-      show: escrowData.pendingDisputes > 0
-    },
-    { 
-      label: "Withdrawal Requests", 
-      href: "/admin/payouts", 
-      icon: DollarSign,
-      badge: escrowData.pendingWithdrawals,
-      color: "from-emerald-600 to-teal-600",
-      show: escrowData.pendingWithdrawals > 0
-    },
-    { 
-      label: "Seller Approvals", 
-      href: "/admin/seller-approvals", 
-      icon: FileText, 
-      badge: escrowData.pendingApprovals,
-      color: "from-amber-600 to-orange-600",
-      show: escrowData.pendingApprovals > 0
-    },
-    { label: "All Sellers", href: "/admin/sellers", icon: Store, color: "from-purple-600 to-pink-600" },
-    { label: "All Orders", href: "/admin/orders", icon: Package, color: "from-blue-600 to-cyan-600" },
-    { label: "Manage Users", href: "/admin/users", icon: Users, color: "from-indigo-600 to-blue-600" },
-    { label: "Reports & Analytics", href: "/admin/analytics", icon: TrendingUp, color: "from-cyan-600 to-blue-600" },
-  ];
-
   return (
-    <>
-      <AdminTopBar title="StudEx Admin" />
+    <div className="min-h-screen bg-[#FFF8F0]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+      <AdminTopBar title="Admin Dashboard" back="/home" />
 
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-6 pb-32">
-        {/* PRIMARY STATS */}
-        <div className="grid grid-cols-2 gap-5 mb-8">
-          {stats.map((stat, i) => (
-            <div
-              key={i}
-              className="bg-white/5 backdrop-blur-xl rounded-3xl p-6 border border-white/10 hover:border-purple-500/50 hover:scale-105 transition-all animate-fadeUp"
-            >
-              <div className="flex items-center justify-between mb-4">
-                <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${stat.color} flex items-center justify-center shadow-lg`}>
-                  <stat.icon className="w-8 h-8 text-white" />
-                </div>
-                <span className="text-emerald-400 text-sm font-bold flex items-center gap-1">
-                  <TrendingUp className="w-4 h-4" />
-                  {stat.change}
-                </span>
-              </div>
-              <p className="text-3xl font-black text-white">{stat.value}</p>
-              <p className="text-white/70 text-sm mt-1">{stat.label}</p>
-            </div>
-          ))}
+      <div className="px-4 pt-5 pb-28 max-w-2xl mx-auto space-y-5">
+
+        {/* Header */}
+        <div>
+          <p className="text-teal-600 text-xs tracking-[0.2em] uppercase font-semibold">Overview</p>
+          <h2 className="text-xl font-bold text-stone-900 mt-0.5" style={SERIF}>StudEx Platform</h2>
         </div>
 
-        {/* ESCROW ALERT & STATS */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-8">
-          {/* IN ESCROW */}
-          <div className="bg-gradient-to-r from-blue-500/20 to-cyan-500/20 border border-blue-500/50 rounded-3xl p-6 backdrop-blur-xl animate-fadeUp">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-white/80 text-sm font-semibold flex items-center gap-2">
-                  <Wallet className="w-5 h-5" /> In Escrow
-                </p>
-                <p className="text-4xl font-black text-white mt-2">₦{escrowData.inEscrow.toLocaleString()}</p>
-                <p className="text-blue-300 text-sm mt-1">Held safely until order completion</p>
-              </div>
-            </div>
+        {loading ? (
+          <div className="grid grid-cols-2 gap-3">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="bg-white border border-stone-200 rounded-2xl p-4 h-24 animate-pulse" />
+            ))}
           </div>
-
-          {/* DISPUTES ALERT */}
-          {escrowData.pendingDisputes > 0 && (
-            <div className="bg-gradient-to-r from-red-500/20 to-orange-500/20 border border-red-500/50 rounded-3xl p-6 backdrop-blur-xl animate-fadeUp">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-white/80 text-sm font-semibold flex items-center gap-2">
-                    <AlertTriangle className="w-5 h-5 text-red-400" /> Open Disputes
-                  </p>
-                  <p className="text-4xl font-black text-white mt-2">{escrowData.pendingDisputes}</p>
-                  <p className="text-red-300 text-sm mt-1">Require your resolution</p>
-                </div>
-                <Link
-                  href="/admin/disputes"
-                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-sm transition"
-                >
-                  Review
-                </Link>
-              </div>
+        ) : stats ? (
+          <>
+            {/* Stats grid */}
+            <div className="grid grid-cols-2 gap-3">
+              <StatCard label="Total Users"     value={stats.users.total_users}      sub={`+${stats.users.new_users_30d} this month`} icon={Users}   accent="#7C3AED" />
+              <StatCard label="Verified Vendors" value={stats.users.verified_vendors} sub={`${stats.users.pending_vendors} pending`}   icon={Store}   accent="#0D9488" />
+              <StatCard label="Total Listings"   value={stats.listings.total_listings} sub={`${stats.listings.published_listings} live`} icon={FileText} accent="#F59E0B" />
+              <StatCard label="Total Orders"     value={stats.orders.total_orders}    sub={`${stats.orders.pending_orders} pending`}   icon={Package} accent="#EF4444" />
+              <StatCard label="Revenue (30d)"    value={`₦${stats.orders.revenue_30d.toLocaleString()}`}   icon={DollarSign} accent="#10B981" />
+              <StatCard label="Total Revenue"    value={`₦${stats.orders.total_revenue.toLocaleString()}`} icon={DollarSign} accent="#6366F1" />
             </div>
-          )}
 
-          {/* COMPLETED ORDERS */}
-          <div className="bg-gradient-to-r from-emerald-500/20 to-teal-500/20 border border-emerald-500/50 rounded-3xl p-6 backdrop-blur-xl animate-fadeUp">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-white/80 text-sm font-semibold flex items-center gap-2">
-                  <CheckCircle className="w-5 h-5 text-emerald-400" /> Completed Orders
-                </p>
-                <p className="text-4xl font-black text-white mt-2">{escrowData.completedOrders}</p>
-                <p className="text-emerald-300 text-sm mt-1">₦{escrowData.totalRevenue.toLocaleString()}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* CRITICAL ALERTS */}
-        <div className="space-y-4 mb-8">
-          {escrowData.pendingWithdrawals > 0 && (
-            <div className="bg-gradient-to-r from-emerald-500/20 to-teal-500/20 border border-emerald-500/50 rounded-3xl p-6 flex items-center justify-between backdrop-blur-xl animate-fadeUp">
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 bg-emerald-500/30 rounded-2xl flex items-center justify-center">
-                  <DollarSign className="w-8 h-8 text-emerald-300" />
-                </div>
-                <div>
-                  <p className="text-xl font-bold text-white">{escrowData.pendingWithdrawals} Payout Request{escrowData.pendingWithdrawals !== 1 ? "s" : ""}</p>
-                  <p className="text-white/70 text-sm">Awaiting your approval</p>
-                </div>
-              </div>
-              <Link
-                href="/admin/payouts"
-                className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-2xl transition shadow-lg"
-              >
-                Process
-              </Link>
-            </div>
-          )}
-
-          {escrowData.pendingApprovals > 0 && (
-            <div className="bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/50 rounded-3xl p-6 flex items-center justify-between backdrop-blur-xl animate-fadeUp">
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 bg-amber-500/30 rounded-2xl flex items-center justify-center">
-                  <AlertCircle className="w-8 h-8 text-amber-300" />
-                </div>
-                <div>
-                  <p className="text-xl font-bold text-white">{escrowData.pendingApprovals} New Seller Request</p>
-                  <p className="text-white/70 text-sm">Requires your verification</p>
-                </div>
-              </div>
-              <Link
-                href="/admin/seller-approvals"
-                className="px-6 py-3 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-2xl transition shadow-lg"
-              >
-                Review Now
-              </Link>
-            </div>
-          )}
-        </div>
-
-        {/* QUICK ACTIONS */}
-        <div className="animate-fadeIn">
-          <h2 className="text-2xl font-black text-white mb-6">Quick Actions</h2>
-          <div className="space-y-4">
-            {quickActions.map((action, i) => (
-              <div
-                key={i}
-                className="animate-fadeUp hover:translate-x-2 transition-transform"
-              >
-                <Link
-                  href={action.href}
-                  className="block bg-white/5 backdrop-blur-xl rounded-3xl p-6 border border-white/10 hover:border-purple-500/50 hover:bg-white/10 transition-all group"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-5">
-                      <div className={`w-14 h-14 bg-gradient-to-br ${action.color} rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition`}>
-                        <action.icon className="w-7 h-7 text-white" />
-                      </div>
-                      <div>
-                        <p className="text-xl font-bold text-white">{action.label}</p>
-                        <p className="text-white/60 text-sm">Manage and monitor</p>
-                      </div>
+            {/* Alerts */}
+            {stats.users.pending_vendors > 0 && (
+              <Link href="/admin/seller-approvals">
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 bg-amber-100 rounded-xl flex items-center justify-center">
+                      <AlertCircle className="w-4.5 h-4.5 text-amber-600" />
                     </div>
-                    <div className="flex items-center gap-4">
-                      {action.badge !== undefined && action.badge > 0 && (
-                        <span className="px-3 py-1 bg-red-500 text-white text-sm font-bold rounded-full animate-fadeIn">
-                          {action.badge} New
-                        </span>
-                      )}
-                      <ChevronRight className="w-6 h-6 text-white/50 group-hover:text-white group-hover:translate-x-2 transition" />
+                    <div>
+                      <p className="font-semibold text-amber-900 text-sm">
+                        {stats.users.pending_vendors} Pending Seller {stats.users.pending_vendors === 1 ? "Application" : "Applications"}
+                      </p>
+                      <p className="text-amber-600 text-xs">Tap to review and approve</p>
                     </div>
                   </div>
-                </Link>
+                  <ChevronRight className="w-4 h-4 text-amber-500" />
+                </div>
+              </Link>
+            )}
+
+            {stats.orders.pending_orders > 0 && (
+              <Link href="/admin/orders">
+                <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 bg-blue-100 rounded-xl flex items-center justify-center">
+                      <Clock className="w-4.5 h-4.5 text-blue-600" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-blue-900 text-sm">
+                        {stats.orders.pending_orders} Pending {stats.orders.pending_orders === 1 ? "Order" : "Orders"}
+                      </p>
+                      <p className="text-blue-600 text-xs">Awaiting confirmation</p>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-blue-500" />
+                </div>
+              </Link>
+            )}
+
+            {stats.orders.completed_orders > 0 && (
+              <div className="bg-teal-50 border border-teal-200 rounded-2xl p-4 flex items-center gap-3">
+                <div className="w-9 h-9 bg-teal-100 rounded-xl flex items-center justify-center">
+                  <CheckCircle className="w-4.5 h-4.5 text-teal-600" />
+                </div>
+                <div>
+                  <p className="font-semibold text-teal-900 text-sm">{stats.orders.completed_orders} Completed Orders</p>
+                  <p className="text-teal-600 text-xs">₦{stats.orders.total_revenue.toLocaleString()} total revenue</p>
+                </div>
               </div>
+            )}
+          </>
+        ) : (
+          <div className="bg-white border border-stone-200 rounded-2xl p-8 text-center">
+            <p className="text-stone-400 text-sm">Could not load dashboard stats.</p>
+          </div>
+        )}
+
+        {/* Quick links */}
+        <div>
+          <p className="text-teal-600 text-xs tracking-[0.2em] uppercase font-semibold mb-3">Quick Access</p>
+          <div className="space-y-2">
+            {QUICK_LINKS.map(({ label, href, icon: Icon, desc }) => (
+              <Link key={href} href={href}>
+                <div className="bg-white border border-stone-200 hover:border-teal-300 rounded-2xl p-4 flex items-center justify-between transition-all active:scale-[0.98]">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                      style={{ background: GRAD }}>
+                      <Icon className="w-4 h-4 text-white" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-stone-900 text-sm">{label}</p>
+                      <p className="text-stone-400 text-xs">{desc}</p>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-stone-400" />
+                </div>
+              </Link>
             ))}
           </div>
         </div>
 
-        <div className="mt-12 text-center">
-          <p className="text-white/40 text-xs">
-            © 2025 StudEx • Pan-Atlantic University Marketplace • Admin Portal v1.0 • Escrow System Active
-          </p>
-        </div>
       </div>
-    </>
+    </div>
   );
 }

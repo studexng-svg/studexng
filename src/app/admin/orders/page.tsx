@@ -2,228 +2,154 @@
 "use client";
 
 import {
-  Package,
-  Clock,
-  CheckCircle,
-  AlertCircle,
-  Search,
-  ArrowRight,
-  Calendar,
-  DollarSign,
-  Shield,
+  Package, Clock, CheckCircle, AlertCircle, Search, ChevronRight,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import AdminTopBar from "@/components/layout/AdminTopBar";
 import { useState, useEffect, useMemo } from "react";
+import { fetchWithAuth } from "@/lib/authStore";
+import { GRAD } from "@/lib/tokens";
 
-interface Order {
-  id: string;
-  buyerName: string;
-  sellerName: string;
-  amount: number;
-  date: string;
-  status: "pending_confirmation" | "completed" | "disputed" | "refunded";
-  type: "service" | "food";
-}
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
-function AdminOrders() {
+const STATUS_LABELS: Record<string, string> = {
+  pending: "Pending",
+  confirmed: "Confirmed",
+  completed: "Completed",
+  cancelled: "Cancelled",
+  disputed: "Disputed",
+};
+
+const STATUS_STYLE: Record<string, string> = {
+  pending:   "bg-amber-100 text-amber-700",
+  confirmed: "bg-blue-100 text-blue-700",
+  completed: "bg-teal-100 text-teal-700",
+  cancelled: "bg-stone-100 text-stone-500",
+  disputed:  "bg-red-100 text-red-700",
+};
+
+export default function AdminOrders() {
   const router = useRouter();
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [orders, setOrders] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
-    const allOrders = JSON.parse(localStorage.getItem("allOrders") || "[]");
-    setOrders(allOrders);
+    fetchWithAuth(`${API_URL}/api/admin/orders/`)
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(d => setOrders(d.results || d))
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, []);
 
-  const filteredOrders = useMemo(() => {
-    let filtered = orders;
-
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (o) =>
-          o.id.toLowerCase().includes(q) ||
-          o.buyerName.toLowerCase().includes(q) ||
-          o.sellerName.toLowerCase().includes(q) ||
-          o.amount.toString().includes(q)
+  const filtered = useMemo(() => {
+    let list = orders;
+    if (statusFilter !== "all") list = list.filter(o => o.status === statusFilter);
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter(o =>
+        String(o.id).includes(q) ||
+        o.buyer?.username?.toLowerCase().includes(q) ||
+        o.listing?.title?.toLowerCase().includes(q)
       );
     }
+    return list;
+  }, [orders, statusFilter, search]);
 
-    if (statusFilter !== "all") {
-      filtered = filtered.filter((o) => o.status === statusFilter);
-    }
-
-    return filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [orders, searchQuery, statusFilter]);
-
-  const stats = {
-    total: orders.length,
-    pending: orders.filter((o) => o.status === "pending_confirmation").length,
-    completed: orders.filter((o) => o.status === "completed").length,
-    disputed: orders.filter((o) => o.status === "disputed").length,
-    refunded: orders.filter((o) => o.status === "refunded").length,
-  };
-
-  const getStatusBadge = (status: string) => {
-    const base = "px-4 py-2 rounded-full font-bold flex items-center gap-2 text-sm";
-    switch (status) {
-      case "pending_confirmation":
-        return `${base} bg-amber-500/20 text-amber-300 border border-amber-500/50`;
-      case "completed":
-        return `${base} bg-emerald-500/20 text-emerald-300 border border-emerald-500/50`;
-      case "disputed":
-        return `${base} bg-red-500/20 text-red-300 border border-red-500/50`;
-      case "refunded":
-        return `${base} bg-blue-500/20 text-blue-300 border border-blue-500/50`;
-      default:
-        return `${base} bg-gray-500/20 text-gray-300`;
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "pending_confirmation":
-        return <Clock className="w-5 h-5" />;
-      case "completed":
-        return <CheckCircle className="w-5 h-5" />;
-      case "disputed":
-        return <AlertCircle className="w-5 h-5" />;
-      case "refunded":
-        return <ArrowRight className="w-5 h-5" />;
-      default:
-        return <Package className="w-5 h-5" />;
-    }
-  };
-
-  if (!mounted) return null;
+  const tabs = [
+    { key: "all",       label: "All",       count: orders.length },
+    { key: "pending",   label: "Pending",   count: orders.filter(o => o.status === "pending").length },
+    { key: "completed", label: "Completed", count: orders.filter(o => o.status === "completed").length },
+    { key: "disputed",  label: "Disputed",  count: orders.filter(o => o.status === "disputed").length },
+  ].filter(t => t.key === "all" || t.count > 0);
 
   return (
-    <>
-      <AdminTopBar title="Order Management" />
+    <div className="min-h-screen bg-[#FFF8F0]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+      <AdminTopBar title="Orders" back="/admin" />
 
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 px-5 pt-4 pb-32 space-y-6">
-        <div className="space-y-3">
-          <div className="relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/50" />
-            <input
-              type="text"
-              placeholder="Search order, buyer, seller..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-12 pr-4 py-3 bg-white/10 backdrop-blur-xl rounded-xl text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
-            />
-          </div>
-          <div className="flex gap-2 overflow-x-auto pb-2">
-            {["all", "pending_confirmation", "completed", "disputed", "refunded"].map((f) => (
-              <button
-                key={f}
-                onClick={() => setStatusFilter(f)}
-                className={`px-5 py-2 rounded-xl font-bold text-sm whitespace-nowrap transition ${
-                  statusFilter === f
-                    ? "bg-gradient-to-r from-purple-600 to-teal-600 text-white shadow-lg"
-                    : "bg-white/10 text-white/60 hover:bg-white/20"
-                }`}
-              >
-                {f === "all"
-                  ? "All"
-                  : f === "pending_confirmation"
-                  ? "Pending"
-                  : f.charAt(0).toUpperCase() + f.slice(1)}{" "}
-                ({stats[f === "all" ? "total" : (f as keyof typeof stats)]})
-              </button>
-            ))}
-          </div>
+      <div className="px-4 pt-4 pb-28 max-w-2xl mx-auto space-y-4">
+
+        {/* Search */}
+        <div className="relative">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search order ID, buyer, listing…"
+            className="w-full pl-10 pr-4 py-3 bg-white border border-stone-200 rounded-xl text-stone-900 placeholder:text-stone-400 text-sm focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20"
+          />
         </div>
-        {/* STATS GRID */}
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-          {[
-            { label: "Total Orders", value: stats.total, color: "from-purple-600 to-pink-600" },
-            { label: "Pending", value: stats.pending, color: "from-amber-500 to-orange-600" },
-            { label: "Completed", value: stats.completed, color: "from-emerald-500 to-teal-600" },
-            { label: "Disputed", value: stats.disputed, color: "from-red-500 to-orange-600" },
-            { label: "Refunded", value: stats.refunded, color: "from-blue-500 to-cyan-600" },
-          ].map((stat, i) => (
-            <div
-              key={stat.label}
-              className={`bg-gradient-to-br ${stat.color} rounded-2xl p-5 text-white shadow-xl animate-fadeUp`}
+
+        {/* Filter tabs */}
+        <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4">
+          {tabs.map(t => (
+            <button
+              key={t.key}
+              onClick={() => setStatusFilter(t.key)}
+              className={`px-4 py-2 rounded-full text-sm font-semibold whitespace-nowrap transition-all flex-shrink-0 ${
+                statusFilter === t.key
+                  ? "text-white shadow-sm"
+                  : "bg-white border border-stone-200 text-stone-600"
+              }`}
+              style={statusFilter === t.key ? { background: GRAD } : {}}
             >
-              <p className="text-sm opacity-90">{stat.label}</p>
-              <p className="text-3xl font-black mt-1">{stat.value}</p>
-            </div>
+              {t.label} ({t.count})
+            </button>
           ))}
         </div>
 
-        {/* ORDERS LIST */}
-        <div className="space-y-4">
-          {filteredOrders.length === 0 ? (
-            <div className="text-center py-20 bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10">
-              <Package className="w-20 h-20 mx-auto text-white/10 mb-4" />
-              <p className="text-white/60 text-lg">No orders found</p>
-              <p className="text-white/40 text-sm mt-2">Orders will appear here when buyers make purchases</p>
-            </div>
-          ) : (
-            filteredOrders.map((order, i) => (
+        {/* Orders */}
+        {loading ? (
+          <div className="space-y-3">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="bg-white border border-stone-200 rounded-2xl h-20 animate-pulse" />
+            ))}
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="bg-white border border-stone-100 rounded-2xl p-10 text-center">
+            <Package className="w-10 h-10 text-stone-200 mx-auto mb-3" />
+            <p className="text-stone-400 text-sm">No orders found</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {filtered.map(order => (
               <div
                 key={order.id}
                 onClick={() => router.push(`/admin/orders/${order.id}`)}
-                className="bg-white/5 backdrop-blur-xl rounded-2xl p-5 border border-white/10 hover:border-purple-500/50 hover:bg-white/10 transition cursor-pointer animate-fadeUp"
+                className="bg-white border border-stone-200 hover:border-teal-300 rounded-2xl p-4 transition-all cursor-pointer active:scale-[0.98] shadow-sm"
               >
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 bg-gradient-to-br from-purple-600 to-teal-600 rounded-2xl flex items-center justify-center text-xl font-black text-white">
-                      {order.id.substring(order.id.length - 3)}
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <p className="font-semibold text-stone-900 text-sm truncate">
+                        {order.listing?.title || `Order #${order.id}`}
+                      </p>
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-semibold flex-shrink-0 ${STATUS_STYLE[order.status] || "bg-stone-100 text-stone-500"}`}>
+                        {STATUS_LABELS[order.status] || order.status}
+                      </span>
                     </div>
-                    <div>
-                      <h3 className="text-lg font-bold text-white">{order.buyerName}</h3>
-                      <p className="text-purple-300 text-sm">→ {order.sellerName}</p>
-                    </div>
-                  </div>
-                  <div className={getStatusBadge(order.status)}>
-                    {getStatusIcon(order.status)}
-                    {order.status === "pending_confirmation"
-                      ? "PENDING"
-                      : order.status.toUpperCase()}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-4 text-sm mb-4">
-                  <div>
-                    <p className="text-white/60">Order ID</p>
-                    <p className="text-white font-mono font-bold text-xs">{order.id}</p>
-                  </div>
-                  <div>
-                    <p className="text-white/60 flex items-center gap-1">
-                      <Shield className="w-4 h-4" /> Type
+                    <p className="text-stone-400 text-xs">
+                      Buyer: {order.buyer?.username || "—"} · #{order.id}
                     </p>
-                    <p className="text-white font-bold capitalize">{order.type}</p>
+                    {order.created_at && (
+                      <p className="text-stone-400 text-xs mt-0.5">
+                        {new Date(order.created_at).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}
+                      </p>
+                    )}
                   </div>
-                  <div className="text-right">
-                    <p className="text-white/60 flex items-center justify-end gap-1">
-                      <Calendar className="w-4 h-4" />
-                    </p>
-                    <p className="text-white font-medium text-xs">
-                      {new Date(order.date).toLocaleDateString()}
-                    </p>
+                  <div className="text-right flex-shrink-0">
+                    {order.total_price && (
+                      <p className="font-bold text-stone-900 text-sm">₦{Number(order.total_price).toLocaleString()}</p>
+                    )}
+                    <ChevronRight className="w-4 h-4 text-stone-400 ml-auto mt-1" />
                   </div>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <p className="text-3xl font-black text-emerald-400">
-                    ₦{order.amount.toLocaleString()}
-                  </p>
-                  <ArrowRight className="w-6 h-6 text-white/40" />
                 </div>
               </div>
-            ))
-          )}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
-    </>
+    </div>
   );
 }
-
-export default AdminOrders;

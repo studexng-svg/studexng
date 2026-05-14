@@ -9,7 +9,7 @@ import AdminTopBar from "@/components/layout/AdminTopBar";
 import { useState, useEffect, useCallback } from "react";
 import { fetchWithAuth } from "@/lib/authStore";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://studex-backend-v2.onrender.com";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -50,7 +50,7 @@ function DocumentPreviewModal({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-xl flex items-center justify-center p-4"
+        className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
         onClick={onClose}
       >
         <motion.div
@@ -58,23 +58,23 @@ function DocumentPreviewModal({
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.85, opacity: 0 }}
           transition={{ type: "spring", stiffness: 300, damping: 25 }}
-          className="relative max-w-3xl w-full bg-slate-900 rounded-3xl overflow-hidden border border-white/10 shadow-2xl"
+          className="relative max-w-3xl w-full bg-white rounded-2xl overflow-hidden border border-stone-200 shadow-2xl"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="flex items-center justify-between p-5 border-b border-white/10">
-            <p className="text-white font-bold text-lg">{label}</p>
+          <div className="flex items-center justify-between p-4 border-b border-stone-100">
+            <p className="text-stone-900 font-bold text-base">{label}</p>
             <div className="flex items-center gap-2">
               <a
                 href={url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="p-2 rounded-xl bg-white/10 hover:bg-white/20 transition text-white flex items-center gap-1.5 text-sm"
+                className="p-2 rounded-xl bg-stone-100 hover:bg-stone-200 transition text-stone-700 flex items-center gap-1.5 text-sm"
               >
                 <ExternalLink className="w-4 h-4" /> Open
               </a>
               <button
                 onClick={onClose}
-                className="p-2 rounded-xl bg-white/10 hover:bg-white/20 transition text-white"
+                className="p-2 rounded-xl bg-stone-100 hover:bg-stone-200 transition text-stone-600"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -209,13 +209,13 @@ function AdminSellerApprovals() {
         />
       )}
 
-      <AdminTopBar title="Seller Approvals" />
+      <AdminTopBar title="Seller Approvals" back="/admin" />
 
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-6 pb-32 space-y-6">
+      <div className="min-h-screen bg-[#FFF8F0] px-4 pt-4 pb-32 space-y-4 max-w-2xl mx-auto" style={{ fontFamily: "'DM Sans', sans-serif" }}>
         <div className="flex justify-end">
           <button
             onClick={fetchApplications}
-            className="text-white/60 hover:text-white hover:bg-white/10 p-2 rounded-xl transition flex items-center gap-2 text-sm"
+            className="text-stone-500 hover:text-stone-800 hover:bg-stone-100 px-3 py-2 rounded-xl transition flex items-center gap-2 text-sm font-medium"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
             Refresh
@@ -224,129 +224,103 @@ function AdminSellerApprovals() {
 
         {/* ERROR BANNER */}
         {error && (
-          <div className="bg-red-500/20 border border-red-500/40 text-red-300 px-4 py-3 rounded-2xl text-center text-sm font-medium flex items-center justify-between animate-fadeUp">
+          <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-2xl text-sm font-medium flex items-center justify-between">
             <span>{error}</span>
-            <button onClick={() => setError("")} className="underline text-red-200 ml-3">
-              Dismiss
-            </button>
+            <button onClick={() => setError("")} className="underline text-red-500 ml-3">Dismiss</button>
           </div>
         )}
 
         {/* LOADING */}
         {loading ? (
-          <div className="flex flex-col items-center justify-center py-24 gap-4">
-            <Loader2 className="w-12 h-12 text-purple-400 animate-spin" />
-            <p className="text-white/60">Loading applications...</p>
+          <div className="space-y-3">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="bg-white border border-stone-200 rounded-2xl h-40 animate-pulse" />
+            ))}
           </div>
         ) : applications.length === 0 ? (
-          <div className="text-center py-20 animate-fadeIn">
-            <CreditCard className="w-20 h-20 mx-auto text-white/20 mb-4" />
-            <p className="text-white/60 text-lg">No applications yet</p>
-            <p className="text-white/40 text-sm mt-2">
-              Applications will appear here when sellers apply
-            </p>
+          <div className="bg-white border border-stone-100 rounded-2xl p-16 text-center">
+            <CreditCard className="w-12 h-12 mx-auto text-stone-200 mb-3" />
+            <p className="text-stone-500 font-medium">No applications yet</p>
+            <p className="text-stone-400 text-sm mt-1">Applications will appear here when sellers apply</p>
           </div>
         ) : (
           applications.map((app, i) => (
             <div
               key={app.id}
-              className="bg-white/5 backdrop-blur-xl rounded-3xl p-6 border border-white/10 space-y-6 animate-fadeUp"
+              className="bg-white border border-stone-200 rounded-2xl p-5 space-y-5 shadow-sm"
             >
               {/* APPLICANT INFO */}
-              <div className="flex items-start justify-between">
+              <div className="flex items-start justify-between gap-3">
                 <div>
-                  <h3 className="text-2xl font-black text-white">{app.applicant_name}</h3>
-                  <p className="text-purple-300 font-medium mt-1">{app.applicant_email}</p>
+                  <h3 className="text-lg font-bold text-stone-900">{app.applicant_name}</h3>
+                  <p className="text-teal-600 text-sm mt-0.5">{app.applicant_email}</p>
                   {app.applicant_matric && (
-                    <p className="text-white/60 text-sm flex items-center gap-2 mt-2">
-                      <span className="font-mono bg-white/10 px-2 py-1 rounded">
-                        {app.applicant_matric}
-                      </span>
-                    </p>
+                    <span className="inline-block mt-1.5 font-mono text-xs bg-stone-100 text-stone-600 px-2 py-0.5 rounded">
+                      {app.applicant_matric}
+                    </span>
                   )}
-                  <p className="text-white/50 text-sm flex items-center gap-2 mt-3">
-                    <Calendar className="w-4 h-4" />
-                    Submitted{" "}
-                    {new Date(app.submitted_at).toLocaleDateString("en-US", {
-                      year: "numeric", month: "long", day: "numeric",
+                  <p className="text-stone-400 text-xs flex items-center gap-1.5 mt-2">
+                    <Calendar className="w-3.5 h-3.5" />
+                    {new Date(app.submitted_at).toLocaleDateString("en-NG", {
+                      year: "numeric", month: "short", day: "numeric",
                     })}
                   </p>
                 </div>
-
-                <div className={`px-4 py-2 rounded-full font-bold flex items-center gap-2 whitespace-nowrap ${
-                  app.status === "pending"
-                    ? "bg-yellow-500/20 text-yellow-300 border border-yellow-500/50"
-                    : app.status === "approved"
-                    ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/50"
-                    : "bg-red-500/20 text-red-300 border border-red-500/50"
+                <span className={`px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 flex-shrink-0 ${
+                  app.status === "pending"  ? "bg-amber-100 text-amber-700" :
+                  app.status === "approved" ? "bg-teal-100 text-teal-700" :
+                                              "bg-red-100 text-red-700"
                 }`}>
-                  {app.status === "pending" ? <Clock className="w-5 h-5" /> :
-                   app.status === "approved" ? <Check className="w-5 h-5" /> :
-                   <X className="w-5 h-5" />}
-                  {app.status.toUpperCase()}
-                </div>
+                  {app.status === "pending"  ? <Clock className="w-3.5 h-3.5" /> :
+                   app.status === "approved" ? <Check className="w-3.5 h-3.5" /> :
+                                               <X className="w-3.5 h-3.5" />}
+                  {app.status.charAt(0).toUpperCase() + app.status.slice(1)}
+                </span>
               </div>
 
-              {/* ID CARD IMAGES — rendered from backend URLs */}
-              <div className="space-y-4">
-                <h4 className="text-lg font-bold text-white flex items-center gap-2">
-                  <CreditCard className="w-5 h-5 text-purple-400" />
-                  Student ID Card
-                </h4>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* ID CARD IMAGES */}
+              <div className="space-y-3">
+                <p className="text-teal-600 text-xs tracking-[0.2em] uppercase font-semibold flex items-center gap-1.5">
+                  <CreditCard className="w-3.5 h-3.5" /> Student ID Card
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {idCards.map(({ key, label, icon: Icon, hint }) => {
                     const url = app[key];
                     return (
-                      <div
-                        key={key}
-                        className="bg-white/10 rounded-2xl overflow-hidden border border-white/20 hover:border-purple-500/50 hover:scale-[1.01] transition-all"
-                      >
+                      <div key={key} className="bg-stone-50 border border-stone-200 rounded-2xl overflow-hidden">
                         <div className="relative group">
                           {url ? (
                             <>
                               <img
                                 src={url}
                                 alt={label}
-                                className="w-full h-44 object-cover"
-                                onError={(e) => {
-                                  (e.target as HTMLImageElement).src =
-                                    "https://via.placeholder.com/400x220?text=Image+Not+Found";
-                                }}
+                                className="w-full h-40 object-cover"
+                                onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
                               />
                               <button
                                 onClick={() => setPreviewImage({ url, label })}
-                                className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100"
+                                className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100"
                               >
-                                <div className="bg-white/20 backdrop-blur-md p-3 rounded-full border border-white/30">
-                                  <ZoomIn className="w-6 h-6 text-white" />
+                                <div className="bg-white/80 p-2.5 rounded-full">
+                                  <ZoomIn className="w-5 h-5 text-stone-700" />
                                 </div>
                               </button>
                             </>
                           ) : (
-                            <div className="w-full h-44 bg-white/5 flex items-center justify-center">
-                              <p className="text-white/30 text-sm">No image uploaded</p>
+                            <div className="w-full h-40 flex items-center justify-center">
+                              <p className="text-stone-400 text-sm">No image</p>
                             </div>
                           )}
                         </div>
-
-                        <div className="p-4 flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-teal-600 rounded-xl flex items-center justify-center flex-shrink-0">
-                              <Icon className="w-5 h-5 text-white" />
-                            </div>
-                            <div>
-                              <p className="text-white font-bold text-sm">{label}</p>
-                              <p className="text-white/50 text-xs">{hint}</p>
-                            </div>
+                        <div className="p-3 flex items-center justify-between border-t border-stone-100">
+                          <div>
+                            <p className="font-semibold text-stone-900 text-xs">{label}</p>
+                            <p className="text-stone-400 text-xs">{hint}</p>
                           </div>
                           {url && (
-                            <button
-                              onClick={() => setPreviewImage({ url, label })}
-                              className="p-2 bg-white/10 hover:bg-white/20 rounded-xl transition"
-                              title="Full screen"
-                            >
-                              <Eye className="w-4 h-4 text-white" />
+                            <button onClick={() => setPreviewImage({ url, label })}
+                              className="p-1.5 bg-stone-100 hover:bg-stone-200 rounded-lg transition">
+                              <Eye className="w-3.5 h-3.5 text-stone-600" />
                             </button>
                           )}
                         </div>
@@ -358,74 +332,53 @@ function AdminSellerApprovals() {
 
               {/* ADMISSION LETTER */}
               {app.admission_letter_url && (
-                <div className="space-y-4">
-                  <h4 className="text-lg font-bold text-white flex items-center gap-2">
-                    <FileText className="w-5 h-5 text-purple-400" />
-                    Admission Letter
-                  </h4>
-                  <div className="bg-white/10 rounded-2xl overflow-hidden border border-white/20 hover:border-purple-500/50 transition-all">
+                <div className="space-y-2">
+                  <p className="text-teal-600 text-xs tracking-[0.2em] uppercase font-semibold flex items-center gap-1.5">
+                    <FileText className="w-3.5 h-3.5" /> Admission Letter
+                  </p>
+                  <div className="bg-stone-50 border border-stone-200 rounded-2xl overflow-hidden">
                     {isPdf(app.admission_letter_url) ? (
-                      <div className="p-5 flex items-center justify-between gap-4">
-                        <div className="flex items-center gap-4">
-                          <div className="w-14 h-14 bg-gradient-to-br from-red-600 to-pink-600 rounded-2xl flex items-center justify-center flex-shrink-0">
-                            <FileText className="w-7 h-7 text-white" />
+                      <div className="p-4 flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                            <FileText className="w-5 h-5 text-red-600" />
                           </div>
                           <div>
-                            <p className="text-white font-bold">PDF Document</p>
-                            <p className="text-white/50 text-xs mt-0.5">Admission letter uploaded as PDF</p>
+                            <p className="font-semibold text-stone-900 text-sm">PDF Document</p>
+                            <p className="text-stone-400 text-xs">Admission letter</p>
                           </div>
                         </div>
                         <div className="flex gap-2">
                           <button
                             onClick={() => setPreviewImage({ url: app.admission_letter_url!, label: "Admission Letter" })}
-                            className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl transition text-white text-sm flex items-center gap-2"
+                            className="px-3 py-1.5 bg-stone-100 hover:bg-stone-200 rounded-xl text-stone-700 text-xs font-medium flex items-center gap-1.5 transition"
                           >
-                            <Eye className="w-4 h-4" /> Preview
+                            <Eye className="w-3.5 h-3.5" /> Preview
                           </button>
-                          <a
-                            href={app.admission_letter_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="px-4 py-2 bg-purple-600/50 hover:bg-purple-600/70 rounded-xl transition text-white text-sm flex items-center gap-2"
-                          >
-                            <ExternalLink className="w-4 h-4" /> Open
+                          <a href={app.admission_letter_url} target="_blank" rel="noopener noreferrer"
+                            className="px-3 py-1.5 bg-teal-100 hover:bg-teal-200 rounded-xl text-teal-700 text-xs font-medium flex items-center gap-1.5 transition">
+                            <ExternalLink className="w-3.5 h-3.5" /> Open
                           </a>
                         </div>
                       </div>
                     ) : (
                       <div className="relative group">
-                        <img
-                          src={app.admission_letter_url}
-                          alt="Admission Letter"
-                          className="w-full h-44 object-cover"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src =
-                              "https://via.placeholder.com/400x220?text=Image+Not+Found";
-                          }}
-                        />
+                        <img src={app.admission_letter_url} alt="Admission Letter"
+                          className="w-full h-40 object-cover"
+                          onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
                         <button
                           onClick={() => setPreviewImage({ url: app.admission_letter_url!, label: "Admission Letter" })}
-                          className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100"
+                          className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100"
                         >
-                          <div className="bg-white/20 backdrop-blur-md p-3 rounded-full border border-white/30">
-                            <ZoomIn className="w-6 h-6 text-white" />
+                          <div className="bg-white/80 p-2.5 rounded-full">
+                            <ZoomIn className="w-5 h-5 text-stone-700" />
                           </div>
                         </button>
-                        <div className="p-4 flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-teal-600 rounded-xl flex items-center justify-center flex-shrink-0">
-                              <FileText className="w-5 h-5 text-white" />
-                            </div>
-                            <div>
-                              <p className="text-white font-bold text-sm">Admission Letter</p>
-                              <p className="text-white/50 text-xs">Image document</p>
-                            </div>
-                          </div>
-                          <button
-                            onClick={() => setPreviewImage({ url: app.admission_letter_url!, label: "Admission Letter" })}
-                            className="p-2 bg-white/10 hover:bg-white/20 rounded-xl transition"
-                          >
-                            <Eye className="w-4 h-4 text-white" />
+                        <div className="p-3 border-t border-stone-100 flex items-center justify-between">
+                          <p className="font-semibold text-stone-900 text-xs">Admission Letter</p>
+                          <button onClick={() => setPreviewImage({ url: app.admission_letter_url!, label: "Admission Letter" })}
+                            className="p-1.5 bg-stone-100 hover:bg-stone-200 rounded-lg transition">
+                            <Eye className="w-3.5 h-3.5 text-stone-600" />
                           </button>
                         </div>
                       </div>
@@ -436,48 +389,41 @@ function AdminSellerApprovals() {
 
               {/* ACTION BUTTONS */}
               {app.status === "pending" && (
-                <div className="flex gap-4 pt-4 border-t border-white/10">
+                <div className="flex gap-3 pt-4 border-t border-stone-100">
                   <button
                     onClick={() => approve(app)}
                     disabled={actionLoading === app.id}
-                    className="flex-1 py-5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-black text-lg rounded-2xl hover:shadow-xl hover:shadow-emerald-500/50 transition-all flex items-center justify-center gap-3 disabled:opacity-60"
+                    className="flex-1 py-3 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl transition-all flex items-center justify-center gap-2 disabled:opacity-50 text-sm"
                   >
-                    {actionLoading === app.id ? (
-                      <Loader2 className="w-6 h-6 animate-spin" />
-                    ) : (
-                      <><Check className="w-7 h-7" /> Approve Seller</>
-                    )}
+                    {actionLoading === app.id
+                      ? <Loader2 className="w-4 h-4 animate-spin" />
+                      : <><Check className="w-4 h-4" /> Approve</>}
                   </button>
                   <button
                     onClick={() => reject(app)}
                     disabled={actionLoading === app.id}
-                    className="flex-1 py-5 bg-gradient-to-r from-red-600 to-pink-600 text-white font-black text-lg rounded-2xl hover:shadow-xl hover:shadow-red-500/50 transition-all flex items-center justify-center gap-3 disabled:opacity-60"
+                    className="flex-1 py-3 bg-red-100 hover:bg-red-200 text-red-700 font-bold rounded-xl transition-all flex items-center justify-center gap-2 disabled:opacity-50 text-sm"
                   >
-                    {actionLoading === app.id ? (
-                      <Loader2 className="w-6 h-6 animate-spin" />
-                    ) : (
-                      <><X className="w-7 h-7" /> Reject</>
-                    )}
+                    {actionLoading === app.id
+                      ? <Loader2 className="w-4 h-4 animate-spin" />
+                      : <><X className="w-4 h-4" /> Reject</>}
                   </button>
                 </div>
               )}
 
               {app.status === "approved" && (
-                <div className="bg-emerald-500/20 border border-emerald-500/50 rounded-2xl p-4 text-center">
-                  <p className="text-emerald-300 font-bold flex items-center justify-center gap-2">
-                    <Check className="w-5 h-5" /> Approved — Seller can now start selling
-                  </p>
+                <div className="bg-teal-50 border border-teal-200 rounded-xl p-3 flex items-center justify-center gap-2">
+                  <Check className="w-4 h-4 text-teal-600" />
+                  <p className="text-teal-700 font-semibold text-sm">Approved — Seller is live</p>
                 </div>
               )}
 
               {app.status === "rejected" && (
-                <div className="bg-red-500/20 border border-red-500/50 rounded-2xl p-4 text-center">
-                  <p className="text-red-300 font-bold flex items-center justify-center gap-2">
-                    <X className="w-5 h-5" /> Rejected — Seller cannot proceed
+                <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-center">
+                  <p className="text-red-600 font-semibold text-sm flex items-center justify-center gap-2">
+                    <X className="w-4 h-4" /> Rejected
                   </p>
-                  {app.notes && (
-                    <p className="text-red-400/70 text-xs mt-1">{app.notes}</p>
-                  )}
+                  {app.notes && <p className="text-red-400 text-xs mt-1">{app.notes}</p>}
                 </div>
               )}
             </div>

@@ -1,11 +1,12 @@
 // src/app/admin/users/page.tsx
 "use client";
 
-import { Search, Mail, ShieldCheck, User, Users } from "lucide-react";
+import { Search, Users, Store, User, ChevronRight } from "lucide-react";
 import AdminTopBar from "@/components/layout/AdminTopBar";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { fetchWithAuth } from "@/lib/authStore";
+import { GRAD } from "@/lib/tokens";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -13,124 +14,96 @@ export default function AdminUsers() {
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [users, setUsers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Fetch real users from backend
-    const fetchUsers = async () => {
-      try {
-        const res = await fetchWithAuth(`${API_URL}/api/admin/users/`);
-        if (!res.ok) return;
-        const data = await res.json();
-        setUsers(data.results || data);
-      } catch {}
-    };
-
-    fetchUsers();
+    fetchWithAuth(`${API_URL}/api/admin/users/`)
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(d => setUsers(d.results || d))
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, []);
 
-  const filtered = users.filter((u) =>
+  const filtered = users.filter(u =>
     u.username?.toLowerCase().includes(search.toLowerCase()) ||
     u.email?.toLowerCase().includes(search.toLowerCase()) ||
     u.profile?.matric_number?.toLowerCase().includes(search.toLowerCase())
   );
 
-  const totalUsers = users.length;
-  const sellersCount = users.filter(u => u.user_type === "vendor").length;
-  const buyersCount = users.filter(u => u.user_type === "student").length;
+  const vendors = users.filter(u => u.user_type === "vendor").length;
+  const students = users.filter(u => u.user_type === "student").length;
 
   return (
-    <>
-      <AdminTopBar title="User Management" />
+    <div className="min-h-screen bg-[#FFF8F0]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+      <AdminTopBar title="Users" back="/admin" />
 
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 px-5 pt-4 pb-32">
-        <div className="relative mb-5">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/50" />
+      <div className="px-4 pt-4 pb-28 max-w-2xl mx-auto space-y-4">
+
+        {/* Stats */}
+        <div className="grid grid-cols-3 gap-3">
+          {[
+            { label: "Total", value: users.length, icon: Users, color: "#7C3AED" },
+            { label: "Vendors", value: vendors, icon: Store, color: "#0D9488" },
+            { label: "Students", value: students, icon: User, color: "#6366F1" },
+          ].map(({ label, value, icon: Icon, color }) => (
+            <div key={label} className="bg-white border border-stone-200 rounded-2xl p-3 text-center shadow-sm">
+              <Icon className="w-5 h-5 mx-auto mb-1" style={{ color }} />
+              <p className="text-xl font-bold text-stone-900">{loading ? "—" : value}</p>
+              <p className="text-xs text-stone-400">{label}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Search */}
+        <div className="relative">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
           <input
-            type="text"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search name, email, matric..."
-            className="w-full pl-12 pr-4 py-3 bg-white/10 backdrop-blur-xl rounded-xl text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-purple-500/50 text-sm"
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search name, email, matric…"
+            className="w-full pl-10 pr-4 py-3 bg-white border border-stone-200 rounded-xl text-stone-900 placeholder:text-stone-400 text-sm focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20"
           />
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-3 gap-3 mb-6">
-          <div className="bg-white/5 rounded-2xl p-4 text-center border border-white/10 animate-fadeIn">
-            <Users className="w-8 h-8 mx-auto text-purple-400 mb-1" />
-            <p className="text-2xl font-black text-white">{totalUsers}</p>
-            <p className="text-xs text-white/60">Total Users</p>
+        {/* User list */}
+        {loading ? (
+          <div className="space-y-3">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="bg-white border border-stone-200 rounded-2xl h-16 animate-pulse" />
+            ))}
           </div>
-          <div className="bg-emerald-500/10 rounded-2xl p-4 text-center border border-emerald-500/30 animate-fadeIn">
-            <ShieldCheck className="w-8 h-8 mx-auto text-emerald-400 mb-1" />
-            <p className="text-2xl font-black text-white">{sellersCount}</p>
-            <p className="text-xs text-white/60">Sellers</p>
+        ) : filtered.length === 0 ? (
+          <div className="bg-white border border-stone-100 rounded-2xl p-10 text-center">
+            <Users className="w-10 h-10 text-stone-200 mx-auto mb-3" />
+            <p className="text-stone-400 text-sm">No users found</p>
           </div>
-          <div className="bg-blue-500/10 rounded-2xl p-4 text-center border border-blue-500/30 animate-fadeIn">
-            <User className="w-8 h-8 mx-auto text-blue-400 mb-1" />
-            <p className="text-2xl font-black text-white">{buyersCount}</p>
-            <p className="text-xs text-white/60">Buyers</p>
-          </div>
-        </div>
-
-        {/* Users List */}
-        <div className="space-y-4">
-          {filtered.length === 0 ? (
-            <div className="text-center py-16">
-              <Users className="w-16 h-16 mx-auto text-white/20 mb-3" />
-              <p className="text-white/60">No users found</p>
-            </div>
-          ) : (
-            filtered.map((user, i) => (
+        ) : (
+          <div className="space-y-2">
+            {filtered.map(user => (
               <div
                 key={user.id}
                 onClick={() => router.push(`/admin/users/${user.id}`)}
-                className="bg-white/5 backdrop-blur-xl rounded-2xl p-5 border border-white/10 hover:border-purple-500/50 transition-all cursor-pointer animate-fadeUp active:scale-[0.98]"
+                className="bg-white border border-stone-200 hover:border-teal-300 rounded-2xl p-3.5 flex items-center gap-3 transition-all cursor-pointer active:scale-[0.98] shadow-sm"
               >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 bg-gradient-to-br from-purple-600 to-teal-600 rounded-2xl flex items-center justify-center text-xl font-black text-white shadow-lg">
-                      {user.username?.substring(0, 2).toUpperCase() || "U"}
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-white text-lg">{user.username}</h3>
-                      <p className="text-purple-300 text-sm flex items-center gap-1.5">
-                        <Mail className="w-4 h-4" /> {user.email}
-                      </p>
-                      <p className="text-white/50 text-xs font-mono mt-1">
-                        {user.profile?.matric_number || user.profile?.business_name || "—"}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="text-right">
-                    <div className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 mb-2 ${
-                      user.user_type === "vendor"
-                        ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/50"
-                        : "bg-blue-500/20 text-blue-300 border border-blue-500/50"
-                    }`}>
-                      {user.user_type === "vendor" ? <ShieldCheck className="w-4 h-4" /> : <User className="w-4 h-4" />}
-                      {user.user_type.toUpperCase()}
-                    </div>
-                    <p className="text-white/60 text-xs">
-                      {new Date(user.date_joined).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                    </p>
-                  </div>
+                <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
+                  style={{ background: GRAD }}>
+                  {(user.business_name || user.username || "?")[0].toUpperCase()}
                 </div>
-
-                {user.user_type === "vendor" && user.profile?.is_verified_vendor && (
-                  <div className="mt-4 pt-4 border-t border-white/10 flex justify-between text-sm">
-                    <span className="text-white/60">Verified Vendor</span>
-                    <span className="text-emerald-400 font-bold flex items-center gap-1">
-                      <ShieldCheck className="w-4 h-4" /> Yes
-                    </span>
-                  </div>
-                )}
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-stone-900 text-sm truncate">{user.username}</p>
+                  <p className="text-stone-400 text-xs truncate">{user.email}</p>
+                </div>
+                <span className={`px-2 py-0.5 rounded-full text-xs font-semibold flex-shrink-0 ${
+                  user.user_type === "vendor" ? "bg-teal-100 text-teal-700" : "bg-stone-100 text-stone-600"
+                }`}>
+                  {user.user_type === "vendor" ? "Vendor" : "Student"}
+                </span>
+                <ChevronRight className="w-4 h-4 text-stone-400 flex-shrink-0" />
               </div>
-            ))
-          )}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
-    </>
+    </div>
   );
 }
