@@ -153,8 +153,6 @@ class SellerApplicationAdmin(admin.ModelAdmin):
         ('Admin Notes', {'fields': ('notes',)}),
     )
 
-    _IMAGE_EXTS = ('.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp', '.avif')
-
     def _file_preview(self, file_field, label):
         if not file_field:
             return format_html('<span style="color:#9ca3af;">Not uploaded</span>')
@@ -163,22 +161,14 @@ class SellerApplicationAdmin(admin.ModelAdmin):
         except Exception:
             return format_html('<span style="color:#ef4444;">File not accessible</span>')
 
+        from urllib.parse import quote
+        from django.utils.html import mark_safe
+        import html as _html
+
         name = str(file_field).lower()
-        url_lower = url.lower()
 
-        # Treat as a document if the stored name has a doc extension, or if it's a
-        # Cloudinary URL with no recognisable image extension (extension was stripped
-        # by MediaCloudinaryStorage during upload).
-        is_doc = (
-            any(name.endswith(ext) for ext in ('.pdf', '.doc', '.docx'))
-            or (
-                'res.cloudinary.com' in url
-                and not any(url_lower.endswith(ext) or f'{ext}?' in url_lower for ext in self._IMAGE_EXTS)
-            )
-        )
-
-        if is_doc:
-            from urllib.parse import quote
+        # Files with explicit PDF/doc extension go straight to the viewer.
+        if any(name.endswith(ext) for ext in ('.pdf', '.doc', '.docx')):
             viewer_url = f'https://docs.google.com/viewer?url={quote(url, safe="")}'
             return format_html(
                 '📄 <a href="{}" target="_blank" style="color:#0d9488;font-weight:600;">View {}</a>'
@@ -186,12 +176,32 @@ class SellerApplicationAdmin(admin.ModelAdmin):
                 viewer_url, label, url,
             )
 
-        return format_html(
-            '<a href="{url}" target="_blank">'
-            '<img src="{url}" style="max-height:240px;max-width:480px;'
-            'object-fit:contain;border-radius:8px;border:1px solid #e5e7eb;" />'
-            '</a>',
-            url=url,
+        # For Cloudinary URLs without extension (extension was stripped by MediaCloudinaryStorage):
+        # try to render as an image. If the image fails to load (e.g. it's a PDF served as
+        # octet-stream), the onerror handler hides it and shows the Google Docs viewer link.
+        e_url = _html.escape(url)
+        e_viewer = _html.escape(f'https://docs.google.com/viewer?url={quote(url, safe="")}')
+        e_label = _html.escape(str(label))
+        uid = abs(hash(url)) % 999999
+
+        return mark_safe(
+            f'<div>'
+            f'<a href="{e_url}" target="_blank" id="doc-img-wrap-{uid}">'
+            f'<img src="{e_url}" id="doc-img-{uid}"'
+            f' style="max-height:240px;max-width:480px;object-fit:contain;border-radius:8px;border:1px solid #e5e7eb;"'
+            f' onerror="'
+            f'document.getElementById(\'doc-img-wrap-{uid}\').style.display=\'none\';'
+            f'document.getElementById(\'doc-fb-{uid}\').style.display=\'block\';'
+            f'" />'
+            f'</a>'
+            f'<div id="doc-fb-{uid}" style="display:none;">'
+            f'📄 <a href="{e_viewer}" target="_blank" style="color:#0d9488;font-weight:600;">View {e_label}</a>'
+            f'&nbsp;&nbsp;<a href="{e_url}" target="_blank" style="color:#9ca3af;font-size:12px;">[Download]</a>'
+            f'</div>'
+            f'<div style="margin-top:4px;">'
+            f'<a href="{e_url}" target="_blank" style="color:#9ca3af;font-size:11px;">⬇ Open original</a>'
+            f'</div>'
+            f'</div>'
         )
 
     def preview_id_front(self, obj):
