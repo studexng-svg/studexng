@@ -102,16 +102,25 @@ class ListingViewSet(viewsets.ModelViewSet):
         if self.action != 'list':
             return Listing.objects.all().select_related('vendor', 'category')
 
-        # List action only — campus-scoped available listings
+        # List action only — campus-scoped listings
         campus = 'pau'
         if user.is_authenticated:
             campus = (getattr(user, 'school', '') or 'pau').lower()
+            # Staff (admin) can override campus via query param
+            if user.is_staff:
+                campus_param = self.request.query_params.get('campus', campus).lower()
+                if campus_param in ('pau', 'futo'):
+                    campus = campus_param
         else:
             campus_param = self.request.query_params.get('campus', '').lower()
             if campus_param in ('pau', 'futo'):
                 campus = campus_param
 
-        qs = Listing.objects.filter(campus=campus, is_available=True)
+        # Staff see all listings regardless of availability; others see only available
+        if user.is_authenticated and user.is_staff:
+            qs = Listing.objects.filter(campus=campus)
+        else:
+            qs = Listing.objects.filter(campus=campus, is_available=True)
 
         search = self.request.query_params.get('search')
         if search:

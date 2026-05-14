@@ -5,7 +5,9 @@ import { Search, Mail, ShieldCheck, User, Users } from "lucide-react";
 import AdminTopBar from "@/components/layout/AdminTopBar";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { adminApi } from "@/lib/adminApi";
+import { fetchWithAuth } from "@/lib/authStore";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 export default function AdminUsers() {
   const router = useRouter();
@@ -16,11 +18,11 @@ export default function AdminUsers() {
     // Fetch real users from backend
     const fetchUsers = async () => {
       try {
-        const data = await adminApi.getUsers();
-        setUsers(data);
-      } catch (error) {
-        console.error("Failed to fetch users:", error);
-      }
+        const res = await fetchWithAuth(`${API_URL}/api/admin/users/`);
+        if (!res.ok) return;
+        const data = await res.json();
+        setUsers(data.results || data);
+      } catch {}
     };
 
     fetchUsers();

@@ -16,12 +16,12 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { adminApi } from "@/lib/adminApi";
 import AdminTopBar from "@/components/layout/AdminTopBar";
+import { fetchWithAuth } from "@/lib/authStore";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 export default function AdminDashboard() {
-  const router = useRouter();
   const [stats, setStats] = useState([
     { label: "Total Users", value: "1,284", change: "+12%", icon: Users, color: "from-purple-500 to-purple-600" },
     { label: "Active Sellers", value: "87", change: "+8%", icon: Store, color: "from-teal-500 to-teal-600" },
@@ -39,17 +39,11 @@ export default function AdminDashboard() {
   });
 
   useEffect(() => {
-    const isAdmin = localStorage.getItem("isAdmin") === "true";
-
-    if (!isAdmin) {
-      router.push("/admin/login");
-      return;
-    }
-
-    // Fetch real dashboard data from backend
     const fetchDashboardData = async () => {
       try {
-        const data = await adminApi.getDashboardStats();
+        const res = await fetchWithAuth(`${API_URL}/api/admin/dashboard/`);
+        if (!res.ok) throw new Error("Failed to fetch stats");
+        const data = await res.json();
 
         // Update stats with real backend data
         setStats([
@@ -101,14 +95,13 @@ export default function AdminDashboard() {
           completedOrders: data.orders.completed_orders,
           totalRevenue: data.orders.total_revenue,
         });
-      } catch (error) {
-        console.error("Failed to fetch dashboard data:", error);
+      } catch {
         // Keep default values if fetch fails
       }
     };
 
     fetchDashboardData();
-  }, [router]);
+  }, []);
 
   const quickActions = [
     { 

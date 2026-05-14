@@ -439,3 +439,34 @@ except ImportError:
     # Services app not available, skip order views
     AdminOrderListView = None
     AdminOrderDetailView = None
+
+
+class AdminNotifyUserView(APIView):
+    """POST /api/admin/users/<user_id>/notify/ — send a notification to any user."""
+    permission_classes = [IsAdminUser]
+
+    def post(self, request, user_id):
+        try:
+            target_user = User.objects.get(pk=user_id)
+        except User.DoesNotExist:
+            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        title = (request.data.get('title') or '').strip()
+        message = (request.data.get('message') or '').strip()
+        if not title or not message:
+            return Response({'error': 'title and message are required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            from accounts.utils import send_notification
+            send_notification(
+                recipient=target_user,
+                notification_type='admin_message',
+                title=title,
+                message=message,
+                action_url='',
+            )
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        return Response({'status': 'sent'})
+

@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import AdminTopBar from "@/components/layout/AdminTopBar";
 import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { fetchWithAuth } from "@/lib/authStore";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://studex-backend-v2.onrender.com";
 
@@ -109,7 +109,6 @@ function DocumentPreviewModal({
 // ─── Main Component ────────────────────────────────────────────────────────────
 
 function AdminSellerApprovals() {
-  const router = useRouter();
   const [applications, setApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<number | null>(null);
@@ -117,33 +116,13 @@ function AdminSellerApprovals() {
   const [previewImage, setPreviewImage] = useState<{ url: string; label: string } | null>(null);
   const [mounted, setMounted] = useState(false);
 
-  const getToken = () =>
-    typeof window !== "undefined"
-      ? localStorage.getItem("admin_access_token")
-      : null;
-
   // ── Fetch all applications from backend ──
   const fetchApplications = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const token = getToken();
-      if (!token) {
-        router.replace("/admin/login");
-        return;
-      }
-
-      const res = await fetch(`${API_URL}/api/auth/seller/applications/`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (res.status === 401 || res.status === 403) {
-        router.replace("/admin/login");
-        return;
-      }
-
+      const res = await fetchWithAuth(`${API_URL}/api/auth/seller/applications/`);
       if (!res.ok) throw new Error("Failed to fetch applications");
-
       const data = await res.json();
       setApplications(Array.isArray(data) ? data : data.results || []);
     } catch (err: any) {
@@ -151,7 +130,7 @@ function AdminSellerApprovals() {
     } finally {
       setLoading(false);
     }
-  }, [router]);
+  }, []);
 
   useEffect(() => {
     setMounted(true);
@@ -163,16 +142,9 @@ function AdminSellerApprovals() {
     setActionLoading(app.id);
     setError("");
     try {
-      const token = getToken();
-      const res = await fetch(
+      const res = await fetchWithAuth(
         `${API_URL}/api/auth/seller/applications/${app.id}/approve/`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        }
+        { method: "POST" }
       );
 
       if (!res.ok) {
@@ -195,15 +167,10 @@ function AdminSellerApprovals() {
     setActionLoading(app.id);
     setError("");
     try {
-      const token = getToken();
-      const res = await fetch(
+      const res = await fetchWithAuth(
         `${API_URL}/api/auth/seller/applications/${app.id}/reject/`,
         {
           method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
           body: JSON.stringify({ notes: "Application rejected by admin." }),
         }
       );

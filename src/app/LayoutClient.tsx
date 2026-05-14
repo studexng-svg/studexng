@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import { useNotifications } from "@/hooks/useNotifications";
 import { NotificationToastContainer } from "@/components/NotificationToast";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
+import AdminBar from "@/components/AdminBar";
 
 function NotificationProvider({ children }: { children: React.ReactNode }) {
   const { toasts, dismissToast } = useNotifications();
@@ -58,6 +59,7 @@ export default function LayoutClient({ children }: { children: React.ReactNode }
           </div>
         )}
 
+        <AdminBar />
         <CookieConsent />
         <Toaster position="top-center" richColors closeButton />
       </NotificationProvider>

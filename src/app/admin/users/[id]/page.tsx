@@ -15,7 +15,9 @@ import {
 } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
-import { adminApi } from "@/lib/adminApi";
+import { fetchWithAuth } from "@/lib/authStore";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 export default function AdminUserDetail() {
   const { id } = useParams();
@@ -28,7 +30,9 @@ export default function AdminUserDetail() {
     const fetchUser = async () => {
       try {
         setLoading(true);
-        const data = await adminApi.getUserDetail(Number(id));
+        const res = await fetchWithAuth(`${API_URL}/api/admin/users/${id}/`);
+        if (!res.ok) throw new Error("Not found");
+        const data = await res.json();
         setUser(data);
       } catch (error) {
         console.error("Failed to fetch user:", error);
@@ -45,11 +49,13 @@ export default function AdminUserDetail() {
 
   const handleDeactivateUser = async () => {
     if (!confirm(`Are you sure you want to ${user.is_active ? 'deactivate' : 'activate'} this user?`)) return;
-
     try {
-      await adminApi.updateUser(Number(id), { is_active: !user.is_active });
+      const res = await fetchWithAuth(`${API_URL}/api/admin/users/${id}/`, {
+        method: "PATCH",
+        body: JSON.stringify({ is_active: !user.is_active }),
+      });
+      if (!res.ok) throw new Error("Failed");
       setUser({ ...user, is_active: !user.is_active });
-      alert(`User ${user.is_active ? 'deactivated' : 'activated'} successfully!`);
     } catch (error: any) {
       alert(error.message || 'Failed to update user status');
     }
@@ -57,16 +63,13 @@ export default function AdminUserDetail() {
 
   const handleVerifyVendor = async () => {
     if (!confirm('Are you sure you want to verify this vendor?')) return;
-
     try {
-      await adminApi.updateUser(Number(id), {
-        profile: { is_verified_vendor: true }
+      const res = await fetchWithAuth(`${API_URL}/api/admin/users/${id}/`, {
+        method: "PATCH",
+        body: JSON.stringify({ profile: { is_verified_vendor: true } }),
       });
-      setUser({
-        ...user,
-        profile: { ...user.profile, is_verified_vendor: true }
-      });
-      alert('Vendor verified successfully!');
+      if (!res.ok) throw new Error("Failed");
+      setUser({ ...user, profile: { ...user.profile, is_verified_vendor: true } });
     } catch (error: any) {
       alert(error.message || 'Failed to verify vendor');
     }

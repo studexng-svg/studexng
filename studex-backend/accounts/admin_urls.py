@@ -15,6 +15,7 @@ from accounts.admin_views import (
     AdminListingDetailView,
     AdminOrderListView,
     AdminOrderDetailView,
+    AdminNotifyUserView,
 )
 
 app_name = 'admin_api'
@@ -26,6 +27,7 @@ urlpatterns = [
     # User Management
     path('users/', AdminUserListView.as_view(), name='user-list'),
     path('users/<int:user_id>/', AdminUserDetailView.as_view(), name='user-detail'),
+    path('users/<int:user_id>/notify/', AdminNotifyUserView.as_view(), name='notify-user'),
 ]
 
 # Add listing routes if services app available

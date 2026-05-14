@@ -6,13 +6,15 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   ChevronLeft, Star, MessageCircle, ShoppingCart, Calendar,
   Clock, FileText, CheckCircle, AlertCircle,
-  ChevronDown, ChevronUp, Send, MapPin, Sparkles, ZoomIn, X as XIcon
+  ChevronDown, ChevronUp, Send, MapPin, Sparkles, ZoomIn, X as XIcon,
+  Shield
 } from "lucide-react";
 import { useAuth, fetchWithAuth } from "@/lib/authStore";
 import { useCartStore } from "@/lib/cartStore";
 import { GRAD, GRAD_TEXT, SERIF } from "@/lib/tokens";
 import VendorBadge from "@/components/VendorBadge";
 import ChatWindow from "@/components/ChatWindow";
+import { useAdminMode } from "@/hooks/useAdminMode";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -77,6 +79,9 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
   const router = useRouter();
   const { isLoggedIn } = useAuth();
   const { fetchCart } = useCartStore();
+  const { isAdmin } = useAdminMode();
+  const [adminLoading, setAdminLoading] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const [listing, setListing] = useState<Listing | null>(initialListing);
   const [reviews] = useState<Review[]>(initialReviews);
@@ -181,6 +186,42 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
     setTimeout(() => {
       document.getElementById("booking-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 150);
+  };
+
+  const handleAdminToggle = async () => {
+    if (!listing) return;
+    setAdminLoading("toggle");
+    try {
+      const res = await fetchWithAuth(`${API_URL}/api/admin/listings/${listing.id}/`, {
+        method: "PATCH",
+        body: JSON.stringify({ is_available: !listing.is_available }),
+      });
+      if (!res.ok) throw new Error("Failed to update listing");
+      const updated = await res.json();
+      setListing(prev => prev ? { ...prev, is_available: updated.is_available } : prev);
+      showToast(updated.is_available ? "Listing approved and live!" : "Listing hidden from marketplace");
+    } catch {
+      showToast("Failed to update listing");
+    } finally {
+      setAdminLoading(null);
+    }
+  };
+
+  const handleAdminDelete = async () => {
+    if (!confirmDelete) { setConfirmDelete(true); return; }
+    setAdminLoading("delete");
+    try {
+      const res = await fetchWithAuth(`${API_URL}/api/admin/listings/${listing!.id}/`, {
+        method: "DELETE",
+      });
+      if (!res.ok && res.status !== 204) throw new Error("Failed to delete listing");
+      showToast("Listing deleted");
+      setTimeout(() => router.back(), 1200);
+    } catch {
+      showToast("Failed to delete listing");
+      setAdminLoading(null);
+      setConfirmDelete(false);
+    }
   };
 
   const today = new Date().toISOString().split("T")[0];
@@ -331,6 +372,42 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
                 <p className={`text-sm font-medium ${listing.is_reserved ? "text-stone-500" : "text-amber-700"}`}>
                   {listing.is_reserved ? "This item is currently reserved by another user" : stockWarning}
                 </p>
+              </div>
+            )}
+
+            {/* ── ADMIN CONTROLS ── */}
+            {isAdmin && (
+              <div className="bg-purple-50 border border-purple-200 rounded-2xl p-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <Shield className="w-4 h-4 text-purple-600" />
+                  <p className="text-purple-700 text-xs tracking-[0.2em] uppercase font-semibold">Admin Controls</p>
+                  <span className={`ml-auto px-2.5 py-0.5 rounded-full text-xs font-semibold ${listing.is_available ? "bg-teal-100 text-teal-700" : "bg-amber-100 text-amber-700"}`}>
+                    {listing.is_available ? "Live" : "Pending Approval"}
+                  </span>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleAdminToggle}
+                    disabled={!!adminLoading}
+                    className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all disabled:opacity-50 ${listing.is_available ? "bg-amber-100 text-amber-700 hover:bg-amber-200" : "bg-teal-100 text-teal-700 hover:bg-teal-200"}`}
+                  >
+                    {adminLoading === "toggle"
+                      ? <span className="flex items-center justify-center gap-1.5"><span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin inline-block" />Updating...</span>
+                      : listing.is_available ? "Hide Listing" : "Approve & Publish"}
+                  </button>
+                  <button
+                    onClick={handleAdminDelete}
+                    disabled={!!adminLoading}
+                    className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all disabled:opacity-50 ${confirmDelete ? "bg-red-500 text-white hover:bg-red-600" : "bg-red-100 text-red-700 hover:bg-red-200"}`}
+                  >
+                    {adminLoading === "delete"
+                      ? <span className="flex items-center justify-center gap-1.5"><span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin inline-block" />Deleting...</span>
+                      : confirmDelete ? "Confirm Delete" : "Delete Listing"}
+                  </button>
+                </div>
+                {confirmDelete && (
+                  <p className="text-xs text-red-500 text-center">Tap &quot;Confirm Delete&quot; again to permanently remove this listing</p>
+                )}
               </div>
             )}
 
