@@ -97,12 +97,12 @@ def send_booking_reminders():
 def auto_release_orders():
     """
     Auto-completes orders stuck in seller_completed for 48 h+ with no buyer
-    confirmation and no open dispute. Releases escrow and credits vendor wallet.
+    confirmation and no open dispute. Vendor was already paid via Paystack
+    Transfer at order time — this just closes the order record.
     Idempotent: auto_released=True prevents double-processing.
     """
     from django.db import transaction as db_tx
     from orders.models import Order
-    from services.models import Transaction
     from accounts.utils import send_notification
 
     cutoff = timezone.now() - timedelta(hours=48)
@@ -126,34 +126,18 @@ def auto_release_orders():
                 locked = Order.objects.select_for_update().get(pk=order.pk)
                 if locked.auto_released or locked.status != 'seller_completed':
                     continue
-
                 locked.status = 'completed'
                 locked.auto_released = True
                 locked.buyer_confirmed_at = timezone.now()
                 locked.save(update_fields=['status', 'auto_released', 'buyer_confirmed_at'])
 
-                try:
-                    tx = Transaction.objects.select_for_update().get(
-                        order=locked, status='in_escrow'
-                    )
-                    tx.status = 'released'
-                    tx.released_at = timezone.now()
-                    tx.save(update_fields=['status', 'released_at'])
-
-                    vendor = locked.listing.vendor
-                    vendor.wallet_balance = (vendor.wallet_balance or 0) + tx.amount
-                    vendor.save(update_fields=['wallet_balance'])
-                except Transaction.DoesNotExist:
-                    pass
-
-            vendor = order.listing.vendor
             send_notification(
-                recipient=vendor,
+                recipient=order.listing.vendor,
                 notification_type='order_auto_released',
-                title='Payment released to your wallet',
+                title='Order automatically completed',
                 message=(
-                    f'Order {order.reference} was automatically completed after 48 hours. '
-                    f'₦{order.amount:,.2f} has been added to your wallet.'
+                    f'Order {order.reference} was automatically marked complete '
+                    f'after 48 hours with no buyer response.'
                 ),
                 action_url='/vendor/dashboard',
             )
