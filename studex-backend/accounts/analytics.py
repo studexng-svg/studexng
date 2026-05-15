@@ -65,7 +65,7 @@ class AdminAnalytics:
             from services.models import Listing
 
             total_listings = Listing.objects.count()
-            published_listings = Listing.objects.filter(is_published=True).count()
+            available_listings = Listing.objects.filter(is_available=True).count()
 
             # Listings by category (top 5)
             category_breakdown = Listing.objects.values(
@@ -76,16 +76,15 @@ class AdminAnalytics:
 
             return {
                 'total_listings': total_listings,
-                'published_listings': published_listings,
-                'draft_listings': total_listings - published_listings,
+                'available_listings': available_listings,
+                'pending_listings': total_listings - available_listings,
                 'category_breakdown': list(category_breakdown),
             }
         except Exception as e:
-            # Return empty stats if services app not available
             return {
                 'total_listings': 0,
-                'published_listings': 0,
-                'draft_listings': 0,
+                'available_listings': 0,
+                'pending_listings': 0,
                 'category_breakdown': [],
             }
 
@@ -98,36 +97,33 @@ class AdminAnalytics:
             dict: Order statistics and revenue data
         """
         try:
-            from services.models import Order
+            from orders.models import Order
 
             total_orders = Order.objects.count()
 
-            # Orders by status
             pending_orders = Order.objects.filter(status='pending').count()
             completed_orders = Order.objects.filter(status='completed').count()
             cancelled_orders = Order.objects.filter(status='cancelled').count()
+            disputed_orders = Order.objects.filter(status='disputed').count()
 
-            # Revenue calculation
             total_revenue = Order.objects.filter(
                 status='completed'
             ).aggregate(
-                total=Sum('total_price')
+                total=Sum('amount')
             )['total'] or 0
 
-            # Revenue in last 30 days
             thirty_days_ago = timezone.now() - timedelta(days=30)
             revenue_30d = Order.objects.filter(
                 status='completed',
                 created_at__gte=thirty_days_ago
             ).aggregate(
-                total=Sum('total_price')
+                total=Sum('amount')
             )['total'] or 0
 
-            # Average order value
             avg_order_value = Order.objects.filter(
                 status='completed'
             ).aggregate(
-                avg=Avg('total_price')
+                avg=Avg('amount')
             )['avg'] or 0
 
             return {
@@ -135,17 +131,18 @@ class AdminAnalytics:
                 'pending_orders': pending_orders,
                 'completed_orders': completed_orders,
                 'cancelled_orders': cancelled_orders,
+                'disputed_orders': disputed_orders,
                 'total_revenue': float(total_revenue),
                 'revenue_30d': float(revenue_30d),
                 'avg_order_value': float(avg_order_value),
             }
         except Exception as e:
-            # Return empty stats if services app not available
             return {
                 'total_orders': 0,
                 'pending_orders': 0,
                 'completed_orders': 0,
                 'cancelled_orders': 0,
+                'disputed_orders': 0,
                 'total_revenue': 0.0,
                 'revenue_30d': 0.0,
                 'avg_order_value': 0.0,

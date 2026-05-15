@@ -411,32 +411,37 @@ try:
 
     class AdminOrderDetailView(APIView):
         """
+        GET  /api/admin/orders/{order_id}/
         PATCH /api/admin/orders/{order_id}/
-
-        Update order status.
         """
         permission_classes = [IsAdminUser]
 
+        def get(self, request, order_id):
+            try:
+                order = Order.objects.select_related('buyer', 'listing__vendor', 'listing__category').get(id=order_id)
+                serializer = OrderSerializer(order)
+                data = serializer.data
+                data['seller'] = order.listing.vendor.username if order.listing else None
+                data['seller_id'] = order.listing.vendor.id if order.listing else None
+                data['paid_at'] = order.paid_at.isoformat() if order.paid_at else None
+                data['seller_completed_at'] = order.seller_completed_at.isoformat() if order.seller_completed_at else None
+                data['buyer_confirmed_at'] = order.buyer_confirmed_at.isoformat() if order.buyer_confirmed_at else None
+                return Response(data, status=status.HTTP_200_OK)
+            except Order.DoesNotExist:
+                return Response({'error': 'Order not found'}, status=status.HTTP_404_NOT_FOUND)
+
         def patch(self, request, order_id):
-            """Update order status."""
             try:
                 order = Order.objects.get(id=order_id)
-
                 if 'status' in request.data:
                     order.status = request.data['status']
                     order.save()
-
                 serializer = OrderSerializer(order)
                 return Response(serializer.data, status=status.HTTP_200_OK)
-
             except Order.DoesNotExist:
-                return Response(
-                    {'error': 'Order not found'},
-                    status=status.HTTP_404_NOT_FOUND
-                )
+                return Response({'error': 'Order not found'}, status=status.HTTP_404_NOT_FOUND)
 
 except ImportError:
-    # Services app not available, skip order views
     AdminOrderListView = None
     AdminOrderDetailView = None
 
@@ -470,3 +475,449 @@ class AdminNotifyUserView(APIView):
 
         return Response({'status': 'sent'})
 
+
+# ============================================
+# DISPUTE MANAGEMENT
+# ============================================
+
+try:
+    from orders.models import Dispute
+    from orders.serializers import DisputeSerializer
+
+    class AdminDisputeListView(generics.ListAPIView):
+        """GET /api/admin/disputes/ — list all disputes with optional ?status= filter."""
+        permission_classes = [IsAdminUser]
+        serializer_class = DisputeSerializer
+
+        def get_queryset(self):
+            qs = Dispute.objects.all().select_related(
+                'order', 'filer', 'assigned_to', 'resolved_by'
+            ).order_by('-created_at')
+            disp_status = self.request.query_params.get('status')
+            if disp_status:
+                qs = qs.filter(status=disp_status)
+            search = self.request.query_params.get('search')
+            if search:
+                qs = qs.filter(
+                    Q(order__reference__icontains=search) |
+                    Q(filer__username__icontains=search) |
+                    Q(complaint__icontains=search)
+                )
+            return qs
+
+    class AdminDisputeDetailView(APIView):
+        """
+        GET   /api/admin/disputes/{id}/
+        PATCH /api/admin/disputes/{id}/  — update status, resolution, admin_decision
+        POST  /api/admin/disputes/{id}/resolve/ — resolve dispute
+        """
+        permission_classes = [IsAdminUser]
+
+        def _get(self, dispute_id):
+            return Dispute.objects.select_related(
+                'order__buyer', 'order__listing__vendor', 'filer', 'assigned_to', 'resolved_by'
+            ).get(id=dispute_id)
+
+        def get(self, request, dispute_id):
+            try:
+                dispute = self._get(dispute_id)
+                s = DisputeSerializer(dispute)
+                data = s.data
+                data['order_buyer'] = dispute.order.buyer.username if dispute.order else None
+                data['order_seller'] = dispute.order.listing.vendor.username if (dispute.order and dispute.order.listing) else None
+                data['order_amount'] = str(dispute.order.amount) if dispute.order else None
+                return Response(data)
+            except Dispute.DoesNotExist:
+                return Response({'error': 'Dispute not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        def patch(self, request, dispute_id):
+            try:
+                dispute = self._get(dispute_id)
+                allowed = ('status', 'resolution', 'admin_decision')
+                for field in allowed:
+                    if field in request.data:
+                        setattr(dispute, field, request.data[field])
+                if 'status' in request.data and request.data['status'] == 'resolved':
+                    from django.utils import timezone as tz
+                    dispute.resolved_at = tz.now()
+                    dispute.resolved_by = request.user
+                dispute.save()
+                return Response(DisputeSerializer(dispute).data)
+            except Dispute.DoesNotExist:
+                return Response({'error': 'Dispute not found'}, status=status.HTTP_404_NOT_FOUND)
+
+except ImportError:
+    AdminDisputeListView = None
+    AdminDisputeDetailView = None
+
+
+# ============================================
+# PAYMENT TRANSACTIONS
+# ============================================
+
+try:
+    from payments.models import PaymentTransaction, SellerBankAccount
+
+    class AdminPaymentListView(generics.ListAPIView):
+        """GET /api/admin/payments/ — list payment transactions."""
+        permission_classes = [IsAdminUser]
+
+        def get_queryset(self):
+            from payments.models import PaymentTransaction
+            qs = PaymentTransaction.objects.all().select_related('buyer', 'seller').order_by('-created_at')
+            pay_status = self.request.query_params.get('status')
+            if pay_status:
+                qs = qs.filter(status=pay_status)
+            search = self.request.query_params.get('search')
+            if search:
+                qs = qs.filter(
+                    Q(reference__icontains=search) |
+                    Q(buyer__username__icontains=search) |
+                    Q(seller__username__icontains=search) |
+                    Q(transfer_reference__icontains=search)
+                )
+            return qs
+
+        def list(self, request, *args, **kwargs):
+            qs = self.get_queryset()
+            data = []
+            for p in qs:
+                data.append({
+                    'id': p.id,
+                    'reference': p.reference,
+                    'buyer': p.buyer.username if p.buyer else None,
+                    'buyer_email': p.buyer_email,
+                    'seller': p.seller.username if p.seller else None,
+                    'amount': str(p.amount),
+                    'seller_amount': str(p.seller_amount),
+                    'platform_amount': str(p.platform_amount),
+                    'service_charge': str(p.service_charge),
+                    'discount_amount': str(p.discount_amount),
+                    'status': p.status,
+                    'order_type': p.order_type,
+                    'transfer_status': p.transfer_status,
+                    'transfer_reference': p.transfer_reference,
+                    'order_id': p.order_id,
+                    'created_at': p.created_at.isoformat(),
+                })
+            return Response(data)
+
+    class AdminPaymentDetailView(APIView):
+        """GET /api/admin/payments/{id}/  POST /api/admin/payments/{id}/retry/"""
+        permission_classes = [IsAdminUser]
+
+        def get(self, request, payment_id):
+            try:
+                p = PaymentTransaction.objects.select_related('buyer', 'seller').get(id=payment_id)
+                return Response({
+                    'id': p.id,
+                    'reference': p.reference,
+                    'paystack_transaction_id': p.paystack_transaction_id,
+                    'buyer': p.buyer.username if p.buyer else None,
+                    'buyer_id': p.buyer.id if p.buyer else None,
+                    'buyer_email': p.buyer_email,
+                    'buyer_name': p.buyer_name,
+                    'seller': p.seller.username if p.seller else None,
+                    'seller_id': p.seller.id if p.seller else None,
+                    'amount': str(p.amount),
+                    'seller_amount': str(p.seller_amount),
+                    'platform_amount': str(p.platform_amount),
+                    'service_charge': str(p.service_charge),
+                    'discount_amount': str(p.discount_amount),
+                    'status': p.status,
+                    'order_type': p.order_type,
+                    'order_id': p.order_id,
+                    'transfer_reference': p.transfer_reference,
+                    'transfer_status': p.transfer_status,
+                    'created_at': p.created_at.isoformat(),
+                    'updated_at': p.updated_at.isoformat(),
+                })
+            except PaymentTransaction.DoesNotExist:
+                return Response({'error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    class AdminBankAccountListView(generics.ListAPIView):
+        """GET /api/admin/bank-accounts/ — list seller bank accounts."""
+        permission_classes = [IsAdminUser]
+
+        def list(self, request, *args, **kwargs):
+            accounts = SellerBankAccount.objects.all().select_related('user').order_by('-created_at')
+            search = request.query_params.get('search')
+            if search:
+                accounts = accounts.filter(
+                    Q(user__username__icontains=search) |
+                    Q(bank_name__icontains=search) |
+                    Q(account_number__icontains=search) |
+                    Q(account_name__icontains=search)
+                )
+            data = []
+            for a in accounts:
+                data.append({
+                    'id': a.id,
+                    'user_id': a.user.id,
+                    'username': a.user.username,
+                    'business_name': getattr(a.user, 'business_name', None),
+                    'bank_name': a.bank_name,
+                    'bank_code': a.bank_code,
+                    'account_number': a.account_number,
+                    'account_name': a.account_name,
+                    'paystack_subaccount_code': a.paystack_subaccount_code,
+                    'paystack_recipient_code': a.paystack_recipient_code,
+                    'is_active': a.is_active,
+                    'created_at': a.created_at.isoformat(),
+                })
+            return Response(data)
+
+    class AdminBankAccountDetailView(APIView):
+        """PATCH /api/admin/bank-accounts/{id}/ — toggle is_active."""
+        permission_classes = [IsAdminUser]
+
+        def get(self, request, account_id):
+            try:
+                a = SellerBankAccount.objects.select_related('user').get(id=account_id)
+                return Response({
+                    'id': a.id,
+                    'user_id': a.user.id,
+                    'username': a.user.username,
+                    'business_name': getattr(a.user, 'business_name', None),
+                    'bank_name': a.bank_name,
+                    'bank_code': a.bank_code,
+                    'account_number': a.account_number,
+                    'account_name': a.account_name,
+                    'paystack_subaccount_code': a.paystack_subaccount_code,
+                    'paystack_recipient_code': a.paystack_recipient_code,
+                    'is_active': a.is_active,
+                    'created_at': a.created_at.isoformat(),
+                    'updated_at': a.updated_at.isoformat(),
+                })
+            except SellerBankAccount.DoesNotExist:
+                return Response({'error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        def patch(self, request, account_id):
+            try:
+                a = SellerBankAccount.objects.get(id=account_id)
+                if 'is_active' in request.data:
+                    a.is_active = request.data['is_active']
+                    a.save()
+                return Response({'id': a.id, 'is_active': a.is_active})
+            except SellerBankAccount.DoesNotExist:
+                return Response({'error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
+
+except ImportError:
+    AdminPaymentListView = None
+    AdminPaymentDetailView = None
+    AdminBankAccountListView = None
+    AdminBankAccountDetailView = None
+
+
+# ============================================
+# SERVICE TRANSACTIONS (ESCROW / PAYOUTS)
+# ============================================
+
+try:
+    from services.models import Transaction as ServiceTransaction
+
+    class AdminServiceTransactionListView(generics.ListAPIView):
+        """GET /api/admin/service-transactions/ — payout escrow records."""
+        permission_classes = [IsAdminUser]
+
+        def list(self, request, *args, **kwargs):
+            qs = ServiceTransaction.objects.all().select_related('vendor', 'order').order_by('-created_at')
+            tx_status = request.query_params.get('status')
+            if tx_status:
+                qs = qs.filter(status=tx_status)
+            search = request.query_params.get('search')
+            if search:
+                qs = qs.filter(
+                    Q(vendor__username__icontains=search) |
+                    Q(order__reference__icontains=search)
+                )
+            data = []
+            for t in qs:
+                data.append({
+                    'id': t.id,
+                    'vendor_id': t.vendor.id,
+                    'vendor': t.vendor.username,
+                    'business_name': getattr(t.vendor, 'business_name', None),
+                    'order_id': t.order.id if t.order else None,
+                    'order_reference': t.order.reference if t.order else None,
+                    'amount': str(t.amount),
+                    'status': t.status,
+                    'created_at': t.created_at.isoformat(),
+                    'released_at': t.released_at.isoformat() if t.released_at else None,
+                    'withdrawn_at': t.withdrawn_at.isoformat() if t.withdrawn_at else None,
+                })
+            return Response(data)
+
+    class AdminServiceTransactionDetailView(APIView):
+        """PATCH /api/admin/service-transactions/{id}/ — release or mark withdrawn."""
+        permission_classes = [IsAdminUser]
+
+        def patch(self, request, tx_id):
+            try:
+                from django.utils import timezone as tz
+                t = ServiceTransaction.objects.select_related('vendor').get(id=tx_id)
+                new_status = request.data.get('status')
+                if new_status == 'released' and t.status == 'in_escrow':
+                    t.status = 'released'
+                    t.released_at = tz.now()
+                    t.vendor.wallet_balance = (t.vendor.wallet_balance or 0) + t.amount
+                    t.vendor.save()
+                    t.save()
+                elif new_status == 'withdrawn' and t.status == 'released':
+                    t.status = 'withdrawn'
+                    t.withdrawn_at = tz.now()
+                    t.save()
+                return Response({'id': t.id, 'status': t.status})
+            except ServiceTransaction.DoesNotExist:
+                return Response({'error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
+
+except ImportError:
+    AdminServiceTransactionListView = None
+    AdminServiceTransactionDetailView = None
+
+
+# ============================================
+# REVIEWS
+# ============================================
+
+try:
+    from reviews.models import Review, AppFeedback
+
+    class AdminReviewListView(generics.ListAPIView):
+        """GET /api/admin/reviews/"""
+        permission_classes = [IsAdminUser]
+
+        def list(self, request, *args, **kwargs):
+            qs = Review.objects.all().select_related('reviewer', 'vendor', 'listing', 'order').order_by('-created_at')
+            search = request.query_params.get('search')
+            if search:
+                qs = qs.filter(
+                    Q(reviewer__username__icontains=search) |
+                    Q(vendor__username__icontains=search) |
+                    Q(listing__title__icontains=search) |
+                    Q(comment__icontains=search)
+                )
+            rating = request.query_params.get('rating')
+            if rating:
+                qs = qs.filter(rating=rating)
+            data = []
+            for r in qs:
+                data.append({
+                    'id': r.id,
+                    'reviewer': r.reviewer.username,
+                    'reviewer_id': r.reviewer.id,
+                    'vendor': r.vendor.username,
+                    'vendor_id': r.vendor.id,
+                    'listing_title': r.listing.title if r.listing else None,
+                    'listing_id': r.listing.id if r.listing else None,
+                    'order_reference': r.order.reference if r.order else None,
+                    'rating': r.rating,
+                    'comment': r.comment,
+                    'created_at': r.created_at.isoformat(),
+                })
+            return Response(data)
+
+    class AdminReviewDetailView(APIView):
+        """DELETE /api/admin/reviews/{id}/"""
+        permission_classes = [IsAdminUser]
+
+        def delete(self, request, review_id):
+            try:
+                r = Review.objects.get(id=review_id)
+                r.delete()
+                return Response({'message': 'Review deleted'}, status=status.HTTP_204_NO_CONTENT)
+            except Review.DoesNotExist:
+                return Response({'error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
+
+    class AdminFeedbackListView(generics.ListAPIView):
+        """GET /api/admin/feedback/"""
+        permission_classes = [IsAdminUser]
+
+        def list(self, request, *args, **kwargs):
+            qs = AppFeedback.objects.all().select_related('user').order_by('-created_at')
+            data = []
+            for f in qs:
+                data.append({
+                    'id': f.id,
+                    'user': f.user.username if f.user else 'Anonymous',
+                    'feedback_type': f.feedback_type,
+                    'rating': f.rating,
+                    'comment': f.comment,
+                    'created_at': f.created_at.isoformat(),
+                })
+            return Response(data)
+
+except ImportError:
+    AdminReviewListView = None
+    AdminReviewDetailView = None
+    AdminFeedbackListView = None
+
+
+# ============================================
+# CATEGORIES
+# ============================================
+
+try:
+    from services.models import Category
+
+    class AdminCategoryListView(APIView):
+        """GET /api/admin/categories/  POST /api/admin/categories/"""
+        permission_classes = [IsAdminUser]
+
+        def get(self, request):
+            cats = Category.objects.all().order_by('title')
+            data = []
+            for c in cats:
+                data.append({
+                    'id': c.id,
+                    'title': c.title,
+                    'slug': c.slug,
+                    'image': c.image,
+                    'campus': c.campus,
+                    'listing_count': c.listings.count(),
+                })
+            return Response(data)
+
+        def post(self, request):
+            from django.utils.text import slugify
+            title = (request.data.get('title') or '').strip()
+            if not title:
+                return Response({'error': 'title is required'}, status=status.HTTP_400_BAD_REQUEST)
+            slug = slugify(title)
+            campus = request.data.get('campus', 'pau')
+            image = request.data.get('image', '')
+            try:
+                cat = Category.objects.create(title=title, slug=slug, campus=campus, image=image or None)
+                return Response({'id': cat.id, 'title': cat.title, 'slug': cat.slug, 'campus': cat.campus, 'image': cat.image}, status=status.HTTP_201_CREATED)
+            except Exception as e:
+                return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    class AdminCategoryDetailView(APIView):
+        """PATCH /api/admin/categories/{id}/  DELETE /api/admin/categories/{id}/"""
+        permission_classes = [IsAdminUser]
+
+        def patch(self, request, category_id):
+            try:
+                cat = Category.objects.get(id=category_id)
+                if 'title' in request.data:
+                    cat.title = request.data['title']
+                if 'campus' in request.data:
+                    cat.campus = request.data['campus']
+                if 'image' in request.data:
+                    cat.image = request.data['image'] or None
+                cat.save()
+                return Response({'id': cat.id, 'title': cat.title, 'slug': cat.slug, 'campus': cat.campus, 'image': cat.image})
+            except Category.DoesNotExist:
+                return Response({'error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        def delete(self, request, category_id):
+            try:
+                cat = Category.objects.get(id=category_id)
+                cat.delete()
+                return Response({'message': 'Category deleted'}, status=status.HTTP_204_NO_CONTENT)
+            except Category.DoesNotExist:
+                return Response({'error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
+
+except ImportError:
+    AdminCategoryListView = None
+    AdminCategoryDetailView = None

@@ -74,8 +74,8 @@ export default function AdminAnalytics() {
                 <p className="text-teal-600 text-xs tracking-[0.2em] uppercase font-semibold">Listings</p>
               </div>
               <Row label="Total listings" value={data.listings.total_listings} />
-              <Row label="Live / published" value={data.listings.published_listings} />
-              <Row label="Pending approval" value={data.listings.draft_listings} />
+              <Row label="Live / available" value={data.listings.available_listings} />
+              <Row label="Pending approval" value={data.listings.pending_listings} />
               {data.listings.category_breakdown?.length > 0 && (
                 <div className="mt-3 pt-3 border-t border-stone-100">
                   <p className="text-xs text-stone-500 font-medium mb-2">Top categories</p>
@@ -100,6 +100,7 @@ export default function AdminAnalytics() {
               <Row label="Total orders"    value={data.orders.total_orders} />
               <Row label="Pending"         value={data.orders.pending_orders} />
               <Row label="Completed"       value={data.orders.completed_orders} />
+              <Row label="Disputed"        value={data.orders.disputed_orders ?? 0} />
               <Row label="Cancelled"       value={data.orders.cancelled_orders} />
               <Row label="Revenue (30d)"   value={`₦${data.orders.revenue_30d.toLocaleString()}`} />
               <Row label="Total revenue"   value={`₦${data.orders.total_revenue.toLocaleString()}`} />

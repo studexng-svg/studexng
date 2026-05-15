@@ -2,8 +2,9 @@
 "use client";
 
 import {
-  Users, Package, DollarSign, Store, FileText,
+  Users, Package, DollarSign, Store, FileText, Tag,
   ChevronRight, AlertCircle, CheckCircle, Clock,
+  CreditCard, Star, AlertTriangle, ArrowUpRight,
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -24,13 +25,14 @@ interface DashStats {
   };
   listings: {
     total_listings: number;
-    published_listings: number;
-    draft_listings: number;
+    available_listings: number;
+    pending_listings: number;
   };
   orders: {
     total_orders: number;
     pending_orders: number;
     completed_orders: number;
+    disputed_orders: number;
     total_revenue: number;
     revenue_30d: number;
   };
@@ -56,10 +58,16 @@ function StatCard({ label, value, sub, icon: Icon, accent }: {
 }
 
 const QUICK_LINKS = [
-  { label: "Seller Approvals", href: "/admin/seller-approvals", icon: FileText, desc: "Review pending applications" },
-  { label: "All Users",        href: "/admin/users",            icon: Users,    desc: "Manage registered users" },
-  { label: "Vendors",          href: "/admin/sellers",          icon: Store,    desc: "View verified vendors" },
-  { label: "Orders",           href: "/admin/orders",           icon: Package,  desc: "Monitor all orders" },
+  { label: "Seller Approvals",    href: "/admin/seller-approvals", icon: FileText,     desc: "Review pending applications" },
+  { label: "All Users",           href: "/admin/users",            icon: Users,        desc: "Manage registered users" },
+  { label: "Vendors",             href: "/admin/sellers",          icon: Store,        desc: "View verified vendors" },
+  { label: "Listings",            href: "/admin/listings",         icon: Package,      desc: "Approve & manage listings" },
+  { label: "Orders",              href: "/admin/orders",           icon: Package,      desc: "Monitor all orders" },
+  { label: "Disputes",            href: "/admin/disputes",         icon: AlertTriangle,desc: "Resolve buyer/seller disputes" },
+  { label: "Payouts",             href: "/admin/payouts",          icon: DollarSign,   desc: "Payments, bank accounts, escrow" },
+  { label: "Reviews",             href: "/admin/reviews",          icon: Star,         desc: "Manage platform reviews" },
+  { label: "Categories",          href: "/admin/categories",       icon: Tag,          desc: "Manage listing categories" },
+  { label: "Payout Transactions", href: "/admin/transactions",     icon: ArrowUpRight, desc: "Escrow and release tracking" },
 ];
 
 export default function AdminDashboard() {
@@ -98,7 +106,7 @@ export default function AdminDashboard() {
             <div className="grid grid-cols-2 gap-3">
               <StatCard label="Total Users"     value={stats.users.total_users}      sub={`+${stats.users.new_users_30d} this month`} icon={Users}   accent="#7C3AED" />
               <StatCard label="Verified Vendors" value={stats.users.verified_vendors} sub={`${stats.users.pending_vendors} pending`}   icon={Store}   accent="#0D9488" />
-              <StatCard label="Total Listings"   value={stats.listings.total_listings} sub={`${stats.listings.published_listings} live`} icon={FileText} accent="#F59E0B" />
+              <StatCard label="Total Listings"   value={stats.listings.total_listings} sub={`${stats.listings.available_listings} live`} icon={FileText} accent="#F59E0B" />
               <StatCard label="Total Orders"     value={stats.orders.total_orders}    sub={`${stats.orders.pending_orders} pending`}   icon={Package} accent="#EF4444" />
               <StatCard label="Revenue (30d)"    value={`₦${stats.orders.revenue_30d.toLocaleString()}`}   icon={DollarSign} accent="#10B981" />
               <StatCard label="Total Revenue"    value={`₦${stats.orders.total_revenue.toLocaleString()}`} icon={DollarSign} accent="#6366F1" />
@@ -139,6 +147,25 @@ export default function AdminDashboard() {
                     </div>
                   </div>
                   <ChevronRight className="w-4 h-4 text-blue-500" />
+                </div>
+              </Link>
+            )}
+
+            {(stats.orders.disputed_orders ?? 0) > 0 && (
+              <Link href="/admin/disputes">
+                <div className="bg-red-50 border border-red-200 rounded-2xl p-4 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 bg-red-100 rounded-xl flex items-center justify-center">
+                      <AlertTriangle className="w-4.5 h-4.5 text-red-600" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-red-900 text-sm">
+                        {stats.orders.disputed_orders} Open {stats.orders.disputed_orders === 1 ? "Dispute" : "Disputes"}
+                      </p>
+                      <p className="text-red-600 text-xs">Tap to review</p>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-red-400" />
                 </div>
               </Link>
             )}

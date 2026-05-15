@@ -1,19 +1,62 @@
 // src/app/admin/payouts/page.tsx
 "use client";
 
-import { DollarSign } from "lucide-react";
+import { DollarSign, CreditCard, ArrowUpRight, ChevronRight } from "lucide-react";
+import Link from "next/link";
 import AdminTopBar from "@/components/layout/AdminTopBar";
 
-export default function AdminPayouts() {
+export default function AdminPayoutsPage() {
   return (
     <div className="min-h-screen bg-[#FFF8F0]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       <AdminTopBar title="Payouts" back="/admin" />
-      <div className="flex flex-col items-center justify-center py-32 px-6 text-center">
-        <div className="w-14 h-14 bg-teal-100 rounded-2xl flex items-center justify-center mb-4">
-          <DollarSign className="w-7 h-7 text-teal-600" />
-        </div>
-        <p className="font-bold text-stone-900 text-lg mb-1">No payout requests</p>
-        <p className="text-stone-400 text-sm">Vendor withdrawal requests will appear here when submitted.</p>
+
+      <div className="px-4 pt-5 pb-28 max-w-2xl mx-auto space-y-3">
+        <p className="text-teal-600 text-xs tracking-[0.2em] uppercase font-semibold">Payout Management</p>
+
+        <Link href="/admin/payments">
+          <div className="bg-white border border-stone-200 hover:border-teal-300 rounded-2xl p-4 flex items-center justify-between transition active:scale-[0.98]">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-teal-100 rounded-xl flex items-center justify-center">
+                <DollarSign className="w-5 h-5 text-teal-600" />
+              </div>
+              <div>
+                <p className="font-semibold text-stone-900 text-sm">Payment Transactions</p>
+                <p className="text-stone-400 text-xs">All Paystack payments and transfer logs</p>
+              </div>
+            </div>
+            <ChevronRight className="w-4 h-4 text-stone-400" />
+          </div>
+        </Link>
+
+        <Link href="/admin/bank-accounts">
+          <div className="bg-white border border-stone-200 hover:border-teal-300 rounded-2xl p-4 flex items-center justify-between transition active:scale-[0.98]">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center">
+                <CreditCard className="w-5 h-5 text-purple-600" />
+              </div>
+              <div>
+                <p className="font-semibold text-stone-900 text-sm">Seller Bank Accounts</p>
+                <p className="text-stone-400 text-xs">Paystack recipient codes and account details</p>
+              </div>
+            </div>
+            <ChevronRight className="w-4 h-4 text-stone-400" />
+          </div>
+        </Link>
+
+        <Link href="/admin/transactions">
+          <div className="bg-white border border-stone-200 hover:border-teal-300 rounded-2xl p-4 flex items-center justify-between transition active:scale-[0.98]">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center">
+                <ArrowUpRight className="w-5 h-5 text-amber-600" />
+              </div>
+              <div>
+                <p className="font-semibold text-stone-900 text-sm">Payout Transactions</p>
+                <p className="text-stone-400 text-xs">Escrow → released → withdrawn flow</p>
+              </div>
+            </div>
+            <ChevronRight className="w-4 h-4 text-stone-400" />
+          </div>
+        </Link>
       </div>
     </div>
   );
