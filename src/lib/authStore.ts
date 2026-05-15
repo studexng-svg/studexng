@@ -138,8 +138,11 @@ export const useAuth = create<AuthState>()(
         state.setAuthReady(true);
         // On page refresh: re-sync profile, cart, and wishlist from backend
         if (state.isLoggedIn && state.user) {
-          setTimeout(() => {
-            // Refresh profile first — gets fresh profile_image URL from backend
+          setTimeout(async () => {
+            // accessToken is null after a refresh (not persisted to localStorage).
+            // Restore it from the httpOnly refresh cookie before any authenticated calls,
+            // otherwise DRF sees an anonymous request and returns 403 instead of 401.
+            await refreshAccessToken();
             useAuth.getState().refreshProfile();
             try {
               // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -265,6 +268,16 @@ export const fetchWithAuth = async (
   let response = await makeRequest(token);
 
   if (response.status === 401) {
+    const newToken = await refreshAccessToken();
+    if (newToken) {
+      response = await makeRequest(newToken);
+    }
+  }
+
+  // DRF returns 403 (not 401) for fully anonymous requests (no Authorization header).
+  // This happens on page refresh when accessToken is null but the user is still "logged in"
+  // (refresh cookie exists). Attempt a token restore and retry once.
+  if (response.status === 403 && !token && useAuth.getState().isLoggedIn) {
     const newToken = await refreshAccessToken();
     if (newToken) {
       response = await makeRequest(newToken);
