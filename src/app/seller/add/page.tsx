@@ -97,8 +97,13 @@ export default function AddService() {
         body: formData,
       });
       if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.detail || (Object.values(data)[0] as string[])?.[0] || "Failed to publish service");
+        const data = await res.json().catch(() => ({}));
+        const firstVal = Object.values(data)[0];
+        throw new Error(
+          data.detail ||
+          (Array.isArray(firstVal) ? firstVal[0] : typeof firstVal === "string" ? firstVal : null) ||
+          "Failed to publish service. Please try again."
+        );
       }
       router.push("/seller");
     } catch (err: any) {
@@ -223,9 +228,14 @@ export default function AddService() {
           <button type="submit" disabled={loading}
             className="w-full py-4 rounded-full text-white font-semibold text-base shadow-lg shadow-teal-200/60 disabled:opacity-60 flex items-center justify-center gap-2 transition active:scale-[0.98]"
             style={{ background: GRAD }}>
-            <Plus className="w-5 h-5" />
-            {loading ? "Publishing..." : "Publish Service"}
+            {loading
+              ? <><span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />Uploading photo & saving…</>
+              : <><Plus className="w-5 h-5" />Publish Service</>
+            }
           </button>
+          {loading && (
+            <p className="text-center text-xs text-stone-400">This may take a few seconds while we upload your photo.</p>
+          )}
         </form>
       </div>
     </div>

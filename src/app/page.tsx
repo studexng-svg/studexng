@@ -355,7 +355,7 @@ export default function LandingPage() {
                 <div className="mb-3">
                   <Icon3D icon={GraduationCap} px={44} iconPx={22} radius={12} color="#0D9488" />
                 </div>
-                <p className="font-black text-stone-900 text-sm uppercase tracking-wide">I&apos;m a Student</p>
+                <p className="font-black text-stone-900 text-sm uppercase tracking-wide">I&apos;m a Buyer</p>
                 <p className="text-stone-500 text-xs mt-1">Browse and order services on campus</p>
                 <p className="text-teal-600 font-bold text-xs mt-3">Start Ordering →</p>
               </div>

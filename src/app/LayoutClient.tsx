@@ -10,10 +10,12 @@ import { useNotifications } from "@/hooks/useNotifications";
 import { NotificationToastContainer } from "@/components/NotificationToast";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import AdminBar from "@/components/AdminBar";
+import { useHeartbeat } from "@/hooks/useHeartbeat";
 
 function NotificationProvider({ children }: { children: React.ReactNode }) {
   const { toasts, dismissToast } = useNotifications();
   usePushNotifications();
+  useHeartbeat();
   return (
     <>
       {children}

@@ -70,6 +70,26 @@ class RateLimitMiddleware(MiddlewareMixin):
         return None
 
 
+class LastSeenMiddleware(MiddlewareMixin):
+    """
+    Updates user.last_seen on each authenticated API request.
+    Throttled via cache to at most one DB write per user per 60 seconds.
+    """
+
+    def process_response(self, request, response):
+        if not request.path.startswith('/api/'):
+            return response
+        if not hasattr(request, 'user') or not request.user.is_authenticated:
+            return response
+        cache_key = f'last_seen:{request.user.pk}'
+        if not cache.get(cache_key):
+            from django.utils import timezone
+            from accounts.models import User
+            User.objects.filter(pk=request.user.pk).update(last_seen=timezone.now())
+            cache.set(cache_key, 1, 60)
+        return response
+
+
 class SecurityHeadersMiddleware(MiddlewareMixin):
     """
     Add additional security headers to all responses

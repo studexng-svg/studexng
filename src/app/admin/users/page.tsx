@@ -17,6 +17,18 @@ function relativeTime(dateStr: string | null | undefined): string {
   if (months < 12) return `${months}mo ago`;
   return `${Math.floor(months / 12)}y ago`;
 }
+
+function ActivityStatus({ lastSeen }: { lastSeen?: string | null }) {
+  if (!lastSeen) return <span className="text-stone-300 text-xs">Never</span>;
+  const mins = Math.floor((Date.now() - new Date(lastSeen).getTime()) / 60000);
+  if (mins < 3) return (
+    <span className="flex items-center gap-1">
+      <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+      <span className="text-green-600 text-xs font-semibold">Online</span>
+    </span>
+  );
+  return <span className="text-stone-400 text-xs">{relativeTime(lastSeen)}</span>;
+}
 import AdminTopBar from "@/components/layout/AdminTopBar";
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
@@ -114,7 +126,7 @@ export default function AdminUsers() {
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-stone-900 text-sm truncate">{user.username}</p>
                   <p className="text-stone-400 text-xs truncate">{user.email}</p>
-                  <p className="text-stone-300 text-xs">Seen {relativeTime(user.last_login)}</p>
+                  <ActivityStatus lastSeen={user.last_seen} />
                 </div>
                 <span className={`px-2 py-0.5 rounded-full text-xs font-semibold flex-shrink-0 ${
                   user.school?.toLowerCase() === "futo"

@@ -91,6 +91,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'studex.middleware.RateLimitMiddleware',
+    'studex.middleware.LastSeenMiddleware',
     'studex.middleware.SecurityHeadersMiddleware',
 ]
 
@@ -250,7 +251,7 @@ REST_FRAMEWORK = {
 # JWT
 # =======================================
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=15),
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=1),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=30),
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,

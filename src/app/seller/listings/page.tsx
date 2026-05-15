@@ -35,7 +35,7 @@ export default function SellerListings() {
 
     const fetchListings = async () => {
       try {
-        const res = await fetchWithAuth(`${API_URL}/api/services/listings/`);
+        const res = await fetchWithAuth(`${API_URL}/api/services/listings/?vendor_username=${encodeURIComponent(authUser.username)}`);
 
         if (!res.ok) {
           if (res.status === 401) {

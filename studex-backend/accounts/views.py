@@ -678,3 +678,11 @@ class VendorDetailView(generics.RetrieveAPIView):
 
     def get_queryset(self):
         return User.objects.filter(is_verified_vendor=True).select_related('profile')
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def heartbeat(request):
+    """Lightweight endpoint the frontend pings every 30s to update last_seen."""
+    User.objects.filter(pk=request.user.pk).update(last_seen=timezone.now())
+    return Response({'status': 'ok'})

@@ -29,6 +29,13 @@ function relativeTime(dateStr: string | null | undefined): string {
   return `${Math.floor(months / 12)}y ago`;
 }
 
+function activityLabel(lastSeen: string | null | undefined): string {
+  if (!lastSeen) return "Never";
+  const mins = Math.floor((Date.now() - new Date(lastSeen).getTime()) / 60000);
+  if (mins < 3) return "🟢 Online now";
+  return `Last seen ${relativeTime(lastSeen)} · ${new Date(lastSeen).toLocaleDateString("en-NG", { year: "numeric", month: "short", day: "numeric" })}`;
+}
+
 function Row({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value?: string | number | null }) {
   if (!value && value !== 0) return null;
   return (
@@ -176,11 +183,7 @@ export default function AdminUserDetail() {
             value={new Date(user.date_joined).toLocaleDateString("en-NG", {
               year: "numeric", month: "long", day: "numeric",
             })} />
-          <Row icon={Clock} label="Last Seen"
-            value={user.last_login
-              ? `${relativeTime(user.last_login)} · ${new Date(user.last_login).toLocaleDateString("en-NG", { year: "numeric", month: "short", day: "numeric" })}`
-              : "Never logged in"
-            } />
+          <Row icon={Clock} label="Activity" value={activityLabel(user.last_seen)} />
         </Section>
 
         {/* Account info */}

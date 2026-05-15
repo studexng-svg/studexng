@@ -4,7 +4,7 @@ from rest_framework_simplejwt.views import TokenRefreshView
 from . import views
 from .views import SellerApplicationViewSet, ForgotPasswordView, ResetPasswordView
 from .views import check_profile_completion, check_username, send_otp, verify_otp
-from .views import VendorDetailView, cookie_token_refresh
+from .views import VendorDetailView, cookie_token_refresh, heartbeat
 
 # Router for Seller Application endpoints
 router = DefaultRouter()
@@ -32,6 +32,7 @@ urlpatterns = [
     path('forgot-password/', ForgotPasswordView.as_view(), name='forgot-password'),
     path('reset-password/', ResetPasswordView.as_view(), name='reset-password'),
     path('me/', views.me, name='me'),
+    path('heartbeat/', heartbeat, name='heartbeat'),
 
     # Seller verification endpoints (via router)
     # Generates:
