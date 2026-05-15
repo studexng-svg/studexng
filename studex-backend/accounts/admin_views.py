@@ -28,8 +28,11 @@ class AdminDashboardView(APIView):
     permission_classes = [IsAdminUser]
 
     def get(self, request):
-        data = AdminAnalytics.get_dashboard_summary()
-        return Response(data, status=status.HTTP_200_OK)
+        try:
+            data = AdminAnalytics.get_dashboard_summary()
+            return Response(data, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class AdminAnalyticsTimeSeriesView(APIView):
@@ -41,67 +44,79 @@ class AdminAnalyticsTimeSeriesView(APIView):
 
     def get(self, request):
         from django.utils import timezone as tz
-        from datetime import timedelta, date
-        days = min(int(request.query_params.get('days', 30)), 90)
-        today = tz.now().date()
-        start = today - timedelta(days=days - 1)
-
-        date_range = [start + timedelta(days=i) for i in range(days)]
-
-        # Users registered per day
-        from accounts.models import User as UserModel
-        user_qs = (
-            UserModel.objects
-            .filter(date_joined__date__gte=start)
-            .extra(select={'day': "date(date_joined)"})
-            .values('day')
-            .annotate(count=Count('id'))
-        )
-        user_by_day = {row['day']: row['count'] for row in user_qs}
-
-        # Orders per day + revenue per day
-        order_by_day = {}
-        revenue_by_day = {}
+        from django.db.models.functions import TruncDate
+        from datetime import timedelta
         try:
-            from orders.models import Order as OrderModel
-            order_qs = (
-                OrderModel.objects
-                .filter(created_at__date__gte=start)
-                .extra(select={'day': "date(created_at)"})
+            days = min(int(request.query_params.get('days', 30)), 90)
+        except (ValueError, TypeError):
+            days = 30
+
+        try:
+            today = tz.now().date()
+            start = today - timedelta(days=days - 1)
+            date_range = [start + timedelta(days=i) for i in range(days)]
+
+            # Users registered per day (PostgreSQL-safe via TruncDate)
+            from accounts.models import User as UserModel
+            user_qs = (
+                UserModel.objects
+                .filter(date_joined__date__gte=start)
+                .annotate(day=TruncDate('date_joined'))
                 .values('day')
-                .annotate(count=Count('id'), rev=Sum('amount'))
+                .annotate(count=Count('id'))
+                .order_by('day')
             )
-            for row in order_qs:
-                order_by_day[row['day']] = row['count']
-                revenue_by_day[row['day']] = float(row['rev'] or 0)
-        except Exception:
-            pass
+            user_by_day = {row['day']: row['count'] for row in user_qs}
 
-        series = []
-        for d in date_range:
-            day_str = d.isoformat()
-            # ORM extra() returns date strings in different formats — normalise
-            series.append({
-                'date': day_str,
-                'label': d.strftime('%b %d'),
-                'new_users': user_by_day.get(d, user_by_day.get(day_str, 0)),
-                'orders': order_by_day.get(d, order_by_day.get(day_str, 0)),
-                'revenue': revenue_by_day.get(d, revenue_by_day.get(day_str, 0.0)),
+            # Orders per day + revenue per day
+            order_by_day = {}
+            revenue_by_day = {}
+            try:
+                from orders.models import Order as OrderModel
+                order_qs = (
+                    OrderModel.objects
+                    .filter(created_at__date__gte=start)
+                    .annotate(day=TruncDate('created_at'))
+                    .values('day')
+                    .annotate(count=Count('id'), rev=Sum('amount'))
+                    .order_by('day')
+                )
+                for row in order_qs:
+                    order_by_day[row['day']] = row['count']
+                    revenue_by_day[row['day']] = float(row['rev'] or 0)
+            except Exception:
+                pass
+
+            series = []
+            for d in date_range:
+                day_str = d.isoformat()
+                series.append({
+                    'date': day_str,
+                    'label': d.strftime('%b %d'),
+                    'new_users': user_by_day.get(d, 0),
+                    'orders': order_by_day.get(d, 0),
+                    'revenue': revenue_by_day.get(d, 0.0),
+                })
+
+            # Order status distribution
+            status_dist = {}
+            try:
+                from orders.models import Order as OrderModel
+                for row in OrderModel.objects.values('status').annotate(count=Count('id')):
+                    status_dist[row['status']] = row['count']
+            except Exception:
+                pass
+
+            return Response({
+                'series': series,
+                'status_distribution': status_dist,
             })
-
-        # Order status distribution
-        status_dist = {}
-        try:
-            from orders.models import Order as OrderModel
-            for row in OrderModel.objects.values('status').annotate(count=Count('id')):
-                status_dist[row['status']] = row['count']
-        except Exception:
-            pass
-
-        return Response({
-            'series': series,
-            'status_distribution': status_dist,
-        })
+        except Exception as e:
+            return Response({
+                'series': [],
+                'status_distribution': {},
+                'error': str(e),
+            })
 
 
 # ============================================
