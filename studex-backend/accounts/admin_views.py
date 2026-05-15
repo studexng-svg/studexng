@@ -863,11 +863,9 @@ class AdminVendorPayoutsView(APIView):
                 )
                 result = []
                 for v in rows:
-                    if v['seller'] is None:
-                        continue
                     result.append({
-                        'vendor_id': v['seller'],
-                        'vendor': v['seller__username'],
+                        'vendor_id': v['seller'] or 0,
+                        'vendor': v['seller__username'] or '[Deleted Account]',
                         'business_name': v['seller__business_name'] or '',
                         'school': (v['seller__school'] or 'pau').upper(),
                         'total_earned': float(v['total_earned'] or 0),
@@ -906,11 +904,9 @@ class AdminVendorPayoutsView(APIView):
             )
             result = []
             for v in rows:
-                if v['listing__vendor'] is None:
-                    continue
                 result.append({
-                    'vendor_id': v['listing__vendor'],
-                    'vendor': v['listing__vendor__username'],
+                    'vendor_id': v['listing__vendor'] or 0,
+                    'vendor': v['listing__vendor__username'] or '[Deleted Account]',
                     'business_name': v['listing__vendor__business_name'] or '',
                     'school': (v['listing__campus'] or 'pau').upper(),
                     'total_earned': float(v['total_earned'] or 0),
