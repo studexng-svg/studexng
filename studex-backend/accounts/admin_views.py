@@ -827,83 +827,48 @@ class AdminVendorPayoutsView(APIView):
 
     def get(self, request):
         from django.db.models import Sum, Count, Max
-        from django.utils import timezone
-        from datetime import timedelta
+        from orders.models import Order
 
         search = request.query_params.get('search', '')
-        campus = request.query_params.get('campus', '')
+        campus = request.query_params.get('campus', '').lower()
 
-        def _campus_filter(qs, field_prefix):
-            if not campus:
-                return qs
-            cl = campus.lower()
-            if cl == 'pau':
-                return qs.filter(
-                    Q(**{f'{field_prefix}__iexact': 'pau'}) |
-                    Q(**{f'{field_prefix}': ''}) |
-                    Q(**{f'{field_prefix}__isnull': True})
-                )
-            return qs.filter(**{f'{field_prefix}__iexact': cl})
-
-        # Try PaymentTransaction first
+        # Always derive from Orders using listing.campus — the only field that
+        # is guaranteed to be 'pau' or 'futo' for every order and never drifts
+        # (unlike vendor.school which can be changed after listing creation).
+        # This ensures PAU + FUTO always sums to All with no rounding gap.
         try:
-            from payments.models import PaymentTransaction
-            qs = PaymentTransaction.objects.filter(status='success').select_related('seller')
-            if search:
-                qs = qs.filter(
-                    Q(seller__username__icontains=search) |
-                    Q(seller__business_name__icontains=search)
-                )
-            qs = _campus_filter(qs, 'seller__school')
-            if qs.exists():
-                rows = (
-                    qs.values('seller', 'seller__username', 'seller__business_name', 'seller__school')
-                    .annotate(total_earned=Sum('seller_amount'), order_count=Count('id'), last_date=Max('created_at'))
-                    .order_by('-total_earned')
-                )
-                result = []
-                for v in rows:
-                    if v['seller'] is None:
-                        continue
-                    result.append({
-                        'vendor_id': v['seller'],
-                        'vendor': v['seller__username'],
-                        'business_name': v['seller__business_name'] or '',
-                        'school': (v['seller__school'] or 'pau').upper(),
-                        'total_earned': float(v['total_earned'] or 0),
-                        'order_count': v['order_count'],
-                        'last_date': v['last_date'].isoformat() if v['last_date'] else None,
-                    })
-                return Response(result)
-        except ImportError:
-            pass
-
-        # Fallback: derive from Orders
-        try:
-            from orders.models import Order
-            from django.db.models import F
             PAID = ['paid', 'seller_completed', 'completed']
-            qs = (
-                Order.objects.filter(status__in=PAID)
-                .annotate(listing_price=F('listing__price'))
-                .select_related('listing__vendor', 'listing')
-            )
+            qs = Order.objects.filter(status__in=PAID).select_related('listing__vendor', 'listing')
+
             if search:
                 qs = qs.filter(
                     Q(listing__vendor__username__icontains=search) |
                     Q(listing__vendor__business_name__icontains=search)
                 )
-            # Filter by listing.campus (authoritative — set at listing creation,
-            # never changes even if vendor later updates their school field).
-            qs = _campus_filter(qs, 'listing__campus')
+
+            if campus:
+                if campus == 'pau':
+                    qs = qs.filter(
+                        Q(listing__campus__iexact='pau') |
+                        Q(listing__campus='') |
+                        Q(listing__campus__isnull=True)
+                    )
+                else:
+                    qs = qs.filter(listing__campus__iexact=campus)
+
             rows = (
                 qs.values(
                     'listing__vendor', 'listing__vendor__username',
                     'listing__vendor__business_name', 'listing__campus'
                 )
-                .annotate(total_earned=Sum('listing_price'), order_count=Count('id'), last_date=Max('created_at'))
+                .annotate(
+                    total_earned=Sum('listing__price'),
+                    order_count=Count('id'),
+                    last_date=Max('created_at'),
+                )
                 .order_by('-total_earned')
             )
+
             result = []
             for v in rows:
                 if v['listing__vendor'] is None:
