@@ -263,12 +263,12 @@ class UserSerializer(serializers.ModelSerializer):
         fields = ['id', 'username', 'email', 'phone', 'user_type',
                   'is_active', 'is_staff', 'is_superuser', 'date_joined',
                   'matric_number', 'hostel', 'business_name',
-                  'is_verified_vendor', 'profile']
-        read_only_fields = ['date_joined']
+                  'is_verified_vendor', 'wallet_balance', 'profile']
+        read_only_fields = ['date_joined', 'wallet_balance']
 
     def get_profile(self, obj):
         try:
-            obj.profile  # ensure the profile relation exists
+            p = obj.profile
         except Profile.DoesNotExist:
             return None
         return {
@@ -276,6 +276,13 @@ class UserSerializer(serializers.ModelSerializer):
             'matric_number': obj.matric_number,
             'business_name': obj.business_name,
             'hostel': obj.hostel,
+            'whatsapp': getattr(p, 'whatsapp', None) or '',
+            'instagram': getattr(p, 'instagram', None) or '',
+            'rating': str(getattr(p, 'rating', None) or ''),
+            'total_orders': getattr(p, 'total_orders', None) or 0,
+            'total_reviews': getattr(p, 'total_reviews', None) or 0,
+            'on_platform_sales': str(getattr(p, 'on_platform_sales', None) or '0'),
+            'vendor_badge': getattr(p, 'vendor_badge', None) or '',
         }
 
 
@@ -293,6 +300,12 @@ class SellerApplicationSerializer(serializers.ModelSerializer):
     applicant_name = serializers.SerializerMethodField()
     applicant_email = serializers.SerializerMethodField()
     applicant_matric = serializers.SerializerMethodField()
+    applicant_phone = serializers.SerializerMethodField()
+    applicant_business_name = serializers.SerializerMethodField()
+    applicant_hostel = serializers.SerializerMethodField()
+    applicant_whatsapp = serializers.SerializerMethodField()
+    applicant_instagram = serializers.SerializerMethodField()
+    applicant_user_id = serializers.SerializerMethodField()
 
     class Meta:
         model = SellerApplication
@@ -310,9 +323,15 @@ class SellerApplicationSerializer(serializers.ModelSerializer):
             'status',
             'submitted_at',
             'notes',
+            'applicant_user_id',
             'applicant_name',
             'applicant_email',
             'applicant_matric',
+            'applicant_phone',
+            'applicant_business_name',
+            'applicant_hostel',
+            'applicant_whatsapp',
+            'applicant_instagram',
         ]
         read_only_fields = ['status', 'submitted_at', 'notes']
 
@@ -348,6 +367,30 @@ class SellerApplicationSerializer(serializers.ModelSerializer):
 
     def get_applicant_matric(self, obj):
         return obj.user.matric_number or ''
+
+    def get_applicant_phone(self, obj):
+        return obj.user.phone or ''
+
+    def get_applicant_business_name(self, obj):
+        return obj.user.business_name or ''
+
+    def get_applicant_hostel(self, obj):
+        return obj.user.hostel or ''
+
+    def get_applicant_whatsapp(self, obj):
+        try:
+            return obj.user.profile.whatsapp or ''
+        except Exception:
+            return ''
+
+    def get_applicant_instagram(self, obj):
+        try:
+            return obj.user.profile.instagram or ''
+        except Exception:
+            return ''
+
+    def get_applicant_user_id(self, obj):
+        return obj.user.id
 
     def validate(self, data):
         import logging
