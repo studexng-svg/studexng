@@ -111,8 +111,15 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             import re
             if not re.match(r'^\d{11}$', value):
                 raise serializers.ValidationError("NIN must be exactly 11 digits")
-            if User.objects.filter(nin=value).exists():
-                raise serializers.ValidationError("This NIN is already registered")
+            # NIN is encrypted at rest so we can't use a DB filter — compare decrypted values.
+            from accounts.fields import decrypt_field
+            instance_pk = getattr(self.instance, 'pk', None)
+            qs = User.objects.filter(nin__isnull=False).exclude(nin='')
+            if instance_pk:
+                qs = qs.exclude(pk=instance_pk)
+            for user in qs:
+                if decrypt_field(user.nin) == value:
+                    raise serializers.ValidationError("This NIN is already registered")
         return value
 
     def create(self, validated_data):
@@ -162,6 +169,7 @@ class UserLoginSerializer(serializers.Serializer):
 class UserProfileSerializer(serializers.ModelSerializer):
     profile = serializers.SerializerMethodField()
     profile_image = serializers.SerializerMethodField()
+    is_admin = serializers.SerializerMethodField()
     whatsapp = serializers.CharField(write_only=True, required=False, allow_blank=True, allow_null=True)
     instagram = serializers.CharField(write_only=True, required=False, allow_blank=True, allow_null=True)
 
@@ -172,10 +180,14 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'matric_number', 'nin', 'verification_type', 'hostel', 'school',
             'business_name', 'is_verified_vendor',
             'bio', 'profile_image', 'wallet_balance', 'created_at', 'profile',
-            'is_staff', 'is_superuser',
+            'is_staff', 'is_superuser', 'is_admin',
             'whatsapp', 'instagram',
         ]
-        read_only_fields = ['wallet_balance', 'is_verified_vendor', 'created_at', 'is_staff', 'is_superuser']
+        read_only_fields = ['wallet_balance', 'is_verified_vendor', 'created_at', 'is_staff', 'is_superuser', 'is_admin']
+
+    def get_is_admin(self, obj):
+        from studex.permissions import _is_platform_admin
+        return _is_platform_admin(obj)
 
     def get_profile_image(self, obj):
         """Always return an absolute URL — works with Cloudinary, S3, and local storage."""

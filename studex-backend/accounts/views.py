@@ -113,6 +113,8 @@ def verify_otp(request):
         return Response({'error': 'Incorrect code. Please try again.'}, status=400)
 
     cache.delete(f'otp_{email}')
+    # Mark this email as OTP-verified so register_user can enforce it server-side.
+    cache.set(f'otp_verified:{email}', True, 600)  # 10-minute window to complete registration
     return Response({'message': 'OTP verified successfully'})
 
 
@@ -136,9 +138,17 @@ def check_username(request):
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def register_user(request):
+    email = request.data.get('email', '').strip().lower()
+    if email and not cache.get(f'otp_verified:{email}'):
+        return Response(
+            {'error': 'Email verification required. Please verify your email with an OTP before registering.'},
+            status=400,
+        )
+
     serializer = UserRegistrationSerializer(data=request.data)
     if serializer.is_valid():
         user = serializer.save()
+        cache.delete(f'otp_verified:{email}')
 
         campus = getattr(user, 'school', 'pau') or 'pau'
         campus_name = 'FUTO' if campus.lower() == 'futo' else 'PAU'
@@ -365,6 +375,7 @@ def me(request):
         }
     except Profile.DoesNotExist:
         pass
+    from studex.permissions import _is_platform_admin
     return Response({
         'id': user.id,
         'username': user.username,
@@ -373,6 +384,7 @@ def me(request):
         'bio': user.bio or '',
         'user_type': user.user_type,
         'is_verified_vendor': user.is_verified_vendor,
+        'is_admin': _is_platform_admin(user),
         'business_name': user.business_name or '',
         'hostel': user.hostel or '',
         'matric_number': user.matric_number or '',

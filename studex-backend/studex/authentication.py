@@ -8,8 +8,6 @@ from rest_framework.exceptions import AuthenticationFailed
 from firebase_admin import auth as firebase_auth
 from django.contrib.auth import get_user_model
 import logging
-import json
-import base64
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -51,31 +49,9 @@ class FirebaseAuthentication(BaseAuthentication):
             raise AuthenticationFailed("Firebase token has been revoked")
         
         except Exception as e:
-            # Catch verification errors including "kid" claim errors
             error_msg = str(e)
-            logger.warning(f"Firebase verification error: {error_msg}")
-            
-            # If it's a "kid" claim error, try to decode without verification
-            if "kid" in error_msg.lower():
-                logger.warning("Token missing 'kid' claim - decoding without verification")
-                try:
-                    # Split token and decode payload (middle part)
-                    parts = id_token.split('.')
-                    if len(parts) == 3:
-                        # Add padding if needed
-                        payload = parts[1]
-                        payload += '=' * (4 - len(payload) % 4)
-                        decoded = json.loads(base64.urlsafe_b64decode(payload))
-                        logger.warning(f"Decoded token payload: {decoded}")
-                    else:
-                        raise AuthenticationFailed(f"Invalid token format: {error_msg}")
-                except Exception as decode_error:
-                    logger.error(f"Failed to decode token: {decode_error}")
-                    raise AuthenticationFailed(f"Invalid Firebase token: {error_msg}")
-            else:
-                # For other errors, fail
-                logger.error(f"Firebase authentication failed: {error_msg}")
-                raise AuthenticationFailed(f"Firebase authentication failed: {error_msg}")
+            logger.error(f"Firebase authentication failed: {error_msg}")
+            raise AuthenticationFailed(f"Firebase authentication failed: {error_msg}")
 
         if not decoded:
             raise AuthenticationFailed("Failed to decode Firebase token")

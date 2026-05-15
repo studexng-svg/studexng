@@ -250,7 +250,7 @@ REST_FRAMEWORK = {
 # JWT
 # =======================================
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(days=7),
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=15),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=30),
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,
@@ -270,15 +270,22 @@ FRONTEND_BASE_URL = config('FRONTEND_BASE_URL', default='https://studex.com.ng')
 PAYSTACK_SECRET_KEY = config('PAYSTACK_SECRET_KEY', default='')
 PAYSTACK_PUBLIC_KEY = config('PAYSTACK_PUBLIC_KEY', default='')
 PAYSTACK_WEBHOOK_SECRET = config('PAYSTACK_WEBHOOK_SECRET', default='')
+# Set PAYSTACK_SKIP_IP_CHECK=true if your hosting layer doesn't forward the real Paystack IP
+PAYSTACK_SKIP_IP_CHECK = config('PAYSTACK_SKIP_IP_CHECK', default='false')
 
 # =======================================
 # CACHE
 # =======================================
 CACHES = {
     'default': {
-        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
+        'LOCATION': 'studex_cache_table',
     }
 }
+
+# Fernet key for NIN and other PII field encryption.
+# Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+FIELD_ENCRYPTION_KEY = config('FIELD_ENCRYPTION_KEY', default='')
 
 # =======================================
 # EMAIL

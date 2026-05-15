@@ -740,11 +740,16 @@ def paystack_webhook(request):
     if request.method != "POST":
         return HttpResponse(status=405)
 
-    # Optional IP whitelist — uncomment if your hosting correctly forwards the real client IP
-    # client_ip = request.META.get("HTTP_X_FORWARDED_FOR", request.META.get("REMOTE_ADDR", "")).split(",")[0].strip()
-    # if client_ip not in PAYSTACK_WEBHOOK_IPS:
-    #     logger.warning(f"Paystack webhook: rejected unknown IP {client_ip}")
-    #     return HttpResponse(status=403)
+    # IP allowlist — enabled unless PAYSTACK_SKIP_IP_CHECK=true in env (useful when the
+    # hosting layer doesn't forward the real client IP into X-Forwarded-For).
+    skip_ip = (getattr(settings, 'PAYSTACK_SKIP_IP_CHECK', '') or '').lower() == 'true'
+    if not skip_ip:
+        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR', '')
+        client_ip = (x_forwarded_for.split(',')[0].strip() if x_forwarded_for
+                     else request.META.get('REMOTE_ADDR', ''))
+        if client_ip not in PAYSTACK_WEBHOOK_IPS:
+            logger.warning(f"Paystack webhook: rejected request from unknown IP {client_ip}")
+            return HttpResponse(status=403)
 
     # Verify HMAC-SHA512 signature — always required, never skipped
     webhook_secret = (getattr(settings, "PAYSTACK_WEBHOOK_SECRET", "") or "").strip()

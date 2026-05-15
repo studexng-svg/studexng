@@ -4,6 +4,7 @@ from django.db import models
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 from studex.validators import validate_image, validate_document, validate_id_document
+from accounts.fields import EncryptedCharField
 
 
 def _raw_storage():
@@ -44,7 +45,7 @@ class User(AbstractUser):
     )
 
     matric_number = models.CharField(max_length=50, blank=True, null=True)
-    nin = models.CharField(max_length=11, blank=True, null=True)
+    nin = EncryptedCharField(max_length=200, blank=True, null=True)
     VERIFICATION_TYPE_CHOICES = [
         ('matric', 'Matric Number'),
         ('nin', 'NIN'),

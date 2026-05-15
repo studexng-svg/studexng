@@ -14,6 +14,7 @@ interface UserProfile {
   hostel?: string;
   business_name?: string | null;
   is_verified_vendor: boolean;
+  is_admin?: boolean;
   wallet_balance: string;
   profile_image?: string | null;
 }
