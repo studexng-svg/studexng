@@ -2,6 +2,21 @@
 "use client";
 
 import { Search, Users, Store, User } from "lucide-react";
+
+function relativeTime(dateStr: string | null | undefined): string {
+  if (!dateStr) return "Never";
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "Just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days < 30) return `${days}d ago`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months}mo ago`;
+  return `${Math.floor(months / 12)}y ago`;
+}
 import AdminTopBar from "@/components/layout/AdminTopBar";
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
@@ -99,6 +114,7 @@ export default function AdminUsers() {
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-stone-900 text-sm truncate">{user.username}</p>
                   <p className="text-stone-400 text-xs truncate">{user.email}</p>
+                  <p className="text-stone-300 text-xs">Seen {relativeTime(user.last_login)}</p>
                 </div>
                 <span className={`px-2 py-0.5 rounded-full text-xs font-semibold flex-shrink-0 ${
                   user.school?.toLowerCase() === "futo"

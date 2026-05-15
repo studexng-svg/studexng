@@ -4,7 +4,7 @@
 import {
   Mail, Phone, ShieldCheck, User, Ban, AlertTriangle, Users,
   Store, Hash, Home, MessageCircle, Instagram, Star,
-  ShoppingBag, Wallet, Calendar, BadgeCheck, Shield,
+  ShoppingBag, Wallet, Calendar, BadgeCheck, Shield, Clock,
 } from "lucide-react";
 import AdminTopBar from "@/components/layout/AdminTopBar";
 import { useParams, useRouter } from "next/navigation";
@@ -13,6 +13,21 @@ import { fetchWithAuth } from "@/lib/authStore";
 import { GRAD } from "@/lib/tokens";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+
+function relativeTime(dateStr: string | null | undefined): string {
+  if (!dateStr) return "Never";
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "Just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days < 30) return `${days}d ago`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months}mo ago`;
+  return `${Math.floor(months / 12)}y ago`;
+}
 
 function Row({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value?: string | number | null }) {
   if (!value && value !== 0) return null;
@@ -161,6 +176,11 @@ export default function AdminUserDetail() {
             value={new Date(user.date_joined).toLocaleDateString("en-NG", {
               year: "numeric", month: "long", day: "numeric",
             })} />
+          <Row icon={Clock} label="Last Seen"
+            value={user.last_login
+              ? `${relativeTime(user.last_login)} · ${new Date(user.last_login).toLocaleDateString("en-NG", { year: "numeric", month: "short", day: "numeric" })}`
+              : "Never logged in"
+            } />
         </Section>
 
         {/* Account info */}
