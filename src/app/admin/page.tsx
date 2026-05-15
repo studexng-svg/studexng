@@ -39,12 +39,12 @@ interface DashStats {
   };
 }
 
-function StatCard({ label, value, sub, icon: Icon, accent }: {
+function StatCard({ label, value, sub, icon: Icon, accent, href }: {
   label: string; value: string | number; sub?: string;
-  icon: React.ElementType; accent: string;
+  icon: React.ElementType; accent: string; href?: string;
 }) {
-  return (
-    <div className="bg-white border border-stone-200 rounded-2xl p-4 shadow-sm">
+  const inner = (
+    <div className={`bg-white border border-stone-200 rounded-2xl p-4 shadow-sm transition-all${href ? " hover:border-teal-300 hover:shadow-md active:scale-[0.98] cursor-pointer" : ""}`}>
       <div className="flex items-center justify-between mb-3">
         <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
           style={{ background: accent + "20" }}>
@@ -56,6 +56,7 @@ function StatCard({ label, value, sub, icon: Icon, accent }: {
       <p className="text-xs text-stone-500 mt-0.5">{label}</p>
     </div>
   );
+  return href ? <Link href={href}>{inner}</Link> : inner;
 }
 
 const QUICK_LINKS = [
@@ -109,12 +110,12 @@ export default function AdminDashboard() {
           <>
             {/* Stats grid */}
             <div className="grid grid-cols-2 gap-3">
-              <StatCard label="Total Users"     value={stats.users.total_users}      sub={`+${stats.users.new_users_30d} this month`} icon={Users}   accent="#7C3AED" />
-              <StatCard label="Verified Vendors" value={stats.users.verified_vendors} sub={`${stats.users.pending_vendors} pending`}   icon={Store}   accent="#0D9488" />
-              <StatCard label="Total Listings"   value={stats.listings.total_listings} sub={`${stats.listings.available_listings} live`} icon={FileText} accent="#F59E0B" />
-              <StatCard label="Total Orders"     value={stats.orders.total_orders}    sub={`${stats.orders.pending_orders} pending`}   icon={Package} accent="#EF4444" />
-              <StatCard label="Revenue (30d)"    value={`₦${stats.orders.revenue_30d.toLocaleString()}`}   icon={DollarSign} accent="#10B981" />
-              <StatCard label="Total Revenue"    value={`₦${stats.orders.total_revenue.toLocaleString()}`} icon={DollarSign} accent="#6366F1" />
+              <StatCard label="Total Users"      value={stats.users.total_users}      sub={`+${stats.users.new_users_30d} this month`} icon={Users}     accent="#7C3AED" href="/admin/users" />
+              <StatCard label="Verified Vendors" value={stats.users.verified_vendors} sub={`${stats.users.pending_vendors} pending`}   icon={Store}     accent="#0D9488" href="/admin/sellers" />
+              <StatCard label="Total Listings"   value={stats.listings.total_listings} sub={`${stats.listings.available_listings} live`} icon={FileText} accent="#F59E0B" href="/admin/listings" />
+              <StatCard label="Total Orders"     value={stats.orders.total_orders}    sub={`${stats.orders.pending_orders} pending`}   icon={Package}   accent="#EF4444" href="/admin/orders" />
+              <StatCard label="Revenue (30d)"    value={`₦${stats.orders.revenue_30d.toLocaleString()}`}   icon={DollarSign} accent="#10B981" href="/admin/analytics" />
+              <StatCard label="Total Revenue"    value={`₦${stats.orders.total_revenue.toLocaleString()}`} icon={DollarSign} accent="#6366F1" href="/admin/analytics" />
             </div>
 
             {/* Alerts */}
