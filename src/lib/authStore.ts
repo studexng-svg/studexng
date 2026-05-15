@@ -26,6 +26,10 @@ interface AuthState {
   refreshToken: string | null;
   isHydrated: boolean;
   isAuthReady: boolean;
+  // True once a profile has been confirmed from the server (not just rehydrated from
+  // localStorage). Guards that depend on server-side flags like is_admin should wait
+  // for this before rendering access-denied states.
+  isProfileReady: boolean;
   walletBalance: string | null;
 
   login: (userData: UserProfile, accessToken: string, refreshToken: string) => void;
@@ -48,10 +52,11 @@ export const useAuth = create<AuthState>()(
       refreshToken: null,
       isHydrated: false,
       isAuthReady: false,
+      isProfileReady: false,
       walletBalance: null,
 
       login: (userData, accessToken, refreshToken) => {
-        set({ user: userData, isLoggedIn: true, accessToken, refreshToken, isAuthReady: true });
+        set({ user: userData, isLoggedIn: true, accessToken, refreshToken, isAuthReady: true, isProfileReady: true });
         // Persist campus to cookie so SSR fetches the right campus on next page load
         if (typeof document !== 'undefined') {
           const isHttps = window.location.protocol === 'https:';
@@ -86,7 +91,7 @@ export const useAuth = create<AuthState>()(
             useWishlistStore.getState().loadWishlistForUser(null);
           } catch {}
         } catch {}
-        set({ user: null, isLoggedIn: false, accessToken: null, refreshToken: null, isAuthReady: true });
+        set({ user: null, isLoggedIn: false, accessToken: null, refreshToken: null, isAuthReady: true, isProfileReady: false });
       },
 
       setUser: (userData) => set({ user: userData }),
@@ -108,8 +113,12 @@ export const useAuth = create<AuthState>()(
           const fresh = await res.json();
           set((state) => ({
             user: state.user ? { ...state.user, ...fresh } : state.user,
+            isProfileReady: true,
           }));
-        } catch {}
+        } catch {
+          // Even on failure, unblock guards so they don't spin forever
+          set({ isProfileReady: true });
+        }
       },
 
       fetchWalletBalance: async () => {

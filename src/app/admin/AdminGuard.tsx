@@ -8,7 +8,7 @@ import { Shield } from "lucide-react";
 
 export default function AdminGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const { isLoggedIn, isAuthReady } = useAuth();
+  const { isLoggedIn, isAuthReady, isProfileReady } = useAuth();
   const { isAdmin } = useAdminMode();
 
   useEffect(() => {
@@ -18,7 +18,9 @@ export default function AdminGuard({ children }: { children: React.ReactNode }) 
     }
   }, [isAuthReady, isLoggedIn, router]);
 
-  if (!isAuthReady) {
+  // Show spinner while auth state is initialising OR while the server profile fetch
+  // is still in flight (is_admin comes from the server, not localStorage).
+  if (!isAuthReady || (isLoggedIn && !isProfileReady)) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
         <div className="w-10 h-10 border-4 border-purple-500/30 border-t-purple-400 rounded-full animate-spin" />
