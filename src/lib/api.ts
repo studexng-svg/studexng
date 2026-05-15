@@ -85,24 +85,38 @@ class API {
     headers.set("Content-Type", "application/json");
     if (token) headers.set("Authorization", `Bearer ${token}`);
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 20_000);
+    const attemptFetch = async (): Promise<Response> => {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 25_000);
+      try {
+        return await fetch(`${this.baseURL}${endpoint}`, {
+          ...options,
+          headers,
+          credentials: "include",
+          signal: controller.signal,
+        });
+      } catch (err: any) {
+        if (err?.name === "AbortError") throw new Error("__timeout__");
+        throw new Error("Network error — check your connection and try again.");
+      } finally {
+        clearTimeout(timeoutId);
+      }
+    };
 
     let response: Response;
     try {
-      response = await fetch(`${this.baseURL}${endpoint}`, {
-        ...options,
-        headers,
-        credentials: "include",
-        signal: controller.signal,
-      });
+      response = await attemptFetch();
     } catch (err: any) {
-      if (err?.name === "AbortError") {
-        throw new Error("Request timed out — the server is waking up, please try again in a moment.");
+      if (err?.message === "__timeout__") {
+        // One silent retry before surfacing the error
+        try {
+          response = await attemptFetch();
+        } catch (retryErr: any) {
+          throw new Error("Request timed out — please check your connection and try again.");
+        }
+      } else {
+        throw err;
       }
-      throw new Error("Network error — check your connection and try again.");
-    } finally {
-      clearTimeout(timeoutId);
     }
 
     const data = await response.json().catch(() => ({}));
