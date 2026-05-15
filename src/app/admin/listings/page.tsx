@@ -5,7 +5,7 @@ import { Package, Search, CheckCircle, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import AdminTopBar from "@/components/layout/AdminTopBar";
-import { fetchWithAuth } from "@/lib/authStore";
+import { fetchAllPages } from "@/lib/authStore";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -33,9 +33,8 @@ export default function AdminListingsPage() {
     let url = `${API_URL}/api/admin/listings/?`;
     if (q) url += `search=${encodeURIComponent(q)}&`;
     if (av !== "") url += `is_available=${av}`;
-    fetchWithAuth(url)
-      .then(r => r.ok ? r.json() : Promise.reject())
-      .then(d => setListings(Array.isArray(d) ? d : (d.results ?? [])))
+    fetchAllPages(url)
+      .then(d => setListings(d))
       .catch(() => {})
       .finally(() => setLoading(false));
   };

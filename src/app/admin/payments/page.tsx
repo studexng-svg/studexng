@@ -5,7 +5,7 @@ import { DollarSign, Search } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import AdminTopBar from "@/components/layout/AdminTopBar";
-import { fetchWithAuth } from "@/lib/authStore";
+import { fetchAllPages } from "@/lib/authStore";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -36,9 +36,8 @@ export default function AdminPaymentsPage() {
     let url = `${API_URL}/api/admin/payments/?`;
     if (st) url += `status=${st}&`;
     if (s) url += `search=${encodeURIComponent(s)}`;
-    fetchWithAuth(url)
-      .then(r => r.ok ? r.json() : Promise.reject())
-      .then(d => setPayments(Array.isArray(d) ? d : (d.results ?? [])))
+    fetchAllPages(url)
+      .then(d => setPayments(d))
       .catch(() => {})
       .finally(() => setLoading(false));
   };

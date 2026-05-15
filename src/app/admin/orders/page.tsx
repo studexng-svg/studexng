@@ -7,7 +7,7 @@ import {
 import { useRouter } from "next/navigation";
 import AdminTopBar from "@/components/layout/AdminTopBar";
 import { useState, useEffect, useMemo } from "react";
-import { fetchWithAuth } from "@/lib/authStore";
+import { fetchAllPages } from "@/lib/authStore";
 import { GRAD } from "@/lib/tokens";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
@@ -36,9 +36,8 @@ export default function AdminOrders() {
   const [statusFilter, setStatusFilter] = useState("all");
 
   useEffect(() => {
-    fetchWithAuth(`${API_URL}/api/admin/orders/`)
-      .then(r => r.ok ? r.json() : Promise.reject())
-      .then(d => setOrders(d.results || d))
+    fetchAllPages(`${API_URL}/api/admin/orders/`)
+      .then(d => setOrders(d))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);

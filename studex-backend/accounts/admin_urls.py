@@ -2,6 +2,7 @@
 from django.urls import path
 from accounts.admin_views import (
     AdminDashboardView,
+    AdminAnalyticsTimeSeriesView,
     AdminUserListView,
     AdminUserDetailView,
     AdminNotifyUserView,
@@ -29,6 +30,7 @@ app_name = 'admin_api'
 urlpatterns = [
     # Dashboard
     path('dashboard/', AdminDashboardView.as_view(), name='dashboard'),
+    path('analytics/timeseries/', AdminAnalyticsTimeSeriesView.as_view(), name='analytics-timeseries'),
 
     # Users
     path('users/', AdminUserListView.as_view(), name='user-list'),

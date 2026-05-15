@@ -222,6 +222,31 @@ const refreshAccessToken = async (): Promise<string | null> => {
 // Falls back to Authorization header if in-memory token is available.
 // Automatically refreshes via cookie on 401 and retries once.
 // ─────────────────────────────────────────
+/**
+ * Fetches all pages of a paginated DRF list endpoint.
+ * Keeps following `next` until exhausted, then returns the full results array.
+ */
+export const fetchAllPages = async (url: string): Promise<any[]> => {
+  const all: any[] = [];
+  let nextUrl: string | null = url;
+  while (nextUrl) {
+    const res = await fetchWithAuth(nextUrl);
+    if (!res.ok) break;
+    const data = await res.json();
+    if (Array.isArray(data)) {
+      all.push(...data);
+      break;
+    }
+    if (Array.isArray(data.results)) {
+      all.push(...data.results);
+      nextUrl = data.next || null;
+    } else {
+      break;
+    }
+  }
+  return all;
+};
+
 export const fetchWithAuth = async (
   url: string,
   options: RequestInit = {}

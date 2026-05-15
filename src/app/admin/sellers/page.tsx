@@ -5,7 +5,7 @@ import { Search, Store, CheckCircle, Clock, Users, ChevronRight } from "lucide-r
 import AdminTopBar from "@/components/layout/AdminTopBar";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { fetchWithAuth } from "@/lib/authStore";
+import { fetchAllPages } from "@/lib/authStore";
 import { GRAD } from "@/lib/tokens";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
@@ -17,9 +17,8 @@ export default function AdminSellers() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchWithAuth(`${API_URL}/api/admin/users/?user_type=vendor`)
-      .then(r => r.ok ? r.json() : Promise.reject())
-      .then(d => setSellers(d.results || d))
+    fetchAllPages(`${API_URL}/api/admin/users/?user_type=vendor`)
+      .then(d => setSellers(d))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);

@@ -4,7 +4,7 @@
 import { Star, Search, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import AdminTopBar from "@/components/layout/AdminTopBar";
-import { fetchWithAuth } from "@/lib/authStore";
+import { fetchWithAuth, fetchAllPages } from "@/lib/authStore";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -29,9 +29,8 @@ export default function AdminReviewsPage() {
     setLoading(true);
     let url = `${API_URL}/api/admin/reviews/?`;
     if (s) url += `search=${encodeURIComponent(s)}`;
-    fetchWithAuth(url)
-      .then(r => r.ok ? r.json() : Promise.reject())
-      .then(d => setReviews(Array.isArray(d) ? d : (d.results ?? [])))
+    fetchAllPages(url)
+      .then(d => setReviews(d))
       .catch(() => {})
       .finally(() => setLoading(false));
   };

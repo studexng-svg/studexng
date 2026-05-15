@@ -4,7 +4,7 @@
 import { ArrowUpRight, Search } from "lucide-react";
 import { useEffect, useState } from "react";
 import AdminTopBar from "@/components/layout/AdminTopBar";
-import { fetchWithAuth } from "@/lib/authStore";
+import { fetchWithAuth, fetchAllPages } from "@/lib/authStore";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -33,9 +33,8 @@ export default function AdminTransactionsPage() {
     let url = `${API_URL}/api/admin/service-transactions/?`;
     if (st) url += `status=${st}&`;
     if (s) url += `search=${encodeURIComponent(s)}`;
-    fetchWithAuth(url)
-      .then(r => r.ok ? r.json() : Promise.reject())
-      .then(d => setTxs(Array.isArray(d) ? d : (d.results ?? [])))
+    fetchAllPages(url)
+      .then(d => setTxs(d))
       .catch(() => {})
       .finally(() => setLoading(false));
   };

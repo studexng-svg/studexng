@@ -9,7 +9,7 @@ These endpoints power the Next.js admin dashboard.
 from rest_framework import status, generics
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from django.db.models import Q
+from django.db.models import Q, Count, Sum
 from django.conf import settings
 import resend
 
@@ -24,23 +24,84 @@ from accounts.analytics import AdminAnalytics
 # ============================================
 
 class AdminDashboardView(APIView):
-    """
-    GET /api/admin/dashboard/
+    """GET /api/admin/dashboard/ — aggregate stats for admin dashboard."""
+    permission_classes = [IsAdminUser]
 
-    Returns comprehensive analytics for admin dashboard.
-    Includes user stats, listing stats, order stats, revenue data.
+    def get(self, request):
+        data = AdminAnalytics.get_dashboard_summary()
+        return Response(data, status=status.HTTP_200_OK)
+
+
+class AdminAnalyticsTimeSeriesView(APIView):
+    """
+    GET /api/admin/analytics/timeseries/
+    Returns daily counts for the last N days (default 30) for charts.
     """
     permission_classes = [IsAdminUser]
 
     def get(self, request):
-        """
-        Get complete dashboard analytics.
+        from django.utils import timezone as tz
+        from datetime import timedelta, date
+        days = min(int(request.query_params.get('days', 30)), 90)
+        today = tz.now().date()
+        start = today - timedelta(days=days - 1)
 
-        Returns:
-            Response: Dashboard data with all statistics
-        """
-        data = AdminAnalytics.get_dashboard_summary()
-        return Response(data, status=status.HTTP_200_OK)
+        date_range = [start + timedelta(days=i) for i in range(days)]
+
+        # Users registered per day
+        from accounts.models import User as UserModel
+        user_qs = (
+            UserModel.objects
+            .filter(date_joined__date__gte=start)
+            .extra(select={'day': "date(date_joined)"})
+            .values('day')
+            .annotate(count=Count('id'))
+        )
+        user_by_day = {row['day']: row['count'] for row in user_qs}
+
+        # Orders per day + revenue per day
+        order_by_day = {}
+        revenue_by_day = {}
+        try:
+            from orders.models import Order as OrderModel
+            order_qs = (
+                OrderModel.objects
+                .filter(created_at__date__gte=start)
+                .extra(select={'day': "date(created_at)"})
+                .values('day')
+                .annotate(count=Count('id'), rev=Sum('amount'))
+            )
+            for row in order_qs:
+                order_by_day[row['day']] = row['count']
+                revenue_by_day[row['day']] = float(row['rev'] or 0)
+        except Exception:
+            pass
+
+        series = []
+        for d in date_range:
+            day_str = d.isoformat()
+            # ORM extra() returns date strings in different formats — normalise
+            series.append({
+                'date': day_str,
+                'label': d.strftime('%b %d'),
+                'new_users': user_by_day.get(d, user_by_day.get(day_str, 0)),
+                'orders': order_by_day.get(d, order_by_day.get(day_str, 0)),
+                'revenue': revenue_by_day.get(d, revenue_by_day.get(day_str, 0.0)),
+            })
+
+        # Order status distribution
+        status_dist = {}
+        try:
+            from orders.models import Order as OrderModel
+            for row in OrderModel.objects.values('status').annotate(count=Count('id')):
+                status_dist[row['status']] = row['count']
+        except Exception:
+            pass
+
+        return Response({
+            'series': series,
+            'status_distribution': status_dist,
+        })
 
 
 # ============================================

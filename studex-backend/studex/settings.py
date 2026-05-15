@@ -18,6 +18,14 @@ if not _SECRET_KEY:
     raise ValueError("SECRET_KEY environment variable is not set. Refusing to start.")
 SECRET_KEY = _SECRET_KEY
 
+# Comma-separated list of emails that have admin API access
+# (in addition to users with is_staff=True)
+ADMIN_EMAILS = [
+    e.strip()
+    for e in config('ADMIN_EMAILS', default='studex.ng@gmail.com').split(',')
+    if e.strip()
+]
+
 DEBUG = config('DEBUG', default='False') == 'True'
 
 ALLOWED_HOSTS = config(

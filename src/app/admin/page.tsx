@@ -2,7 +2,7 @@
 "use client";
 
 import {
-  Users, Package, DollarSign, Store, FileText, Tag,
+  Users, Package, DollarSign, Store, FileText, Tag, TrendingUp,
   ChevronRight, AlertCircle, CheckCircle, Clock,
   CreditCard, Star, AlertTriangle, ArrowUpRight,
 } from "lucide-react";
@@ -68,6 +68,7 @@ const QUICK_LINKS = [
   { label: "Reviews",             href: "/admin/reviews",          icon: Star,         desc: "Manage platform reviews" },
   { label: "Categories",          href: "/admin/categories",       icon: Tag,          desc: "Manage listing categories" },
   { label: "Payout Transactions", href: "/admin/transactions",     icon: ArrowUpRight, desc: "Escrow and release tracking" },
+  { label: "Analytics",          href: "/admin/analytics",         icon: TrendingUp,   desc: "Charts, trends, live stats" },
 ];
 
 export default function AdminDashboard() {
