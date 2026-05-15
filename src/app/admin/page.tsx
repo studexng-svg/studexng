@@ -135,7 +135,7 @@ export default function AdminDashboard() {
                     sub={`₦${stats.payments.transaction_volume_30d.toLocaleString()} last 30 days`}
                     icon={ArrowUpRight}
                     accent="#6366F1"
-                    href="/admin/transactions"
+                    href="/admin/payments"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
@@ -145,7 +145,7 @@ export default function AdminDashboard() {
                     sub={`₦${stats.payments.vendor_payouts_30d.toLocaleString()} last 30d`}
                     icon={Store}
                     accent="#10B981"
-                    href="/admin/payouts"
+                    href="/admin/vendor-payouts"
                   />
                   <StatCard
                     label="Platform Earnings"
@@ -153,7 +153,7 @@ export default function AdminDashboard() {
                     sub={`₦${stats.payments.platform_fees_30d.toLocaleString()} last 30d`}
                     icon={DollarSign}
                     accent="#F59E0B"
-                    href="/admin/analytics"
+                    href="/admin/platform-earnings"
                   />
                 </div>
               </>

@@ -16,6 +16,8 @@ from accounts.admin_views import (
     AdminPaymentDetailView,
     AdminBankAccountListView,
     AdminBankAccountDetailView,
+    AdminVendorPayoutsView,
+    AdminPlatformEarningsView,
     AdminServiceTransactionListView,
     AdminServiceTransactionDetailView,
     AdminReviewListView,
@@ -67,6 +69,11 @@ if AdminPaymentListView is not None:
         path('bank-accounts/', AdminBankAccountListView.as_view(), name='bank-account-list'),
         path('bank-accounts/<int:account_id>/', AdminBankAccountDetailView.as_view(), name='bank-account-detail'),
     ]
+
+urlpatterns += [
+    path('vendor-payouts/', AdminVendorPayoutsView.as_view(), name='vendor-payouts'),
+    path('platform-earnings/', AdminPlatformEarningsView.as_view(), name='platform-earnings'),
+]
 
 if AdminServiceTransactionListView is not None:
     urlpatterns += [

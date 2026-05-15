@@ -818,6 +818,213 @@ except ImportError:
 
 
 # ============================================
+# VENDOR PAYOUTS (per-vendor earnings breakdown)
+# ============================================
+
+class AdminVendorPayoutsView(APIView):
+    """GET /api/admin/vendor-payouts/ — per-vendor total earnings."""
+    permission_classes = [IsAdminUser]
+
+    def get(self, request):
+        from django.db.models import Sum, Count, Max
+        from django.utils import timezone
+        from datetime import timedelta
+
+        search = request.query_params.get('search', '')
+        campus = request.query_params.get('campus', '')
+
+        def _campus_filter(qs, field_prefix):
+            if not campus:
+                return qs
+            cl = campus.lower()
+            if cl == 'pau':
+                return qs.filter(
+                    Q(**{f'{field_prefix}__iexact': 'pau'}) |
+                    Q(**{f'{field_prefix}': ''}) |
+                    Q(**{f'{field_prefix}__isnull': True})
+                )
+            return qs.filter(**{f'{field_prefix}__iexact': cl})
+
+        # Try PaymentTransaction first
+        try:
+            from payments.models import PaymentTransaction
+            qs = PaymentTransaction.objects.filter(status='success').select_related('seller')
+            if search:
+                qs = qs.filter(
+                    Q(seller__username__icontains=search) |
+                    Q(seller__business_name__icontains=search)
+                )
+            qs = _campus_filter(qs, 'seller__school')
+            if qs.exists():
+                rows = (
+                    qs.values('seller', 'seller__username', 'seller__business_name', 'seller__school')
+                    .annotate(total_earned=Sum('seller_amount'), order_count=Count('id'), last_date=Max('created_at'))
+                    .order_by('-total_earned')
+                )
+                result = []
+                for v in rows:
+                    if v['seller'] is None:
+                        continue
+                    result.append({
+                        'vendor_id': v['seller'],
+                        'vendor': v['seller__username'],
+                        'business_name': v['seller__business_name'] or '',
+                        'school': (v['seller__school'] or 'pau').upper(),
+                        'total_earned': float(v['total_earned'] or 0),
+                        'order_count': v['order_count'],
+                        'last_date': v['last_date'].isoformat() if v['last_date'] else None,
+                    })
+                return Response(result)
+        except ImportError:
+            pass
+
+        # Fallback: derive from Orders
+        try:
+            from orders.models import Order
+            from django.db.models import F
+            PAID = ['paid', 'seller_completed', 'completed']
+            qs = (
+                Order.objects.filter(status__in=PAID)
+                .annotate(listing_price=F('listing__price'))
+                .select_related('listing__vendor')
+            )
+            if search:
+                qs = qs.filter(
+                    Q(listing__vendor__username__icontains=search) |
+                    Q(listing__vendor__business_name__icontains=search)
+                )
+            qs = _campus_filter(qs, 'listing__vendor__school')
+            rows = (
+                qs.values(
+                    'listing__vendor', 'listing__vendor__username',
+                    'listing__vendor__business_name', 'listing__vendor__school'
+                )
+                .annotate(total_earned=Sum('listing_price'), order_count=Count('id'), last_date=Max('created_at'))
+                .order_by('-total_earned')
+            )
+            result = []
+            for v in rows:
+                if v['listing__vendor'] is None:
+                    continue
+                result.append({
+                    'vendor_id': v['listing__vendor'],
+                    'vendor': v['listing__vendor__username'],
+                    'business_name': v['listing__vendor__business_name'] or '',
+                    'school': (v['listing__vendor__school'] or 'pau').upper(),
+                    'total_earned': float(v['total_earned'] or 0),
+                    'order_count': v['order_count'],
+                    'last_date': v['last_date'].isoformat() if v['last_date'] else None,
+                })
+            return Response(result)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# ============================================
+# PLATFORM EARNINGS (per-transaction fee breakdown)
+# ============================================
+
+class AdminPlatformEarningsView(APIView):
+    """GET /api/admin/platform-earnings/ — platform fee per transaction."""
+    permission_classes = [IsAdminUser]
+
+    def get(self, request):
+        from django.db.models import Sum, Count
+        from django.utils import timezone
+        from datetime import timedelta
+        thirty_days_ago = timezone.now() - timedelta(days=30)
+        search = request.query_params.get('search', '')
+
+        # Try PaymentTransaction first
+        try:
+            from payments.models import PaymentTransaction
+            qs = PaymentTransaction.objects.filter(status='success').select_related('buyer', 'seller').order_by('-created_at')
+            if search:
+                qs = qs.filter(
+                    Q(reference__icontains=search) |
+                    Q(buyer__username__icontains=search) |
+                    Q(seller__username__icontains=search)
+                )
+            if qs.exists():
+                agg = qs.aggregate(total_fees=Sum('platform_amount'), total_vol=Sum('amount'), count=Count('id'))
+                agg_30d = qs.filter(created_at__gte=thirty_days_ago).aggregate(fees_30d=Sum('platform_amount'))
+                txns = []
+                for p in qs[:500]:
+                    txns.append({
+                        'id': p.id,
+                        'reference': p.reference,
+                        'buyer': p.buyer.username if p.buyer else None,
+                        'seller': p.seller.username if p.seller else None,
+                        'total_paid': float(p.amount),
+                        'seller_amount': float(p.seller_amount),
+                        'platform_fee': float(p.platform_amount),
+                        'service_charge': float(p.service_charge),
+                        'discount': float(p.discount_amount),
+                        'date': p.created_at.isoformat(),
+                    })
+                return Response({
+                    'totals': {
+                        'total_platform_fees': float(agg['total_fees'] or 0),
+                        'total_platform_fees_30d': float(agg_30d['fees_30d'] or 0),
+                        'total_volume': float(agg['total_vol'] or 0),
+                        'transaction_count': agg['count'],
+                    },
+                    'transactions': txns,
+                })
+        except ImportError:
+            pass
+
+        # Fallback: derive from Orders
+        try:
+            from orders.models import Order
+            from django.db.models import F
+            PAID = ['paid', 'seller_completed', 'completed']
+            qs = (
+                Order.objects.filter(status__in=PAID)
+                .annotate(listing_price=F('listing__price'))
+                .select_related('buyer', 'listing__vendor')
+                .order_by('-created_at')
+            )
+            if search:
+                qs = qs.filter(
+                    Q(reference__icontains=search) |
+                    Q(buyer__username__icontains=search) |
+                    Q(listing__vendor__username__icontains=search)
+                )
+            vol = float(qs.aggregate(t=Sum('amount'))['t'] or 0)
+            vendor_total = float(qs.aggregate(t=Sum('listing_price'))['t'] or 0)
+            fee_total = max(vol - vendor_total, 0.0)
+            vol_30d = float(qs.filter(created_at__gte=thirty_days_ago).aggregate(t=Sum('amount'))['t'] or 0)
+            vend_30d = float(qs.filter(created_at__gte=thirty_days_ago).aggregate(t=Sum('listing_price'))['t'] or 0)
+            fee_30d = max(vol_30d - vend_30d, 0.0)
+            txns = []
+            for o in qs[:500]:
+                listing_price = float(o.listing.price) if o.listing else 0.0
+                total_paid = float(o.amount)
+                txns.append({
+                    'id': o.id,
+                    'reference': o.reference,
+                    'buyer': o.buyer.username if o.buyer else None,
+                    'seller': o.listing.vendor.username if o.listing else None,
+                    'total_paid': total_paid,
+                    'seller_amount': listing_price,
+                    'platform_fee': max(total_paid - listing_price, 0.0),
+                    'date': o.created_at.isoformat(),
+                })
+            return Response({
+                'totals': {
+                    'total_platform_fees': fee_total,
+                    'total_platform_fees_30d': fee_30d,
+                    'total_volume': vol,
+                    'transaction_count': qs.count(),
+                },
+                'transactions': txns,
+            })
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# ============================================
 # SERVICE TRANSACTIONS (ESCROW / PAYOUTS)
 # ============================================
 
