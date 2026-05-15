@@ -1412,6 +1412,29 @@ except ImportError:
 # BROADCAST MESSAGING
 # ============================================
 
+class AdminActivityView(APIView):
+    """GET /api/admin/activity/ — real-time online/offline counts."""
+    permission_classes = [IsAdminUser]
+
+    def get(self, request):
+        from django.utils import timezone
+        from datetime import timedelta
+        threshold = timezone.now() - timedelta(minutes=3)
+        online_qs = User.objects.filter(last_seen__gte=threshold, is_active=True)
+        online_users = list(
+            online_qs.values('id', 'username', 'user_type', 'business_name', 'last_seen')
+        )
+        for u in online_users:
+            if u['last_seen']:
+                u['last_seen'] = u['last_seen'].isoformat()
+        return Response({
+            'online_count': online_qs.count(),
+            'online_vendors': online_qs.filter(user_type='vendor').count(),
+            'online_students': online_qs.filter(user_type='student').count(),
+            'online_users': online_users,
+        })
+
+
 class AdminBroadcastMessageView(APIView):
     """
     POST /api/admin/notify-all/

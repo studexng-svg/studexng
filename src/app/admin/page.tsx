@@ -5,7 +5,7 @@ import {
   Users, Package, DollarSign, Store, FileText, Tag, TrendingUp,
   ChevronRight, AlertCircle, CheckCircle, Clock,
   CreditCard, Star, AlertTriangle, ArrowUpRight,
-  ShoppingCart, MessageCircle, Send,
+  ShoppingCart, MessageCircle, Send, Radio,
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -14,6 +14,13 @@ import { fetchWithAuth } from "@/lib/authStore";
 import { GRAD, SERIF } from "@/lib/tokens";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+
+interface ActivityData {
+  online_count: number;
+  online_vendors: number;
+  online_students: number;
+  online_users: { id: number; username: string; user_type: string; business_name?: string; last_seen: string }[];
+}
 
 interface DashStats {
   users: {
@@ -83,6 +90,79 @@ const QUICK_LINKS = [
   { label: "Conversations",      href: "/admin/conversations",    icon: MessageCircle,desc: "Monitor buyer/seller chats" },
   { label: "Messages",           href: "/admin/messages",         icon: Send,         desc: "Send notifications to users" },
 ];
+
+function LiveActivity() {
+  const [activity, setActivity] = useState<ActivityData | null>(null);
+  const [expanded, setExpanded] = useState(false);
+
+  useEffect(() => {
+    const fetch_ = () => {
+      fetchWithAuth(`${API_URL}/api/admin/activity/`)
+        .then(r => r.ok ? r.json() : Promise.reject())
+        .then(d => setActivity(d))
+        .catch(() => {});
+    };
+    fetch_();
+    const id = setInterval(fetch_, 30_000);
+    return () => clearInterval(id);
+  }, []);
+
+  const count = activity?.online_count ?? 0;
+
+  return (
+    <div className="bg-white border border-stone-200 rounded-2xl shadow-sm overflow-hidden">
+      <button
+        onClick={() => setExpanded(e => !e)}
+        className="w-full flex items-center justify-between p-4"
+      >
+        <div className="flex items-center gap-3">
+          <div className="relative w-9 h-9 bg-teal-50 rounded-xl flex items-center justify-center flex-shrink-0">
+            <Radio className="w-4 h-4 text-teal-600" />
+            {count > 0 && (
+              <span className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full flex items-center justify-center text-white text-[9px] font-bold leading-none">
+                {count > 99 ? "99+" : count}
+              </span>
+            )}
+          </div>
+          <div className="text-left">
+            <p className="font-semibold text-stone-900 text-sm">Live Activity</p>
+            <p className="text-stone-400 text-xs">
+              {activity
+                ? `${count} online — ${activity.online_vendors}v / ${activity.online_students}s`
+                : "Loading…"}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {count > 0 && <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />}
+          <ChevronRight className={`w-4 h-4 text-stone-400 transition-transform ${expanded ? "rotate-90" : ""}`} />
+        </div>
+      </button>
+
+      {expanded && activity && (
+        <div className="border-t border-stone-100 px-4 pb-4 pt-2 space-y-1">
+          {activity.online_users.length === 0 ? (
+            <p className="text-stone-400 text-xs text-center py-3">No one online right now</p>
+          ) : (
+            activity.online_users.map(u => (
+              <div key={u.id} className="flex items-center gap-2 py-1.5">
+                <span className="w-2 h-2 rounded-full bg-green-400 flex-shrink-0" />
+                <span className="text-sm text-stone-800 font-medium truncate flex-1">
+                  {u.business_name || u.username}
+                </span>
+                <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold flex-shrink-0 ${
+                  u.user_type === "vendor" ? "bg-teal-100 text-teal-700" : "bg-stone-100 text-stone-600"
+                }`}>
+                  {u.user_type === "vendor" ? "V" : "S"}
+                </span>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState<DashStats | null>(null);
@@ -234,6 +314,9 @@ export default function AdminDashboard() {
             <p className="text-stone-400 text-sm">Could not load dashboard stats.</p>
           </div>
         )}
+
+        {/* Live activity */}
+        <LiveActivity />
 
         {/* Quick links */}
         <div>

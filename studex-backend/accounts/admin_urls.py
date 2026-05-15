@@ -3,6 +3,7 @@ from django.urls import path
 from accounts.admin_views import (
     AdminDashboardView,
     AdminAnalyticsTimeSeriesView,
+    AdminActivityView,
     AdminUserListView,
     AdminUserDetailView,
     AdminNotifyUserView,
@@ -37,6 +38,7 @@ urlpatterns = [
     # Dashboard
     path('dashboard/', AdminDashboardView.as_view(), name='dashboard'),
     path('analytics/timeseries/', AdminAnalyticsTimeSeriesView.as_view(), name='analytics-timeseries'),
+    path('activity/', AdminActivityView.as_view(), name='activity'),
 
     # Users
     path('users/', AdminUserListView.as_view(), name='user-list'),
