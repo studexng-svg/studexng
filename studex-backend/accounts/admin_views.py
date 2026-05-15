@@ -886,18 +886,20 @@ class AdminVendorPayoutsView(APIView):
             qs = (
                 Order.objects.filter(status__in=PAID)
                 .annotate(listing_price=F('listing__price'))
-                .select_related('listing__vendor')
+                .select_related('listing__vendor', 'listing')
             )
             if search:
                 qs = qs.filter(
                     Q(listing__vendor__username__icontains=search) |
                     Q(listing__vendor__business_name__icontains=search)
                 )
-            qs = _campus_filter(qs, 'listing__vendor__school')
+            # Filter by listing.campus (authoritative — set at listing creation,
+            # never changes even if vendor later updates their school field).
+            qs = _campus_filter(qs, 'listing__campus')
             rows = (
                 qs.values(
                     'listing__vendor', 'listing__vendor__username',
-                    'listing__vendor__business_name', 'listing__vendor__school'
+                    'listing__vendor__business_name', 'listing__campus'
                 )
                 .annotate(total_earned=Sum('listing_price'), order_count=Count('id'), last_date=Max('created_at'))
                 .order_by('-total_earned')
@@ -910,7 +912,7 @@ class AdminVendorPayoutsView(APIView):
                     'vendor_id': v['listing__vendor'],
                     'vendor': v['listing__vendor__username'],
                     'business_name': v['listing__vendor__business_name'] or '',
-                    'school': (v['listing__vendor__school'] or 'pau').upper(),
+                    'school': (v['listing__campus'] or 'pau').upper(),
                     'total_earned': float(v['total_earned'] or 0),
                     'order_count': v['order_count'],
                     'last_date': v['last_date'].isoformat() if v['last_date'] else None,
