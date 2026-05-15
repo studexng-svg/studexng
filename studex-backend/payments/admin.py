@@ -2,6 +2,7 @@
 from django.contrib import admin
 from django.utils.html import format_html
 from django.http import HttpResponse
+from django.db.models import Sum
 import csv
 from .models import SellerBankAccount, PaymentTransaction
 from .views import _transfer_to_vendor
@@ -62,6 +63,21 @@ class PaymentTransactionAdmin(admin.ModelAdmin):
             obj.status.upper()
         )
     colored_status.short_description = 'Status'
+
+    def changelist_view(self, request, extra_context=None):
+        successful = PaymentTransaction.objects.filter(status='success')
+        totals = successful.aggregate(
+            volume=Sum('amount'),
+            vendor=Sum('seller_amount'),
+            platform=Sum('platform_amount'),
+        )
+        extra_context = extra_context or {}
+        extra_context['payment_totals'] = {
+            'volume': f"₦{float(totals['volume'] or 0):,.2f}",
+            'vendor': f"₦{float(totals['vendor'] or 0):,.2f}",
+            'platform': f"₦{float(totals['platform'] or 0):,.2f}",
+        }
+        return super().changelist_view(request, extra_context=extra_context)
 
     actions = ['retry_transfer', 'export_to_csv']
 

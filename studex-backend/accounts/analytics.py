@@ -149,6 +149,50 @@ class AdminAnalytics:
             }
 
     @staticmethod
+    def get_payment_stats():
+        """
+        Financial breakdown from PaymentTransaction records (status='success').
+
+        transaction_volume — total money buyers paid into the platform
+        vendor_payouts     — total money transferred out to vendors
+        platform_fees      — net platform earnings (service charge minus discounts)
+        """
+        try:
+            from payments.models import PaymentTransaction
+
+            thirty_days_ago = timezone.now() - timedelta(days=30)
+            successful = PaymentTransaction.objects.filter(status='success')
+
+            totals = successful.aggregate(
+                transaction_volume=Sum('amount'),
+                vendor_payouts=Sum('seller_amount'),
+                platform_fees=Sum('platform_amount'),
+            )
+            totals_30d = successful.filter(created_at__gte=thirty_days_ago).aggregate(
+                transaction_volume_30d=Sum('amount'),
+                vendor_payouts_30d=Sum('seller_amount'),
+                platform_fees_30d=Sum('platform_amount'),
+            )
+
+            return {
+                'transaction_volume': float(totals['transaction_volume'] or 0),
+                'vendor_payouts': float(totals['vendor_payouts'] or 0),
+                'platform_fees': float(totals['platform_fees'] or 0),
+                'transaction_volume_30d': float(totals_30d['transaction_volume_30d'] or 0),
+                'vendor_payouts_30d': float(totals_30d['vendor_payouts_30d'] or 0),
+                'platform_fees_30d': float(totals_30d['platform_fees_30d'] or 0),
+            }
+        except Exception:
+            return {
+                'transaction_volume': 0.0,
+                'vendor_payouts': 0.0,
+                'platform_fees': 0.0,
+                'transaction_volume_30d': 0.0,
+                'vendor_payouts_30d': 0.0,
+                'platform_fees_30d': 0.0,
+            }
+
+    @staticmethod
     def get_dashboard_summary():
         """
         Get complete dashboard summary combining all stats.
@@ -160,5 +204,6 @@ class AdminAnalytics:
             'users': AdminAnalytics.get_user_stats(),
             'listings': AdminAnalytics.get_listing_stats(),
             'orders': AdminAnalytics.get_order_stats(),
+            'payments': AdminAnalytics.get_payment_stats(),
             'timestamp': timezone.now().isoformat(),
         }

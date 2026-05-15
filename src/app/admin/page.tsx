@@ -37,6 +37,14 @@ interface DashStats {
     total_revenue: number;
     revenue_30d: number;
   };
+  payments: {
+    transaction_volume: number;
+    vendor_payouts: number;
+    platform_fees: number;
+    transaction_volume_30d: number;
+    vendor_payouts_30d: number;
+    platform_fees_30d: number;
+  };
 }
 
 function StatCard({ label, value, sub, icon: Icon, accent, href }: {
@@ -108,15 +116,48 @@ export default function AdminDashboard() {
           </div>
         ) : stats ? (
           <>
-            {/* Stats grid */}
+            {/* Platform overview */}
             <div className="grid grid-cols-2 gap-3">
-              <StatCard label="Total Users"      value={stats.users.total_users}      sub={`+${stats.users.new_users_30d} this month`} icon={Users}     accent="#7C3AED" href="/admin/users" />
-              <StatCard label="Verified Vendors" value={stats.users.verified_vendors} sub={`${stats.users.pending_vendors} pending`}   icon={Store}     accent="#0D9488" href="/admin/sellers" />
-              <StatCard label="Total Listings"   value={stats.listings.total_listings} sub={`${stats.listings.available_listings} live`} icon={FileText} accent="#F59E0B" href="/admin/listings" />
-              <StatCard label="Total Orders"     value={stats.orders.total_orders}    sub={`${stats.orders.pending_orders} pending`}   icon={Package}   accent="#EF4444" href="/admin/orders" />
-              <StatCard label="Revenue (30d)"    value={`₦${stats.orders.revenue_30d.toLocaleString()}`}   icon={DollarSign} accent="#10B981" href="/admin/analytics" />
-              <StatCard label="Total Revenue"    value={`₦${stats.orders.total_revenue.toLocaleString()}`} icon={DollarSign} accent="#6366F1" href="/admin/analytics" />
+              <StatCard label="Total Users"      value={stats.users.total_users}       sub={`+${stats.users.new_users_30d} this month`}  icon={Users}     accent="#7C3AED" href="/admin/users" />
+              <StatCard label="Verified Vendors" value={stats.users.verified_vendors}  sub={`${stats.users.pending_vendors} pending`}    icon={Store}     accent="#0D9488" href="/admin/sellers" />
+              <StatCard label="Total Listings"   value={stats.listings.total_listings} sub={`${stats.listings.available_listings} live`} icon={FileText}  accent="#F59E0B" href="/admin/listings" />
+              <StatCard label="Total Orders"     value={stats.orders.total_orders}     sub={`${stats.orders.pending_orders} pending`}    icon={Package}   accent="#EF4444" href="/admin/orders" />
             </div>
+
+            {/* Financial breakdown */}
+            {stats.payments && (
+              <>
+                <p className="text-teal-600 text-xs tracking-[0.2em] uppercase font-semibold">Financials</p>
+                <div className="grid grid-cols-1 gap-3">
+                  <StatCard
+                    label="Transaction Volume"
+                    value={`₦${stats.payments.transaction_volume.toLocaleString()}`}
+                    sub={`₦${stats.payments.transaction_volume_30d.toLocaleString()} last 30 days`}
+                    icon={ArrowUpRight}
+                    accent="#6366F1"
+                    href="/admin/transactions"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <StatCard
+                    label="Vendor Payouts"
+                    value={`₦${stats.payments.vendor_payouts.toLocaleString()}`}
+                    sub={`₦${stats.payments.vendor_payouts_30d.toLocaleString()} last 30d`}
+                    icon={Store}
+                    accent="#10B981"
+                    href="/admin/payouts"
+                  />
+                  <StatCard
+                    label="Platform Earnings"
+                    value={`₦${stats.payments.platform_fees.toLocaleString()}`}
+                    sub={`₦${stats.payments.platform_fees_30d.toLocaleString()} last 30d`}
+                    icon={DollarSign}
+                    accent="#F59E0B"
+                    href="/admin/analytics"
+                  />
+                </div>
+              </>
+            )}
 
             {/* Alerts */}
             {stats.users.pending_vendors > 0 && (
