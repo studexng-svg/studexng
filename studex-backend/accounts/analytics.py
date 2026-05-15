@@ -151,7 +151,8 @@ class AdminAnalytics:
     @staticmethod
     def get_payment_stats():
         """
-        Financial breakdown from PaymentTransaction records (status='success').
+        Financial breakdown sourced from PaymentTransaction when available,
+        falling back to Order data for platforms that pre-date the new payment flow.
 
         transaction_volume — total money buyers paid into the platform
         vendor_payouts     — total money transferred out to vendors
@@ -159,29 +160,62 @@ class AdminAnalytics:
         """
         try:
             from payments.models import PaymentTransaction
+            from orders.models import Order
+            from django.db.models import F
 
             thirty_days_ago = timezone.now() - timedelta(days=30)
-            successful = PaymentTransaction.objects.filter(status='success')
 
+            # ── Primary source: PaymentTransaction ────────────────────────────
+            successful = PaymentTransaction.objects.filter(status='success')
             totals = successful.aggregate(
                 transaction_volume=Sum('amount'),
                 vendor_payouts=Sum('seller_amount'),
                 platform_fees=Sum('platform_amount'),
             )
-            totals_30d = successful.filter(created_at__gte=thirty_days_ago).aggregate(
-                transaction_volume_30d=Sum('amount'),
-                vendor_payouts_30d=Sum('seller_amount'),
-                platform_fees_30d=Sum('platform_amount'),
-            )
+
+            if totals.get('transaction_volume'):
+                # PaymentTransaction records exist — use them directly
+                totals_30d = successful.filter(created_at__gte=thirty_days_ago).aggregate(
+                    transaction_volume_30d=Sum('amount'),
+                    vendor_payouts_30d=Sum('seller_amount'),
+                    platform_fees_30d=Sum('platform_amount'),
+                )
+                return {
+                    'transaction_volume': float(totals['transaction_volume'] or 0),
+                    'vendor_payouts': float(totals['vendor_payouts'] or 0),
+                    'platform_fees': float(totals['platform_fees'] or 0),
+                    'transaction_volume_30d': float(totals_30d['transaction_volume_30d'] or 0),
+                    'vendor_payouts_30d': float(totals_30d['vendor_payouts_30d'] or 0),
+                    'platform_fees_30d': float(totals_30d['platform_fees_30d'] or 0),
+                }
+
+            # ── Fallback: derive from Order + listing price ───────────────────
+            # Covers orders processed before PaymentTransaction records existed.
+            PAID_STATUSES = ['paid', 'seller_completed', 'completed']
+
+            def _order_financials(qs):
+                vol = float(qs.aggregate(t=Sum('amount'))['t'] or 0)
+                vendor = float(
+                    qs.annotate(listing_price=F('listing__price'))
+                      .aggregate(t=Sum('listing_price'))['t'] or 0
+                )
+                return vol, vendor, max(vol - vendor, 0.0)
+
+            paid_orders = Order.objects.filter(status__in=PAID_STATUSES)
+            paid_orders_30d = paid_orders.filter(created_at__gte=thirty_days_ago)
+
+            vol, vendor, fees = _order_financials(paid_orders)
+            vol_30d, vendor_30d, fees_30d = _order_financials(paid_orders_30d)
 
             return {
-                'transaction_volume': float(totals['transaction_volume'] or 0),
-                'vendor_payouts': float(totals['vendor_payouts'] or 0),
-                'platform_fees': float(totals['platform_fees'] or 0),
-                'transaction_volume_30d': float(totals_30d['transaction_volume_30d'] or 0),
-                'vendor_payouts_30d': float(totals_30d['vendor_payouts_30d'] or 0),
-                'platform_fees_30d': float(totals_30d['platform_fees_30d'] or 0),
+                'transaction_volume': vol,
+                'vendor_payouts': vendor,
+                'platform_fees': fees,
+                'transaction_volume_30d': vol_30d,
+                'vendor_payouts_30d': vendor_30d,
+                'platform_fees_30d': fees_30d,
             }
+
         except Exception:
             return {
                 'transaction_volume': 0.0,

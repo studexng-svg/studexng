@@ -143,20 +143,46 @@ export default function AdminAnalytics() {
           <>
             {/* Summary stats */}
             {summary && (
-              <div className="grid grid-cols-2 gap-3">
-                {[
-                  { label: "Total Users",    value: summary.users?.total_users ?? 0,        sub: `+${summary.users?.new_users_30d ?? 0} this month`, color: PURPLE },
-                  { label: "Verified Vendors",value: summary.users?.verified_vendors ?? 0,  sub: `${summary.users?.pending_vendors ?? 0} pending`,   color: TEAL },
-                  { label: "Total Listings", value: summary.listings?.total_listings ?? 0,  sub: `${summary.listings?.available_listings ?? 0} live`, color: AMBER },
-                  { label: "Total Orders",   value: summary.orders?.total_orders ?? 0,      sub: `${summary.orders?.pending_orders ?? 0} pending`,   color: BLUE },
-                ].map(({ label, value, sub, color }) => (
-                  <div key={label} className="bg-white border border-stone-200 rounded-2xl p-4 shadow-sm">
-                    <p className="text-2xl font-bold" style={{ color }}>{value}</p>
-                    <p className="text-stone-700 text-sm font-semibold mt-0.5">{label}</p>
-                    <p className="text-stone-400 text-xs mt-0.5">{sub}</p>
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    { label: "Total Users",     value: summary.users?.total_users ?? 0,       sub: `+${summary.users?.new_users_30d ?? 0} this month`, color: PURPLE },
+                    { label: "Verified Vendors",value: summary.users?.verified_vendors ?? 0,  sub: `${summary.users?.pending_vendors ?? 0} pending`,   color: TEAL },
+                    { label: "Total Listings",  value: summary.listings?.total_listings ?? 0, sub: `${summary.listings?.available_listings ?? 0} live`, color: AMBER },
+                    { label: "Total Orders",    value: summary.orders?.total_orders ?? 0,     sub: `${summary.orders?.pending_orders ?? 0} pending`,   color: BLUE },
+                  ].map(({ label, value, sub, color }) => (
+                    <div key={label} className="bg-white border border-stone-200 rounded-2xl p-4 shadow-sm">
+                      <p className="text-2xl font-bold" style={{ color }}>{value}</p>
+                      <p className="text-stone-700 text-sm font-semibold mt-0.5">{label}</p>
+                      <p className="text-stone-400 text-xs mt-0.5">{sub}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Financial breakdown */}
+                {summary.payments && (
+                  <div className="bg-white border border-stone-200 rounded-2xl p-4 shadow-sm">
+                    <p className="text-teal-600 text-xs tracking-[0.2em] uppercase font-semibold mb-3">Financials (all-time)</p>
+                    <div className="grid grid-cols-3 gap-3 text-center">
+                      <div>
+                        <p className="text-lg font-bold text-stone-900">₦{Number(summary.payments.transaction_volume).toLocaleString()}</p>
+                        <p className="text-stone-500 text-xs font-semibold mt-0.5">Transaction Volume</p>
+                        <p className="text-stone-400 text-xs">what buyers paid</p>
+                      </div>
+                      <div className="border-x border-stone-100">
+                        <p className="text-lg font-bold" style={{ color: "#10B981" }}>₦{Number(summary.payments.vendor_payouts).toLocaleString()}</p>
+                        <p className="text-stone-500 text-xs font-semibold mt-0.5">Vendor Payouts</p>
+                        <p className="text-stone-400 text-xs">sent to vendors</p>
+                      </div>
+                      <div>
+                        <p className="text-lg font-bold" style={{ color: AMBER }}>₦{Number(summary.payments.platform_fees).toLocaleString()}</p>
+                        <p className="text-stone-500 text-xs font-semibold mt-0.5">Platform Earnings</p>
+                        <p className="text-stone-400 text-xs">kept by StudEx</p>
+                      </div>
+                    </div>
                   </div>
-                ))}
-              </div>
+                )}
+              </>
             )}
 
             {/* New Users chart */}
@@ -189,31 +215,31 @@ export default function AdminAnalytics() {
               </SectionCard>
             )}
 
-            {/* Revenue chart */}
+            {/* Transaction volume chart */}
             {tsData?.series && (
-              <SectionCard title={`Revenue — Last ${days} days`} icon={DollarSign}>
+              <SectionCard title={`Transaction Volume — Last ${days} days`} icon={DollarSign}>
                 <ResponsiveContainer width="100%" height={200}>
                   <LineChart data={tsData.series} margin={{ top: 4, right: 4, left: -12, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#F5F5F4" />
                     <XAxis dataKey="label" tick={{ fontSize: 10, fill: "#A8A29E" }} interval={Math.floor(days / 7)} />
                     <YAxis tick={{ fontSize: 10, fill: "#A8A29E" }} tickFormatter={v => `₦${(v / 1000).toFixed(0)}k`} />
                     <Tooltip content={<CustomTooltip />} />
-                    <Line type="monotone" dataKey="revenue" name="Revenue" stroke={AMBER} strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+                    <Line type="monotone" dataKey="revenue" name="Volume" stroke={AMBER} strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
                   </LineChart>
                 </ResponsiveContainer>
-                {summary?.orders && (
+                {summary?.payments && (
                   <div className="mt-3 pt-3 border-t border-stone-100 grid grid-cols-3 gap-2 text-center">
                     <div>
-                      <p className="text-xs text-stone-400">30d Revenue</p>
-                      <p className="font-bold text-stone-900 text-sm">₦{Number(summary.orders.revenue_30d ?? 0).toLocaleString()}</p>
+                      <p className="text-xs text-stone-400">Volume (30d)</p>
+                      <p className="font-bold text-stone-900 text-sm">₦{Number(summary.payments.transaction_volume_30d ?? 0).toLocaleString()}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-stone-400">Total Revenue</p>
-                      <p className="font-bold text-stone-900 text-sm">₦{Number(summary.orders.total_revenue ?? 0).toLocaleString()}</p>
+                      <p className="text-xs text-stone-400">Vendor Paid (30d)</p>
+                      <p className="font-bold text-stone-900 text-sm">₦{Number(summary.payments.vendor_payouts_30d ?? 0).toLocaleString()}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-stone-400">Avg Order</p>
-                      <p className="font-bold text-stone-900 text-sm">₦{Math.round(summary.orders.avg_order_value ?? 0).toLocaleString()}</p>
+                      <p className="text-xs text-stone-400">Earned (30d)</p>
+                      <p className="font-bold text-stone-900 text-sm">₦{Number(summary.payments.platform_fees_30d ?? 0).toLocaleString()}</p>
                     </div>
                   </div>
                 )}
@@ -283,15 +309,17 @@ export default function AdminAnalytics() {
                 <StatRow label="Total listings"    value={summary.listings?.total_listings ?? 0} />
                 <StatRow label="Available / Live"  value={summary.listings?.available_listings ?? 0} />
                 <StatRow label="Pending approval"  value={summary.listings?.pending_listings ?? 0} />
-                <p className="text-teal-600 text-xs font-semibold mb-1 mt-4">Orders & Revenue</p>
+                <p className="text-teal-600 text-xs font-semibold mb-1 mt-4">Orders</p>
                 <StatRow label="Total orders"      value={summary.orders?.total_orders ?? 0} />
                 <StatRow label="Pending"           value={summary.orders?.pending_orders ?? 0} />
                 <StatRow label="Completed"         value={summary.orders?.completed_orders ?? 0} />
                 <StatRow label="Disputed"          value={summary.orders?.disputed_orders ?? 0} />
                 <StatRow label="Cancelled"         value={summary.orders?.cancelled_orders ?? 0} />
-                <StatRow label="Revenue (30d)"     value={`₦${Number(summary.orders?.revenue_30d ?? 0).toLocaleString()}`} />
-                <StatRow label="Total revenue"     value={`₦${Number(summary.orders?.total_revenue ?? 0).toLocaleString()}`} />
                 <StatRow label="Avg order value"   value={`₦${Math.round(summary.orders?.avg_order_value ?? 0).toLocaleString()}`} />
+                <p className="text-teal-600 text-xs font-semibold mb-1 mt-4">Financials</p>
+                <StatRow label="Transaction Volume"  value={`₦${Number(summary.payments?.transaction_volume ?? 0).toLocaleString()}`}  sub={`₦${Number(summary.payments?.transaction_volume_30d ?? 0).toLocaleString()} last 30d`} />
+                <StatRow label="Vendor Payouts"      value={`₦${Number(summary.payments?.vendor_payouts ?? 0).toLocaleString()}`}      sub={`₦${Number(summary.payments?.vendor_payouts_30d ?? 0).toLocaleString()} last 30d`} />
+                <StatRow label="Platform Earnings"   value={`₦${Number(summary.payments?.platform_fees ?? 0).toLocaleString()}`}      sub={`₦${Number(summary.payments?.platform_fees_30d ?? 0).toLocaleString()} last 30d`} />
               </SectionCard>
             )}
           </>
