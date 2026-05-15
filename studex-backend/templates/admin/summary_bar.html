@@ -1,0 +1,20 @@
+{% if summary_stats %}
+<div style="
+  display:flex;gap:0;flex-wrap:wrap;
+  background:#1a1a2e;border-radius:8px;
+  padding:14px 0;margin-bottom:20px;
+  overflow:hidden;
+">
+  {% for stat in summary_stats %}
+  <div style="
+    flex:1;min-width:120px;text-align:center;
+    padding:6px 16px;
+    {% if not forloop.first %}border-left:1px solid #2d2d44;{% endif %}
+  ">
+    <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.09em;margin-bottom:3px;">{{ stat.label }}</div>
+    <div style="font-size:20px;font-weight:700;color:{{ stat.color|default:'#ffffff' }};line-height:1.15;">{{ stat.value }}</div>
+    {% if stat.sub %}<div style="font-size:10px;color:#666;margin-top:2px;">{{ stat.sub }}</div>{% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}

@@ -2,6 +2,8 @@ from django.contrib import admin
 from django.utils import timezone
 from django.utils.html import format_html
 from django.http import HttpResponse
+from django.db.models import Sum
+from datetime import timedelta
 import csv
 from .models import Order, Dispute
 
@@ -30,6 +32,26 @@ class OrderAdmin(admin.ModelAdmin):
     )
 
     actions = ['mark_as_completed', 'mark_as_cancelled', 'trigger_auto_complete', 'export_to_csv']
+
+    def changelist_view(self, request, extra_context=None):
+        o = Order.objects
+        thirty_days_ago = timezone.now() - timedelta(days=30)
+        paid_statuses = ['paid', 'seller_completed', 'completed']
+        total_rev = float(o.filter(status__in=paid_statuses).aggregate(s=Sum('amount'))['s'] or 0)
+        rev_30d   = float(o.filter(status__in=paid_statuses, created_at__gte=thirty_days_ago).aggregate(s=Sum('amount'))['s'] or 0)
+        extra_context = extra_context or {}
+        extra_context['summary_stats'] = [
+            {'label': 'Total',         'value': o.count(),                                   'color': '#fff'},
+            {'label': 'Pending',       'value': o.filter(status='pending').count(),          'color': '#9ca3af'},
+            {'label': 'Paid',          'value': o.filter(status='paid').count(),             'color': '#60a5fa'},
+            {'label': 'In Progress',   'value': o.filter(status='seller_completed').count(), 'color': '#fbbf24'},
+            {'label': 'Completed',     'value': o.filter(status='completed').count(),        'color': '#34d399'},
+            {'label': 'Cancelled',     'value': o.filter(status='cancelled').count(),        'color': '#f87171'},
+            {'label': 'Disputed',      'value': o.filter(status='disputed').count(),         'color': '#c084fc'},
+            {'label': 'Revenue (30d)', 'value': f'₦{rev_30d:,.0f}',                         'color': '#fbbf24'},
+            {'label': 'Total Revenue', 'value': f'₦{total_rev:,.0f}',                       'color': '#a78bfa'},
+        ]
+        return super().changelist_view(request, extra_context=extra_context)
 
     def get_seller(self, obj):
         """Get seller from listing"""
@@ -181,6 +203,20 @@ class DisputeAdmin(admin.ModelAdmin):
     ordering = ['-created_at']
 
     actions = ['resolve_in_buyer_favor', 'resolve_in_seller_favor', 'mark_under_review', 'export_to_csv']
+
+    def changelist_view(self, request, extra_context=None):
+        d = Dispute.objects
+        extra_context = extra_context or {}
+        extra_context['summary_stats'] = [
+            {'label': 'Total',        'value': d.count(),                                    'color': '#fff'},
+            {'label': 'Open',         'value': d.filter(status='open').count(),              'color': '#f87171'},
+            {'label': 'Under Review', 'value': d.filter(status='under_review').count(),      'color': '#fbbf24'},
+            {'label': 'Resolved',     'value': d.filter(status='resolved').count(),          'color': '#34d399'},
+            {'label': 'Closed',       'value': d.filter(status='closed').count(),            'color': '#9ca3af'},
+            {'label': 'Buyer Favor',  'value': d.filter(resolution='buyer_favor').count(),  'color': '#60a5fa'},
+            {'label': 'Seller Favor', 'value': d.filter(resolution='seller_favor').count(), 'color': '#c084fc'},
+        ]
+        return super().changelist_view(request, extra_context=extra_context)
 
     def order_reference(self, obj):
         """Display order reference"""

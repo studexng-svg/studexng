@@ -6,6 +6,7 @@ from django.template.response import TemplateResponse
 from django.utils import timezone
 from django.utils.html import format_html
 from django.http import HttpResponse
+from django.db.models import Count, Avg, Sum, Q
 import csv
 from .models import User, Profile, SellerApplication
 from .utils import send_notification
@@ -51,6 +52,23 @@ class UserAdmin(BaseUserAdmin):
 
     ordering = ['-created_at']
     actions = ['approve_vendors', 'unverify_vendors', 'export_to_csv', 'send_custom_notification']
+
+    def changelist_view(self, request, extra_context=None):
+        from datetime import timedelta
+        thirty_days_ago = timezone.now() - timedelta(days=30)
+        u = User.objects
+        extra_context = extra_context or {}
+        extra_context['summary_stats'] = [
+            {'label': 'Total Users',      'value': u.count(),                                          'color': '#fff'},
+            {'label': 'Active',           'value': u.filter(is_active=True).count(),                   'color': '#4ade80'},
+            {'label': 'Inactive',         'value': u.filter(is_active=False).count(),                  'color': '#f87171'},
+            {'label': 'Students',         'value': u.filter(user_type='student').count(),              'color': '#60a5fa'},
+            {'label': 'Vendors',          'value': u.filter(user_type='vendor').count(),               'color': '#c084fc'},
+            {'label': 'Verified Vendors', 'value': u.filter(is_verified_vendor=True).count(),          'color': '#34d399'},
+            {'label': 'Pending Vendors',  'value': u.filter(user_type='vendor', is_verified_vendor=False).count(), 'color': '#fbbf24'},
+            {'label': 'New (30d)',        'value': u.filter(date_joined__gte=thirty_days_ago).count(), 'color': '#a78bfa'},
+        ]
+        return super().changelist_view(request, extra_context=extra_context)
 
     def send_custom_notification(self, request, queryset):
         if 'apply' in request.POST:
@@ -134,6 +152,21 @@ class ProfileAdmin(admin.ModelAdmin):
     list_filter = ['notifications_enabled', 'email_notifications']
     readonly_fields = ['total_orders', 'total_sales', 'rating', 'total_reviews']
     ordering = ['-total_orders']
+
+    def changelist_view(self, request, extra_context=None):
+        p = Profile.objects
+        agg = p.aggregate(avg_rating=Avg('rating'), total_reviews=Sum('total_reviews'))
+        extra_context = extra_context or {}
+        extra_context['summary_stats'] = [
+            {'label': 'Total Profiles',      'value': p.count(),                                        'color': '#fff'},
+            {'label': 'Avg Rating',          'value': f"{float(agg['avg_rating'] or 0):.2f} ★",        'color': '#fbbf24'},
+            {'label': 'Total Reviews',       'value': agg['total_reviews'] or 0,                        'color': '#60a5fa'},
+            {'label': 'Bonus Eligible',      'value': p.filter(profile_bonus_eligible=True).count(),    'color': '#34d399'},
+            {'label': 'Bonus Used',          'value': p.filter(profile_bonus_used=True).count(),        'color': '#a78bfa'},
+            {'label': 'Has WhatsApp',        'value': p.filter(whatsapp__isnull=False).exclude(whatsapp='').count(), 'color': '#4ade80'},
+            {'label': 'Has Instagram',       'value': p.filter(instagram__isnull=False).exclude(instagram='').count(), 'color': '#f472b6'},
+        ]
+        return super().changelist_view(request, extra_context=extra_context)
 
 
 @admin.register(SellerApplication)
@@ -261,6 +294,21 @@ class SellerApplicationAdmin(admin.ModelAdmin):
             rejected_count += 1
         self.message_user(request, f"{rejected_count} application(s) rejected and applicants notified.")
     reject_applications.short_description = "Reject selected applications"
+
+    def changelist_view(self, request, extra_context=None):
+        s = SellerApplication.objects
+        extra_context = extra_context or {}
+        extra_context['summary_stats'] = [
+            {'label': 'Total',          'value': s.count(),                          'color': '#fff'},
+            {'label': 'Pending',        'value': s.filter(status='pending').count(), 'color': '#fbbf24'},
+            {'label': 'Approved',       'value': s.filter(status='approved').count(),'color': '#34d399'},
+            {'label': 'Rejected',       'value': s.filter(status='rejected').count(),'color': '#f87171'},
+            {'label': 'PAU Pending',    'value': s.filter(status='pending', user__school__iexact='pau').count(), 'color': '#60a5fa'},
+            {'label': 'FUTO Pending',   'value': s.filter(status='pending', user__school__iexact='futo').count(),'color': '#c084fc'},
+            {'label': 'Unassigned',     'value': s.filter(Q(user__school='') | Q(user__school__isnull=True)).count(), 'color': '#9ca3af',
+             'sub': 'no campus set'},
+        ]
+        return super().changelist_view(request, extra_context=extra_context)
 
     def has_add_permission(self, request):
         return False

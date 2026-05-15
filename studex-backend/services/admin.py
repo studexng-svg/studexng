@@ -3,6 +3,7 @@ from django.contrib import admin
 from django.utils import timezone
 from django.utils.html import format_html
 from django.http import HttpResponse
+from django.db.models import Count, Sum
 from django import forms
 import csv
 from .models import Category, Listing, Transaction
@@ -101,6 +102,20 @@ class CategoryAdmin(admin.ModelAdmin):
                 logging.getLogger(__name__).warning(f"Cloudinary category upload failed: {e}")
         super().save_model(request, obj, form, change)
 
+    def changelist_view(self, request, extra_context=None):
+        c = Category.objects
+        l = Listing.objects
+        extra_context = extra_context or {}
+        extra_context['summary_stats'] = [
+            {'label': 'Total Categories', 'value': c.count(),                              'color': '#fff'},
+            {'label': 'PAU',              'value': c.filter(campus='pau').count(),         'color': '#60a5fa'},
+            {'label': 'FUTO',             'value': c.filter(campus='futo').count(),        'color': '#c084fc'},
+            {'label': 'Total Listings',   'value': l.count(),                              'color': '#fbbf24'},
+            {'label': 'Active Listings',  'value': l.filter(is_available=True).count(),    'color': '#34d399'},
+            {'label': 'Inactive Listings','value': l.filter(is_available=False).count(),   'color': '#f87171'},
+        ]
+        return super().changelist_view(request, extra_context=extra_context)
+
     def export_to_csv(self, request, queryset):
         response = HttpResponse(content_type='text/csv')
         response['Content-Disposition'] = 'attachment; filename="categories.csv"'
@@ -150,6 +165,25 @@ class ListingAdmin(admin.ModelAdmin):
     )
 
     actions = ['mark_available', 'mark_unavailable', 'export_to_csv']
+
+    def changelist_view(self, request, extra_context=None):
+        from orders.models import Order
+        l = Listing.objects
+        rev = Order.objects.filter(status__in=['paid', 'seller_completed', 'completed']).aggregate(
+            total=Sum('amount')
+        )['total'] or 0
+        extra_context = extra_context or {}
+        extra_context['summary_stats'] = [
+            {'label': 'Total',      'value': l.count(),                                      'color': '#fff'},
+            {'label': 'Available',  'value': l.filter(is_available=True).count(),            'color': '#34d399'},
+            {'label': 'Unavailable','value': l.filter(is_available=False).count(),           'color': '#f87171'},
+            {'label': 'Services',   'value': l.filter(listing_type='service').count(),       'color': '#60a5fa'},
+            {'label': 'Products',   'value': l.filter(listing_type='product').count(),       'color': '#c084fc'},
+            {'label': 'Food',       'value': l.filter(listing_type='food').count(),          'color': '#fb923c'},
+            {'label': 'Revenue',    'value': f'₦{float(rev):,.0f}',                          'color': '#fbbf24',
+             'sub': 'paid orders'},
+        ]
+        return super().changelist_view(request, extra_context=extra_context)
 
     def get_changelist_form(self, request, **kwargs):
         kwargs.setdefault('form', ListingChangelistForm)
@@ -393,6 +427,22 @@ class TransactionAdmin(admin.ModelAdmin):
             ])
         return response
     export_to_csv.short_description = "Export selected to CSV"
+
+    def changelist_view(self, request, extra_context=None):
+        t = Transaction.objects
+        in_escrow_amt = float(t.filter(status='in_escrow').aggregate(s=Sum('amount'))['s'] or 0)
+        released_amt  = float(t.filter(status='released').aggregate(s=Sum('amount'))['s'] or 0)
+        withdrawn_amt = float(t.filter(status='withdrawn').aggregate(s=Sum('amount'))['s'] or 0)
+        total_amt     = float(t.aggregate(s=Sum('amount'))['s'] or 0)
+        extra_context = extra_context or {}
+        extra_context['summary_stats'] = [
+            {'label': 'Total',        'value': t.count(),                           'color': '#fff'},
+            {'label': 'In Escrow',    'value': t.filter(status='in_escrow').count(),'color': '#fbbf24', 'sub': f'₦{in_escrow_amt:,.0f}'},
+            {'label': 'Released',     'value': t.filter(status='released').count(), 'color': '#34d399', 'sub': f'₦{released_amt:,.0f}'},
+            {'label': 'Withdrawn',    'value': t.filter(status='withdrawn').count(),'color': '#60a5fa', 'sub': f'₦{withdrawn_amt:,.0f}'},
+            {'label': 'Total Volume', 'value': f'₦{total_amt:,.0f}',               'color': '#a78bfa'},
+        ]
+        return super().changelist_view(request, extra_context=extra_context)
 
     def has_add_permission(self, request):
         return False
