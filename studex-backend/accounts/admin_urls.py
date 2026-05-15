@@ -23,6 +23,10 @@ from accounts.admin_views import (
     AdminFeedbackListView,
     AdminCategoryListView,
     AdminCategoryDetailView,
+    AdminCartListView,
+    AdminConversationListView,
+    AdminConversationDetailView,
+    AdminBroadcastMessageView,
 )
 
 app_name = 'admin_api'
@@ -81,4 +85,20 @@ if AdminCategoryListView is not None:
     urlpatterns += [
         path('categories/', AdminCategoryListView.as_view(), name='category-list'),
         path('categories/<int:category_id>/', AdminCategoryDetailView.as_view(), name='category-detail'),
+    ]
+
+# Broadcast messaging
+urlpatterns += [
+    path('notify-all/', AdminBroadcastMessageView.as_view(), name='notify-all'),
+]
+
+if AdminCartListView is not None:
+    urlpatterns += [
+        path('cart/', AdminCartListView.as_view(), name='cart-list'),
+    ]
+
+if AdminConversationListView is not None:
+    urlpatterns += [
+        path('conversations/', AdminConversationListView.as_view(), name='conversation-list'),
+        path('conversations/<int:conversation_id>/', AdminConversationDetailView.as_view(), name='conversation-detail'),
     ]

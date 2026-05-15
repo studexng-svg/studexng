@@ -1,35 +1,40 @@
 // src/app/admin/users/page.tsx
 "use client";
 
-import { Search, Users, Store, User, ChevronRight } from "lucide-react";
+import { Search, Users, Store, User } from "lucide-react";
 import AdminTopBar from "@/components/layout/AdminTopBar";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { fetchAllPages } from "@/lib/authStore";
 import { GRAD } from "@/lib/tokens";
+import { CampusPills, type Campus } from "@/components/admin/CampusPills";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 export default function AdminUsers() {
   const router = useRouter();
   const [search, setSearch] = useState("");
+  const [campus, setCampus] = useState<Campus>("");
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchAllPages(`${API_URL}/api/admin/users/`)
+  const load = useCallback((s = search, c = campus) => {
+    setLoading(true);
+    let url = `${API_URL}/api/admin/users/?`;
+    if (s) url += `search=${encodeURIComponent(s)}&`;
+    if (c) url += `school=${c}`;
+    fetchAllPages(url)
       .then(d => setUsers(d))
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const filtered = users.filter(u =>
-    u.username?.toLowerCase().includes(search.toLowerCase()) ||
-    u.email?.toLowerCase().includes(search.toLowerCase()) ||
-    u.profile?.matric_number?.toLowerCase().includes(search.toLowerCase())
-  );
+  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const vendors = users.filter(u => u.user_type === "vendor").length;
+  const handleCampus = (c: Campus) => { setCampus(c); load(search, c); };
+  const handleSearch = (s: string) => { setSearch(s); load(s, campus); };
+
+  const vendors  = users.filter(u => u.user_type === "vendor").length;
   const students = users.filter(u => u.user_type === "student").length;
 
   return (
@@ -41,9 +46,9 @@ export default function AdminUsers() {
         {/* Stats */}
         <div className="grid grid-cols-3 gap-3">
           {[
-            { label: "Total", value: users.length, icon: Users, color: "#7C3AED" },
-            { label: "Vendors", value: vendors, icon: Store, color: "#0D9488" },
-            { label: "Students", value: students, icon: User, color: "#6366F1" },
+            { label: "Total",    value: users.length, icon: Users, color: "#7C3AED" },
+            { label: "Vendors",  value: vendors,      icon: Store, color: "#0D9488" },
+            { label: "Students", value: students,     icon: User,  color: "#6366F1" },
           ].map(({ label, value, icon: Icon, color }) => (
             <div key={label} className="bg-white border border-stone-200 rounded-2xl p-3 text-center shadow-sm">
               <Icon className="w-5 h-5 mx-auto mb-1" style={{ color }} />
@@ -53,12 +58,15 @@ export default function AdminUsers() {
           ))}
         </div>
 
+        {/* Campus filter */}
+        <CampusPills value={campus} onChange={handleCampus} />
+
         {/* Search */}
         <div className="relative">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
           <input
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={e => handleSearch(e.target.value)}
             placeholder="Search name, email, matric…"
             className="w-full pl-10 pr-4 py-3 bg-white border border-stone-200 rounded-xl text-stone-900 placeholder:text-stone-400 text-sm focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20"
           />
@@ -71,14 +79,14 @@ export default function AdminUsers() {
               <div key={i} className="bg-white border border-stone-200 rounded-2xl h-16 animate-pulse" />
             ))}
           </div>
-        ) : filtered.length === 0 ? (
+        ) : users.length === 0 ? (
           <div className="bg-white border border-stone-100 rounded-2xl p-10 text-center">
             <Users className="w-10 h-10 text-stone-200 mx-auto mb-3" />
             <p className="text-stone-400 text-sm">No users found</p>
           </div>
         ) : (
           <div className="space-y-2">
-            {filtered.map(user => (
+            {users.map(user => (
               <div
                 key={user.id}
                 onClick={() => router.push(`/admin/users/${user.id}`)}
@@ -93,11 +101,17 @@ export default function AdminUsers() {
                   <p className="text-stone-400 text-xs truncate">{user.email}</p>
                 </div>
                 <span className={`px-2 py-0.5 rounded-full text-xs font-semibold flex-shrink-0 ${
-                  user.user_type === "vendor" ? "bg-teal-100 text-teal-700" : "bg-stone-100 text-stone-600"
+                  user.school?.toLowerCase() === "futo"
+                    ? "bg-orange-100 text-orange-700"
+                    : "bg-teal-50 text-teal-700"
+                }`}>
+                  {user.school?.toUpperCase() || "PAU"}
+                </span>
+                <span className={`px-2 py-0.5 rounded-full text-xs font-semibold flex-shrink-0 ${
+                  user.user_type === "vendor" ? "bg-purple-100 text-purple-700" : "bg-stone-100 text-stone-600"
                 }`}>
                   {user.user_type === "vendor" ? "Vendor" : "Student"}
                 </span>
-                <ChevronRight className="w-4 h-4 text-stone-400 flex-shrink-0" />
               </div>
             ))}
           </div>

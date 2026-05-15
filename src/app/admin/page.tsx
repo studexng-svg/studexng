@@ -5,6 +5,7 @@ import {
   Users, Package, DollarSign, Store, FileText, Tag, TrendingUp,
   ChevronRight, AlertCircle, CheckCircle, Clock,
   CreditCard, Star, AlertTriangle, ArrowUpRight,
+  ShoppingCart, MessageCircle, Send,
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -69,6 +70,9 @@ const QUICK_LINKS = [
   { label: "Categories",          href: "/admin/categories",       icon: Tag,          desc: "Manage listing categories" },
   { label: "Payout Transactions", href: "/admin/transactions",     icon: ArrowUpRight, desc: "Escrow and release tracking" },
   { label: "Analytics",          href: "/admin/analytics",         icon: TrendingUp,   desc: "Charts, trends, live stats" },
+  { label: "Cart Overview",      href: "/admin/cart",             icon: ShoppingCart, desc: "View all user cart items" },
+  { label: "Conversations",      href: "/admin/conversations",    icon: MessageCircle,desc: "Monitor buyer/seller chats" },
+  { label: "Messages",           href: "/admin/messages",         icon: Send,         desc: "Send notifications to users" },
 ];
 
 export default function AdminDashboard() {

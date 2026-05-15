@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import AdminTopBar from "@/components/layout/AdminTopBar";
 import { fetchAllPages } from "@/lib/authStore";
+import { CampusPills, type Campus } from "@/components/admin/CampusPills";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -27,12 +28,14 @@ export default function AdminListingsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState("");
+  const [campus, setCampus] = useState<Campus>("");
 
-  const load = (q = search, av = tab) => {
+  const load = (q = search, av = tab, c = campus) => {
     setLoading(true);
     let url = `${API_URL}/api/admin/listings/?`;
     if (q) url += `search=${encodeURIComponent(q)}&`;
-    if (av !== "") url += `is_available=${av}`;
+    if (av !== "") url += `is_available=${av}&`;
+    if (c) url += `campus=${c}`;
     fetchAllPages(url)
       .then(d => setListings(d))
       .catch(() => {})
@@ -46,6 +49,9 @@ export default function AdminListingsPage() {
       <AdminTopBar title="Listings" back="/admin" />
 
       <div className="px-4 pt-4 pb-28 max-w-2xl mx-auto space-y-3">
+
+        {/* Campus filter */}
+        <CampusPills value={campus} onChange={c => { setCampus(c); load(search, tab, c); }} />
 
         {/* Search */}
         <div className="relative">
@@ -63,7 +69,7 @@ export default function AdminListingsPage() {
         <div className="flex gap-2">
           {TABS.map(t => (
             <button key={t.value}
-              onClick={() => { setTab(t.value); load(search, t.value); }}
+              onClick={() => { setTab(t.value); load(search, t.value, campus); }}
               className={`px-4 py-1.5 rounded-full text-xs font-semibold transition ${tab === t.value ? "bg-teal-600 text-white" : "bg-white border border-stone-200 text-stone-600"}`}>
               {t.label}
             </button>

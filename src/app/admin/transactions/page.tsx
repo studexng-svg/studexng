@@ -5,6 +5,7 @@ import { ArrowUpRight, Search } from "lucide-react";
 import { useEffect, useState } from "react";
 import AdminTopBar from "@/components/layout/AdminTopBar";
 import { fetchWithAuth, fetchAllPages } from "@/lib/authStore";
+import { CampusPills, type Campus } from "@/components/admin/CampusPills";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -26,13 +27,15 @@ export default function AdminTransactionsPage() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("");
   const [search, setSearch] = useState("");
+  const [campus, setCampus] = useState<Campus>("");
   const [acting, setActing] = useState<number | null>(null);
 
-  const load = (s = search, st = tab) => {
+  const load = (s = search, st = tab, c = campus) => {
     setLoading(true);
     let url = `${API_URL}/api/admin/service-transactions/?`;
     if (st) url += `status=${st}&`;
-    if (s) url += `search=${encodeURIComponent(s)}`;
+    if (s) url += `search=${encodeURIComponent(s)}&`;
+    if (c) url += `campus=${c}`;
     fetchAllPages(url)
       .then(d => setTxs(d))
       .catch(() => {})
@@ -62,18 +65,20 @@ export default function AdminTransactionsPage() {
 
       <div className="px-4 pt-4 pb-28 max-w-2xl mx-auto space-y-3">
 
+        <CampusPills value={campus} onChange={c => { setCampus(c); load(search, tab, c); }} />
+
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
           <input className="w-full bg-white border border-stone-200 rounded-xl pl-9 pr-4 py-2.5 text-sm placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-teal-400"
             placeholder="Search vendor, order ref…"
             value={search} onChange={e => setSearch(e.target.value)}
-            onKeyDown={e => e.key === "Enter" && load(search, tab)} />
+            onKeyDown={e => e.key === "Enter" && load(search, tab, campus)} />
         </div>
 
         <div className="flex gap-2 flex-wrap">
           {TABS.map(t => (
             <button key={t.value}
-              onClick={() => { setTab(t.value); load(search, t.value); }}
+              onClick={() => { setTab(t.value); load(search, t.value, campus); }}
               className={`px-3 py-1.5 rounded-full text-xs font-semibold transition ${tab === t.value ? "bg-teal-600 text-white" : "bg-white border border-stone-200 text-stone-600"}`}>
               {t.label}
             </button>

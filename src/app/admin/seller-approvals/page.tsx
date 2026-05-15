@@ -7,6 +7,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { fetchWithAuth } from "@/lib/authStore";
 import { GRAD } from "@/lib/tokens";
+import { CampusPills, type Campus } from "@/components/admin/CampusPills";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -31,12 +32,15 @@ export default function AdminSellerApprovals() {
   const [applications, setApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [campus, setCampus] = useState<Campus>("");
 
-  const fetchApplications = useCallback(async () => {
+  const fetchApplications = useCallback(async (c = campus) => {
     setLoading(true);
     setError("");
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/auth/seller/applications/`);
+      let url = `${API_URL}/api/auth/seller/applications/`;
+      if (c) url += `?school=${c}`;
+      const res = await fetchWithAuth(url);
       if (!res.ok) throw new Error("Failed to fetch applications");
       const data = await res.json();
       setApplications(Array.isArray(data) ? data : data.results || []);
@@ -73,9 +77,11 @@ export default function AdminSellerApprovals() {
           ))}
         </div>
 
+        <CampusPills value={campus} onChange={c => { setCampus(c); fetchApplications(c); }} />
+
         <div className="flex justify-end">
           <button
-            onClick={fetchApplications}
+            onClick={() => fetchApplications(campus)}
             className="text-stone-500 hover:text-stone-800 hover:bg-stone-100 px-3 py-2 rounded-xl transition flex items-center gap-2 text-sm font-medium"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />

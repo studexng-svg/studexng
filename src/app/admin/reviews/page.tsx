@@ -5,6 +5,7 @@ import { Star, Search, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import AdminTopBar from "@/components/layout/AdminTopBar";
 import { fetchWithAuth, fetchAllPages } from "@/lib/authStore";
+import { CampusPills, type Campus } from "@/components/admin/CampusPills";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -22,13 +23,15 @@ export default function AdminReviewsPage() {
   const [reviews, setReviews] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [campus, setCampus] = useState<Campus>("");
   const [deleting, setDeleting] = useState<number | null>(null);
   const [confirmId, setConfirmId] = useState<number | null>(null);
 
-  const load = (s = search) => {
+  const load = (s = search, c = campus) => {
     setLoading(true);
     let url = `${API_URL}/api/admin/reviews/?`;
-    if (s) url += `search=${encodeURIComponent(s)}`;
+    if (s) url += `search=${encodeURIComponent(s)}&`;
+    if (c) url += `campus=${c}`;
     fetchAllPages(url)
       .then(d => setReviews(d))
       .catch(() => {})
@@ -56,12 +59,14 @@ export default function AdminReviewsPage() {
 
       <div className="px-4 pt-4 pb-28 max-w-2xl mx-auto space-y-3">
 
+        <CampusPills value={campus} onChange={c => { setCampus(c); load(search, c); }} />
+
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
           <input className="w-full bg-white border border-stone-200 rounded-xl pl-9 pr-4 py-2.5 text-sm placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-teal-400"
             placeholder="Search reviewer, vendor, listing…"
             value={search} onChange={e => setSearch(e.target.value)}
-            onKeyDown={e => e.key === "Enter" && load(search)} />
+            onKeyDown={e => e.key === "Enter" && load(search, campus)} />
         </div>
 
         {!loading && <p className="text-xs text-stone-400">{reviews.length} review{reviews.length !== 1 ? "s" : ""}</p>}

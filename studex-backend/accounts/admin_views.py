@@ -172,6 +172,17 @@ class AdminUserListView(generics.ListAPIView):
             is_staff_bool = is_staff.lower() == 'true'
             queryset = queryset.filter(is_staff=is_staff_bool)
 
+        # Campus / school filter — PAU includes null/blank (legacy users)
+        school = self.request.query_params.get('school', None)
+        if school:
+            school = school.lower()
+            if school == 'pau':
+                queryset = queryset.filter(
+                    Q(school__iexact='pau') | Q(school='') | Q(school__isnull=True)
+                )
+            else:
+                queryset = queryset.filter(school__iexact=school)
+
         return queryset
 
 
@@ -372,6 +383,11 @@ try:
             if category_id:
                 queryset = queryset.filter(category_id=category_id)
 
+            # Campus filter
+            campus = self.request.query_params.get('campus', None)
+            if campus:
+                queryset = queryset.filter(campus__iexact=campus)
+
             return queryset
 
 
@@ -481,6 +497,11 @@ try:
             if order_status:
                 queryset = queryset.filter(status=order_status)
 
+            # Campus filter via listing
+            campus = self.request.query_params.get('campus', None)
+            if campus:
+                queryset = queryset.filter(listing__campus__iexact=campus)
+
             return queryset
 
 
@@ -578,6 +599,9 @@ try:
                     Q(filer__username__icontains=search) |
                     Q(complaint__icontains=search)
                 )
+            campus = self.request.query_params.get('campus')
+            if campus:
+                qs = qs.filter(order__listing__campus__iexact=campus)
             return qs
 
     class AdminDisputeDetailView(APIView):
@@ -651,6 +675,15 @@ try:
                     Q(seller__username__icontains=search) |
                     Q(transfer_reference__icontains=search)
                 )
+            campus = self.request.query_params.get('campus')
+            if campus:
+                campus = campus.lower()
+                if campus == 'pau':
+                    qs = qs.filter(
+                        Q(seller__school__iexact='pau') | Q(seller__school='') | Q(seller__school__isnull=True)
+                    )
+                else:
+                    qs = qs.filter(seller__school__iexact=campus)
             return qs
 
         def list(self, request, *args, **kwargs):
@@ -806,6 +839,15 @@ try:
                     Q(vendor__username__icontains=search) |
                     Q(order__reference__icontains=search)
                 )
+            campus = request.query_params.get('campus')
+            if campus:
+                campus = campus.lower()
+                if campus == 'pau':
+                    qs = qs.filter(
+                        Q(vendor__school__iexact='pau') | Q(vendor__school='') | Q(vendor__school__isnull=True)
+                    )
+                else:
+                    qs = qs.filter(vendor__school__iexact=campus)
             data = []
             for t in qs:
                 data.append({
@@ -875,6 +917,15 @@ try:
             rating = request.query_params.get('rating')
             if rating:
                 qs = qs.filter(rating=rating)
+            campus = request.query_params.get('campus')
+            if campus:
+                campus = campus.lower()
+                if campus == 'pau':
+                    qs = qs.filter(
+                        Q(vendor__school__iexact='pau') | Q(vendor__school='') | Q(vendor__school__isnull=True)
+                    )
+                else:
+                    qs = qs.filter(vendor__school__iexact=campus)
             data = []
             for r in qs:
                 data.append({
@@ -996,3 +1047,213 @@ try:
 except ImportError:
     AdminCategoryListView = None
     AdminCategoryDetailView = None
+
+
+# ============================================
+# CART OVERSIGHT
+# ============================================
+
+try:
+    from cart.models import CartItem
+
+    class AdminCartListView(APIView):
+        """GET /api/admin/cart/ — all active cart items across all users."""
+        permission_classes = [IsAdminUser]
+
+        def get(self, request):
+            qs = CartItem.objects.all().select_related('user', 'listing').order_by('-created_at')
+
+            search = request.query_params.get('search')
+            if search:
+                qs = qs.filter(
+                    Q(user__username__icontains=search) |
+                    Q(listing__title__icontains=search)
+                )
+
+            campus = request.query_params.get('campus')
+            if campus:
+                qs = qs.filter(listing__campus__iexact=campus)
+
+            school = request.query_params.get('school')
+            if school:
+                school = school.lower()
+                if school == 'pau':
+                    qs = qs.filter(
+                        Q(user__school__iexact='pau') | Q(user__school='') | Q(user__school__isnull=True)
+                    )
+                else:
+                    qs = qs.filter(user__school__iexact=school)
+
+            data = []
+            for item in qs:
+                data.append({
+                    'id': item.id,
+                    'user_id': item.user.id,
+                    'username': item.user.username,
+                    'user_school': (item.user.school or 'pau').upper(),
+                    'listing_id': item.listing.id,
+                    'listing_title': item.listing.title,
+                    'listing_price': str(item.listing.price),
+                    'listing_campus': item.listing.campus,
+                    'quantity': item.quantity,
+                    'created_at': item.created_at.isoformat(),
+                    'reserved_at': item.reserved_at.isoformat() if item.reserved_at else None,
+                })
+            return Response(data)
+
+except ImportError:
+    AdminCartListView = None
+
+
+# ============================================
+# CONVERSATION / CHAT OVERSIGHT
+# ============================================
+
+try:
+    from chat.models import Conversation, Message as ChatMessage
+
+    class AdminConversationListView(APIView):
+        """GET /api/admin/conversations/ — all conversations."""
+        permission_classes = [IsAdminUser]
+
+        def get(self, request):
+            qs = Conversation.objects.all().select_related(
+                'buyer', 'seller', 'listing'
+            ).order_by('-updated_at')
+
+            search = request.query_params.get('search')
+            if search:
+                qs = qs.filter(
+                    Q(buyer__username__icontains=search) |
+                    Q(seller__username__icontains=search) |
+                    Q(listing__title__icontains=search)
+                )
+
+            campus = request.query_params.get('campus')
+            if campus:
+                qs = qs.filter(listing__campus__iexact=campus)
+
+            data = []
+            for conv in qs:
+                msg_count = ChatMessage.objects.filter(conversation=conv).count()
+                data.append({
+                    'id': conv.id,
+                    'buyer_id': conv.buyer.id,
+                    'buyer': conv.buyer.username,
+                    'seller_id': conv.seller.id,
+                    'seller': conv.seller.username,
+                    'listing_id': conv.listing.id if conv.listing else None,
+                    'listing_title': conv.listing.title if conv.listing else None,
+                    'listing_campus': conv.listing.campus if conv.listing else None,
+                    'last_message': conv.last_message or '',
+                    'last_message_at': conv.last_message_at.isoformat() if conv.last_message_at else None,
+                    'message_count': msg_count,
+                    'created_at': conv.created_at.isoformat(),
+                    'updated_at': conv.updated_at.isoformat(),
+                })
+            return Response(data)
+
+    class AdminConversationDetailView(APIView):
+        """GET /api/admin/conversations/{id}/ — conversation + all messages."""
+        permission_classes = [IsAdminUser]
+
+        def get(self, request, conversation_id):
+            try:
+                conv = Conversation.objects.select_related(
+                    'buyer', 'seller', 'listing'
+                ).get(id=conversation_id)
+            except Conversation.DoesNotExist:
+                return Response({'error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
+
+            messages = ChatMessage.objects.filter(
+                conversation=conv
+            ).select_related('sender').order_by('created_at')
+
+            msgs_data = []
+            for msg in messages:
+                msgs_data.append({
+                    'id': msg.id,
+                    'sender_id': msg.sender.id,
+                    'sender': msg.sender.username,
+                    'message_type': msg.message_type,
+                    'content': msg.content or '',
+                    'image_url': msg.image_url or None,
+                    'offer_amount': str(msg.offer_amount) if msg.offer_amount else None,
+                    'offer_status': msg.offer_status,
+                    'is_read': msg.is_read,
+                    'is_edited': msg.is_edited,
+                    'is_pinned': msg.is_pinned,
+                    'created_at': msg.created_at.isoformat(),
+                })
+
+            return Response({
+                'id': conv.id,
+                'buyer_id': conv.buyer.id,
+                'buyer': conv.buyer.username,
+                'seller_id': conv.seller.id,
+                'seller': conv.seller.username,
+                'listing_id': conv.listing.id if conv.listing else None,
+                'listing_title': conv.listing.title if conv.listing else None,
+                'listing_campus': conv.listing.campus if conv.listing else None,
+                'messages': msgs_data,
+            })
+
+except ImportError:
+    AdminConversationListView = None
+    AdminConversationDetailView = None
+
+
+# ============================================
+# BROADCAST MESSAGING
+# ============================================
+
+class AdminBroadcastMessageView(APIView):
+    """
+    POST /api/admin/notify-all/
+    Send a notification to all active users or a filtered subset.
+    Body: { title, message, school?, user_type? }
+    """
+    permission_classes = [IsAdminUser]
+
+    def post(self, request):
+        from accounts.utils import send_notification
+
+        title   = (request.data.get('title')   or '').strip()
+        message = (request.data.get('message') or '').strip()
+        school     = (request.data.get('school')     or '').strip().lower()
+        user_type  = (request.data.get('user_type')  or '').strip().lower()
+
+        if not title or not message:
+            return Response(
+                {'error': 'title and message are required'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        recipients = User.objects.filter(is_active=True)
+
+        if school:
+            if school == 'pau':
+                recipients = recipients.filter(
+                    Q(school__iexact='pau') | Q(school='') | Q(school__isnull=True)
+                )
+            else:
+                recipients = recipients.filter(school__iexact=school)
+
+        if user_type in ('student', 'vendor'):
+            recipients = recipients.filter(user_type=user_type)
+
+        sent = 0
+        for user in recipients.iterator():
+            try:
+                send_notification(
+                    recipient=user,
+                    notification_type='admin_message',
+                    title=title,
+                    message=message,
+                    action_url='',
+                )
+                sent += 1
+            except Exception:
+                pass
+
+        return Response({'sent': sent})

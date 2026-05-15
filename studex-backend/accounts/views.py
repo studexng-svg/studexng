@@ -392,7 +392,18 @@ class SellerApplicationViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         if self.request.user.is_staff:
-            return self.queryset.order_by('-submitted_at')
+            from django.db.models import Q as _Q
+            qs = self.queryset.order_by('-submitted_at')
+            school = self.request.query_params.get('school', None)
+            if school:
+                school = school.lower()
+                if school == 'pau':
+                    qs = qs.filter(
+                        _Q(user__school__iexact='pau') | _Q(user__school='') | _Q(user__school__isnull=True)
+                    )
+                else:
+                    qs = qs.filter(user__school__iexact=school)
+            return qs
         return self.queryset.filter(user=self.request.user)
 
     def create(self, request, *args, **kwargs):

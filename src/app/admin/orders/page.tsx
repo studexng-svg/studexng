@@ -1,25 +1,20 @@
 // src/app/admin/orders/page.tsx
 "use client";
 
-import {
-  Package, Clock, CheckCircle, AlertCircle, Search, ChevronRight,
-} from "lucide-react";
+import { Package, Search, ChevronRight } from "lucide-react";
 import { useRouter } from "next/navigation";
 import AdminTopBar from "@/components/layout/AdminTopBar";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { fetchAllPages } from "@/lib/authStore";
 import { GRAD } from "@/lib/tokens";
+import { CampusPills, type Campus } from "@/components/admin/CampusPills";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 const STATUS_LABELS: Record<string, string> = {
-  pending: "Pending",
-  confirmed: "Confirmed",
-  completed: "Completed",
-  cancelled: "Cancelled",
-  disputed: "Disputed",
+  pending: "Pending", confirmed: "Confirmed",
+  completed: "Completed", cancelled: "Cancelled", disputed: "Disputed",
 };
-
 const STATUS_STYLE: Record<string, string> = {
   pending:   "bg-amber-100 text-amber-700",
   confirmed: "bg-blue-100 text-blue-700",
@@ -27,47 +22,54 @@ const STATUS_STYLE: Record<string, string> = {
   cancelled: "bg-stone-100 text-stone-500",
   disputed:  "bg-red-100 text-red-700",
 };
+const STATUS_TABS = ["", "pending", "completed", "disputed", "cancelled"];
 
 export default function AdminOrders() {
   const router = useRouter();
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [campus, setCampus] = useState<Campus>("");
 
-  useEffect(() => {
-    fetchAllPages(`${API_URL}/api/admin/orders/`)
+  const load = useCallback((s = search, st = statusFilter, c = campus) => {
+    setLoading(true);
+    let url = `${API_URL}/api/admin/orders/?`;
+    if (st) url += `status=${st}&`;
+    if (c) url += `campus=${c}&`;
+    fetchAllPages(url)
       .then(d => setOrders(d))
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const filtered = useMemo(() => {
-    let list = orders;
-    if (statusFilter !== "all") list = list.filter(o => o.status === statusFilter);
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      list = list.filter(o =>
-        String(o.id).includes(q) ||
-        o.buyer?.username?.toLowerCase().includes(q) ||
-        o.listing?.title?.toLowerCase().includes(q)
-      );
-    }
-    return list;
-  }, [orders, statusFilter, search]);
+  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const tabs = [
-    { key: "all",       label: "All",       count: orders.length },
-    { key: "pending",   label: "Pending",   count: orders.filter(o => o.status === "pending").length },
-    { key: "completed", label: "Completed", count: orders.filter(o => o.status === "completed").length },
-    { key: "disputed",  label: "Disputed",  count: orders.filter(o => o.status === "disputed").length },
-  ].filter(t => t.key === "all" || t.count > 0);
+  const handleCampus = (c: Campus) => { setCampus(c); load(search, statusFilter, c); };
+  const handleStatus = (st: string) => { setStatusFilter(st); load(search, st, campus); };
+
+  const filtered = search.trim()
+    ? orders.filter(o => {
+        const q = search.toLowerCase();
+        return String(o.id).includes(q) ||
+          o.buyer?.username?.toLowerCase().includes(q) ||
+          o.listing?.title?.toLowerCase().includes(q);
+      })
+    : orders;
+
+  const counts = STATUS_TABS.reduce((acc, k) => {
+    acc[k] = k ? orders.filter(o => o.status === k).length : orders.length;
+    return acc;
+  }, {} as Record<string, number>);
 
   return (
     <div className="min-h-screen bg-[#FFF8F0]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       <AdminTopBar title="Orders" back="/admin" />
 
       <div className="px-4 pt-4 pb-28 max-w-2xl mx-auto space-y-4">
+
+        {/* Campus filter */}
+        <CampusPills value={campus} onChange={handleCampus} />
 
         {/* Search */}
         <div className="relative">
@@ -80,25 +82,28 @@ export default function AdminOrders() {
           />
         </div>
 
-        {/* Filter tabs */}
+        {/* Status tabs */}
         <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4">
-          {tabs.map(t => (
+          {[
+            { key: "",          label: "All" },
+            { key: "pending",   label: "Pending" },
+            { key: "completed", label: "Completed" },
+            { key: "disputed",  label: "Disputed" },
+            { key: "cancelled", label: "Cancelled" },
+          ].map(t => (
             <button
               key={t.key}
-              onClick={() => setStatusFilter(t.key)}
-              className={`px-4 py-2 rounded-full text-sm font-semibold whitespace-nowrap transition-all flex-shrink-0 ${
-                statusFilter === t.key
-                  ? "text-white shadow-sm"
-                  : "bg-white border border-stone-200 text-stone-600"
+              onClick={() => handleStatus(t.key)}
+              className={`px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition-all flex-shrink-0 ${
+                statusFilter === t.key ? "text-white shadow-sm" : "bg-white border border-stone-200 text-stone-600"
               }`}
               style={statusFilter === t.key ? { background: GRAD } : {}}
             >
-              {t.label} ({t.count})
+              {t.label} ({counts[t.key] ?? 0})
             </button>
           ))}
         </div>
 
-        {/* Orders */}
         {loading ? (
           <div className="space-y-3">
             {[...Array(4)].map((_, i) => (
