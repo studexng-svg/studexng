@@ -50,17 +50,6 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/maintenance", request.url));
   }
 
-  // Admin route protection — require an access_token cookie for all /admin/* pages
-  // except /admin/login (the entry point). The component-level AdminGuard performs
-  // the full is_admin check; this just prevents unauthenticated users from loading
-  // the admin shell at all.
-  if (pathname.startsWith("/admin") && pathname !== "/admin/login") {
-    const token = request.cookies.get("access_token");
-    if (!token) {
-      return NextResponse.redirect(new URL("/auth", request.url));
-    }
-  }
-
   return NextResponse.next();
 }
 
