@@ -241,12 +241,11 @@ class AdminUserDetailView(APIView):
 
             user.save()
 
-            # Update profile if needed
+            # Update vendor verification flag (lives on User, not Profile)
             if 'profile' in request.data:
-                profile = user.profile
                 if 'is_verified_vendor' in request.data['profile']:
-                    profile.is_verified_vendor = request.data['profile']['is_verified_vendor']
-                    profile.save()
+                    user.is_verified_vendor = request.data['profile']['is_verified_vendor']
+                    user.save()
 
             if not was_vendor and user.user_type == 'vendor':
                 try:

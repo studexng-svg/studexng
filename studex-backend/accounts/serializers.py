@@ -268,15 +268,15 @@ class UserSerializer(serializers.ModelSerializer):
 
     def get_profile(self, obj):
         try:
-            profile = obj.profile
-            return {
-                'is_verified_vendor': profile.is_verified_vendor,
-                'matric_number': obj.matric_number,
-                'business_name': obj.business_name,
-                'hostel': obj.hostel,
-            }
+            obj.profile  # ensure the profile relation exists
         except Profile.DoesNotExist:
             return None
+        return {
+            'is_verified_vendor': obj.is_verified_vendor,
+            'matric_number': obj.matric_number,
+            'business_name': obj.business_name,
+            'hostel': obj.hostel,
+        }
 
 
 class SellerApplicationSerializer(serializers.ModelSerializer):

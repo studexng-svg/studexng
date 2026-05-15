@@ -32,8 +32,8 @@ class AdminAnalytics:
         vendors = User.objects.filter(user_type='vendor').count()
 
         # Get verified vendors count
-        verified_vendors = Profile.objects.filter(
-            user__user_type='vendor',
+        verified_vendors = User.objects.filter(
+            user_type='vendor',
             is_verified_vendor=True
         ).count()
 
