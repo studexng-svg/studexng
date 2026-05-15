@@ -89,6 +89,7 @@ class PaymentTransaction(models.Model):
     # Populated after a Transfer API call to pay out the vendor
     transfer_reference = models.CharField(max_length=200, blank=True, null=True)
     transfer_status = models.CharField(max_length=50, blank=True, null=True)
+    transfer_retry_count = models.IntegerField(default=0)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
