@@ -7,12 +7,22 @@ from django.db import models
 from django.utils import timezone
 from django.contrib.auth import get_user_model
 from decimal import Decimal
-from .models import Order, Booking, Dispute
-from .serializers import OrderSerializer, DisputeSerializer, BookingSerializer
+from .models import Order, OrderStatus, Booking, Dispute
+from .serializers import OrderSerializer, OrderStatusSerializer, DisputeSerializer, BookingSerializer
 import logging
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
+
+TRACKING_STATUS_ORDER = ['paid', 'confirmed', 'preparing', 'ready', 'delivered']
+
+TRACKING_NOTIFICATIONS = {
+    'confirmed': ('✅ Order Confirmed!', 'Your order has been confirmed! The vendor is getting started.'),
+    'preparing': ('🍳 Order Being Prepared!', 'Your order is being prepared! 🍳'),
+    'ready':     ('📦 Order Ready for Pickup!', 'Your order is ready for pickup! 📦'),
+    'delivered': ('🎉 Order Delivered!', 'Order delivered! Hope you enjoy it 🎉'),
+    'cancelled': ('❌ Order Cancelled', 'Your order has been cancelled. Please contact support if you have concerns.'),
+}
 
 
 def _notify(recipient, notification_type, title, message, action_url=""):
@@ -75,6 +85,96 @@ class OrderViewSet(viewsets.ModelViewSet):
             action_url='/account/orders',
         )
         return Response({"message": "Order marked as complete.", "order": self.get_serializer(order).data})
+
+    @action(detail=True, methods=['patch'], url_path='update-status')
+    def update_status(self, request, pk=None):
+        """Vendor updates order tracking status with optional note and estimated time."""
+        order = self.get_object()
+
+        if order.listing.vendor != request.user:
+            return Response({"detail": "Only the listing vendor can update this order's status."}, status=403)
+
+        if order.status not in ['paid', 'seller_completed']:
+            return Response({"detail": "Can only update tracking status of active paid orders."}, status=400)
+
+        new_status = request.data.get('status')
+        note = request.data.get('note', '')
+        estimated_time = request.data.get('estimated_time')
+
+        if not new_status:
+            return Response({"detail": "status is required."}, status=400)
+
+        valid_statuses = [s[0] for s in OrderStatus.TRACKING_STATUS_CHOICES]
+        if new_status not in valid_statuses:
+            return Response({"detail": f"Invalid status. Must be one of: {', '.join(valid_statuses)}"}, status=400)
+
+        current = order.current_status
+        if new_status != 'cancelled':
+            if current not in TRACKING_STATUS_ORDER or new_status not in TRACKING_STATUS_ORDER:
+                return Response({"detail": "Invalid status transition."}, status=400)
+            if TRACKING_STATUS_ORDER.index(new_status) <= TRACKING_STATUS_ORDER.index(current):
+                return Response(
+                    {"detail": f"Cannot move from '{current}' to '{new_status}'. Status can only move forward."},
+                    status=400,
+                )
+
+        order.current_status = new_status
+        if estimated_time is not None:
+            try:
+                order.estimated_time = int(estimated_time)
+            except (ValueError, TypeError):
+                pass
+
+        if new_status == 'delivered' and order.status == 'paid':
+            order.status = 'seller_completed'
+            order.seller_completed_at = timezone.now()
+        elif new_status == 'cancelled':
+            order.status = 'cancelled'
+
+        order.save()
+
+        OrderStatus.objects.create(order=order, status=new_status, note=note, updated_by=request.user)
+
+        notif = TRACKING_NOTIFICATIONS.get(new_status)
+        if notif:
+            try:
+                from accounts.utils import send_notification
+                send_notification(
+                    recipient=order.buyer,
+                    notification_type='order_update',
+                    title=notif[0],
+                    message=notif[1],
+                    action_url=f'/account/orders/{order.id}',
+                )
+            except Exception as e:
+                logger.warning(f"Tracking notification failed: {e}")
+
+        return Response({"message": f"Status updated to '{new_status}'.", "order": self.get_serializer(order).data})
+
+    @action(detail=True, methods=['get'], url_path='tracking')
+    def tracking(self, request, pk=None):
+        """Returns full tracking history for an order (buyer or vendor)."""
+        order = self.get_object()
+
+        history_qs = OrderStatus.objects.filter(order=order).order_by('created_at')
+        history = OrderStatusSerializer(history_qs, many=True).data
+
+        synthetic_start = {
+            "id": None,
+            "status": "paid",
+            "note": "Payment confirmed.",
+            "updated_by": order.buyer.username,
+            "created_at": (order.paid_at or order.created_at).isoformat(),
+        }
+        if not history or history[0]['status'] != 'paid':
+            history = [synthetic_start] + list(history)
+
+        return Response({
+            "current_status": order.current_status,
+            "estimated_time": order.estimated_time,
+            "history": history,
+            "order": self.get_serializer(order).data,
+        })
 
     @action(detail=True, methods=['post'])
     def confirm(self, request, pk=None):

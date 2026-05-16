@@ -1,10 +1,10 @@
 // src/app/admin/orders/page.tsx
 "use client";
 
-import { Package, Search, ChevronRight } from "lucide-react";
+import { Package, Search, ChevronRight, RefreshCw } from "lucide-react";
 import { useRouter } from "next/navigation";
 import AdminTopBar from "@/components/layout/AdminTopBar";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { fetchAllPages } from "@/lib/authStore";
 import { GRAD } from "@/lib/tokens";
 import { CampusPills, type Campus } from "@/components/admin/CampusPills";
@@ -12,41 +12,60 @@ import { CampusPills, type Campus } from "@/components/admin/CampusPills";
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 const STATUS_LABELS: Record<string, string> = {
-  pending: "Pending", confirmed: "Confirmed",
-  completed: "Completed", cancelled: "Cancelled", disputed: "Disputed",
+  pending:          "Pending",
+  paid:             "In Progress",
+  seller_completed: "Awaiting Confirmation",
+  confirmed:        "Confirmed",
+  completed:        "Completed",
+  cancelled:        "Cancelled",
+  disputed:         "Disputed",
 };
 const STATUS_STYLE: Record<string, string> = {
-  pending:   "bg-amber-100 text-amber-700",
-  confirmed: "bg-blue-100 text-blue-700",
-  completed: "bg-teal-100 text-teal-700",
-  cancelled: "bg-stone-100 text-stone-500",
-  disputed:  "bg-red-100 text-red-700",
+  pending:          "bg-amber-100 text-amber-700",
+  paid:             "bg-amber-100 text-amber-700",
+  seller_completed: "bg-blue-100 text-blue-700",
+  confirmed:        "bg-blue-100 text-blue-700",
+  completed:        "bg-teal-100 text-teal-700",
+  cancelled:        "bg-stone-100 text-stone-500",
+  disputed:         "bg-red-100 text-red-700",
 };
-const STATUS_TABS = ["", "pending", "completed", "disputed", "cancelled"];
+const STATUS_TABS = ["", "paid", "seller_completed", "completed", "disputed", "cancelled"];
 
 export default function AdminOrders() {
   const router = useRouter();
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [campus, setCampus] = useState<Campus>("");
+  const filterRef = useRef({ search: "", statusFilter: "", campus: "" as Campus });
 
-  const load = useCallback((s = search, st = statusFilter, c = campus) => {
-    setLoading(true);
+  const load = useCallback((s?: string, st?: string, c?: Campus, silent = false) => {
+    const fs = s ?? filterRef.current.search;
+    const fst = st ?? filterRef.current.statusFilter;
+    const fc = c ?? filterRef.current.campus;
+    filterRef.current = { search: fs, statusFilter: fst, campus: fc };
+    if (!silent) setLoading(true);
+    else setRefreshing(true);
     let url = `${API_URL}/api/admin/orders/?`;
-    if (st) url += `status=${st}&`;
-    if (c) url += `campus=${c}&`;
+    if (fst) url += `status=${fst}&`;
+    if (fc) url += `campus=${fc}&`;
     fetchAllPages(url)
-      .then(d => setOrders(d))
+      .then(d => { setOrders(d); setLastRefresh(new Date()); })
       .catch(() => {})
-      .finally(() => setLoading(false));
+      .finally(() => { setLoading(false); setRefreshing(false); });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    load();
+    const interval = setInterval(() => load(undefined, undefined, undefined, true), 30_000);
+    return () => clearInterval(interval);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleCampus = (c: Campus) => { setCampus(c); load(search, statusFilter, c); };
-  const handleStatus = (st: string) => { setStatusFilter(st); load(search, st, campus); };
+  const handleCampus = (c: Campus) => { setCampus(c); load(undefined, undefined, c); };
+  const handleStatus = (st: string) => { setStatusFilter(st); load(undefined, st, undefined); };
 
   const filtered = search.trim()
     ? orders.filter(o => {
@@ -57,16 +76,35 @@ export default function AdminOrders() {
       })
     : orders;
 
-  const counts = STATUS_TABS.reduce((acc, k) => {
-    acc[k] = k ? orders.filter(o => o.status === k).length : orders.length;
-    return acc;
-  }, {} as Record<string, number>);
+  const counts: Record<string, number> = {
+    "": orders.length,
+    paid: orders.filter(o => o.status === "paid").length,
+    seller_completed: orders.filter(o => o.status === "seller_completed").length,
+    completed: orders.filter(o => o.status === "completed").length,
+    disputed: orders.filter(o => o.status === "disputed").length,
+    cancelled: orders.filter(o => o.status === "cancelled").length,
+  };
 
   return (
     <div className="min-h-screen bg-[#FFF8F0]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       <AdminTopBar title="Orders" back="/admin" />
 
       <div className="px-4 pt-4 pb-28 max-w-2xl mx-auto space-y-4">
+
+        {/* Live refresh bar */}
+        <div className="flex items-center justify-between text-xs text-stone-400 px-1">
+          <span className="flex items-center gap-1.5">
+            <span className={`w-2 h-2 rounded-full ${refreshing ? "bg-amber-400 animate-pulse" : "bg-teal-400"}`} />
+            {refreshing ? "Refreshing…" : `Updated ${lastRefresh.toLocaleTimeString("en-NG", { hour: "2-digit", minute: "2-digit" })}`}
+          </span>
+          <button
+            onClick={() => load(undefined, undefined, undefined, true)}
+            disabled={refreshing}
+            className="flex items-center gap-1 text-teal-600 font-medium disabled:opacity-50"
+          >
+            <RefreshCw className={`w-3 h-3 ${refreshing ? "animate-spin" : ""}`} /> Refresh
+          </button>
+        </div>
 
         {/* Campus filter */}
         <CampusPills value={campus} onChange={handleCampus} />
@@ -85,11 +123,12 @@ export default function AdminOrders() {
         {/* Status tabs */}
         <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4">
           {[
-            { key: "",          label: "All" },
-            { key: "pending",   label: "Pending" },
-            { key: "completed", label: "Completed" },
-            { key: "disputed",  label: "Disputed" },
-            { key: "cancelled", label: "Cancelled" },
+            { key: "",                label: "All" },
+            { key: "paid",            label: "In Progress" },
+            { key: "seller_completed",label: "Awaiting Confirm" },
+            { key: "completed",       label: "Completed" },
+            { key: "disputed",        label: "Disputed" },
+            { key: "cancelled",       label: "Cancelled" },
           ].map(t => (
             <button
               key={t.key}

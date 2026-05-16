@@ -9,6 +9,16 @@ import ReviewForm from "@/components/ReviewForm";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
+const TRACKING_STEPS = [
+  { key: "paid",      label: "Payment Confirmed",  icon: "💳", desc: "Your payment is secured in escrow." },
+  { key: "confirmed", label: "Order Confirmed",    icon: "✅", desc: "The vendor accepted your order." },
+  { key: "preparing", label: "Preparing",          icon: "🍳", desc: "Your order is being prepared." },
+  { key: "ready",     label: "Ready for Pickup",   icon: "📦", desc: "Your order is ready!" },
+  { key: "delivered", label: "Delivered",          icon: "🎉", desc: "Your order has been delivered." },
+];
+
+const STATUS_ORDER = ["paid", "confirmed", "preparing", "ready", "delivered"];
+
 interface Order {
   id: number;
   reference: string;
@@ -16,6 +26,16 @@ interface Order {
   amount: number;
   created_at: string;
   status: "pending" | "paid" | "seller_completed" | "completed" | "disputed" | "cancelled";
+  current_status: string;
+  estimated_time: number | null;
+}
+
+interface TrackingEntry {
+  id: number | null;
+  status: string;
+  note: string;
+  updated_by: string;
+  created_at: string;
 }
 
 export default function OrderDetailPage() {
@@ -25,6 +45,7 @@ export default function OrderDetailPage() {
   const orderId = params.id as string;
 
   const [order, setOrder] = useState<Order | null>(null);
+  const [history, setHistory] = useState<TrackingEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [confirming, setConfirming] = useState(false);
   const [showModal, setShowModal] = useState(false);
@@ -38,12 +59,19 @@ export default function OrderDetailPage() {
 
     const load = async () => {
       try {
-        const res = await fetchWithAuth(`${API_URL}/api/orders/orders/${orderId}/`);
-        if (res.status === 404) { setError("not_found"); return; }
-        if (!res.ok) throw new Error();
-        const data = await res.json();
+        const [orderRes, trackRes] = await Promise.all([
+          fetchWithAuth(`${API_URL}/api/orders/orders/${orderId}/`),
+          fetchWithAuth(`${API_URL}/api/orders/orders/${orderId}/tracking/`),
+        ]);
+        if (orderRes.status === 404) { setError("not_found"); return; }
+        if (!orderRes.ok) throw new Error();
+        const data = await orderRes.json();
         setOrder(data);
-        if (data.status === 'completed') {
+        if (trackRes.ok) {
+          const trackData = await trackRes.json();
+          setHistory(trackData.history || []);
+        }
+        if (data.status === "completed") {
           const rv = await fetchWithAuth(`${API_URL}/api/reviews/reviews/can-review/${orderId}/`);
           if (rv.ok) { const d = await rv.json(); setCanReview(d.can_review); }
         }
@@ -74,18 +102,10 @@ export default function OrderDetailPage() {
     try {
       const res = await fetchWithAuth(`${API_URL}/api/chat/conversations/`, {
         method: "POST",
-        body: JSON.stringify({
-          listing_id: order.listing?.id,
-          seller_id: order.listing?.vendor?.id,
-        }),
+        body: JSON.stringify({ listing_id: order.listing?.id, seller_id: order.listing?.vendor?.id }),
       });
-      if (res.ok) {
-        const data = await res.json();
-        router.push(`/chat/${data.id}`);
-      }
-    } catch {
-      router.push("/chat");
-    }
+      if (res.ok) { const data = await res.json(); router.push(`/chat/${data.id}`); }
+    } catch { router.push("/chat"); }
   };
 
   const statusColor = (s: string) => ({
@@ -99,7 +119,7 @@ export default function OrderDetailPage() {
   const statusLabel = (s: string) => ({
     pending: "Pending Payment",
     paid: "In Progress",
-    seller_completed: "Seller Completed",
+    seller_completed: "Ready — Confirm Receipt",
     completed: "Completed",
     disputed: "Disputed",
     cancelled: "Cancelled",
@@ -107,9 +127,7 @@ export default function OrderDetailPage() {
 
   if (!isHydrated || loading) return (
     <div className="min-h-screen flex items-center justify-center bg-[#FAFAF9]">
-      <div className="animate-spin">
-        <Clock className="w-10 h-10 text-teal-600" />
-      </div>
+      <div className="animate-spin"><Clock className="w-10 h-10 text-teal-600" /></div>
     </div>
   );
 
@@ -119,10 +137,7 @@ export default function OrderDetailPage() {
         <AlertCircle className="w-14 h-14 text-red-500 mx-auto mb-3" />
         <h2 className="text-xl font-bold text-stone-800 mb-2">Order Not Found</h2>
         <Link href="/account/orders">
-          <button
-            className="mt-4 px-6 py-3 text-white font-semibold rounded-full"
-            style={{ background: GRAD }}
-          >
+          <button className="mt-4 px-6 py-3 text-white font-semibold rounded-full" style={{ background: GRAD }}>
             Back to Orders
           </button>
         </Link>
@@ -130,8 +145,11 @@ export default function OrderDetailPage() {
     </div>
   );
 
-  const canConfirm = order.status === 'paid' || order.status === 'seller_completed';
-  const isCompleted = order.status === 'completed';
+  const canConfirm = order.status === "paid" || order.status === "seller_completed";
+  const isCompleted = order.status === "completed";
+  const isCancelled = order.status === "cancelled" || order.current_status === "cancelled";
+
+  const currentStepIndex = STATUS_ORDER.indexOf(order.current_status);
 
   return (
     <div className="min-h-screen bg-[#FAFAF9]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
@@ -143,9 +161,7 @@ export default function OrderDetailPage() {
               <ChevronLeft className="w-5 h-5 text-stone-600" />
             </button>
           </Link>
-          <h1 className="text-base font-bold text-stone-900" style={SERIF}>
-            Order Details
-          </h1>
+          <h1 className="text-base font-bold text-stone-900" style={SERIF}>Order Details</h1>
           <button
             onClick={handleOpenChat}
             className="p-2.5 bg-white border border-stone-200 rounded-full shadow-sm active:scale-95 transition-all"
@@ -171,9 +187,7 @@ export default function OrderDetailPage() {
               <p className="text-xs text-stone-400 font-medium">Reference</p>
               <p className="font-semibold text-stone-800 text-sm mt-0.5">#{order.reference}</p>
               <p className="text-xs text-stone-400 mt-1">
-                {new Date(order.created_at).toLocaleDateString("en-NG", {
-                  day: "numeric", month: "long", year: "numeric"
-                })}
+                {new Date(order.created_at).toLocaleDateString("en-NG", { day: "numeric", month: "long", year: "numeric" })}
               </p>
             </div>
             <div className={`px-3 py-1.5 rounded-full font-semibold text-xs flex items-center gap-1.5 ${statusColor(order.status)}`}>
@@ -183,18 +197,86 @@ export default function OrderDetailPage() {
           </div>
         </div>
 
-        {/* IN-PROGRESS NOTICE */}
-        {canConfirm && (
+        {/* TRACKING TIMELINE */}
+        {!isCancelled && (
+          <div className="bg-white rounded-2xl p-5 shadow-sm border border-stone-200 animate-fadeUp">
+            <div className="flex items-center justify-between mb-4">
+              <p className="text-xs font-semibold text-teal-600 tracking-widest uppercase">Order Tracking</p>
+              {order.estimated_time && order.status !== "completed" && (
+                <span className="text-xs bg-teal-50 text-teal-700 border border-teal-100 px-2.5 py-1 rounded-full font-medium flex items-center gap-1">
+                  <Clock className="w-3 h-3" /> ~{order.estimated_time} min
+                </span>
+              )}
+            </div>
+            <div className="space-y-0">
+              {TRACKING_STEPS.map((step, i) => {
+                const stepDone = isCompleted
+                  ? true
+                  : i <= currentStepIndex;
+                const isCurrent = !isCompleted && i === currentStepIndex;
+                const histEntry = history.find(h => h.status === step.key);
+
+                return (
+                  <div key={step.key} className="flex gap-3">
+                    <div className="flex flex-col items-center">
+                      <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm flex-shrink-0 transition-all ${
+                        isCurrent ? "ring-2 ring-teal-400 ring-offset-2" : ""
+                      } ${stepDone ? "bg-teal-500 text-white shadow-sm" : "bg-stone-100 text-stone-400"}`}>
+                        {stepDone ? <CheckCircle className="w-4 h-4" /> : <span className="text-sm">{step.icon}</span>}
+                      </div>
+                      {i < TRACKING_STEPS.length - 1 && (
+                        <div className={`w-0.5 h-8 mt-1 ${stepDone && i < currentStepIndex ? "bg-teal-400" : "bg-stone-100"}`} />
+                      )}
+                    </div>
+                    <div className="pb-5 flex-1 min-w-0">
+                      <p className={`text-sm font-semibold ${stepDone ? "text-stone-900" : "text-stone-400"}`}>
+                        {step.label}
+                      </p>
+                      {histEntry ? (
+                        <div className="mt-0.5">
+                          <p className="text-xs text-stone-400">
+                            {new Date(histEntry.created_at).toLocaleString("en-NG", {
+                              hour: "2-digit", minute: "2-digit", day: "numeric", month: "short",
+                            })}
+                          </p>
+                          {histEntry.note && (
+                            <p className="text-xs text-stone-600 bg-stone-50 border border-stone-100 rounded-lg px-2.5 py-1.5 mt-1 italic">
+                              "{histEntry.note}"
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-stone-400 mt-0.5">{step.desc}</p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {isCancelled && (
+          <div className="bg-red-50 border border-red-100 rounded-2xl p-4 animate-fadeUp">
+            <div className="flex gap-3">
+              <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="font-semibold text-red-900 text-sm">Order Cancelled</p>
+                <p className="text-xs text-red-700 mt-1">This order was cancelled. Contact support if you need help.</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* SELLER COMPLETED NOTICE */}
+        {order.status === "seller_completed" && (
           <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 animate-fadeUp">
             <div className="flex gap-3">
               <Clock className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
               <div>
                 <p className="font-semibold text-amber-900 text-sm">Awaiting Your Confirmation</p>
                 <p className="text-xs text-amber-800 mt-1">
-                  ₦{parseFloat(String(order.amount)).toLocaleString("en-NG", { minimumFractionDigits: 2 })} paid via Paystack.{" "}
-                  {order.status === 'seller_completed'
-                    ? "The vendor has marked this complete — confirm below if you received the service."
-                    : "Waiting for the vendor to deliver and mark the service complete."}
+                  The vendor has delivered your order — please confirm below to release their payment.
                 </p>
               </div>
             </div>
@@ -209,7 +291,7 @@ export default function OrderDetailPage() {
               <div>
                 <p className="font-semibold text-emerald-900 text-sm">Order Completed ✓</p>
                 <p className="text-xs text-emerald-700 mt-1">
-                  This order is complete. Paystack will transfer the vendor's share within 1-2 business days.
+                  Paystack will transfer the vendor's share within 1–2 business days.
                 </p>
               </div>
             </div>
@@ -258,11 +340,7 @@ export default function OrderDetailPage() {
         {/* REVIEW FORM */}
         {isCompleted && canReview && (
           <div className="animate-fadeUp">
-            <ReviewForm
-              orderId={order.id}
-              vendorName={order.listing?.vendor?.username}
-              onSuccess={() => setCanReview(false)}
-            />
+            <ReviewForm orderId={order.id} vendorName={order.listing?.vendor?.username} onSuccess={() => setCanReview(false)} />
           </div>
         )}
       </div>
@@ -271,13 +349,15 @@ export default function OrderDetailPage() {
       {showModal && (
         <div
           className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4 animate-fadeIn"
-          onClick={() => !confirming && setShowModal(false)}>
+          onClick={() => !confirming && setShowModal(false)}
+        >
           <div
             className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl border border-stone-100 mb-20 sm:mb-0 animate-fadeUp"
-            onClick={e => e.stopPropagation()}>
+            onClick={e => e.stopPropagation()}
+          >
             <h3 className="text-xl font-bold text-stone-900 mb-2">Confirm Service Received?</h3>
             <p className="text-stone-500 text-sm mb-5">
-              Only confirm if the vendor delivered the service. This completes the order.
+              Only confirm if the vendor delivered the service. This releases the payment.
             </p>
             <div className="bg-teal-50 rounded-xl p-4 mb-5 text-center">
               <p className="text-xs text-stone-400">Amount paid</p>
@@ -298,9 +378,7 @@ export default function OrderDetailPage() {
                 className="flex-1 py-3 text-white rounded-full font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
                 style={{ background: GRAD }}>
                 {confirming
-                  ? <div className="animate-spin">
-                      <Clock className="w-5 h-5" />
-                    </div>
+                  ? <div className="animate-spin"><Clock className="w-5 h-5" /></div>
                   : <><CheckCircle className="w-5 h-5" /> Confirm</>}
               </button>
             </div>

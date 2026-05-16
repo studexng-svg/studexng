@@ -1,19 +1,37 @@
 # orders/serializers.py
 from rest_framework import serializers
-from .models import Order, Dispute, Booking
+from .models import Order, OrderStatus, Dispute, Booking
 from services.serializers import ListingSerializer
 from services.models import Listing
 import uuid
+
+
+class OrderStatusSerializer(serializers.ModelSerializer):
+    updated_by = serializers.ReadOnlyField(source='updated_by.username')
+
+    class Meta:
+        model = OrderStatus
+        fields = ['id', 'status', 'note', 'updated_by', 'created_at']
+        read_only_fields = ['id', 'updated_by', 'created_at']
+
 
 class OrderSerializer(serializers.ModelSerializer):
     listing = ListingSerializer(read_only=True)
     listing_id = serializers.IntegerField(write_only=True)
     buyer = serializers.ReadOnlyField(source='buyer.username')
+    buyer_id = serializers.ReadOnlyField(source='buyer.id')
 
     class Meta:
         model = Order
-        fields = ['id', 'reference', 'listing', 'listing_id', 'buyer', 'amount', 'status', 'created_at', 'paid_at']
-        read_only_fields = ['reference', 'amount', 'status', 'created_at', 'paid_at']
+        fields = [
+            'id', 'reference', 'listing', 'listing_id', 'buyer', 'buyer_id',
+            'amount', 'status', 'current_status', 'estimated_time',
+            'created_at', 'paid_at',
+        ]
+        read_only_fields = [
+            'reference', 'amount', 'status', 'current_status', 'estimated_time',
+            'created_at', 'paid_at',
+        ]
 
     def create(self, validated_data):
         from wallet.models import EscrowTransaction

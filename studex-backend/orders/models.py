@@ -22,6 +22,8 @@ class Order(models.Model):
     listing = models.ForeignKey(Listing, on_delete=models.CASCADE)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     status = models.CharField(max_length=30, choices=STATUS_CHOICES, default='pending')
+    current_status = models.CharField(max_length=30, default='paid')
+    estimated_time = models.PositiveIntegerField(null=True, blank=True, help_text="Estimated minutes to completion")
     created_at = models.DateTimeField(auto_now_add=True)
     paid_at = models.DateTimeField(null=True, blank=True)
     seller_completed_at = models.DateTimeField(null=True, blank=True)
@@ -35,6 +37,29 @@ class Order(models.Model):
         ordering = ['-created_at']
         verbose_name = "Order"
         verbose_name_plural = "Orders"
+
+
+class OrderStatus(models.Model):
+    TRACKING_STATUS_CHOICES = (
+        ('paid', 'Payment Confirmed'),
+        ('confirmed', 'Order Confirmed'),
+        ('preparing', 'Preparing'),
+        ('ready', 'Ready for Pickup'),
+        ('delivered', 'Delivered'),
+        ('cancelled', 'Cancelled'),
+    )
+
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='status_history')
+    status = models.CharField(max_length=30, choices=TRACKING_STATUS_CHOICES)
+    note = models.TextField(blank=True)
+    updated_by = models.ForeignKey(User, on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at']
+
+    def __str__(self):
+        return f"Order {self.order.reference} — {self.status}"
 
 
 class Dispute(models.Model):
