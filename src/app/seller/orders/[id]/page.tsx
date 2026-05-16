@@ -74,6 +74,7 @@ export default function SellerOrderDetailPage() {
   const [history, setHistory] = useState<TrackingEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [retryCount, setRetryCount] = useState(0);
   const [updating, setUpdating] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [note, setNote] = useState("");
@@ -120,7 +121,7 @@ export default function SellerOrderDetailPage() {
     };
 
     loadOrder();
-  }, [isHydrated, isLoggedIn, orderId, router]);
+  }, [isHydrated, isLoggedIn, orderId, router, retryCount]);
 
   const handleUpdateStatus = async () => {
     if (!order) return;
@@ -172,13 +173,26 @@ export default function SellerOrderDetailPage() {
     <div className="min-h-screen bg-[#FAFAF9] flex items-center justify-center p-6" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       <div className="text-center bg-white border border-stone-200 rounded-2xl p-8 shadow-sm max-w-sm w-full">
         <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
-        <h2 className="text-lg font-bold text-stone-800 mb-2" style={SERIF}>Order Not Found</h2>
+        <h2 className="text-lg font-bold text-stone-800 mb-2" style={SERIF}>
+          {error?.includes("not found") ? "Order Not Found" : "Couldn't Load Order"}
+        </h2>
         <p className="text-sm text-stone-500 mb-6">{error || "This order could not be loaded."}</p>
-        <Link href="/seller/orders">
-          <button className="px-8 py-3 text-white font-semibold rounded-full shadow-md text-sm" style={{ background: GRAD }}>
-            Back to Orders
-          </button>
-        </Link>
+        <div className="flex flex-col gap-3">
+          {error?.includes("Network") && (
+            <button
+              onClick={() => { setError(""); setRetryCount(c => c + 1); }}
+              className="w-full px-8 py-3 text-white font-semibold rounded-full shadow-md text-sm"
+              style={{ background: GRAD }}
+            >
+              Retry
+            </button>
+          )}
+          <Link href="/seller/orders">
+            <button className="w-full px-8 py-3 bg-stone-100 text-stone-700 font-semibold rounded-full text-sm">
+              Back to Orders
+            </button>
+          </Link>
+        </div>
       </div>
     </div>
   );

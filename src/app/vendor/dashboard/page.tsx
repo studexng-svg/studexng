@@ -5,6 +5,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth, fetchWithAuth } from "@/lib/authStore";
 import { GRAD, SERIF, toArray } from "@/lib/tokens";
+import Link from "next/link";
 import {
   MessageCircle, Calendar, DollarSign, Package, ShoppingBag,
   Send, Check, X, Plus, Edit2, Trash2,
@@ -439,7 +440,7 @@ function BookingsTab() {
   if (loading) return <LoadingSpinner />;
 
   return (
-    <div className="overflow-y-auto pb-4" style={{ maxHeight: "calc(100vh - 200px)" }}>
+    <div className="pb-4">
       <div className="flex gap-2 mb-5">
         {(["pending", "confirmed", "all"] as const).map(f => (
           <button key={f} onClick={() => setFilter(f)}
@@ -582,7 +583,7 @@ function EarningsTab() {
   ];
 
   return (
-    <div className="overflow-y-auto space-y-5 pb-4" style={{ maxHeight: "calc(100vh - 200px)" }}>
+    <div className="space-y-5 pb-4">
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {stats.map(stat => (
@@ -735,7 +736,7 @@ function ListingsTab() {
   if (loading) return <LoadingSpinner />;
 
   return (
-    <div className="overflow-y-auto pb-4" style={{ maxHeight: "calc(100vh - 200px)" }}>
+    <div className="pb-4">
       {toast && (
         <div className="fixed top-6 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full font-semibold text-white text-sm z-50 shadow-xl"
           style={{ background: GRAD }}>
@@ -878,7 +879,7 @@ function OrdersTab() {
   if (loading) return <LoadingSpinner />;
 
   return (
-    <div className="overflow-y-auto pb-4" style={{ maxHeight: "calc(100vh - 200px)" }}>
+    <div className="pb-4">
       <div className="mb-4">
         <h2 className="font-bold text-stone-900 text-base">Orders</h2>
         <p className="text-stone-400 text-xs">{orders.length} total</p>
@@ -888,31 +889,33 @@ function OrdersTab() {
       ) : (
         <div className="space-y-3">
           {orders.map(order => (
-            <div key={order.id} className="bg-white border border-stone-200 rounded-2xl p-4 shadow-sm hover:border-teal-300 hover:shadow-md transition-all">
-              <div className="flex items-center justify-between mb-3">
-                <div>
-                  <p className="font-semibold text-stone-900 text-sm">{order.listing?.title}</p>
-                  <p className="text-xs text-stone-400">#{order.reference}</p>
+            <Link key={order.id} href={`/seller/orders/${order.id}`}>
+              <div className="bg-white border border-stone-200 rounded-2xl p-4 shadow-sm hover:border-teal-300 hover:shadow-md transition-all active:scale-[0.99] cursor-pointer">
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <p className="font-semibold text-stone-900 text-sm">{order.listing?.title}</p>
+                    <p className="text-xs text-stone-400">#{order.reference}</p>
+                  </div>
+                  <StatusBadge status={order.status} />
                 </div>
-                <StatusBadge status={order.status} />
+                <div className="flex items-center justify-between text-sm">
+                  <div>
+                    <p className="text-xs text-stone-400">Buyer</p>
+                    <p className="font-semibold text-stone-800">{order.buyer}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-stone-400">Order total</p>
+                    <p className="font-semibold text-stone-800">₦{Number(order.amount).toLocaleString()}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-stone-400">Your payout</p>
+                    <p className="font-bold text-teal-600">
+                      ₦{Number(order.listing?.price ?? order.amount).toLocaleString()}
+                    </p>
+                  </div>
+                </div>
               </div>
-              <div className="flex items-center justify-between text-sm">
-                <div>
-                  <p className="text-xs text-stone-400">Buyer</p>
-                  <p className="font-semibold text-stone-800">{order.buyer}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-xs text-stone-400">Order total</p>
-                  <p className="font-semibold text-stone-800">₦{Number(order.amount).toLocaleString()}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-xs text-stone-400">Your payout</p>
-                  <p className="font-bold text-teal-600">
-                    ₦{Math.max(0, Number(order.amount) - 215.56).toLocaleString()}
-                  </p>
-                </div>
-              </div>
-            </div>
+            </Link>
           ))}
         </div>
       )}
@@ -941,7 +944,7 @@ function ReviewsTab() {
   if (loading) return <LoadingSpinner />;
 
   return (
-    <div className="overflow-y-auto pb-4 space-y-3" style={{ maxHeight: "calc(100vh - 200px)" }}>
+    <div className="pb-4 space-y-3">
       {reviews.length > 0 && (
         <div className="bg-white border border-amber-100 rounded-2xl p-4 shadow-sm flex items-center gap-4">
           <div className="text-center">

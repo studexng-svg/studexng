@@ -36,7 +36,8 @@ export default function LayoutClient({ children }: { children: React.ReactNode }
     pathname === "/" ||
     pathname === "/auth" ||
     pathname === "/maintenance" ||
-    pathname?.startsWith("/admin");
+    pathname?.startsWith("/admin") ||
+    pathname?.startsWith("/seller");
 
   if (!mounted) {
     return <main className="min-h-screen" />;
