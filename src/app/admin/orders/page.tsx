@@ -1,10 +1,10 @@
 // src/app/admin/orders/page.tsx
 "use client";
 
-import { Package, Search, ChevronRight, RefreshCw } from "lucide-react";
+import { Package, Search, ChevronRight } from "lucide-react";
 import { useRouter } from "next/navigation";
 import AdminTopBar from "@/components/layout/AdminTopBar";
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect } from "react";
 import { fetchAllPages } from "@/lib/authStore";
 import { GRAD } from "@/lib/tokens";
 import { CampusPills, type Campus } from "@/components/admin/CampusPills";
@@ -35,37 +35,25 @@ export default function AdminOrders() {
   const router = useRouter();
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [campus, setCampus] = useState<Campus>("");
-  const filterRef = useRef({ search: "", statusFilter: "", campus: "" as Campus });
 
-  const load = useCallback((s?: string, st?: string, c?: Campus, silent = false) => {
-    const fs = s ?? filterRef.current.search;
-    const fst = st ?? filterRef.current.statusFilter;
-    const fc = c ?? filterRef.current.campus;
-    filterRef.current = { search: fs, statusFilter: fst, campus: fc };
-    if (!silent) setLoading(true);
-    else setRefreshing(true);
+  const load = (s?: string, st?: string, c?: Campus) => {
+    setLoading(true);
     let url = `${API_URL}/api/admin/orders/?`;
-    if (fst) url += `status=${fst}&`;
-    if (fc) url += `campus=${fc}&`;
+    if (st) url += `status=${st}&`;
+    if (c) url += `campus=${c}&`;
     fetchAllPages(url)
-      .then(d => { setOrders(d); setLastRefresh(new Date()); })
+      .then(d => setOrders(d))
       .catch(() => {})
-      .finally(() => { setLoading(false); setRefreshing(false); });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+      .finally(() => setLoading(false));
+  };
 
-  useEffect(() => {
-    load();
-    const interval = setInterval(() => load(undefined, undefined, undefined, true), 30_000);
-    return () => clearInterval(interval);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleCampus = (c: Campus) => { setCampus(c); load(undefined, undefined, c); };
-  const handleStatus = (st: string) => { setStatusFilter(st); load(undefined, st, undefined); };
+  const handleCampus = (c: Campus) => { setCampus(c); load(undefined, statusFilter, c); };
+  const handleStatus = (st: string) => { setStatusFilter(st); load(undefined, st, campus); };
 
   const filtered = search.trim()
     ? orders.filter(o => {
@@ -90,21 +78,6 @@ export default function AdminOrders() {
       <AdminTopBar title="Orders" back="/admin" />
 
       <div className="px-4 pt-4 pb-28 max-w-2xl mx-auto space-y-4">
-
-        {/* Live refresh bar */}
-        <div className="flex items-center justify-between text-xs text-stone-400 px-1">
-          <span className="flex items-center gap-1.5">
-            <span className={`w-2 h-2 rounded-full ${refreshing ? "bg-amber-400 animate-pulse" : "bg-teal-400"}`} />
-            {refreshing ? "Refreshing…" : `Updated ${lastRefresh.toLocaleTimeString("en-NG", { hour: "2-digit", minute: "2-digit" })}`}
-          </span>
-          <button
-            onClick={() => load(undefined, undefined, undefined, true)}
-            disabled={refreshing}
-            className="flex items-center gap-1 text-teal-600 font-medium disabled:opacity-50"
-          >
-            <RefreshCw className={`w-3 h-3 ${refreshing ? "animate-spin" : ""}`} /> Refresh
-          </button>
-        </div>
 
         {/* Campus filter */}
         <CampusPills value={campus} onChange={handleCampus} />

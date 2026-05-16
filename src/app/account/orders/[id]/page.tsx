@@ -2,8 +2,7 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import {
-  Package, CheckCircle, Clock, AlertCircle, ChevronLeft, MessageCircle,
-  CreditCard, ChefHat, PartyPopper, XCircle,
+  Package, CheckCircle, Clock, AlertCircle, ChevronLeft, MessageCircle, XCircle,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAuth, fetchWithAuth } from "@/lib/authStore";
@@ -12,17 +11,6 @@ import ReviewForm from "@/components/ReviewForm";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
-const STEP_CONFIG = {
-  paid:      { Icon: CreditCard,  iconColor: "#10b981", bg: "bg-emerald-50", label: "Payment Confirmed", desc: "Your payment is secured in escrow."   },
-  confirmed: { Icon: CheckCircle, iconColor: "#6366f1", bg: "bg-indigo-50",  label: "Order Confirmed",  desc: "The vendor accepted your order."      },
-  preparing: { Icon: ChefHat,     iconColor: "#f59e0b", bg: "bg-amber-50",   label: "Preparing",        desc: "Your order is being prepared."        },
-  ready:     { Icon: Package,     iconColor: "#0ea5e9", bg: "bg-sky-50",     label: "Ready for Pickup", desc: "Your order is ready!"                 },
-  delivered: { Icon: PartyPopper, iconColor: "#ec4899", bg: "bg-pink-50",    label: "Delivered",        desc: "Your order has been delivered."       },
-} as const;
-
-const TRACKING_STEPS = ["paid", "confirmed", "preparing", "ready", "delivered"] as const;
-
-const STATUS_ORDER = ["paid", "confirmed", "preparing", "ready", "delivered"] as const;
 
 interface Order {
   id: number;
@@ -32,15 +20,6 @@ interface Order {
   created_at: string;
   status: "pending" | "paid" | "seller_completed" | "completed" | "disputed" | "cancelled";
   current_status: string;
-  estimated_time: number | null;
-}
-
-interface TrackingEntry {
-  id: number | null;
-  status: string;
-  note: string;
-  updated_by: string;
-  created_at: string;
 }
 
 export default function OrderDetailPage() {
@@ -50,7 +29,6 @@ export default function OrderDetailPage() {
   const orderId = params.id as string;
 
   const [order, setOrder] = useState<Order | null>(null);
-  const [history, setHistory] = useState<TrackingEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [confirming, setConfirming] = useState(false);
   const [showModal, setShowModal] = useState(false);
@@ -64,18 +42,11 @@ export default function OrderDetailPage() {
 
     const load = async () => {
       try {
-        const [orderRes, trackRes] = await Promise.all([
-          fetchWithAuth(`${API_URL}/api/orders/orders/${orderId}/`),
-          fetchWithAuth(`${API_URL}/api/orders/orders/${orderId}/tracking/`),
-        ]);
+        const orderRes = await fetchWithAuth(`${API_URL}/api/orders/orders/${orderId}/`);
         if (orderRes.status === 404) { setError("not_found"); return; }
         if (!orderRes.ok) throw new Error();
         const data = await orderRes.json();
         setOrder(data);
-        if (trackRes.ok) {
-          const trackData = await trackRes.json();
-          setHistory(trackData.history || []);
-        }
         if (data.status === "completed") {
           const rv = await fetchWithAuth(`${API_URL}/api/reviews/reviews/can-review/${orderId}/`);
           if (rv.ok) { const d = await rv.json(); setCanReview(d.can_review); }
@@ -154,8 +125,6 @@ export default function OrderDetailPage() {
   const isCompleted = order.status === "completed";
   const isCancelled = order.status === "cancelled" || order.current_status === "cancelled";
 
-  const currentStepIndex = STATUS_ORDER.indexOf(order.current_status as typeof STATUS_ORDER[number]);
-
   return (
     <div className="min-h-screen bg-[#FAFAF9]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       {/* HEADER */}
@@ -201,68 +170,6 @@ export default function OrderDetailPage() {
             </div>
           </div>
         </div>
-
-        {/* TRACKING TIMELINE */}
-        {!isCancelled && (
-          <div className="bg-white rounded-2xl p-5 shadow-sm border border-stone-200 animate-fadeUp">
-            <div className="flex items-center justify-between mb-4">
-              <p className="text-xs font-semibold text-teal-600 tracking-widest uppercase">Order Tracking</p>
-              {order.estimated_time && order.status !== "completed" && (
-                <span className="text-xs bg-teal-50 text-teal-700 border border-teal-100 px-2.5 py-1 rounded-full font-medium flex items-center gap-1">
-                  <Clock className="w-3 h-3" /> ~{order.estimated_time} min
-                </span>
-              )}
-            </div>
-            <div className="space-y-0">
-              {TRACKING_STEPS.map((stepKey, i) => {
-                const cfg = STEP_CONFIG[stepKey];
-                const stepDone = isCompleted ? true : i <= currentStepIndex;
-                const isCurrent = !isCompleted && i === currentStepIndex;
-                const histEntry = history.find(h => h.status === stepKey);
-
-                return (
-                  <div key={stepKey} className="flex gap-3">
-                    <div className="flex flex-col items-center">
-                      <div
-                        className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 transition-all ${stepDone ? cfg.bg : "bg-stone-100"}`}
-                        style={isCurrent ? { boxShadow: `0 0 0 3px white, 0 0 0 5px ${cfg.iconColor}` } : {}}
-                      >
-                        <cfg.Icon
-                          className="w-5 h-5"
-                          style={{ color: stepDone ? cfg.iconColor : "#d6d3d1" }}
-                        />
-                      </div>
-                      {i < TRACKING_STEPS.length - 1 && (
-                        <div className={`w-0.5 h-8 mt-1 transition-all ${stepDone && i < currentStepIndex ? "bg-gradient-to-b from-teal-300 to-stone-200" : "bg-stone-100"}`} />
-                      )}
-                    </div>
-                    <div className="pb-5 flex-1 min-w-0">
-                      <p className={`text-sm font-semibold ${stepDone ? "text-stone-900" : "text-stone-400"}`}>
-                        {cfg.label}
-                      </p>
-                      {histEntry ? (
-                        <div className="mt-0.5">
-                          <p className="text-xs text-stone-400">
-                            {new Date(histEntry.created_at).toLocaleString("en-NG", {
-                              hour: "2-digit", minute: "2-digit", day: "numeric", month: "short",
-                            })}
-                          </p>
-                          {histEntry.note && (
-                            <p className="text-xs italic mt-1 px-2.5 py-1.5 rounded-lg border" style={{ color: cfg.iconColor, borderColor: `${cfg.iconColor}30`, backgroundColor: `${cfg.iconColor}08` }}>
-                              "{histEntry.note}"
-                            </p>
-                          )}
-                        </div>
-                      ) : (
-                        <p className="text-xs text-stone-400 mt-0.5">{cfg.desc}</p>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
 
         {isCancelled && (
           <div className="bg-red-50 border border-red-100 rounded-2xl p-4 animate-fadeUp">
