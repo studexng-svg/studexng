@@ -20,7 +20,7 @@ const drinkData: Record<string, any> = {
 export default function DrinkDetail() {
   const router = useRouter();
   const { id } = useParams();
-  const drinkId = Array.isArray(id) ? id[0] : id;
+  const drinkId = (Array.isArray(id) ? id[0] : id) ?? "1";
   const drink = drinkData[drinkId] || drinkData["1"];
   const numericId = parseInt(drinkId);
 
@@ -31,13 +31,13 @@ export default function DrinkDetail() {
   const removeFromWishlist = useWishlistStore((s) => s.removeFromWishlist);
 
   useEffect(() => {
-    const items = useWishlistStore.getState().items ?? [];
+    const items = useWishlistStore.getState().wishlist ?? [];
     setLocalWishlist(new Set(items.map(i => i.id)));
   }, []);
 
   useEffect(() => {
     const unsub = useWishlistStore.subscribe((state) => {
-      setLocalWishlist(new Set(state.items?.map(i => i.id) || []));
+      setLocalWishlist(new Set(state.wishlist?.map(i => i.id) || []));
     });
     return unsub;
   }, []);

@@ -34,7 +34,7 @@ const vendors: Record<string, any> = {
 export default function LaundryBookingPage() {
   const router = useRouter();
   const { id } = useParams();
-  const vendorId = Array.isArray(id) ? id[0] : id;
+  const vendorId = (Array.isArray(id) ? id[0] : id) ?? "freshfold";
   const v = vendors[vendorId] || vendors.freshfold;
 
   const setBooking = useBookingStore((state) => state.setBooking);

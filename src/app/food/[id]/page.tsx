@@ -77,7 +77,7 @@ export default function FoodDetailPage() {
   const product = foodProducts[id as string] || foodProducts["1"];
 
   const addToCart = useCartStore((state) => state.addToCart);
-  const { items: wishlist, addToWishlist, removeFromWishlist } = useWishlistStore();
+  const { wishlist, addToWishlist, removeFromWishlist } = useWishlistStore();
   const [isWishlisted, setIsWishlisted] = useState(false);
 
   useEffect(() => {

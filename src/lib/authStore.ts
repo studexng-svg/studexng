@@ -16,6 +16,7 @@ interface UserProfile {
   is_verified_vendor: boolean;
   wallet_balance: string;
   profile_image?: string | null;
+  school?: string;
 }
 
 interface AuthState {

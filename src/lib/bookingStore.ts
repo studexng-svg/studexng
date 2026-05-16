@@ -10,10 +10,11 @@ type BookingItem = {
   date: string | null;
   time: string;
   location: string;
-  addons: Record<string, number>;
+  addons: Record<string, number | string>;
   note: string;
   total: number;
   bookingId?: number;
+  category?: string;
 };
 
 type BookingStore = {

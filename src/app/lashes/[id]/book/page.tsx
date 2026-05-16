@@ -49,7 +49,7 @@ const providers: Record<string, any> = {
 export default function BookingPage() {
   const router = useRouter();
   const { id } = useParams();
-  const providerId = Array.isArray(id) ? id[0] : id;
+  const providerId = (Array.isArray(id) ? id[0] : id) ?? "bella";
   const p = providers[providerId] || providers.bella;
 
   const setBooking = useBookingStore((state) => state.setBooking);
@@ -126,7 +126,7 @@ export default function BookingPage() {
           className="bg-white rounded-3xl shadow-xl p-6 flex items-center gap-5 border border-purple-100"
         >
           <div className="relative w-24 h-24 rounded-3xl overflow-hidden ring-4 ring-purple-100">
-            <Image src={`/images/${p.img}`} alt={p.name} fill className="object-cover" fill />
+            <Image src={`/images/${p.img}`} alt={p.name} fill className="object-cover" />
           </div>
           <div>
             <h2 className="text-2xl font-black">{p.name}</h2>

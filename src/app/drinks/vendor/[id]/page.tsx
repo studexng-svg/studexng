@@ -28,7 +28,7 @@ const drinks = [
 export default function DrinkVendorMenu() {
   const router = useRouter();
   const { id } = useParams();
-  const vendorId = Array.isArray(id) ? id[0] : id;
+  const vendorId = (Array.isArray(id) ? id[0] : id) ?? "1";
   const vendor = vendorData[vendorId] || vendorData["1"];
 
   const [search, setSearch] = useState("");
@@ -39,13 +39,13 @@ export default function DrinkVendorMenu() {
   const removeFromWishlist = useWishlistStore((s) => s.removeFromWishlist);
 
   useEffect(() => {
-    const items = useWishlistStore.getState().items ?? [];
+    const items = useWishlistStore.getState().wishlist ?? [];
     setLocalWishlist(new Set(items.map(i => i.id)));
   }, []);
 
   useEffect(() => {
     const unsub = useWishlistStore.subscribe((state) => {
-      setLocalWishlist(new Set(state.items?.map(i => i.id) || []));
+      setLocalWishlist(new Set(state.wishlist?.map(i => i.id) || []));
     });
     return unsub;
   }, []);

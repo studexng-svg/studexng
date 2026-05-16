@@ -3,10 +3,9 @@ import { useEffect } from "react";
 import { useAuth } from "./authStore";
 
 export const useAuthInit = () => {
-  const { checkAuth } = useAuth();
+  const { refreshProfile } = useAuth();
 
   useEffect(() => {
-    // Check auth on app load
-    checkAuth();
-  }, [checkAuth]);
+    refreshProfile();
+  }, [refreshProfile]);
 };

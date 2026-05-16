@@ -56,7 +56,7 @@ const providers: Record<string, any> = {
 export default function NailsBookingPage() {
   const router = useRouter();
   const { id } = useParams();
-  const providerId = Array.isArray(id) ? id[0] : id;
+  const providerId = (Array.isArray(id) ? id[0] : id) ?? "temi";
   const p = providers[providerId] || providers.temi;
 
   const setBooking = useBookingStore((state) => state.setBooking);

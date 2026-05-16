@@ -51,7 +51,7 @@ interface Order {
   status: string;
   current_status: string;
   estimated_time: number | null;
-  listing: { id: number; title: string };
+  listing: { id: number; title: string; price: number };
 }
 
 interface TrackingEntry {
@@ -67,8 +67,8 @@ export default function SellerOrderDetailPage() {
   const router = useRouter();
   const { isLoggedIn, isHydrated } = useAuth();
 
-  const rawId = params.id;
-  const orderId = Array.isArray(rawId) ? rawId[0] : rawId;
+  const rawId = params?.id;
+  const orderId = (Array.isArray(rawId) ? rawId[0] : rawId) ?? "";
 
   const [order, setOrder] = useState<Order | null>(null);
   const [history, setHistory] = useState<TrackingEntry[]>([]);
@@ -86,21 +86,33 @@ export default function SellerOrderDetailPage() {
     const loadOrder = async () => {
       setLoading(true);
       try {
-        const [orderRes, trackRes] = await Promise.all([
-          fetchWithAuth(`${API_URL}/api/orders/orders/${orderId}/`),
-          fetchWithAuth(`${API_URL}/api/orders/orders/${orderId}/tracking/`),
-        ]);
-        if (orderRes.status === 401) { router.push("/auth"); return; }
-        if (!orderRes.ok) {
-          setError(orderRes.status === 404 ? "Order not found" : "Failed to load order");
+        const orderRes = await fetchWithAuth(`${API_URL}/api/orders/orders/${orderId}/`);
+
+        if (orderRes.status === 401 || orderRes.status === 403) {
+          router.push("/auth");
           return;
         }
-        setOrder(await orderRes.json());
-        if (trackRes.ok) {
-          const t = await trackRes.json();
-          setHistory(t.history || []);
+        if (!orderRes.ok) {
+          const statusText = orderRes.status === 404 ? "Order not found" : `Failed to load order (${orderRes.status})`;
+          console.error("Seller order fetch failed:", orderRes.status, orderId);
+          setError(statusText);
+          return;
         }
-      } catch {
+
+        setOrder(await orderRes.json());
+
+        // Tracking history is best-effort — don't let it block the order view
+        try {
+          const trackRes = await fetchWithAuth(`${API_URL}/api/orders/orders/${orderId}/tracking/`);
+          if (trackRes.ok) {
+            const t = await trackRes.json();
+            setHistory(t.history || []);
+          }
+        } catch (trackErr) {
+          console.warn("Tracking fetch failed (non-critical):", trackErr);
+        }
+      } catch (err) {
+        console.error("Order load error:", err);
         setError("Network error. Please try again.");
       } finally {
         setLoading(false);
@@ -128,8 +140,9 @@ export default function SellerOrderDetailPage() {
         body: JSON.stringify(body),
       });
       if (!res.ok) {
-        const err = await res.json();
-        alert(err.detail || "Failed to update status");
+        const errData = await res.json().catch(() => ({}));
+        console.error("Status update failed:", res.status, errData);
+        alert(errData.detail || `Failed to update status (${res.status})`);
         return;
       }
       const data = await res.json();
@@ -137,9 +150,12 @@ export default function SellerOrderDetailPage() {
       setNote(""); setEstimatedTime(""); setShowModal(false);
 
       // Reload tracking history
-      const trackRes = await fetchWithAuth(`${API_URL}/api/orders/orders/${orderId}/tracking/`);
-      if (trackRes.ok) { const t = await trackRes.json(); setHistory(t.history || []); }
-    } catch {
+      try {
+        const trackRes = await fetchWithAuth(`${API_URL}/api/orders/orders/${orderId}/tracking/`);
+        if (trackRes.ok) { const t = await trackRes.json(); setHistory(t.history || []); }
+      } catch {}
+    } catch (err) {
+      console.error("Status update network error:", err);
       alert("Network error. Please try again.");
     } finally {
       setUpdating(false);
@@ -288,10 +304,16 @@ export default function SellerOrderDetailPage() {
               <span className="text-sm text-stone-400">Item</span>
               <span className="font-semibold text-stone-800 text-sm">{order.listing?.title}</span>
             </div>
-            <div className="flex justify-between pt-2">
-              <span className="font-semibold text-stone-700">Amount</span>
-              <span className="font-bold text-2xl text-teal-700">
+            <div className="flex justify-between py-2 border-b border-stone-50">
+              <span className="text-sm text-stone-400">Order Total</span>
+              <span className="text-sm text-stone-500">
                 ₦{Number(order.amount).toLocaleString("en-NG")}
+              </span>
+            </div>
+            <div className="flex justify-between pt-2">
+              <span className="font-semibold text-stone-700">Your Payout</span>
+              <span className="font-bold text-2xl text-teal-700">
+                ₦{Number(order.listing?.price ?? order.amount).toLocaleString("en-NG")}
               </span>
             </div>
           </div>

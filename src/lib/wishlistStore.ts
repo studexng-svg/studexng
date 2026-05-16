@@ -7,6 +7,7 @@ export interface WishlistItem {
   title: string;
   price: number;
   img: string;
+  vendor?: string;
 }
 
 interface WishlistStore {

@@ -82,7 +82,7 @@ const vendors: Record<string, any> = {
 export default function LaundryVendorProfile() {
   const router = useRouter();
   const { id } = useParams();
-  const vendorId = Array.isArray(id) ? id[0] : id;
+  const vendorId = (Array.isArray(id) ? id[0] : id) ?? "freshfold";
   const vendor = vendors[vendorId] || vendors.freshfold;
 
   const [message, setMessage] = useState("");

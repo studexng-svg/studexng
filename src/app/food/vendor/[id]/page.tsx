@@ -59,7 +59,7 @@ const menu = [
 export default function VendorMenu() {
   const router = useRouter();
   const { id } = useParams();
-  const vendorId = Array.isArray(id) ? id[0] : id;
+  const vendorId = (Array.isArray(id) ? id[0] : id) ?? "1";
   const vendor = vendorData[vendorId] || vendorData["1"];
 
   const [search, setSearch] = useState("");

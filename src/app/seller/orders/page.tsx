@@ -18,7 +18,7 @@ interface Order {
   created_at: string;
   status: string;
   current_status: string;
-  listing: { title: string };
+  listing: { title: string; price: number };
 }
 
 export default function SellerOrdersPage() {
@@ -162,11 +162,19 @@ export default function SellerOrdersPage() {
                         </p>
                       )}
 
-                      <div className="flex justify-between items-center pt-2 border-t border-stone-100">
-                        <span className="text-xs text-stone-500">Order Amount</span>
-                        <span className="text-lg font-bold text-teal-600">
-                          ₦{Number(order.amount).toLocaleString("en-NG")}
-                        </span>
+                      <div className="pt-2 border-t border-stone-100 space-y-1">
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs text-stone-400">Order Total</span>
+                          <span className="text-sm text-stone-500">
+                            ₦{Number(order.amount).toLocaleString("en-NG")}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs font-semibold text-stone-500">Your Payout</span>
+                          <span className="text-lg font-bold text-teal-600">
+                            ₦{Number(order.listing?.price ?? order.amount).toLocaleString("en-NG")}
+                          </span>
+                        </div>
                       </div>
                     </div>
 

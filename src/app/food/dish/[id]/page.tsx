@@ -75,7 +75,7 @@ const dishData: Record<string, any> = {
 export default function FoodDishDetail() {
   const router = useRouter();
   const { id } = useParams();
-  const dishId = Array.isArray(id) ? id[0] : id;
+  const dishId = (Array.isArray(id) ? id[0] : id) ?? "1";
   const dish = dishData[dishId] || dishData["1"];
 
   const addToCart = useCartStore((state) => state.addToCart);
