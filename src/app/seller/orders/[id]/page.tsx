@@ -4,36 +4,41 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
-  ChevronLeft, Package, DollarSign, User, Clock, CheckCircle,
-  AlertCircle, ChevronRight, Utensils, Truck, Bell,
+  ChevronLeft, User, Clock, CheckCircle, AlertCircle,
+  ChevronRight, Bell, CreditCard, ChefHat, Package,
+  PartyPopper, XCircle,
 } from "lucide-react";
 import Link from "next/link";
-import { fetchWithAuth } from "@/lib/authStore";
+import { useAuth, fetchWithAuth } from "@/lib/authStore";
 import { GRAD, SERIF } from "@/lib/tokens";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
-const TRACKING_STEPS = [
-  { key: "paid",      label: "Payment Confirmed",  icon: "💳" },
-  { key: "confirmed", label: "Order Confirmed",    icon: "✅" },
-  { key: "preparing", label: "Preparing",          icon: "🍳" },
-  { key: "ready",     label: "Ready for Pickup",   icon: "📦" },
-  { key: "delivered", label: "Delivered",          icon: "🎉" },
-];
+const STEP_CONFIG = {
+  paid:      { Icon: CreditCard,  iconColor: "#10b981", bg: "bg-emerald-50",  label: "Payment Confirmed" },
+  confirmed: { Icon: CheckCircle, iconColor: "#6366f1", bg: "bg-indigo-50",   label: "Order Confirmed"   },
+  preparing: { Icon: ChefHat,     iconColor: "#f59e0b", bg: "bg-amber-50",    label: "Preparing"         },
+  ready:     { Icon: Package,     iconColor: "#0ea5e9", bg: "bg-sky-50",      label: "Ready for Pickup"  },
+  delivered: { Icon: PartyPopper, iconColor: "#ec4899", bg: "bg-pink-50",     label: "Delivered"         },
+  cancelled: { Icon: XCircle,     iconColor: "#ef4444", bg: "bg-red-50",      label: "Cancelled"         },
+} as const;
 
-const NEXT_ACTION: Record<string, { label: string; confirmLabel: string; color: string }> = {
-  paid:      { label: "Confirm Order",     confirmLabel: "Confirm this order?",     color: "teal" },
-  confirmed: { label: "Start Preparing",   confirmLabel: "Mark as preparing?",      color: "blue" },
-  preparing: { label: "Mark as Ready",     confirmLabel: "Mark order as ready?",    color: "amber" },
-  ready:     { label: "Mark as Delivered", confirmLabel: "Confirm order delivered?", color: "emerald" },
+const TRACKING_STEPS = ["paid", "confirmed", "preparing", "ready", "delivered"] as const;
+type TrackingKey = keyof typeof STEP_CONFIG;
+
+const NEXT_ACTION: Record<string, { label: string; confirmLabel: string }> = {
+  paid:      { label: "Confirm Order",     confirmLabel: "Confirm this order?" },
+  confirmed: { label: "Start Preparing",   confirmLabel: "Mark as preparing?"  },
+  preparing: { label: "Mark as Ready",     confirmLabel: "Mark order as ready?" },
+  ready:     { label: "Mark as Delivered", confirmLabel: "Confirm order delivered?" },
 };
 
-const STATUS_COLOR: Record<string, string> = {
+const CURRENT_STATUS_BADGE: Record<string, string> = {
   paid:      "bg-amber-100 text-amber-700",
-  confirmed: "bg-blue-100 text-blue-700",
-  preparing: "bg-purple-100 text-purple-700",
-  ready:     "bg-teal-100 text-teal-700",
-  delivered: "bg-emerald-100 text-emerald-700",
+  confirmed: "bg-indigo-100 text-indigo-700",
+  preparing: "bg-amber-100 text-amber-700",
+  ready:     "bg-sky-100 text-sky-700",
+  delivered: "bg-pink-100 text-pink-700",
   cancelled: "bg-stone-100 text-stone-500",
 };
 
@@ -41,7 +46,6 @@ interface Order {
   id: number;
   reference: string;
   buyer: string;
-  buyer_id: number;
   amount: number;
   created_at: string;
   status: string;
@@ -59,8 +63,13 @@ interface TrackingEntry {
 }
 
 export default function SellerOrderDetailPage() {
-  const { id } = useParams();
+  const params = useParams();
   const router = useRouter();
+  const { isLoggedIn, isHydrated } = useAuth();
+
+  const rawId = params.id;
+  const orderId = Array.isArray(rawId) ? rawId[0] : rawId;
+
   const [order, setOrder] = useState<Order | null>(null);
   const [history, setHistory] = useState<TrackingEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -70,50 +79,51 @@ export default function SellerOrderDetailPage() {
   const [note, setNote] = useState("");
   const [estimatedTime, setEstimatedTime] = useState("");
 
-  const loadOrder = async () => {
-    try {
-      const [orderRes, trackRes] = await Promise.all([
-        fetchWithAuth(`${API_URL}/api/orders/orders/${id}/`),
-        fetchWithAuth(`${API_URL}/api/orders/orders/${id}/tracking/`),
-      ]);
-      if (!orderRes.ok) {
-        setError(orderRes.status === 404 ? "Order not found" : "Failed to load order");
-        return;
-      }
-      const orderData = await orderRes.json();
-      setOrder(orderData);
-      if (trackRes.ok) {
-        const trackData = await trackRes.json();
-        setHistory(trackData.history || []);
-      }
-    } catch {
-      setError("Failed to load order details");
-    } finally {
-      setLoading(false);
-    }
-  };
+  useEffect(() => {
+    if (isHydrated && !isLoggedIn) { router.push("/auth"); return; }
+    if (!isHydrated || !isLoggedIn || !orderId) return;
 
-  useEffect(() => { loadOrder(); }, [id]);
+    const loadOrder = async () => {
+      setLoading(true);
+      try {
+        const [orderRes, trackRes] = await Promise.all([
+          fetchWithAuth(`${API_URL}/api/orders/orders/${orderId}/`),
+          fetchWithAuth(`${API_URL}/api/orders/orders/${orderId}/tracking/`),
+        ]);
+        if (orderRes.status === 401) { router.push("/auth"); return; }
+        if (!orderRes.ok) {
+          setError(orderRes.status === 404 ? "Order not found" : "Failed to load order");
+          return;
+        }
+        setOrder(await orderRes.json());
+        if (trackRes.ok) {
+          const t = await trackRes.json();
+          setHistory(t.history || []);
+        }
+      } catch {
+        setError("Network error. Please try again.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadOrder();
+  }, [isHydrated, isLoggedIn, orderId, router]);
 
   const handleUpdateStatus = async () => {
     if (!order) return;
-    const nextKey = NEXT_ACTION[order.current_status];
-    if (!nextKey) return;
-
-    const nextStatus = {
-      paid: "confirmed",
-      confirmed: "preparing",
-      preparing: "ready",
-      ready: "delivered",
-    }[order.current_status];
+    const nextStatus = ({
+      paid: "confirmed", confirmed: "preparing",
+      preparing: "ready", ready: "delivered",
+    } as Record<string, string>)[order.current_status];
+    if (!nextStatus) return;
 
     setUpdating(true);
     try {
       const body: Record<string, unknown> = { status: nextStatus, note };
-      if (nextStatus === "confirmed" && estimatedTime) {
-        body.estimated_time = parseInt(estimatedTime, 10);
-      }
-      const res = await fetchWithAuth(`${API_URL}/api/orders/orders/${id}/update-status/`, {
+      if (nextStatus === "confirmed" && estimatedTime) body.estimated_time = parseInt(estimatedTime, 10);
+
+      const res = await fetchWithAuth(`${API_URL}/api/orders/orders/${orderId}/update-status/`, {
         method: "PATCH",
         body: JSON.stringify(body),
       });
@@ -124,10 +134,11 @@ export default function SellerOrderDetailPage() {
       }
       const data = await res.json();
       setOrder(data.order);
-      setNote("");
-      setEstimatedTime("");
-      setShowModal(false);
-      await loadOrder();
+      setNote(""); setEstimatedTime(""); setShowModal(false);
+
+      // Reload tracking history
+      const trackRes = await fetchWithAuth(`${API_URL}/api/orders/orders/${orderId}/tracking/`);
+      if (trackRes.ok) { const t = await trackRes.json(); setHistory(t.history || []); }
     } catch {
       alert("Network error. Please try again.");
     } finally {
@@ -135,7 +146,7 @@ export default function SellerOrderDetailPage() {
     }
   };
 
-  if (loading) return (
+  if (!isHydrated || loading) return (
     <div className="min-h-screen flex items-center justify-center bg-[#FAFAF9]">
       <div className="animate-spin"><Clock className="w-10 h-10 text-teal-600" /></div>
     </div>
@@ -146,7 +157,7 @@ export default function SellerOrderDetailPage() {
       <div className="text-center bg-white border border-stone-200 rounded-2xl p-8 shadow-sm max-w-sm w-full">
         <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
         <h2 className="text-lg font-bold text-stone-800 mb-2" style={SERIF}>Order Not Found</h2>
-        <p className="text-sm text-stone-500 mb-6">{error || "This order may have been removed."}</p>
+        <p className="text-sm text-stone-500 mb-6">{error || "This order could not be loaded."}</p>
         <Link href="/seller/orders">
           <button className="px-8 py-3 text-white font-semibold rounded-full shadow-md text-sm" style={{ background: GRAD }}>
             Back to Orders
@@ -161,7 +172,8 @@ export default function SellerOrderDetailPage() {
   const isCompleted = order.status === "completed";
   const isCancelled = order.status === "cancelled" || order.current_status === "cancelled";
 
-  const currentStepIndex = TRACKING_STEPS.findIndex(s => s.key === order.current_status);
+  const currentStepIndex = TRACKING_STEPS.indexOf(order.current_status as typeof TRACKING_STEPS[number]);
+  const badgeConfig = STEP_CONFIG[order.current_status as TrackingKey] ?? STEP_CONFIG.paid;
 
   return (
     <div className="min-h-screen bg-[#FAFAF9]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
@@ -185,66 +197,84 @@ export default function SellerOrderDetailPage() {
             <p className="text-xl font-bold text-stone-900 mt-0.5">#{order.reference}</p>
             <p className="text-xs text-stone-400 mt-1">{new Date(order.created_at).toLocaleString("en-NG")}</p>
           </div>
-          <span className={`px-3 py-1.5 rounded-full font-semibold text-xs flex items-center gap-1.5 ${STATUS_COLOR[order.current_status] || "bg-stone-100 text-stone-500"}`}>
-            {TRACKING_STEPS.find(s => s.key === order.current_status)?.icon}{" "}
-            {TRACKING_STEPS.find(s => s.key === order.current_status)?.label || order.current_status}
+          <span className={`px-3 py-1.5 rounded-full font-semibold text-xs flex items-center gap-1.5 ${CURRENT_STATUS_BADGE[order.current_status] || "bg-stone-100 text-stone-500"}`}>
+            <badgeConfig.Icon className="w-3.5 h-3.5" style={{ color: badgeConfig.iconColor }} />
+            {badgeConfig.label}
           </span>
         </div>
 
         {/* TRACKING TIMELINE */}
         <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm animate-fadeUp">
-          <p className="text-xs font-semibold text-teal-600 tracking-widest uppercase mb-4">Order Progress</p>
-          {order.estimated_time && (
-            <div className="flex items-center gap-2 mb-4 p-3 bg-teal-50 rounded-xl border border-teal-100">
-              <Clock className="w-4 h-4 text-teal-600 flex-shrink-0" />
-              <p className="text-sm text-teal-800 font-medium">Estimated: {order.estimated_time} minutes</p>
-            </div>
-          )}
+          <div className="flex items-center justify-between mb-5">
+            <p className="text-xs font-semibold text-teal-600 tracking-widest uppercase">Order Progress</p>
+            {order.estimated_time && (
+              <span className="text-xs bg-teal-50 text-teal-700 border border-teal-100 px-2.5 py-1 rounded-full font-medium flex items-center gap-1">
+                <Clock className="w-3 h-3" /> ~{order.estimated_time} min
+              </span>
+            )}
+          </div>
+
           <div className="space-y-0">
-            {TRACKING_STEPS.map((step, i) => {
-              const isDone = i <= currentStepIndex && !isCancelled;
-              const isCurrent = i === currentStepIndex && !isCancelled;
-              const histEntry = history.find(h => h.status === step.key);
+            {TRACKING_STEPS.map((stepKey, i) => {
+              const cfg = STEP_CONFIG[stepKey];
+              const isDone = !isCancelled && i <= currentStepIndex;
+              const isCurrent = !isCancelled && i === currentStepIndex;
+              const histEntry = history.find(h => h.status === stepKey);
+
               return (
-                <div key={step.key} className="flex gap-3">
+                <div key={stepKey} className="flex gap-3">
                   <div className="flex flex-col items-center">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm flex-shrink-0 transition-all ${
-                      isCurrent ? "ring-2 ring-teal-400 ring-offset-2" : ""
-                    } ${isDone ? "bg-teal-500 text-white" : "bg-stone-100 text-stone-400"}`}>
-                      {isDone ? <CheckCircle className="w-4 h-4" /> : <span className="text-xs">{i + 1}</span>}
+                    <div
+                      className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 transition-all ${isDone ? cfg.bg : "bg-stone-100"}`}
+                      style={isCurrent ? { boxShadow: `0 0 0 3px white, 0 0 0 5px ${cfg.iconColor}` } : {}}
+                    >
+                      <cfg.Icon
+                        className="w-5 h-5"
+                        style={{ color: isDone ? cfg.iconColor : "#d6d3d1" }}
+                      />
                     </div>
                     {i < TRACKING_STEPS.length - 1 && (
-                      <div className={`w-0.5 h-8 mt-1 ${isDone && i < currentStepIndex ? "bg-teal-400" : "bg-stone-200"}`} />
+                      <div className={`w-0.5 h-8 mt-1 transition-all ${isDone && i < currentStepIndex ? "bg-gradient-to-b from-teal-400 to-stone-200" : "bg-stone-100"}`} />
                     )}
                   </div>
-                  <div className="pb-4 flex-1 min-w-0">
+                  <div className="pb-5 flex-1 min-w-0">
                     <p className={`text-sm font-semibold ${isDone ? "text-stone-900" : "text-stone-400"}`}>
-                      {step.icon} {step.label}
+                      {cfg.label}
                     </p>
-                    {histEntry && (
-                      <p className="text-xs text-stone-400 mt-0.5">
-                        {new Date(histEntry.created_at).toLocaleTimeString("en-NG", { hour: "2-digit", minute: "2-digit" })}
-                        {histEntry.note ? ` · "${histEntry.note}"` : ""}
-                      </p>
+                    {histEntry ? (
+                      <div className="mt-0.5">
+                        <p className="text-xs text-stone-400">
+                          {new Date(histEntry.created_at).toLocaleString("en-NG", { hour: "2-digit", minute: "2-digit", day: "numeric", month: "short" })}
+                        </p>
+                        {histEntry.note && (
+                          <p className="text-xs italic mt-1 px-2.5 py-1.5 rounded-lg border" style={{ color: cfg.iconColor, borderColor: `${cfg.iconColor}30`, backgroundColor: `${cfg.iconColor}08` }}>
+                            "{histEntry.note}"
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-stone-300 mt-0.5">{isCurrent ? "In progress" : isDone ? "Done" : "Pending"}</p>
                     )}
                   </div>
                 </div>
               );
             })}
+
             {isCancelled && (
               <div className="flex gap-3 mt-1">
-                <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
-                  <AlertCircle className="w-4 h-4 text-red-500" />
+                <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center flex-shrink-0">
+                  <XCircle className="w-5 h-5 text-red-500" />
                 </div>
-                <div className="pb-4">
+                <div className="pb-4 flex-1">
                   <p className="text-sm font-semibold text-red-600">Cancelled</p>
+                  <p className="text-xs text-stone-400 mt-0.5">This order was cancelled.</p>
                 </div>
               </div>
             )}
           </div>
         </div>
 
-        {/* CUSTOMER + LISTING */}
+        {/* ORDER INFO */}
         <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm animate-fadeUp">
           <h3 className="font-semibold text-stone-800 mb-3 flex items-center gap-2 text-sm">
             <User className="w-4 h-4 text-teal-600" /> Customer & Order
@@ -261,13 +291,13 @@ export default function SellerOrderDetailPage() {
             <div className="flex justify-between pt-2">
               <span className="font-semibold text-stone-700">Amount</span>
               <span className="font-bold text-2xl text-teal-700">
-                ₦{parseFloat(String(order.amount)).toLocaleString("en-NG", { minimumFractionDigits: 2 })}
+                ₦{Number(order.amount).toLocaleString("en-NG")}
               </span>
             </div>
           </div>
           {order.status === "seller_completed" && (
             <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2 mt-3">
-              Awaiting buyer confirmation to release payment.
+              Waiting for buyer to confirm receipt and release your payment.
             </p>
           )}
           {isCompleted && (
@@ -277,25 +307,23 @@ export default function SellerOrderDetailPage() {
           )}
         </div>
 
-        {/* STATUS UPDATE ACTION */}
+        {/* ACTION BUTTON */}
         {isActive && nextAction && order.current_status !== "delivered" && (
-          <div className="space-y-3 animate-fadeUp">
-            <button
-              onClick={() => setShowModal(true)}
-              className="w-full py-4 text-white font-semibold rounded-full shadow-lg flex items-center justify-center gap-2 active:scale-[0.98] transition-all"
-              style={{ background: GRAD }}
-            >
-              <ChevronRight className="w-5 h-5" />
-              {nextAction.label}
-            </button>
-          </div>
+          <button
+            onClick={() => setShowModal(true)}
+            className="w-full py-4 text-white font-semibold rounded-full shadow-lg flex items-center justify-center gap-2 active:scale-[0.98] transition-all animate-fadeUp"
+            style={{ background: GRAD }}
+          >
+            <ChevronRight className="w-5 h-5" />
+            {nextAction.label}
+          </button>
         )}
 
         {order.current_status === "delivered" && order.status === "seller_completed" && (
-          <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 text-center animate-fadeUp">
-            <Bell className="w-6 h-6 text-blue-500 mx-auto mb-2" />
-            <p className="text-sm font-semibold text-blue-900">Awaiting Buyer Confirmation</p>
-            <p className="text-xs text-blue-700 mt-1">Buyer will confirm receipt to release your payment.</p>
+          <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 text-center animate-fadeUp">
+            <Bell className="w-6 h-6 text-indigo-500 mx-auto mb-2" />
+            <p className="text-sm font-semibold text-indigo-900">Awaiting Buyer Confirmation</p>
+            <p className="text-xs text-indigo-700 mt-1">The buyer needs to confirm receipt to release your payment.</p>
           </div>
         )}
       </div>
@@ -315,51 +343,36 @@ export default function SellerOrderDetailPage() {
 
             {order.current_status === "paid" && (
               <div className="mb-4">
-                <label className="text-xs font-semibold text-stone-600 mb-1.5 block">
-                  Estimated time (minutes) — optional
-                </label>
+                <label className="text-xs font-semibold text-stone-600 mb-1.5 block">Estimated time (minutes) — optional</label>
                 <input
-                  type="number"
-                  min="1"
-                  value={estimatedTime}
+                  type="number" min="1" value={estimatedTime}
                   onChange={e => setEstimatedTime(e.target.value)}
                   placeholder="e.g. 20"
-                  className="w-full px-4 py-3 bg-stone-50 border border-stone-200 rounded-xl text-sm text-stone-900 focus:outline-none focus:border-teal-400"
+                  className="w-full px-4 py-3 bg-stone-50 border border-stone-200 rounded-xl text-sm focus:outline-none focus:border-teal-400"
                 />
               </div>
             )}
 
             <div className="mb-5">
-              <label className="text-xs font-semibold text-stone-600 mb-1.5 block">
-                Message to buyer — optional
-              </label>
+              <label className="text-xs font-semibold text-stone-600 mb-1.5 block">Message to buyer — optional</label>
               <textarea
-                value={note}
-                onChange={e => setNote(e.target.value)}
-                rows={2}
-                placeholder="e.g. 'Your food will be ready in 15 mins!'"
-                className="w-full px-4 py-3 bg-stone-50 border border-stone-200 rounded-xl text-sm text-stone-900 focus:outline-none focus:border-teal-400 resize-none"
+                value={note} onChange={e => setNote(e.target.value)} rows={2}
+                placeholder="e.g. 'Ready in 15 mins!'"
+                className="w-full px-4 py-3 bg-stone-50 border border-stone-200 rounded-xl text-sm focus:outline-none focus:border-teal-400 resize-none"
               />
             </div>
 
             <div className="flex gap-3">
-              <button
-                onClick={() => setShowModal(false)}
-                disabled={updating}
-                className="flex-1 py-3 bg-stone-100 text-stone-700 rounded-full font-semibold text-sm disabled:opacity-50"
-              >
+              <button onClick={() => setShowModal(false)} disabled={updating}
+                className="flex-1 py-3 bg-stone-100 text-stone-700 rounded-full font-semibold text-sm disabled:opacity-50">
                 Cancel
               </button>
-              <button
-                onClick={handleUpdateStatus}
-                disabled={updating}
+              <button onClick={handleUpdateStatus} disabled={updating}
                 className="flex-1 py-3 text-white rounded-full font-semibold text-sm disabled:opacity-50 flex items-center justify-center gap-2"
-                style={{ background: GRAD }}
-              >
+                style={{ background: GRAD }}>
                 {updating
                   ? <><div className="animate-spin"><Clock className="w-4 h-4" /></div> Updating…</>
-                  : <><CheckCircle className="w-4 h-4" /> Confirm</>
-                }
+                  : <><CheckCircle className="w-4 h-4" /> Confirm</>}
               </button>
             </div>
           </div>

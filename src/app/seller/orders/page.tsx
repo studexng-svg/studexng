@@ -1,7 +1,7 @@
 // src/app/seller/orders/page.tsx
 "use client";
 
-import { Package, Clock, CheckCircle, ChevronLeft, Calendar, MapPin, User, DollarSign } from "lucide-react";
+import { Package, Clock, ChevronRight, ChevronLeft, User } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -13,23 +13,12 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 interface Order {
   id: number;
   reference: string;
-  buyer: {
-    username: string;
-  };
+  buyer: string;
   amount: number;
   created_at: string;
-  status: "pending_confirmation" | "completed" | "disputed" | "refunded" | "paid" | "seller_completed";
-  type: "service" | "food";
-  service_details?: {
-    service_name: string;
-    date: string;
-    time: string;
-    location: string;
-  };
-  food_items?: Array<{
-    title: string;
-    quantity: number;
-  }>;
+  status: string;
+  current_status: string;
+  listing: { title: string };
 }
 
 export default function SellerOrdersPage() {
@@ -162,57 +151,28 @@ export default function SellerOrdersPage() {
                           <User className="w-4 h-4 text-teal-600" />
                         </div>
                         <div>
-                          <p className="font-semibold text-stone-900 text-sm">{order.buyer.username}</p>
+                          <p className="font-semibold text-stone-900 text-sm">{order.buyer}</p>
                           <p className="text-xs text-stone-400">Buyer</p>
                         </div>
                       </div>
 
-                      {order.type === "service" && order.service_details && (
-                        <div className="bg-stone-50 rounded-xl p-3 space-y-1.5 border border-stone-100">
-                          <p className="font-semibold text-stone-800 text-sm">{order.service_details.service_name}</p>
-                          <div className="flex items-center gap-2 text-xs text-stone-500">
-                            <Calendar className="w-3 h-3" />
-                            {order.service_details.date} at {order.service_details.time}
-                          </div>
-                          <div className="flex items-center gap-2 text-xs text-stone-500">
-                            <MapPin className="w-3 h-3" />
-                            {order.service_details.location}
-                          </div>
-                        </div>
-                      )}
-
-                      {order.type === "food" && order.food_items && (
-                        <div className="bg-stone-50 rounded-xl p-3 border border-stone-100">
-                          <p className="font-semibold text-stone-800 text-sm mb-1.5">Food Order:</p>
-                          <div className="space-y-0.5">
-                            {order.food_items.slice(0, 2).map((item, i) => (
-                              <p key={i} className="text-xs text-stone-600">
-                                {item.title} ×{item.quantity}
-                              </p>
-                            ))}
-                            {order.food_items.length > 2 && (
-                              <p className="text-xs text-stone-500">+{order.food_items.length - 2} more items</p>
-                            )}
-                          </div>
-                        </div>
+                      {order.listing?.title && (
+                        <p className="text-sm text-stone-600 bg-stone-50 rounded-xl px-3 py-2 border border-stone-100">
+                          {order.listing.title}
+                        </p>
                       )}
 
                       <div className="flex justify-between items-center pt-2 border-t border-stone-100">
-                        <span className="text-xs text-stone-500 flex items-center gap-1.5">
-                          <DollarSign className="w-3.5 h-3.5" />
-                          Order Amount
-                        </span>
+                        <span className="text-xs text-stone-500">Order Amount</span>
                         <span className="text-lg font-bold text-teal-600">
-                          ₦{order.amount.toLocaleString()}
+                          ₦{Number(order.amount).toLocaleString("en-NG")}
                         </span>
                       </div>
                     </div>
 
-                    <div className="bg-teal-50 border-t border-teal-100 px-4 py-2.5">
-                      <p className="text-xs font-medium text-teal-700 flex items-center gap-1.5">
-                        <CheckCircle className="w-3.5 h-3.5" />
-                        Tap to mark as complete
-                      </p>
+                    <div className="bg-teal-50 border-t border-teal-100 px-4 py-2.5 flex items-center justify-between">
+                      <p className="text-xs font-medium text-teal-700">Tap to update order status</p>
+                      <ChevronRight className="w-3.5 h-3.5 text-teal-500" />
                     </div>
                   </div>
                 </Link>

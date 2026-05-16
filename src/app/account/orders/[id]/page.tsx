@@ -1,7 +1,10 @@
 "use client";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { Package, CheckCircle, Clock, AlertCircle, ChevronLeft, MessageCircle } from "lucide-react";
+import {
+  Package, CheckCircle, Clock, AlertCircle, ChevronLeft, MessageCircle,
+  CreditCard, ChefHat, PartyPopper, XCircle,
+} from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAuth, fetchWithAuth } from "@/lib/authStore";
 import { GRAD, SERIF } from "@/lib/tokens";
@@ -9,15 +12,17 @@ import ReviewForm from "@/components/ReviewForm";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
-const TRACKING_STEPS = [
-  { key: "paid",      label: "Payment Confirmed",  icon: "💳", desc: "Your payment is secured in escrow." },
-  { key: "confirmed", label: "Order Confirmed",    icon: "✅", desc: "The vendor accepted your order." },
-  { key: "preparing", label: "Preparing",          icon: "🍳", desc: "Your order is being prepared." },
-  { key: "ready",     label: "Ready for Pickup",   icon: "📦", desc: "Your order is ready!" },
-  { key: "delivered", label: "Delivered",          icon: "🎉", desc: "Your order has been delivered." },
-];
+const STEP_CONFIG = {
+  paid:      { Icon: CreditCard,  iconColor: "#10b981", bg: "bg-emerald-50", label: "Payment Confirmed", desc: "Your payment is secured in escrow."   },
+  confirmed: { Icon: CheckCircle, iconColor: "#6366f1", bg: "bg-indigo-50",  label: "Order Confirmed",  desc: "The vendor accepted your order."      },
+  preparing: { Icon: ChefHat,     iconColor: "#f59e0b", bg: "bg-amber-50",   label: "Preparing",        desc: "Your order is being prepared."        },
+  ready:     { Icon: Package,     iconColor: "#0ea5e9", bg: "bg-sky-50",     label: "Ready for Pickup", desc: "Your order is ready!"                 },
+  delivered: { Icon: PartyPopper, iconColor: "#ec4899", bg: "bg-pink-50",    label: "Delivered",        desc: "Your order has been delivered."       },
+} as const;
 
-const STATUS_ORDER = ["paid", "confirmed", "preparing", "ready", "delivered"];
+const TRACKING_STEPS = ["paid", "confirmed", "preparing", "ready", "delivered"] as const;
+
+const STATUS_ORDER = ["paid", "confirmed", "preparing", "ready", "delivered"] as const;
 
 interface Order {
   id: number;
@@ -149,7 +154,7 @@ export default function OrderDetailPage() {
   const isCompleted = order.status === "completed";
   const isCancelled = order.status === "cancelled" || order.current_status === "cancelled";
 
-  const currentStepIndex = STATUS_ORDER.indexOf(order.current_status);
+  const currentStepIndex = STATUS_ORDER.indexOf(order.current_status as typeof STATUS_ORDER[number]);
 
   return (
     <div className="min-h-screen bg-[#FAFAF9]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
@@ -209,28 +214,31 @@ export default function OrderDetailPage() {
               )}
             </div>
             <div className="space-y-0">
-              {TRACKING_STEPS.map((step, i) => {
-                const stepDone = isCompleted
-                  ? true
-                  : i <= currentStepIndex;
+              {TRACKING_STEPS.map((stepKey, i) => {
+                const cfg = STEP_CONFIG[stepKey];
+                const stepDone = isCompleted ? true : i <= currentStepIndex;
                 const isCurrent = !isCompleted && i === currentStepIndex;
-                const histEntry = history.find(h => h.status === step.key);
+                const histEntry = history.find(h => h.status === stepKey);
 
                 return (
-                  <div key={step.key} className="flex gap-3">
+                  <div key={stepKey} className="flex gap-3">
                     <div className="flex flex-col items-center">
-                      <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm flex-shrink-0 transition-all ${
-                        isCurrent ? "ring-2 ring-teal-400 ring-offset-2" : ""
-                      } ${stepDone ? "bg-teal-500 text-white shadow-sm" : "bg-stone-100 text-stone-400"}`}>
-                        {stepDone ? <CheckCircle className="w-4 h-4" /> : <span className="text-sm">{step.icon}</span>}
+                      <div
+                        className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 transition-all ${stepDone ? cfg.bg : "bg-stone-100"}`}
+                        style={isCurrent ? { boxShadow: `0 0 0 3px white, 0 0 0 5px ${cfg.iconColor}` } : {}}
+                      >
+                        <cfg.Icon
+                          className="w-5 h-5"
+                          style={{ color: stepDone ? cfg.iconColor : "#d6d3d1" }}
+                        />
                       </div>
                       {i < TRACKING_STEPS.length - 1 && (
-                        <div className={`w-0.5 h-8 mt-1 ${stepDone && i < currentStepIndex ? "bg-teal-400" : "bg-stone-100"}`} />
+                        <div className={`w-0.5 h-8 mt-1 transition-all ${stepDone && i < currentStepIndex ? "bg-gradient-to-b from-teal-300 to-stone-200" : "bg-stone-100"}`} />
                       )}
                     </div>
                     <div className="pb-5 flex-1 min-w-0">
                       <p className={`text-sm font-semibold ${stepDone ? "text-stone-900" : "text-stone-400"}`}>
-                        {step.label}
+                        {cfg.label}
                       </p>
                       {histEntry ? (
                         <div className="mt-0.5">
@@ -240,13 +248,13 @@ export default function OrderDetailPage() {
                             })}
                           </p>
                           {histEntry.note && (
-                            <p className="text-xs text-stone-600 bg-stone-50 border border-stone-100 rounded-lg px-2.5 py-1.5 mt-1 italic">
+                            <p className="text-xs italic mt-1 px-2.5 py-1.5 rounded-lg border" style={{ color: cfg.iconColor, borderColor: `${cfg.iconColor}30`, backgroundColor: `${cfg.iconColor}08` }}>
                               "{histEntry.note}"
                             </p>
                           )}
                         </div>
                       ) : (
-                        <p className="text-xs text-stone-400 mt-0.5">{step.desc}</p>
+                        <p className="text-xs text-stone-400 mt-0.5">{cfg.desc}</p>
                       )}
                     </div>
                   </div>
@@ -259,7 +267,7 @@ export default function OrderDetailPage() {
         {isCancelled && (
           <div className="bg-red-50 border border-red-100 rounded-2xl p-4 animate-fadeUp">
             <div className="flex gap-3">
-              <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+              <XCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
               <div>
                 <p className="font-semibold text-red-900 text-sm">Order Cancelled</p>
                 <p className="text-xs text-red-700 mt-1">This order was cancelled. Contact support if you need help.</p>

@@ -44,6 +44,9 @@ class OrderViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         from services.models import Listing
+        role = self.request.query_params.get('role')
+        if role == 'buyer':
+            return self.queryset.filter(buyer=user).order_by('-created_at')
         vendor_listing_ids = Listing.objects.filter(vendor=user).values_list('id', flat=True)
         return self.queryset.filter(
             models.Q(buyer=user) | models.Q(listing__id__in=vendor_listing_ids)
