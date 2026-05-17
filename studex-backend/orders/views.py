@@ -231,7 +231,7 @@ class OrderViewSet(viewsets.ModelViewSet):
         except Exception as e:
             logger.warning(f"Loyalty award skipped for order {order.id}: {e}")
 
-        # Vendor badge
+        # Vendor badge + completion rate
         try:
             vendor = order.listing.vendor
             vp = vendor.profile
@@ -240,9 +240,19 @@ class OrderViewSet(viewsets.ModelViewSet):
             if sales >= 50: vp.vendor_badge = 'top'
             elif sales >= 30: vp.vendor_badge = 'trusted'
             elif sales >= 10: vp.vendor_badge = 'rising'
-            vp.save(update_fields=['on_platform_sales', 'vendor_badge'])
+
+            vendor_orders = Order.objects.filter(listing__vendor=vendor)
+            completed_count = vendor_orders.filter(status='completed').count()
+            finalized_count = vendor_orders.filter(
+                status__in=['completed', 'cancelled', 'disputed']
+            ).count()
+            vp.completion_rate = round(
+                (completed_count / finalized_count * 100), 2
+            ) if finalized_count > 0 else 0
+
+            vp.save(update_fields=['on_platform_sales', 'vendor_badge', 'completion_rate'])
         except Exception as e:
-            logger.warning(f"Vendor badge update skipped: {e}")
+            logger.warning(f"Vendor badge/completion update skipped: {e}")
 
         response_data = {
             "message": "Order confirmed! Paystack will transfer payment to the vendor.",

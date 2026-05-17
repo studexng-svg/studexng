@@ -10,6 +10,21 @@ from .models import Review, AppFeedback
 from .serializers import ReviewSerializer
 
 
+def _recalc_vendor_profile(vendor):
+    """Recalculate rating and total_reviews from live Review table and persist."""
+    try:
+        stats = Review.objects.filter(vendor=vendor).aggregate(
+            avg_rating=Avg('rating'),
+            total_reviews=Count('id'),
+        )
+        profile = vendor.profile
+        profile.rating = round(stats['avg_rating'] or 0, 2)
+        profile.total_reviews = stats['total_reviews']
+        profile.save(update_fields=['rating', 'total_reviews'])
+    except Exception:
+        pass
+
+
 class ReviewViewSet(viewsets.ModelViewSet):
     queryset = Review.objects.all()
     serializer_class = ReviewSerializer
@@ -27,7 +42,8 @@ class ReviewViewSet(viewsets.ModelViewSet):
         return qs
 
     def perform_create(self, serializer):
-        serializer.save()
+        review = serializer.save()
+        _recalc_vendor_profile(review.vendor)
 
     @action(detail=False, methods=['get'], url_path='can-review/(?P<order_id>[^/.]+)')
     def can_review(self, request, order_id=None):
@@ -145,4 +161,5 @@ def submit_listing_review(request):
         rating=int(rating),
         comment=comment,
     )
+    _recalc_vendor_profile(review.vendor)
     return Response({'message': 'Review submitted successfully', 'id': review.id})
