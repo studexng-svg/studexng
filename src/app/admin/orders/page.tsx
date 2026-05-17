@@ -4,7 +4,7 @@
 import { Package, Search, ChevronRight } from "lucide-react";
 import { useRouter } from "next/navigation";
 import AdminTopBar from "@/components/layout/AdminTopBar";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { fetchAllPages } from "@/lib/authStore";
 import { GRAD } from "@/lib/tokens";
 import { CampusPills, type Campus } from "@/components/admin/CampusPills";
@@ -38,19 +38,29 @@ export default function AdminOrders() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [campus, setCampus] = useState<Campus>("");
+  const filtersRef = useRef({ statusFilter: "", campus: "" as Campus });
 
-  const load = (s?: string, st?: string, c?: Campus) => {
-    setLoading(true);
+  const load = (s?: string, st?: string, c?: Campus, silent = false) => {
+    if (!silent) setLoading(true);
     let url = `${API_URL}/api/admin/orders/?`;
     if (st) url += `status=${st}&`;
     if (c) url += `campus=${c}&`;
     fetchAllPages(url)
       .then(d => setOrders(d))
       .catch(() => {})
-      .finally(() => setLoading(false));
+      .finally(() => { if (!silent) setLoading(false); });
   };
 
-  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    load();
+    const interval = setInterval(() => {
+      const f = filtersRef.current;
+      load(undefined, f.statusFilter || undefined, f.campus || undefined, true);
+    }, 8000);
+    return () => clearInterval(interval);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  filtersRef.current = { statusFilter, campus };
 
   const handleCampus = (c: Campus) => { setCampus(c); load(undefined, statusFilter, c); };
   const handleStatus = (st: string) => { setStatusFilter(st); load(undefined, st, campus); };

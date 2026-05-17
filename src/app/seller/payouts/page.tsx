@@ -41,15 +41,16 @@ export default function SellerPayouts() {
       return;
     }
 
-    const fetchData = async () => {
+    const fetchData = async (silent = false) => {
+      if (!silent) setLoading(true);
       try {
         const profileRes = await fetchWithAuth(`${API_URL}/api/auth/profile/`);
-        if (!profileRes.ok) throw new Error("Failed to load profile");
+        if (!profileRes.ok) { if (!silent) throw new Error("Failed to load profile"); return; }
         const profileData = await profileRes.json();
         setWalletBalance(parseFloat(profileData.wallet_balance || "0"));
 
         const txRes = await fetchWithAuth(`${API_URL}/api/services/transactions/`);
-        if (!txRes.ok) throw new Error("Failed to load transactions");
+        if (!txRes.ok) { if (!silent) throw new Error("Failed to load transactions"); return; }
 
         const txData = await txRes.json();
         const txList = Array.isArray(txData) ? txData : txData.results || [];
@@ -69,13 +70,15 @@ export default function SellerPayouts() {
         setTotalEarned(earned);
         setTotalWithdrawn(withdrawn);
       } catch (err) {
-        setError("Failed to load payout data. Make sure backend is running.");
+        if (!silent) setError("Failed to load payout data. Make sure backend is running.");
       } finally {
-        setLoading(false);
+        if (!silent) setLoading(false);
       }
     };
 
     fetchData();
+    const interval = setInterval(() => fetchData(true), 15000);
+    return () => clearInterval(interval);
   }, [authUser, router]);
 
   const getStatusColor = (status: string) => {

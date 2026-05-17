@@ -36,31 +36,35 @@ export default function OrdersPage() {
     }
     if (!isHydrated || !isLoggedIn) return;
 
-    const fetchOrders = async () => {
+    const fetchOrders = async (silent = false) => {
+      if (!silent) setLoading(true);
       try {
         const res = await fetchWithAuth(`${API_URL}/api/orders/orders/?role=buyer`);
-
         if (!res.ok) {
           if (res.status === 401) {
             setError("Session expired. Please log in again.");
             setTimeout(() => router.push("/auth"), 2000);
             return;
           }
-          throw new Error(`Failed to load orders: ${res.status}`);
+          if (!silent) throw new Error(`Failed to load orders: ${res.status}`);
+          return;
         }
-
         const data = await res.json();
         const ordersList = Array.isArray(data) ? data : data.results || [];
         setOrders(ordersList);
       } catch (err) {
-        console.error("Orders fetch error:", err);
-        setError("Failed to load orders. Please try again.");
+        if (!silent) {
+          console.error("Orders fetch error:", err);
+          setError("Failed to load orders. Please try again.");
+        }
       } finally {
-        setLoading(false);
+        if (!silent) setLoading(false);
       }
     };
 
     fetchOrders();
+    const interval = setInterval(() => fetchOrders(true), 8000);
+    return () => clearInterval(interval);
   }, [isHydrated, isLoggedIn, router]);
 
   const getStatusColor = (status: string) => {

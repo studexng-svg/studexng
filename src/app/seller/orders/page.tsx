@@ -34,37 +34,37 @@ export default function SellerOrdersPage() {
       return;
     }
 
-    const fetchOrders = async () => {
+    const fetchOrders = async (silent = false) => {
+      if (!silent) setLoading(true);
       try {
         const res = await fetchWithAuth(`${API_URL}/api/orders/orders/vendor-orders/`);
-
         if (!res.ok) {
-          if (res.status === 401) {
-            setError("Session expired. Redirecting...");
-            setTimeout(() => router.push("/auth"), 2000);
-            return;
+          if (!silent) {
+            if (res.status === 401) {
+              setError("Session expired. Redirecting...");
+              setTimeout(() => router.push("/auth"), 2000);
+            } else if (res.status === 404) {
+              setError("Endpoint not found (404). Make sure you updated orders/views.py with the pending action.");
+            } else if (res.status === 500) {
+              setError("Backend error (500). Check your Django console for errors.");
+            } else {
+              setError(`API Error ${res.status}: ${res.statusText}`);
+            }
           }
-          if (res.status === 404) {
-            setError("Endpoint not found (404). Make sure you updated orders/views.py with the pending action.");
-          } else if (res.status === 500) {
-            setError("Backend error (500). Check your Django console for errors.");
-          } else {
-            setError(`API Error ${res.status}: ${res.statusText}`);
-          }
-          setLoading(false);
           return;
         }
-
         const data = await res.json();
         setOrders(Array.isArray(data) ? data : []);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load orders. Try again.");
+        if (!silent) setError(err instanceof Error ? err.message : "Failed to load orders. Try again.");
       } finally {
-        setLoading(false);
+        if (!silent) setLoading(false);
       }
     };
 
     fetchOrders();
+    const interval = setInterval(() => fetchOrders(true), 8000);
+    return () => clearInterval(interval);
   }, [router, authUser]);
 
   const pendingCount = orders.length;

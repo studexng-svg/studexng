@@ -84,6 +84,8 @@ export default function NotificationsPage() {
   useEffect(() => {
     if (!isHydrated || !isLoggedIn) return;
     fetchNotifications();
+    const interval = setInterval(fetchNotifications, 10000);
+    return () => clearInterval(interval);
   }, [isHydrated, isLoggedIn, fetchNotifications]);
 
   const markAllRead = async () => {

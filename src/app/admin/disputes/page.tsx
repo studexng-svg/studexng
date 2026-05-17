@@ -2,7 +2,7 @@
 "use client";
 
 import { AlertTriangle, Search } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import AdminTopBar from "@/components/layout/AdminTopBar";
 import { fetchAllPages } from "@/lib/authStore";
@@ -32,9 +32,10 @@ export default function AdminDisputesPage() {
   const [tab, setTab] = useState("");
   const [search, setSearch] = useState("");
   const [campus, setCampus] = useState<Campus>("");
+  const filtersRef = useRef({ search: "", tab: "", campus: "" as Campus });
 
-  const load = (s = search, st = tab, c = campus) => {
-    setLoading(true);
+  const load = (s = search, st = tab, c = campus, silent = false) => {
+    if (!silent) setLoading(true);
     let url = `${API_URL}/api/admin/disputes/?`;
     if (st) url += `status=${st}&`;
     if (s) url += `search=${encodeURIComponent(s)}&`;
@@ -42,10 +43,19 @@ export default function AdminDisputesPage() {
     fetchAllPages(url)
       .then(d => setDisputes(d))
       .catch(() => {})
-      .finally(() => setLoading(false));
+      .finally(() => { if (!silent) setLoading(false); });
   };
 
-  useEffect(() => { load(); }, []);
+  filtersRef.current = { search, tab, campus };
+
+  useEffect(() => {
+    load();
+    const interval = setInterval(() => {
+      const f = filtersRef.current;
+      load(f.search, f.tab, f.campus, true);
+    }, 10000);
+    return () => clearInterval(interval);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="min-h-screen bg-[#FFF8F0]" style={{ fontFamily: "'DM Sans', sans-serif" }}>

@@ -2,7 +2,7 @@
 "use client";
 
 import { DollarSign, Search } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import AdminTopBar from "@/components/layout/AdminTopBar";
 import { fetchAllPages } from "@/lib/authStore";
@@ -32,9 +32,10 @@ export default function AdminPaymentsPage() {
   const [tab, setTab] = useState("");
   const [search, setSearch] = useState("");
   const [campus, setCampus] = useState<Campus>("");
+  const filtersRef = useRef({ search: "", tab: "", campus: "" as Campus });
 
-  const load = (s = search, st = tab, c = campus) => {
-    setLoading(true);
+  const load = (s = search, st = tab, c = campus, silent = false) => {
+    if (!silent) setLoading(true);
     let url = `${API_URL}/api/admin/payments/?`;
     if (st) url += `status=${st}&`;
     if (s) url += `search=${encodeURIComponent(s)}&`;
@@ -42,10 +43,19 @@ export default function AdminPaymentsPage() {
     fetchAllPages(url)
       .then(d => setPayments(d))
       .catch(() => {})
-      .finally(() => setLoading(false));
+      .finally(() => { if (!silent) setLoading(false); });
   };
 
-  useEffect(() => { load(); }, []);
+  filtersRef.current = { search, tab, campus };
+
+  useEffect(() => {
+    load();
+    const interval = setInterval(() => {
+      const f = filtersRef.current;
+      load(f.search, f.tab, f.campus, true);
+    }, 15000);
+    return () => clearInterval(interval);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="min-h-screen bg-[#FFF8F0]" style={{ fontFamily: "'DM Sans', sans-serif" }}>

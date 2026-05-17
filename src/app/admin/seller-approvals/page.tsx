@@ -3,7 +3,7 @@
 
 import { CreditCard, Clock, Check, X, ChevronRight, RefreshCw, Users } from "lucide-react";
 import AdminTopBar from "@/components/layout/AdminTopBar";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { fetchWithAuth } from "@/lib/authStore";
 import { GRAD } from "@/lib/tokens";
@@ -33,25 +33,31 @@ export default function AdminSellerApprovals() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [campus, setCampus] = useState<Campus>("");
+  const campusRef = useRef<Campus>("");
 
-  const fetchApplications = useCallback(async (c = campus) => {
-    setLoading(true);
-    setError("");
+  const fetchApplications = useCallback(async (c = campus, silent = false) => {
+    if (!silent) { setLoading(true); setError(""); }
     try {
       let url = `${API_URL}/api/auth/seller/applications/`;
       if (c) url += `?school=${c}`;
       const res = await fetchWithAuth(url);
-      if (!res.ok) throw new Error("Failed to fetch applications");
+      if (!res.ok) { if (!silent) throw new Error("Failed to fetch applications"); return; }
       const data = await res.json();
       setApplications(Array.isArray(data) ? data : data.results || []);
     } catch (err: any) {
-      setError(err.message || "Could not load applications.");
+      if (!silent) setError(err.message || "Could not load applications.");
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, []);
 
-  useEffect(() => { fetchApplications(); }, [fetchApplications]);
+  campusRef.current = campus;
+
+  useEffect(() => {
+    fetchApplications();
+    const interval = setInterval(() => fetchApplications(campusRef.current, true), 10000);
+    return () => clearInterval(interval);
+  }, [fetchApplications]);
 
   const pending  = applications.filter(a => a.status === "pending").length;
   const approved = applications.filter(a => a.status === "approved").length;

@@ -55,6 +55,14 @@ export default function OrderDetailPage() {
       finally { setLoading(false); }
     };
     load();
+
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetchWithAuth(`${API_URL}/api/orders/orders/${orderId}/`);
+        if (res.ok) setOrder(await res.json());
+      } catch {}
+    }, 10000);
+    return () => clearInterval(interval);
   }, [isHydrated, isLoggedIn, orderId, router]);
 
   const handleConfirm = async () => {

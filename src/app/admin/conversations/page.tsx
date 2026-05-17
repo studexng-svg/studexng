@@ -3,7 +3,7 @@
 
 import { MessageCircle, Search, ChevronRight } from "lucide-react";
 import AdminTopBar from "@/components/layout/AdminTopBar";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { fetchAllPages } from "@/lib/authStore";
 import { CampusPills, type Campus } from "@/components/admin/CampusPills";
@@ -26,19 +26,29 @@ export default function AdminConversationsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [campus, setCampus] = useState<Campus>("");
+  const filtersRef = useRef({ search: "", campus: "" as Campus });
 
-  const load = useCallback((s = search, c = campus) => {
-    setLoading(true);
+  const load = useCallback((s = search, c = campus, silent = false) => {
+    if (!silent) setLoading(true);
     let url = `${API_URL}/api/admin/conversations/?`;
     if (s) url += `search=${encodeURIComponent(s)}&`;
     if (c) url += `campus=${c}`;
     fetchAllPages(url)
       .then(d => setConvs(d))
       .catch(() => {})
-      .finally(() => setLoading(false));
+      .finally(() => { if (!silent) setLoading(false); });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  filtersRef.current = { search, campus };
+
+  useEffect(() => {
+    load();
+    const interval = setInterval(() => {
+      const f = filtersRef.current;
+      load(f.search, f.campus, true);
+    }, 8000);
+    return () => clearInterval(interval);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="min-h-screen bg-[#FFF8F0]" style={{ fontFamily: "'DM Sans', sans-serif" }}>

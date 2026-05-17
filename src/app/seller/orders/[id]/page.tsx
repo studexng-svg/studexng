@@ -46,27 +46,33 @@ export default function SellerOrderDetailPage() {
     if (isHydrated && !isLoggedIn) { router.push("/auth"); return; }
     if (!isHydrated || !isLoggedIn || !orderId) return;
 
-    const loadOrder = async () => {
-      setLoading(true);
+    const loadOrder = async (silent = false) => {
+      if (!silent) setLoading(true);
       try {
         const orderRes = await fetchWithAuth(`${API_URL}/api/orders/orders/${orderId}/`);
         if (orderRes.status === 401 || orderRes.status === 403) { router.push("/auth"); return; }
         if (!orderRes.ok) {
-          const statusText = orderRes.status === 404 ? "Order not found" : `Failed to load order (${orderRes.status})`;
-          console.error("Seller order fetch failed:", orderRes.status, orderId);
-          setError(statusText);
+          if (!silent) {
+            const statusText = orderRes.status === 404 ? "Order not found" : `Failed to load order (${orderRes.status})`;
+            console.error("Seller order fetch failed:", orderRes.status, orderId);
+            setError(statusText);
+          }
           return;
         }
         setOrder(await orderRes.json());
       } catch (err) {
-        console.error("Order load error:", err);
-        setError("Network error. Please try again.");
+        if (!silent) {
+          console.error("Order load error:", err);
+          setError("Network error. Please try again.");
+        }
       } finally {
-        setLoading(false);
+        if (!silent) setLoading(false);
       }
     };
 
     loadOrder();
+    const interval = setInterval(() => loadOrder(true), 10000);
+    return () => clearInterval(interval);
   }, [isHydrated, isLoggedIn, orderId, router, retryCount]);
 
   if (!isHydrated || loading) return (
