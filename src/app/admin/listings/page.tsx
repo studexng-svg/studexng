@@ -1,12 +1,13 @@
 // src/app/admin/listings/page.tsx
 "use client";
 
-import { Package, Search, CheckCircle, XCircle } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Package, Search, CheckCircle, XCircle, Tag, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import AdminTopBar from "@/components/layout/AdminTopBar";
-import { fetchAllPages } from "@/lib/authStore";
+import { fetchAllPages, fetchWithAuth } from "@/lib/authStore";
 import { CampusPills, type Campus } from "@/components/admin/CampusPills";
+import { toast } from "sonner";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -17,10 +18,12 @@ const TYPE_COLOR: Record<string, string> = {
 };
 
 const TABS = [
-  { label: "All",      value: "" },
-  { label: "Pending",  value: "false" },
-  { label: "Live",     value: "true" },
+  { label: "All",     value: "" },
+  { label: "Pending", value: "false" },
+  { label: "Live",    value: "true" },
 ];
+
+interface Category { id: number; title: string; slug: string; campus: string; }
 
 export default function AdminListingsPage() {
   const router = useRouter();
@@ -29,20 +32,83 @@ export default function AdminListingsPage() {
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState("");
   const [campus, setCampus] = useState<Campus>("");
+  const [categoryFilter, setCategoryFilter] = useState("");
+  const [categories, setCategories] = useState<Category[]>([]);
 
-  const load = (q = search, av = tab, c = campus) => {
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [showModal, setShowModal] = useState(false);
+  const [bulkCategory, setBulkCategory] = useState("");
+  const [applying, setApplying] = useState(false);
+
+  const selectAllRef = useRef<HTMLInputElement>(null);
+
+  const load = (q = search, av = tab, c = campus, cat = categoryFilter) => {
     setLoading(true);
+    setSelected(new Set());
     let url = `${API_URL}/api/admin/listings/?`;
     if (q) url += `search=${encodeURIComponent(q)}&`;
     if (av !== "") url += `is_available=${av}&`;
-    if (c) url += `campus=${c}`;
+    if (c) url += `campus=${c}&`;
+    if (cat) url += `category=${cat}&`;
     fetchAllPages(url)
       .then(d => setListings(d))
       .catch(() => {})
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    fetchWithAuth(`${API_URL}/api/admin/categories/`)
+      .then(r => r.ok ? r.json() : [])
+      .then(d => setCategories(Array.isArray(d) ? d : []))
+      .catch(() => {});
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const allSelected = listings.length > 0 && selected.size === listings.length;
+  const someSelected = selected.size > 0 && !allSelected;
+
+  useEffect(() => {
+    if (selectAllRef.current) selectAllRef.current.indeterminate = someSelected;
+  }, [someSelected]);
+
+  const toggleAll = () => setSelected(allSelected ? new Set() : new Set(listings.map(l => l.id)));
+
+  const toggleOne = (id: number) => {
+    const next = new Set(selected);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    setSelected(next);
+  };
+
+  const openBulkModal = () => {
+    setBulkCategory(categories[0] ? String(categories[0].id) : "");
+    setShowModal(true);
+  };
+
+  const handleBulkApply = async () => {
+    if (!bulkCategory) { toast.error("Select a category first."); return; }
+    setApplying(true);
+    try {
+      const res = await fetchWithAuth(`${API_URL}/api/admin/listings/bulk-update-category/`, {
+        method: "PATCH",
+        body: JSON.stringify({ listing_ids: Array.from(selected), category_id: Number(bulkCategory) }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        toast.success(`${data.updated} listing(s) moved to "${data.category_name}".`);
+        setShowModal(false);
+        setSelected(new Set());
+        setBulkCategory("");
+        load();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.error || "Failed to update listings.");
+      }
+    } catch {
+      toast.error("Network error. Please try again.");
+    } finally {
+      setApplying(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#FFF8F0]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
@@ -51,7 +117,7 @@ export default function AdminListingsPage() {
       <div className="px-4 pt-4 pb-28 max-w-2xl mx-auto space-y-3">
 
         {/* Campus filter */}
-        <CampusPills value={campus} onChange={c => { setCampus(c); load(search, tab, c); }} />
+        <CampusPills value={campus} onChange={c => { setCampus(c); load(search, tab, c, categoryFilter); }} />
 
         {/* Search */}
         <div className="relative">
@@ -61,24 +127,63 @@ export default function AdminListingsPage() {
             placeholder="Search title, vendor…"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            onKeyDown={e => e.key === "Enter" && load(search, tab)}
+            onKeyDown={e => e.key === "Enter" && load(search, tab, campus, categoryFilter)}
           />
         </div>
+
+        {/* Category filter */}
+        {categories.length > 0 && (
+          <select
+            value={categoryFilter}
+            onChange={e => { setCategoryFilter(e.target.value); load(search, tab, campus, e.target.value); }}
+            className="w-full bg-white border border-stone-200 rounded-xl px-4 py-2.5 text-sm text-stone-700 focus:outline-none focus:ring-2 focus:ring-teal-400"
+          >
+            <option value="">All categories</option>
+            {categories.map(c => (
+              <option key={c.id} value={String(c.id)}>{c.title} ({c.campus.toUpperCase()})</option>
+            ))}
+          </select>
+        )}
 
         {/* Tabs */}
         <div className="flex gap-2">
           {TABS.map(t => (
             <button key={t.value}
-              onClick={() => { setTab(t.value); load(search, t.value, campus); }}
+              onClick={() => { setTab(t.value); load(search, t.value, campus, categoryFilter); }}
               className={`px-4 py-1.5 rounded-full text-xs font-semibold transition ${tab === t.value ? "bg-teal-600 text-white" : "bg-white border border-stone-200 text-stone-600"}`}>
               {t.label}
             </button>
           ))}
         </div>
 
-        {/* Count */}
-        {!loading && (
-          <p className="text-xs text-stone-400">{listings.length} listing{listings.length !== 1 ? "s" : ""}</p>
+        {/* Bulk action bar */}
+        {selected.size > 0 && (
+          <div className="flex items-center justify-between bg-teal-50 border border-teal-200 rounded-xl px-4 py-2.5">
+            <span className="text-sm font-semibold text-teal-800">{selected.size} selected</span>
+            <button
+              onClick={openBulkModal}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 text-white rounded-lg text-xs font-semibold hover:bg-teal-700 transition"
+            >
+              <Tag className="w-3.5 h-3.5" /> Change Category
+            </button>
+          </div>
+        )}
+
+        {/* Count + select all */}
+        {!loading && listings.length > 0 && (
+          <div className="flex items-center justify-between px-1">
+            <p className="text-xs text-stone-400">{listings.length} listing{listings.length !== 1 ? "s" : ""}</p>
+            <label className="flex items-center gap-2 text-xs text-stone-500 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                ref={selectAllRef}
+                checked={allSelected}
+                onChange={toggleAll}
+                className="w-4 h-4 accent-teal-600"
+              />
+              Select all
+            </label>
+          </div>
         )}
 
         {/* List */}
@@ -96,37 +201,104 @@ export default function AdminListingsPage() {
         ) : (
           <div className="space-y-2">
             {listings.map((l: any) => (
-              <button key={l.id} onClick={() => router.push(`/admin/listings/${l.id}`)}
-                className="w-full bg-white border border-stone-200 hover:border-teal-300 rounded-2xl p-4 text-left transition active:scale-[0.98]">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="font-semibold text-stone-900 text-sm truncate">{l.title}</p>
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${TYPE_COLOR[l.listing_type] || "bg-stone-100 text-stone-600"}`}>
-                        {l.listing_type}
-                      </span>
+              <div
+                key={l.id}
+                className={`flex items-start gap-3 bg-white border rounded-2xl p-4 transition ${selected.has(l.id) ? "border-teal-300 bg-teal-50/40" : "border-stone-200 hover:border-teal-200"}`}
+              >
+                <input
+                  type="checkbox"
+                  checked={selected.has(l.id)}
+                  onChange={() => toggleOne(l.id)}
+                  onClick={e => e.stopPropagation()}
+                  className="mt-0.5 w-4 h-4 accent-teal-600 flex-shrink-0 cursor-pointer"
+                />
+                <button className="flex-1 text-left min-w-0" onClick={() => router.push(`/admin/listings/${l.id}`)}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-semibold text-stone-900 text-sm truncate">{l.title}</p>
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-semibold flex-shrink-0 ${TYPE_COLOR[l.listing_type] || "bg-stone-100 text-stone-600"}`}>
+                          {l.listing_type}
+                        </span>
+                        {l.category?.title && (
+                          <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-stone-100 text-stone-500 flex-shrink-0">
+                            {l.category.title}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-stone-500 text-xs mt-0.5">
+                        {l.vendor?.username || l.vendor} · ₦{Number(l.price).toLocaleString()}
+                      </p>
                     </div>
-                    <p className="text-stone-500 text-xs mt-0.5">
-                      {l.vendor?.username || l.vendor} · ₦{Number(l.price).toLocaleString()}
-                    </p>
+                    <div className="flex-shrink-0">
+                      {l.is_available ? (
+                        <span className="flex items-center gap-1 px-2.5 py-0.5 bg-teal-100 text-teal-700 rounded-full text-xs font-semibold">
+                          <CheckCircle className="w-3 h-3" /> Live
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1 px-2.5 py-0.5 bg-amber-100 text-amber-700 rounded-full text-xs font-semibold">
+                          <XCircle className="w-3 h-3" /> Pending
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1.5 flex-shrink-0">
-                    {l.is_available ? (
-                      <span className="flex items-center gap-1 px-2.5 py-0.5 bg-teal-100 text-teal-700 rounded-full text-xs font-semibold">
-                        <CheckCircle className="w-3 h-3" /> Live
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-1 px-2.5 py-0.5 bg-amber-100 text-amber-700 rounded-full text-xs font-semibold">
-                        <XCircle className="w-3 h-3" /> Pending
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </button>
+                </button>
+              </div>
             ))}
           </div>
         )}
       </div>
+
+      {/* Bulk Category Modal */}
+      {showModal && (
+        <div
+          className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4"
+          onClick={() => !applying && setShowModal(false)}
+        >
+          <div
+            className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-bold text-stone-900">Change Category</h3>
+              <button onClick={() => !applying && setShowModal(false)} className="p-1 rounded-full hover:bg-stone-100">
+                <X className="w-4 h-4 text-stone-500" />
+              </button>
+            </div>
+            <p className="text-sm text-stone-500 mb-4">
+              Moving{" "}
+              <span className="font-semibold text-stone-900">{selected.size}</span>
+              {" "}listing{selected.size !== 1 ? "s" : ""} to a new category.
+            </p>
+            <select
+              value={bulkCategory}
+              onChange={e => setBulkCategory(e.target.value)}
+              className="w-full border border-stone-200 rounded-xl px-4 py-2.5 text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-teal-400 mb-5"
+            >
+              <option value="">Select a category…</option>
+              {categories.map(c => (
+                <option key={c.id} value={String(c.id)}>{c.title} ({c.campus.toUpperCase()})</option>
+              ))}
+            </select>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowModal(false)}
+                disabled={applying}
+                className="flex-1 py-2.5 bg-stone-100 text-stone-700 rounded-full text-sm font-semibold disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleBulkApply}
+                disabled={applying || !bulkCategory}
+                className="flex-1 py-2.5 bg-teal-600 text-white rounded-full text-sm font-semibold disabled:opacity-50 hover:bg-teal-700 transition"
+              >
+                {applying ? "Applying…" : "Apply"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

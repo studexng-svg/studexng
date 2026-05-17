@@ -164,7 +164,7 @@ class ListingAdmin(admin.ModelAdmin):
         }),
     )
 
-    actions = ['mark_available', 'mark_unavailable', 'export_to_csv']
+    actions = ['mark_available', 'mark_unavailable', 'export_to_csv', 'change_category']
 
     def changelist_view(self, request, extra_context=None):
         from orders.models import Order
@@ -321,6 +321,30 @@ class ListingAdmin(admin.ModelAdmin):
             ])
         return response
     export_to_csv.short_description = "Export selected to CSV"
+
+    def change_category(self, request, queryset):
+        from django.contrib.admin import helpers
+        from django.template.response import TemplateResponse
+
+        if 'apply' in request.POST:
+            category_id = request.POST.get('category_id')
+            try:
+                category = Category.objects.get(id=category_id)
+            except Category.DoesNotExist:
+                self.message_user(request, "Invalid category selected.", level='error')
+                return
+            updated = queryset.update(category=category)
+            self.message_user(request, f"{updated} listing(s) changed to '{category.title}'.")
+            return
+
+        return TemplateResponse(request, 'admin/services/listing/change_category.html', {
+            'title': 'Change category',
+            'queryset': queryset,
+            'categories': Category.objects.order_by('title'),
+            'action_checkbox_name': helpers.ACTION_CHECKBOX_NAME,
+            'opts': self.model._meta,
+        })
+    change_category.short_description = "Change category"
 
     def delete_model(self, request, obj):
         """Notify vendor when admin deletes a single listing."""

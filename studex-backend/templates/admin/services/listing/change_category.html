@@ -1,0 +1,32 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}Change category | StudEx Admin{% endblock %}
+
+{% block content %}
+<h1>Change category for {{ queryset.count }} listing{{ queryset.count|pluralize }}</h1>
+
+<form method="post">
+  {% csrf_token %}
+  {% for obj in queryset %}
+    <input type="hidden" name="{{ action_checkbox_name }}" value="{{ obj.pk }}">
+  {% endfor %}
+  <input type="hidden" name="action" value="change_category">
+
+  <fieldset class="module aligned">
+    <div class="form-row">
+      <label for="id_category" class="required">New category:</label>
+      <select name="category_id" id="id_category" style="min-width:250px;">
+        {% for cat in categories %}
+          <option value="{{ cat.id }}">{{ cat.title }} ({{ cat.campus|upper }})</option>
+        {% endfor %}
+      </select>
+    </div>
+  </fieldset>
+
+  <div class="submit-row">
+    <input type="submit" name="apply" value="Apply" class="default">
+    <a href="javascript:history.back()" style="margin-left:12px;">Cancel</a>
+  </div>
+</form>
+{% endblock %}

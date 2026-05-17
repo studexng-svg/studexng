@@ -463,10 +463,38 @@ try:
                     status=status.HTTP_404_NOT_FOUND
                 )
 
+    class AdminListingBulkUpdateCategoryView(APIView):
+        """
+        PATCH /api/admin/listings/bulk-update-category/
+        Body: { listing_ids: [1, 2, 3], category_id: 5 }
+        Updates all specified listings to the new category.
+        Returns { updated: count, category_name: string }
+        """
+        permission_classes = [IsAdminUser]
+
+        def patch(self, request):
+            from services.models import Category
+            listing_ids = request.data.get('listing_ids', [])
+            category_id = request.data.get('category_id')
+
+            if not listing_ids:
+                return Response({'error': 'listing_ids is required'}, status=status.HTTP_400_BAD_REQUEST)
+            if not category_id:
+                return Response({'error': 'category_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+            try:
+                category = Category.objects.get(id=category_id)
+            except Category.DoesNotExist:
+                return Response({'error': 'Category not found'}, status=status.HTTP_404_NOT_FOUND)
+
+            updated = Listing.objects.filter(id__in=listing_ids).update(category=category)
+            return Response({'updated': updated, 'category_name': category.title})
+
 except ImportError:
     # Services app not available, skip listing views
     AdminListingListView = None
     AdminListingDetailView = None
+    AdminListingBulkUpdateCategoryView = None
 
 
 # ============================================

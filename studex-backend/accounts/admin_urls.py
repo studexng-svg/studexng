@@ -9,6 +9,7 @@ from accounts.admin_views import (
     AdminNotifyUserView,
     AdminListingListView,
     AdminListingDetailView,
+    AdminListingBulkUpdateCategoryView,
     AdminOrderListView,
     AdminOrderDetailView,
     AdminDisputeListView,
@@ -49,6 +50,7 @@ urlpatterns = [
 if AdminListingListView is not None:
     urlpatterns += [
         path('listings/', AdminListingListView.as_view(), name='listing-list'),
+        path('listings/bulk-update-category/', AdminListingBulkUpdateCategoryView.as_view(), name='listing-bulk-category'),
         path('listings/<int:listing_id>/', AdminListingDetailView.as_view(), name='listing-detail'),
     ]
 
