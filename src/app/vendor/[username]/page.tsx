@@ -127,7 +127,7 @@ export default function VendorProfilePage() {
 
       {/* Notify modal */}
       {notifyOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-end justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-end justify-center p-4 pb-24">
           <div className="bg-white rounded-2xl w-full max-w-md p-5 space-y-4">
             <div className="flex items-center justify-between">
               <p className="font-bold text-stone-900">Send Notification</p>
