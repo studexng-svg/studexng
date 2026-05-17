@@ -22,6 +22,7 @@ interface Vendor {
   completion_rate: number;
   total_listings: number;
   hostel: string;
+  is_online?: boolean;
 }
 
 interface Category {
@@ -601,6 +602,9 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                                     <VendorAvatar src={vendor.username === user?.username && user?.profile_image ? user.profile_image : vendor.profile_picture} name={vendor.business_name || vendor.username} />
                                   </div>
                                 </div>
+                                {vendor.is_online && (
+                                  <div className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-green-400 border-2 border-white" />
+                                )}
                                 {vendor.vendor_badge && vendor.vendor_badge !== "none" && (
                                   <div className={`absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full border-2 border-white flex items-center justify-center text-[8px] font-bold
                                     ${vendor.vendor_badge === "top" ? "bg-amber-400" : vendor.vendor_badge === "trusted" ? "bg-teal-500" : "bg-purple-500"}`}>
@@ -756,6 +760,9 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                                 <VendorAvatar src={vendor.username === user?.username && user?.profile_image ? user.profile_image : vendor.profile_picture} name={vendor.business_name || vendor.username} />
                               </div>
                             </div>
+                            {vendor.is_online && (
+                              <div className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-green-400 border-2 border-white" />
+                            )}
                             {vendor.vendor_badge && vendor.vendor_badge !== "none" && (
                               <div className={`absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full border-2 border-white flex items-center justify-center text-[8px] font-bold
                                 ${vendor.vendor_badge === "top" ? "bg-amber-400" : vendor.vendor_badge === "trusted" ? "bg-teal-500" : "bg-purple-500"}`}>

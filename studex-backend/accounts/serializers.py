@@ -440,14 +440,22 @@ class VendorListSerializer(serializers.ModelSerializer):
     total_reviews = serializers.SerializerMethodField()
     completion_rate = serializers.SerializerMethodField()
     total_listings = serializers.SerializerMethodField()
+    is_online = serializers.SerializerMethodField()
 
     class Meta:
         model = User
         fields = [
             'id', 'username', 'business_name', 'profile_picture',
             'bio', 'vendor_badge', 'rating', 'total_reviews',
-            'completion_rate', 'total_listings', 'hostel',
+            'completion_rate', 'total_listings', 'hostel', 'is_online',
         ]
+
+    def get_is_online(self, obj):
+        from django.utils import timezone
+        from datetime import timedelta
+        if obj.last_seen is None:
+            return False
+        return timezone.now() - obj.last_seen < timedelta(minutes=3)
 
     def get_profile_picture(self, obj):
         if not obj.profile_image:
