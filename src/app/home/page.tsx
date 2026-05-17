@@ -9,6 +9,9 @@ export const metadata: Metadata = {
   title: { absolute: "StudEx - Campus Marketplace Feed" },
   description:
     "Discover services and products from verified student vendors near you. Browse lashes, nails, laundry, food delivery and more on StudEx.",
+  alternates: {
+    canonical: "https://studex.com.ng/home",
+  },
   openGraph: {
     title: "StudEx - Campus Marketplace Feed",
     description:

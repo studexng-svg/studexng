@@ -101,6 +101,9 @@ export default function ChatWindow({
   const [showPinnedBanner, setShowPinnedBanner] = useState(true);
   const [pinnedIndex, setPinnedIndex] = useState(0);
 
+  const [otherUserLastSeen, setOtherUserLastSeen] = useState<string | null>(null);
+  const [otherUserOnline, setOtherUserOnline] = useState(false);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const editInputRef = useRef<HTMLInputElement>(null);
@@ -145,6 +148,8 @@ export default function ChatWindow({
         if (!res.ok) throw new Error('Could not start conversation');
         const conv = await res.json();
         setConversationId(conv.id);
+        setOtherUserLastSeen(conv.other_user?.last_seen || null);
+        setOtherUserOnline(conv.other_user?.is_online || false);
         const msgRes = await fetchWithAuth(`${API_URL}/api/chat/conversations/${conv.id}/messages/`);
         const data = await msgRes.json();
         setMessages(mapMessages(Array.isArray(data) ? data : data.results || []));
@@ -169,6 +174,31 @@ export default function ChatWindow({
     }, 5000);
     return () => clearInterval(interval);
   }, [conversationId, user?.username]);
+
+  useEffect(() => {
+    if (!conversationId) return;
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetchWithAuth(`${API_URL}/api/chat/conversations/${conversationId}/`);
+        if (res.ok) {
+          const conv = await res.json();
+          setOtherUserLastSeen(conv.other_user?.last_seen || null);
+          setOtherUserOnline(conv.other_user?.is_online || false);
+        }
+      } catch {}
+    }, 15000);
+    return () => clearInterval(interval);
+  }, [conversationId]);
+
+  const formatLastSeen = (lastSeen: string | null): string => {
+    if (!lastSeen) return '';
+    const diff = Math.floor((Date.now() - new Date(lastSeen).getTime()) / 60000);
+    if (diff < 1) return 'Active just now';
+    if (diff < 60) return `Last seen ${diff}m ago`;
+    const hrs = Math.floor(diff / 60);
+    if (hrs < 24) return `Last seen ${hrs}h ago`;
+    return `Last seen ${Math.floor(hrs / 24)}d ago`;
+  };
 
   const loadPinned = async (convId?: number) => {
     const id = convId || conversationId;
@@ -392,6 +422,14 @@ export default function ChatWindow({
           </div>
           <div className="flex-1 min-w-0">
             <p className="font-semibold text-stone-900 text-sm">@{sellerName}</p>
+            {otherUserOnline ? (
+              <div className="flex items-center gap-1 mt-0.5">
+                <div className="w-1.5 h-1.5 rounded-full bg-teal-500" />
+                <p className="text-xs text-teal-600 font-medium">Online</p>
+              </div>
+            ) : otherUserLastSeen ? (
+              <p className="text-xs text-stone-400 mt-0.5">{formatLastSeen(otherUserLastSeen)}</p>
+            ) : null}
           </div>
           <button onClick={onClose} className="p-1.5 hover:bg-stone-100 rounded-full transition flex-shrink-0">
             <X className="w-4 h-4 text-stone-400" />

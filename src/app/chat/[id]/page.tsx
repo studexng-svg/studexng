@@ -50,6 +50,8 @@ export default function ChatRoomPage() {
   const [sending, setSending] = useState(false);
   const [otherUser, setOtherUser] = useState("");
   const [listingTitle, setListingTitle] = useState("");
+  const [otherUserLastSeen, setOtherUserLastSeen] = useState<string | null>(null);
+  const [otherUserOnline, setOtherUserOnline] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -86,6 +88,31 @@ export default function ChatRoomPage() {
 
   useEffect(() => { if (editingId !== null) editInputRef.current?.focus(); }, [editingId]);
 
+  useEffect(() => {
+    if (!conversationId) return;
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetchWithAuth(`${API_URL}/api/chat/conversations/${conversationId}/`);
+        if (res.ok) {
+          const conv = await res.json();
+          setOtherUserLastSeen(conv.other_user?.last_seen || null);
+          setOtherUserOnline(conv.other_user?.is_online || false);
+        }
+      } catch {}
+    }, 15000);
+    return () => clearInterval(interval);
+  }, [conversationId]);
+
+  const formatLastSeen = (lastSeen: string | null): string => {
+    if (!lastSeen) return '';
+    const diff = Math.floor((Date.now() - new Date(lastSeen).getTime()) / 60000);
+    if (diff < 1) return 'Active just now';
+    if (diff < 60) return `Last seen ${diff}m ago`;
+    const hrs = Math.floor(diff / 60);
+    if (hrs < 24) return `Last seen ${hrs}h ago`;
+    return `Last seen ${Math.floor(hrs / 24)}d ago`;
+  };
+
   const loadAll = async () => {
     try {
       let convData: any = null;
@@ -106,6 +133,8 @@ export default function ChatRoomPage() {
       if (convData) {
         setOtherUser(convData.other_user?.username || convData.buyer_username || convData.seller_username || "");
         setListingTitle(convData.listing_title || "");
+        setOtherUserLastSeen(convData.other_user?.last_seen || null);
+        setOtherUserOnline(convData.other_user?.is_online || false);
       }
 
       await loadMessages();
@@ -314,6 +343,14 @@ export default function ChatRoomPage() {
         </div>
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-stone-900">@{otherUser}</p>
+          {otherUserOnline ? (
+            <div className="flex items-center gap-1 mt-0.5">
+              <div className="w-1.5 h-1.5 rounded-full bg-teal-500" />
+              <p className="text-xs text-teal-600 font-medium">Online</p>
+            </div>
+          ) : otherUserLastSeen ? (
+            <p className="text-xs text-stone-400 mt-0.5">{formatLastSeen(otherUserLastSeen)}</p>
+          ) : null}
         </div>
       </div>
 

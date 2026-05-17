@@ -55,6 +55,16 @@ class ConversationSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         if not request:
             return None
-        if obj.buyer == request.user:
-            return {'id': obj.seller.id, 'username': obj.seller.username}
-        return {'id': obj.buyer.id, 'username': obj.buyer.username}
+        from django.utils import timezone
+        from datetime import timedelta
+        other = obj.seller if obj.buyer == request.user else obj.buyer
+        is_online = (
+            other.last_seen is not None and
+            timezone.now() - other.last_seen < timedelta(minutes=3)
+        )
+        return {
+            'id': other.id,
+            'username': other.username,
+            'last_seen': other.last_seen.isoformat() if other.last_seen else None,
+            'is_online': is_online,
+        }

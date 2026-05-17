@@ -8,7 +8,6 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import Script from "next/script";
 import Link from "next/link";
 import { useAuth } from "@/lib/authStore";
@@ -180,18 +179,13 @@ function ReviewCarousel() {
 
 /* ─── MAIN PAGE ─────────────────────────────────────────── */
 export default function LandingPage() {
-  const router = useRouter();
-  const { isLoggedIn, isHydrated } = useAuth();
+  const { isLoggedIn } = useAuth();
   const [mounted, setMounted] = useState(false);
   const [featuredListings, setFeaturedListings] = useState<any[]>([]);
   const [heroIndex, setHeroIndex] = useState(0);
   const [listingIndex, setListingIndex] = useState(0);
   const listingCount = 53;
   const vendorCount = 38;
-
-  useEffect(() => {
-    if (isHydrated && isLoggedIn) router.replace("/home");
-  }, [isHydrated, isLoggedIn, router]);
 
   useEffect(() => {
     setMounted(true);
@@ -221,7 +215,7 @@ export default function LandingPage() {
 
   const navigate = (path: string) => { window.location.href = path; };
 
-  if (!mounted || isLoggedIn) {
+  if (!mounted) {
     return (
       <div className="min-h-screen bg-stone-50 flex items-center justify-center">
         <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: "linear" }}>
