@@ -31,11 +31,17 @@ export default function ChatListPage() {
   useEffect(() => {
     if (isHydrated && !isLoggedIn) { router.push("/auth"); return; }
     if (!isHydrated || !isLoggedIn) return;
-    fetchWithAuth(`${API_URL}/api/chat/conversations/`)
-      .then(r => r.json())
-      .then(data => setConversations(data.results || data))
-      .catch(() => setConversations([]))
-      .finally(() => setLoading(false));
+
+    const load = () =>
+      fetchWithAuth(`${API_URL}/api/chat/conversations/`)
+        .then(r => r.json())
+        .then(data => setConversations(data.results || data))
+        .catch(() => {});
+
+    load().finally(() => setLoading(false));
+
+    const interval = setInterval(load, 5000);
+    return () => clearInterval(interval);
   }, [isHydrated, isLoggedIn, router]);
 
   const filtered = conversations.filter(c =>
