@@ -642,6 +642,13 @@ class VendorListView(ListAPIView):
 
     def get_queryset(self):
         from django.db.models import Q
+        from datetime import timedelta
+        online_threshold = timezone.now() - timedelta(minutes=3)
+        online_order = Case(
+            When(last_seen__gte=online_threshold, then=Value(0)),
+            default=Value(1),
+            output_field=IntegerField(),
+        )
         badge_order = Case(
             When(profile__vendor_badge='top', then=Value(0)),
             When(profile__vendor_badge='trusted', then=Value(1)),
@@ -666,8 +673,8 @@ class VendorListView(ListAPIView):
         return (
             qs
             .select_related('profile')
-            .annotate(badge_order=badge_order)
-            .order_by('badge_order', '-profile__rating')
+            .annotate(online_order=online_order, badge_order=badge_order)
+            .order_by('online_order', 'badge_order', '-profile__rating')
         )
 
 
