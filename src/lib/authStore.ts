@@ -17,6 +17,12 @@ interface UserProfile {
   wallet_balance: string;
   profile_image?: string | null;
   school?: string;
+  profile?: {
+    vendor_badge?: string;
+    rating?: string;
+    total_reviews?: number;
+    [key: string]: unknown;
+  };
 }
 
 interface AuthState {

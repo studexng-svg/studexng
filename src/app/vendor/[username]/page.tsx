@@ -201,6 +201,18 @@ export default function VendorProfilePage() {
             <div>
               <p className="font-bold text-stone-900">{vendor.business_name || vendor.username}</p>
               <p className="text-xs text-stone-400">@{vendor.username}</p>
+              {vendor.vendor_badge && vendor.vendor_badge !== "none" && (
+                <span className={`inline-flex items-center gap-0.5 mt-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${
+                  vendor.vendor_badge === "top"
+                    ? "bg-amber-50 text-amber-700 border-amber-200"
+                    : vendor.vendor_badge === "trusted"
+                    ? "bg-blue-50 text-blue-700 border-blue-200"
+                    : "bg-purple-50 text-purple-700 border-purple-200"
+                }`}>
+                  {vendor.vendor_badge === "top" ? "🏆" : vendor.vendor_badge === "trusted" ? "✅" : "⭐"}
+                  {" "}{vendor.vendor_badge === "top" ? "Top Vendor" : vendor.vendor_badge === "trusted" ? "Trusted Vendor" : "Rising Vendor"}
+                </span>
+              )}
               {vendor.total_reviews > 0 && (
                 <div className="flex items-center gap-1 mt-1">
                   <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />

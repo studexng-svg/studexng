@@ -8,7 +8,7 @@ import { GRAD, SERIF, toArray } from "@/lib/tokens";
 import Link from "next/link";
 import {
   MessageCircle, Calendar, DollarSign, Package, ShoppingBag,
-  Send, Check, X, Plus, Edit2, Trash2,
+  Send, Check, CheckCheck, X, Plus, Edit2, Trash2,
   TrendingUp, Loader, ToggleLeft, ToggleRight, Image as ImageIcon,
   Star, ArrowLeft, Link2, Share2,
 } from "lucide-react";
@@ -73,7 +73,21 @@ export default function VendorDashboard() {
               <h1 className="text-base font-bold text-stone-900" style={SERIF}>
                 Vendor Hub
               </h1>
-              <p className="text-stone-400 text-xs">{user?.username}</p>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <p className="text-stone-400 text-xs">{user?.username}</p>
+                {user?.profile?.vendor_badge && user.profile.vendor_badge !== "none" && (
+                  <span className={`inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${
+                    user.profile.vendor_badge === "top"
+                      ? "bg-amber-50 text-amber-700 border-amber-200"
+                      : user.profile.vendor_badge === "trusted"
+                      ? "bg-blue-50 text-blue-700 border-blue-200"
+                      : "bg-purple-50 text-purple-700 border-purple-200"
+                  }`}>
+                    {user.profile.vendor_badge === "top" ? "🏆" : user.profile.vendor_badge === "trusted" ? "✅" : "⭐"}
+                    {" "}{user.profile.vendor_badge === "top" ? "Top Vendor" : user.profile.vendor_badge === "trusted" ? "Trusted Vendor" : "Rising Vendor"}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
           {user?.profile_image ? (
@@ -219,9 +233,16 @@ function MessagesTab() {
               {msg.sender_username || (msg.is_mine ? user?.username : activeConv?.buyer_username)}
             </p>
             <p className="text-sm">{msg.content}</p>
-            <p className="text-xs opacity-50 mt-1 text-right">
-              {new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-            </p>
+            <div className="flex items-center justify-end gap-1 mt-1">
+              <p className="text-xs opacity-50">
+                {new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+              </p>
+              {msg.is_mine && (
+                msg.is_read
+                  ? <CheckCheck className="w-3.5 h-3.5 text-white/80 flex-shrink-0" />
+                  : <Check className="w-3.5 h-3.5 text-white/40 flex-shrink-0" />
+              )}
+            </div>
           </div>
         </div>
       );

@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useRouter, useParams } from "next/navigation";
 import {
   ChevronLeft, Send, Loader, ImageIcon, X, Pin, Pencil,
-  Trash2, Check, PinOff, ChevronDown, UserX, Users
+  Trash2, Check, CheckCheck, PinOff, ChevronDown, UserX, Users
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { useAuth, fetchWithAuth, getToken } from "@/lib/authStore";
@@ -25,6 +25,7 @@ interface Message {
   is_edited: boolean;
   edited_at: string | null;
   is_pinned: boolean;
+  is_read: boolean;
 }
 
 interface ActionMenu {
@@ -464,6 +465,11 @@ export default function ChatRoomPage() {
                   <p className={`text-xs ${msg.is_mine ? "text-white/60" : "text-stone-400"}`}>
                     {new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                   </p>
+                  {msg.is_mine && (
+                    msg.is_read
+                      ? <CheckCheck className="w-3.5 h-3.5 text-white/80 flex-shrink-0" />
+                      : <Check className="w-3.5 h-3.5 text-white/40 flex-shrink-0" />
+                  )}
                 </div>
               </motion.div>
             </div>

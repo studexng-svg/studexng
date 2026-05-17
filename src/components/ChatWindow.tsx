@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import {
   X, Send, Loader, ImageIcon,
-  Pin, PinOff, Pencil, Trash2, Check,
+  Pin, PinOff, Pencil, Trash2, Check, CheckCheck,
   UserX, Users, ChevronDown, ChevronLeft,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -34,6 +34,7 @@ interface Message {
   message_type?: string;
   is_edited?: boolean;
   is_pinned?: boolean;
+  is_read?: boolean;
 }
 
 interface ActionMenu {
@@ -133,6 +134,7 @@ export default function ChatWindow({
       message_type: m.message_type || 'text',
       is_edited: m.is_edited || false,
       is_pinned: m.is_pinned || false,
+      is_read: m.is_read || false,
     }));
   };
 
@@ -572,6 +574,11 @@ export default function ChatWindow({
                           <p className={`text-xs ${msg.is_mine ? "text-white/60" : "text-stone-400"}`}>
                             {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </p>
+                          {msg.is_mine && (
+                            msg.is_read
+                              ? <CheckCheck className="w-3.5 h-3.5 text-white/80 flex-shrink-0" />
+                              : <Check className="w-3.5 h-3.5 text-white/40 flex-shrink-0" />
+                          )}
                         </div>
                       )}
                     </motion.div>
