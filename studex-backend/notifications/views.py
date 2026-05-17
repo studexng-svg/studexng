@@ -74,35 +74,14 @@ def account_status(request):
 
     # ── Unread messages ────────────────────────────────────────────────────
     try:
-        from chat.models import Conversation, Message
-        # Count conversations where latest message is not from this user
-        unread = Conversation.objects.filter(
-            messages__sender__isnull=False
-        ).filter(
-            # conversations that have at least one unread message for this user
-        ).distinct().count()
-        # Simpler: count via unread_count if your Conversation model has it
-        from django.db.models import Sum
-        conv_qs = Conversation.objects.filter(
-            participants=user
-        ) if hasattr(Conversation, 'participants') else Conversation.objects.filter(
-            buyer=user
-        ) | Conversation.objects.filter(
-            seller=user
-        )
-        # fallback: just count convs with messages not from this user
-        result["unread_messages"] = conv_qs.filter(
-            messages__is_read=False
-        ).exclude(
-            messages__sender=user
-        ).distinct().count()
+        from chat.models import Message
+        from django.db.models import Q
+        result["unread_messages"] = Message.objects.filter(
+            Q(conversation__buyer=user) | Q(conversation__seller=user),
+            is_read=False,
+        ).exclude(sender=user).count()
     except Exception:
-        try:
-            # Minimal fallback using the API approach
-            from chat.models import Conversation
-            result["unread_messages"] = 0
-        except Exception:
-            pass
+        pass
 
     # ── Pending bookings ───────────────────────────────────────────────────
     try:
