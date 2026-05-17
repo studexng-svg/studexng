@@ -570,7 +570,7 @@ export default function ChatRoomPage() {
 
       {/* IMAGE PREVIEW */}
       {imagePreview && (
-        <div className="fixed left-0 right-0 bg-white border-t border-stone-100 px-4 py-2 flex items-center gap-3 z-20" style={{ bottom: "calc(70px + 68px)" }}>
+        <div className="fixed left-0 right-0 bg-white border-t border-stone-100 px-4 py-2 flex items-center gap-3 z-20" style={{ bottom: "calc(80px + 68px)" }}>
           <div className="relative flex-shrink-0">
             <img src={imagePreview} alt="preview" className="h-14 w-14 object-cover rounded-xl border-2 border-teal-400" />
             <button onClick={cancelImage} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center">
@@ -582,7 +582,7 @@ export default function ChatRoomPage() {
       )}
 
       {/* INPUT BAR */}
-      <div className="fixed bottom-[70px] left-0 right-0 bg-white border-t border-stone-100 px-4 py-3 flex items-center gap-2 z-20">
+      <div className="fixed bottom-[80px] left-0 right-0 bg-white border-t border-stone-100 px-4 py-3 flex items-center gap-2 z-20">
         <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageSelect} />
         <button
           onClick={() => fileInputRef.current?.click()}
