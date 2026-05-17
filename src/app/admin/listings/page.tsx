@@ -41,10 +41,10 @@ export default function AdminListingsPage() {
   const [applying, setApplying] = useState(false);
 
   const selectAllRef = useRef<HTMLInputElement>(null);
+  const filtersRef = useRef({ search, tab, campus, categoryFilter });
 
-  const load = (q = search, av = tab, c = campus, cat = categoryFilter) => {
-    setLoading(true);
-    setSelected(new Set());
+  const load = (q = search, av = tab, c = campus, cat = categoryFilter, silent = false) => {
+    if (!silent) { setLoading(true); setSelected(new Set()); }
     let url = `${API_URL}/api/admin/listings/?`;
     if (q) url += `search=${encodeURIComponent(q)}&`;
     if (av !== "") url += `is_available=${av}&`;
@@ -53,7 +53,7 @@ export default function AdminListingsPage() {
     fetchAllPages(url)
       .then(d => setListings(d))
       .catch(() => {})
-      .finally(() => setLoading(false));
+      .finally(() => { if (!silent) setLoading(false); });
   };
 
   useEffect(() => {
@@ -62,7 +62,15 @@ export default function AdminListingsPage() {
       .then(r => r.ok ? r.json() : [])
       .then(d => setCategories(Array.isArray(d) ? d : []))
       .catch(() => {});
+
+    const interval = setInterval(() => {
+      const f = filtersRef.current;
+      load(f.search, f.tab, f.campus, f.categoryFilter, true);
+    }, 8000);
+    return () => clearInterval(interval);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  filtersRef.current = { search, tab, campus, categoryFilter };
 
   const allSelected = listings.length > 0 && selected.size === listings.length;
   const someSelected = selected.size > 0 && !allSelected;
