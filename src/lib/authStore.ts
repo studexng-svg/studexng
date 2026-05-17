@@ -54,9 +54,12 @@ export const useAuth = create<AuthState>()(
         set({ user: userData, isLoggedIn: true, accessToken, refreshToken, isAuthReady: true });
         // Persist campus to cookie so SSR fetches the right campus on next page load
         if (typeof document !== 'undefined') {
-          const isHttps = window.location.protocol === 'https:';
-          const extra = isHttps ? '; Secure; SameSite=Lax' : '; SameSite=Lax';
-          document.cookie = `studex_campus=${((userData as any).school || 'pau').toLowerCase()}; path=/; max-age=31536000${extra}`;
+          const school = ((userData as any).school || '').toLowerCase();
+          if (school === 'pau' || school === 'futo') {
+            const isHttps = window.location.protocol === 'https:';
+            const extra = isHttps ? '; Secure; SameSite=Lax' : '; SameSite=Lax';
+            document.cookie = `studex_campus=${school}; path=/; max-age=31536000${extra}`;
+          }
         }
         // Sync cart and wishlist from backend on login
         try {

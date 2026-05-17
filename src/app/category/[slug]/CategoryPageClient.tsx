@@ -141,7 +141,13 @@ export default function CategoryPageClient({ slug, initialListings }: Props) {
       return;
     }
 
-    const campus = ((user as any).school || 'pau').toLowerCase();
+    const userSchool = ((user as any).school || '').toLowerCase();
+    // Admin users have no school — trust the existing cookie, don't override it
+    if (userSchool !== 'pau' && userSchool !== 'futo') {
+      setCampusReady(true);
+      return;
+    }
+
     const cookieCampus =
       document.cookie
         .split(';')
@@ -149,15 +155,15 @@ export default function CategoryPageClient({ slug, initialListings }: Props) {
         ?.split('=')?.[1]
         ?.toLowerCase() || 'pau';
 
-    if (cookieCampus === campus) {
+    if (cookieCampus === userSchool) {
       setCampusReady(true);
       return;
     }
 
     const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
     const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
-    document.cookie = `studex_campus=${campus}; path=/; max-age=31536000; SameSite=Lax${isHttps ? '; Secure' : ''}`;
-    fetchWithAuth(`${API_URL}/api/services/listings/?category=${slug}&campus=${campus}`)
+    document.cookie = `studex_campus=${userSchool}; path=/; max-age=31536000; SameSite=Lax${isHttps ? '; Secure' : ''}`;
+    fetchWithAuth(`${API_URL}/api/services/listings/?category=${slug}&campus=${userSchool}`)
       .then(async (res) => {
         if (res.ok) {
           const data = await res.json();

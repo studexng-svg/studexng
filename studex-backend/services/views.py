@@ -64,7 +64,13 @@ class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
         user = self.request.user
         campus = 'pau'
         if user.is_authenticated:
-            campus = (getattr(user, 'school', 'pau') or 'pau').lower()
+            user_school = (getattr(user, 'school', '') or '').lower()
+            if user_school in ('pau', 'futo'):
+                campus = user_school
+            # Users with no school (admins) can use the campus query param
+            campus_param = self.request.query_params.get('campus', '').lower()
+            if campus_param in ('pau', 'futo') and (not user_school or user_school not in ('pau', 'futo')):
+                campus = campus_param
         else:
             campus_param = self.request.query_params.get('campus', '').lower()
             if campus_param in ('pau', 'futo'):

@@ -171,7 +171,13 @@ export default function HomePageClient({ initialVendors, initialListings, initia
       return;
     }
 
-    const campus = ((user as any).school || 'pau').toLowerCase();
+    const userSchool = ((user as any).school || '').toLowerCase();
+    // Admin users have no school — trust the existing cookie, don't override it
+    if (userSchool !== 'pau' && userSchool !== 'futo') {
+      setCampusReady(true);
+      return;
+    }
+
     const cookieCampus =
       document.cookie
         .split(';')
@@ -179,18 +185,18 @@ export default function HomePageClient({ initialVendors, initialListings, initia
         ?.split('=')?.[1]
         ?.toLowerCase() || 'pau';
 
-    if (cookieCampus === campus) {
+    if (cookieCampus === userSchool) {
       setCampusReady(true);
       return;
     }
 
     const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
-    document.cookie = `studex_campus=${campus}; path=/; max-age=31536000; SameSite=Lax${isHttps ? '; Secure' : ''}`;
+    document.cookie = `studex_campus=${userSchool}; path=/; max-age=31536000; SameSite=Lax${isHttps ? '; Secure' : ''}`;
 
     Promise.all([
-      fetchWithAuth(`${API_URL}/api/services/listings/?campus=${campus}&page_size=500`),
-      fetchWithAuth(`${API_URL}/api/auth/vendors/?campus=${campus}`),
-      fetchWithAuth(`${API_URL}/api/services/categories/?campus=${campus}`),
+      fetchWithAuth(`${API_URL}/api/services/listings/?campus=${userSchool}&page_size=500`),
+      fetchWithAuth(`${API_URL}/api/auth/vendors/?campus=${userSchool}`),
+      fetchWithAuth(`${API_URL}/api/services/categories/?campus=${userSchool}`),
     ])
       .then(async ([listRes, vendorRes, catRes]) => {
         if (listRes.ok) {
