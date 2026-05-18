@@ -83,8 +83,9 @@ export default function AdminSellerApprovals() {
                 key={label}
                 onClick={() => setStatusFilter(active ? "" : key)}
                 className={`rounded-2xl p-3 text-center shadow-sm transition-all active:scale-95 border-2 ${
-                  active ? "bg-stone-900 border-stone-900" : "bg-white border-stone-200 hover:border-stone-300"
+                  active ? "border-transparent" : "bg-white border-stone-200 hover:border-stone-300"
                 }`}
+                style={active ? { background: GRAD } : undefined}
               >
                 <p className="text-xl font-bold" style={{ color: active ? "#fff" : color }}>{loading ? "—" : value}</p>
                 <p className={`text-xs ${active ? "text-stone-300" : "text-stone-400"}`}>{label}</p>

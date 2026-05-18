@@ -85,8 +85,9 @@ export default function AdminUsers() {
                 key={label}
                 onClick={() => setTypeFilter(active && key !== "" ? "" : key)}
                 className={`rounded-2xl p-3 text-center shadow-sm transition-all active:scale-95 border-2 ${
-                  active ? "bg-stone-900 border-stone-900" : "bg-white border-stone-200 hover:border-stone-300"
+                  active ? "border-transparent" : "bg-white border-stone-200 hover:border-stone-300"
                 }`}
+                style={active ? { background: GRAD } : undefined}
               >
                 <Icon className="w-5 h-5 mx-auto mb-1" style={{ color: active ? "#fff" : color }} />
                 <p className={`text-xl font-bold ${active ? "text-white" : "text-stone-900"}`}>{loading ? "—" : value}</p>
