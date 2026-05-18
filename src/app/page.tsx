@@ -36,6 +36,12 @@ const heroImages = [
   { src: "https://images.unsplash.com/photo-1604654894610-df63bc536371?auto=format&fit=crop&q=60&w=1200", label: "Nails" },
   { src: "https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?auto=format&fit=crop&q=60&w=1200", label: "Drinks" },
   { src: "https://images.unsplash.com/photo-1596462502278-27bfdc403348?auto=format&fit=crop&q=60&w=1200", label: "Makeup" },
+  { src: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&q=60&w=1200", label: "Healthy Food" },
+  { src: "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&q=60&w=1200", label: "Fitness" },
+  { src: "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&q=60&w=1200", label: "Style" },
+  { src: "https://images.unsplash.com/photo-1487412947147-5cebf100ffc2?auto=format&fit=crop&q=60&w=1200", label: "Beauty" },
+  { src: "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&q=60&w=1200", label: "Meals" },
+  { src: "https://images.unsplash.com/photo-1562322140-8baeececf3df?auto=format&fit=crop&q=60&w=1200", label: "Hair Salon" },
 ];
 
 /* ─── STAR ROW ─────────────────────────────────────────── */
