@@ -36,14 +36,22 @@ export default function LayoutClient({ children }: { children: React.ReactNode }
   useEffect(() => {
     const key = `scroll:${pathname}`;
     const saved = sessionStorage.getItem(key);
-    let timer: ReturnType<typeof setTimeout> | null = null;
+    const timers: ReturnType<typeof setTimeout>[] = [];
+
     if (saved) {
       sessionStorage.removeItem(key);
       const y = parseInt(saved, 10);
-      if (y > 0) timer = setTimeout(() => window.scrollTo({ top: y, behavior: "instant" }), 80);
+      if (y > 0) {
+        // Try at 100ms, 300ms, and 600ms — pages with API fetches need the later attempts
+        const attempt = () => window.scrollTo({ top: y, behavior: "instant" });
+        timers.push(setTimeout(attempt, 100));
+        timers.push(setTimeout(attempt, 300));
+        timers.push(setTimeout(attempt, 600));
+      }
     }
+
     return () => {
-      if (timer) clearTimeout(timer);
+      timers.forEach(clearTimeout);
       if (window.scrollY > 0) sessionStorage.setItem(key, String(window.scrollY));
     };
   }, [pathname]);
