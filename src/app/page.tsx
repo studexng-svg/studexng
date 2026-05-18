@@ -204,14 +204,24 @@ export default function LandingPage() {
     document.title = "StudEx — Campus Marketplace for Student Services";
 
     const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
-    fetch(`${API_URL}/api/services/listings/?campus=pau`)
-      .then(res => res.ok ? res.json() : null)
-      .then(data => {
-        if (!data) return;
-        const all = data.results || data || [];
-        setFeaturedListings(all.filter((l: any) => l.image?.startsWith("http")).slice(0, 6));
-      })
-      .catch(() => {});
+    Promise.all([
+      fetch(`${API_URL}/api/services/listings/?campus=pau`).then(r => r.ok ? r.json() : null).catch(() => null),
+      fetch(`${API_URL}/api/services/listings/?campus=futo`).then(r => r.ok ? r.json() : null).catch(() => null),
+    ]).then(([pau, futo]) => {
+      const pauList = pau ? (pau.results || pau || []) : [];
+      const futoList = futo ? (futo.results || futo || []) : [];
+      const combined = [...pauList, ...futoList].filter((l: any) => l.image?.startsWith("http"));
+      // interleave so campuses alternate rather than all PAU first
+      const interleaved: any[] = [];
+      const maxLen = Math.max(pauList.filter((l: any) => l.image?.startsWith("http")).length, futoList.filter((l: any) => l.image?.startsWith("http")).length);
+      const p = pauList.filter((l: any) => l.image?.startsWith("http"));
+      const f = futoList.filter((l: any) => l.image?.startsWith("http"));
+      for (let i = 0; i < maxLen; i++) {
+        if (p[i]) interleaved.push(p[i]);
+        if (f[i]) interleaved.push(f[i]);
+      }
+      setFeaturedListings(interleaved.slice(0, 20));
+    });
   }, []);
 
   useEffect(() => {
@@ -510,7 +520,7 @@ export default function LandingPage() {
                 )}
               </div>
               <div className="flex justify-center gap-2 mt-3">
-                {(featuredListings.length > 0 ? featuredListings : [1,2,3]).map((_, i) => (
+                {(featuredListings.length > 0 ? featuredListings : [1,2,3]).slice(0, 10).map((_, i) => (
                   <button
                     key={i}
                     onClick={() => setListingIndex(i)}
