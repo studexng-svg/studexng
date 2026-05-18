@@ -168,7 +168,7 @@ export default function ChatListPage() {
                         )}
                       </div>
                       <p className="text-xs font-medium text-teal-600 truncate mt-0.5">
-                        {conv.listing_title}
+                        {conv.listing_title ? `Re: ${conv.listing_title}` : ""}
                       </p>
                       <p className={`text-xs truncate mt-0.5 ${conv.unread_count > 0 ? "text-stone-700 font-medium" : "text-stone-400"}`}>
                         {conv.last_message || "No messages yet"}

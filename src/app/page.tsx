@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Script from "next/script";
 import Link from "next/link";
 import { useAuth } from "@/lib/authStore";
@@ -179,8 +180,13 @@ function ReviewCarousel() {
 
 /* ─── MAIN PAGE ─────────────────────────────────────────── */
 export default function LandingPage() {
-  const { isLoggedIn } = useAuth();
+  const { isLoggedIn, isHydrated } = useAuth();
+  const router = useRouter();
   const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    if (isHydrated && isLoggedIn) router.replace("/home");
+  }, [isHydrated, isLoggedIn, router]);
   const [featuredListings, setFeaturedListings] = useState<any[]>([]);
   const [heroIndex, setHeroIndex] = useState(0);
   const [listingIndex, setListingIndex] = useState(0);
