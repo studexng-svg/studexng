@@ -84,7 +84,7 @@ export default function NotificationsPage() {
   useEffect(() => {
     if (!isHydrated || !isLoggedIn) return;
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, 10000);
+    const interval = setInterval(fetchNotifications, 15000);
     return () => clearInterval(interval);
   }, [isHydrated, isLoggedIn, fetchNotifications]);
 

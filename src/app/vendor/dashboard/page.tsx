@@ -252,14 +252,14 @@ function MessagesTab() {
 
   useEffect(() => {
     loadConversations();
-    const interval = setInterval(loadConversations, 10000);
+    const interval = setInterval(loadConversations, 15000);
     return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
     if (!activeConv) return;
     loadMessages(activeConv.id);
-    const interval = setInterval(() => loadMessages(activeConv.id), 5000);
+    const interval = setInterval(() => loadMessages(activeConv.id), 15000);
     return () => clearInterval(interval);
   }, [activeConv?.id]);
 

@@ -55,7 +55,7 @@ export default function AdminSellerApprovals() {
 
   useEffect(() => {
     fetchApplications();
-    const interval = setInterval(() => fetchApplications(campusRef.current, true), 10000);
+    const interval = setInterval(() => fetchApplications(campusRef.current, true), 15000);
     return () => clearInterval(interval);
   }, [fetchApplications]);
 

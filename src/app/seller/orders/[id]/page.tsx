@@ -71,7 +71,7 @@ export default function SellerOrderDetailPage() {
     };
 
     loadOrder();
-    const interval = setInterval(() => loadOrder(true), 10000);
+    const interval = setInterval(() => loadOrder(true), 15000);
     return () => clearInterval(interval);
   }, [isHydrated, isLoggedIn, orderId, router, retryCount]);
 

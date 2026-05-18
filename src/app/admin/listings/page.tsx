@@ -66,7 +66,7 @@ export default function AdminListingsPage() {
     const interval = setInterval(() => {
       const f = filtersRef.current;
       load(f.search, f.tab, f.campus, f.categoryFilter, true);
-    }, 8000);
+    }, 15000);
     return () => clearInterval(interval);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 

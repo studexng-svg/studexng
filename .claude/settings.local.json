@@ -25,7 +25,10 @@
       "Bash(curl -s \"http://127.0.0.1:8000/api/auth/check-username/?username=test%40%23%24\")",
       "WebFetch(domain:futo.edu.ng)",
       "WebFetch(domain:futosite.teneceschoolsupport.com)",
-      "Bash(xargs wc *)"
+      "Bash(xargs wc *)",
+      "Bash(xargs grep -l \"chat\\\\|message\")",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\HomePC\\\\Documents\\\\studexng\" -Recurse -Directory | Select-Object -First 30 | ForEach-Object { $_.FullName })",
+      "Bash(Get-ChildItem *)"
     ]
   }
 }

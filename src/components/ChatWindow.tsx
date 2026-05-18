@@ -173,7 +173,7 @@ export default function ChatWindow({
         const data = await res.json();
         setMessages(mapMessages(Array.isArray(data) ? data : data.results || []));
       } catch {}
-    }, 5000);
+    }, 15000);
     return () => clearInterval(interval);
   }, [conversationId, user?.username]);
 

@@ -73,7 +73,7 @@ export default function ChatRoomPage() {
     if (isHydrated && !isLoggedIn) { router.push("/auth"); return; }
     if (!isHydrated || !isLoggedIn || !conversationId) return;
     loadAll();
-    const interval = setInterval(loadMessages, 4000);
+    const interval = setInterval(loadMessages, 15000);
     return () => clearInterval(interval);
   }, [isHydrated, isLoggedIn, conversationId]);
 

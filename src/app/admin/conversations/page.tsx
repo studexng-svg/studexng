@@ -46,7 +46,7 @@ export default function AdminConversationsPage() {
     const interval = setInterval(() => {
       const f = filtersRef.current;
       load(f.search, f.campus, true);
-    }, 8000);
+    }, 15000);
     return () => clearInterval(interval);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 

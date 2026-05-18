@@ -63,7 +63,7 @@ export default function SellerOrdersPage() {
     };
 
     fetchOrders();
-    const interval = setInterval(() => fetchOrders(true), 8000);
+    const interval = setInterval(() => fetchOrders(true), 15000);
     return () => clearInterval(interval);
   }, [router, authUser]);
 

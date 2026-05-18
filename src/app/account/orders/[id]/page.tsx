@@ -61,7 +61,7 @@ export default function OrderDetailPage() {
         const res = await fetchWithAuth(`${API_URL}/api/orders/orders/${orderId}/`);
         if (res.ok) setOrder(await res.json());
       } catch {}
-    }, 10000);
+    }, 15000);
     return () => clearInterval(interval);
   }, [isHydrated, isLoggedIn, orderId, router]);
 
