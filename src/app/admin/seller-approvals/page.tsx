@@ -34,6 +34,7 @@ export default function AdminSellerApprovals() {
   const [error, setError] = useState("");
   const [campus, setCampus] = useState<Campus>("");
   const campusRef = useRef<Campus>("");
+  const [statusFilter, setStatusFilter] = useState<"" | "pending" | "approved" | "rejected">("");
 
   const fetchApplications = useCallback(async (c = campus, silent = false) => {
     if (!silent) { setLoading(true); setError(""); }
@@ -72,15 +73,24 @@ export default function AdminSellerApprovals() {
         {/* Summary chips */}
         <div className="grid grid-cols-3 gap-3">
           {[
-            { label: "Pending",  value: pending,  color: "#F59E0B" },
-            { label: "Approved", value: approved, color: "#0D9488" },
-            { label: "Rejected", value: rejected, color: "#EF4444" },
-          ].map(({ label, value, color }) => (
-            <div key={label} className="bg-white border border-stone-200 rounded-2xl p-3 text-center shadow-sm">
-              <p className="text-xl font-bold text-stone-900" style={{ color }}>{loading ? "—" : value}</p>
-              <p className="text-xs text-stone-400">{label}</p>
-            </div>
-          ))}
+            { label: "Pending",  value: pending,  color: "#F59E0B", key: "pending"  as const },
+            { label: "Approved", value: approved, color: "#0D9488", key: "approved" as const },
+            { label: "Rejected", value: rejected, color: "#EF4444", key: "rejected" as const },
+          ].map(({ label, value, color, key }) => {
+            const active = statusFilter === key;
+            return (
+              <button
+                key={label}
+                onClick={() => setStatusFilter(active ? "" : key)}
+                className={`rounded-2xl p-3 text-center shadow-sm transition-all active:scale-95 border-2 ${
+                  active ? "bg-stone-900 border-stone-900" : "bg-white border-stone-200 hover:border-stone-300"
+                }`}
+              >
+                <p className="text-xl font-bold" style={{ color: active ? "#fff" : color }}>{loading ? "—" : value}</p>
+                <p className={`text-xs ${active ? "text-stone-300" : "text-stone-400"}`}>{label}</p>
+              </button>
+            );
+          })}
         </div>
 
         <CampusPills value={campus} onChange={c => { setCampus(c); fetchApplications(c); }} />
@@ -108,15 +118,17 @@ export default function AdminSellerApprovals() {
               <div key={i} className="bg-white border border-stone-200 rounded-2xl h-16 animate-pulse" />
             ))}
           </div>
-        ) : applications.length === 0 ? (
-          <div className="bg-white border border-stone-100 rounded-2xl p-16 text-center">
-            <CreditCard className="w-12 h-12 mx-auto text-stone-200 mb-3" />
-            <p className="text-stone-500 font-medium">No applications yet</p>
-            <p className="text-stone-400 text-sm mt-1">Applications will appear here when sellers apply</p>
-          </div>
-        ) : (
+        ) : (() => {
+          const visible = statusFilter ? applications.filter(a => a.status === statusFilter) : applications;
+          return visible.length === 0 ? (
+            <div className="bg-white border border-stone-100 rounded-2xl p-16 text-center">
+              <CreditCard className="w-12 h-12 mx-auto text-stone-200 mb-3" />
+              <p className="text-stone-500 font-medium">{statusFilter ? `No ${statusFilter} applications` : "No applications yet"}</p>
+              <p className="text-stone-400 text-sm mt-1">{statusFilter ? <button onClick={() => setStatusFilter("")} className="underline">Clear filter</button> : "Applications will appear here when sellers apply"}</p>
+            </div>
+          ) : (
           <div className="space-y-2">
-            {applications.map(app => {
+            {visible.map(app => {
               const { bg, icon: Icon } = STATUS_STYLES[app.status];
               return (
                 <div
@@ -144,7 +156,8 @@ export default function AdminSellerApprovals() {
               );
             })}
           </div>
-        )}
+          );
+        })()}
       </div>
     </div>
   );

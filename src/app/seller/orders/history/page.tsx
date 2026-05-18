@@ -190,7 +190,7 @@ export default function SellerOrderHistoryPage() {
             onChange={(e) => handleSearchChange(e.target.value)}
             className="w-full px-4 py-3 bg-white border border-stone-200 rounded-xl text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 transition placeholder:text-stone-400"
           />
-          <div className="flex gap-2 overflow-x-auto pb-1">
+          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none [&::-webkit-scrollbar]:hidden">
             {(["all", "today", "week", "month"] as const).map((period) => (
               <button
                 key={period}

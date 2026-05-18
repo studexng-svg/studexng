@@ -104,7 +104,7 @@ export default function AdminOrders() {
         </div>
 
         {/* Status tabs */}
-        <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4">
+        <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 scrollbar-none [&::-webkit-scrollbar]:hidden">
           {[
             { key: "",                label: "All" },
             { key: "paid",            label: "In Progress" },

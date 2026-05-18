@@ -108,7 +108,7 @@ export default function VendorDashboard() {
       </div>
 
       {/* Tab Bar */}
-      <div className="bg-white border-b border-stone-100 overflow-x-auto flex-shrink-0">
+      <div className="bg-white border-b border-stone-100 overflow-x-auto flex-shrink-0 scrollbar-none [&::-webkit-scrollbar]:hidden">
         <div className="max-w-5xl mx-auto flex">
           {tabs.map(tab => {
             const Icon = tab.icon;

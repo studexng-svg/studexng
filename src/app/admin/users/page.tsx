@@ -63,6 +63,8 @@ export default function AdminUsers() {
 
   const vendors  = users.filter(u => u.user_type === "vendor").length;
   const students = users.filter(u => u.user_type === "student").length;
+  const [typeFilter, setTypeFilter] = useState<"" | "vendor" | "student">("");
+  const visible = typeFilter ? users.filter(u => u.user_type === typeFilter) : users;
 
   return (
     <div className="min-h-screen bg-[#FFF8F0]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
@@ -73,16 +75,25 @@ export default function AdminUsers() {
         {/* Stats */}
         <div className="grid grid-cols-3 gap-3">
           {[
-            { label: "Total",    value: users.length, icon: Users, color: "#7C3AED" },
-            { label: "Vendors",  value: vendors,      icon: Store, color: "#0D9488" },
-            { label: "Students", value: students,     icon: User,  color: "#6366F1" },
-          ].map(({ label, value, icon: Icon, color }) => (
-            <div key={label} className="bg-white border border-stone-200 rounded-2xl p-3 text-center shadow-sm">
-              <Icon className="w-5 h-5 mx-auto mb-1" style={{ color }} />
-              <p className="text-xl font-bold text-stone-900">{loading ? "—" : value}</p>
-              <p className="text-xs text-stone-400">{label}</p>
-            </div>
-          ))}
+            { label: "Total",    value: users.length, icon: Users, color: "#7C3AED", key: ""        as const },
+            { label: "Vendors",  value: vendors,      icon: Store, color: "#0D9488", key: "vendor"  as const },
+            { label: "Students", value: students,     icon: User,  color: "#6366F1", key: "student" as const },
+          ].map(({ label, value, icon: Icon, color, key }) => {
+            const active = typeFilter === key;
+            return (
+              <button
+                key={label}
+                onClick={() => setTypeFilter(active && key !== "" ? "" : key)}
+                className={`rounded-2xl p-3 text-center shadow-sm transition-all active:scale-95 border-2 ${
+                  active ? "bg-stone-900 border-stone-900" : "bg-white border-stone-200 hover:border-stone-300"
+                }`}
+              >
+                <Icon className="w-5 h-5 mx-auto mb-1" style={{ color: active ? "#fff" : color }} />
+                <p className={`text-xl font-bold ${active ? "text-white" : "text-stone-900"}`}>{loading ? "—" : value}</p>
+                <p className={`text-xs ${active ? "text-stone-300" : "text-stone-400"}`}>{label}</p>
+              </button>
+            );
+          })}
         </div>
 
         {/* Campus filter */}
@@ -106,14 +117,14 @@ export default function AdminUsers() {
               <div key={i} className="bg-white border border-stone-200 rounded-2xl h-16 animate-pulse" />
             ))}
           </div>
-        ) : users.length === 0 ? (
+        ) : visible.length === 0 ? (
           <div className="bg-white border border-stone-100 rounded-2xl p-10 text-center">
             <Users className="w-10 h-10 text-stone-200 mx-auto mb-3" />
             <p className="text-stone-400 text-sm">No users found</p>
           </div>
         ) : (
           <div className="space-y-2">
-            {users.map(user => (
+            {visible.map(user => (
               <div
                 key={user.id}
                 onClick={() => router.push(`/admin/users/${user.id}`)}

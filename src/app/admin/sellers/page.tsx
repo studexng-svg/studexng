@@ -63,6 +63,12 @@ export default function AdminSellers() {
 
   const verified = sellers.filter(s => s.profile?.is_verified_vendor).length;
   const pending  = sellers.length - verified;
+  const [verifiedFilter, setVerifiedFilter] = useState<"" | "verified" | "pending">("");
+  const visible = verifiedFilter === "verified"
+    ? sellers.filter(s => s.profile?.is_verified_vendor)
+    : verifiedFilter === "pending"
+    ? sellers.filter(s => !s.profile?.is_verified_vendor)
+    : sellers;
 
   return (
     <div className="min-h-screen bg-[#FFF8F0]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
@@ -73,16 +79,25 @@ export default function AdminSellers() {
         {/* Stats */}
         <div className="grid grid-cols-3 gap-3">
           {[
-            { label: "Total",    value: sellers.length, icon: Users,         color: "#7C3AED" },
-            { label: "Verified", value: verified,       icon: CheckCircle,   color: "#0D9488" },
-            { label: "Pending",  value: pending,        icon: Clock,         color: "#F59E0B" },
-          ].map(({ label, value, icon: Icon, color }) => (
-            <div key={label} className="bg-white border border-stone-200 rounded-2xl p-3 text-center shadow-sm">
-              <Icon className="w-5 h-5 mx-auto mb-1" style={{ color }} />
-              <p className="text-xl font-bold text-stone-900">{loading ? "—" : value}</p>
-              <p className="text-xs text-stone-400">{label}</p>
-            </div>
-          ))}
+            { label: "Total",    value: sellers.length, icon: Users,       color: "#7C3AED", key: ""         as const },
+            { label: "Verified", value: verified,       icon: CheckCircle, color: "#0D9488", key: "verified" as const },
+            { label: "Pending",  value: pending,        icon: Clock,       color: "#F59E0B", key: "pending"  as const },
+          ].map(({ label, value, icon: Icon, color, key }) => {
+            const active = verifiedFilter === key;
+            return (
+              <button
+                key={label}
+                onClick={() => setVerifiedFilter(active && key !== "" ? "" : key)}
+                className={`rounded-2xl p-3 text-center shadow-sm transition-all active:scale-95 border-2 ${
+                  active ? "bg-stone-900 border-stone-900" : "bg-white border-stone-200 hover:border-stone-300"
+                }`}
+              >
+                <Icon className="w-5 h-5 mx-auto mb-1" style={{ color: active ? "#fff" : color }} />
+                <p className={`text-xl font-bold ${active ? "text-white" : "text-stone-900"}`}>{loading ? "—" : value}</p>
+                <p className={`text-xs ${active ? "text-stone-300" : "text-stone-400"}`}>{label}</p>
+              </button>
+            );
+          })}
         </div>
 
         {/* Campus filter */}
@@ -106,14 +121,14 @@ export default function AdminSellers() {
               <div key={i} className="bg-white border border-stone-200 rounded-2xl h-20 animate-pulse" />
             ))}
           </div>
-        ) : sellers.length === 0 ? (
+        ) : visible.length === 0 ? (
           <div className="bg-white border border-stone-100 rounded-2xl p-10 text-center">
             <Store className="w-10 h-10 text-stone-200 mx-auto mb-3" />
             <p className="text-stone-400 text-sm">No vendors found</p>
           </div>
         ) : (
           <div className="space-y-2">
-            {sellers.map(seller => (
+            {visible.map(seller => (
               <div
                 key={seller.id}
                 onClick={() => router.push(`/admin/users/${seller.id}`)}
