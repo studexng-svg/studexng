@@ -229,7 +229,6 @@ export default function LandingPage() {
     return () => clearInterval(t);
   }, [featuredListings.length]);
 
-  const navigate = (path: string) => { window.location.href = path; };
 
   if (!mounted) {
     return (
@@ -627,8 +626,8 @@ export default function LandingPage() {
           </p>
 
           <div className="flex gap-8 text-sm">
-            <button onClick={() => navigate("/terms")} className="text-stone-400 hover:text-stone-700 transition">Terms</button>
-            <button onClick={() => navigate("/privacy-policy")} className="text-stone-400 hover:text-stone-700 transition">Privacy</button>
+            <Link href="/terms" className="text-stone-400 hover:text-stone-700 transition">Terms</Link>
+            <Link href="/privacy-policy" className="text-stone-400 hover:text-stone-700 transition">Privacy</Link>
           </div>
 
           <p className="text-stone-300 text-sm">© 2026 StudEx. All rights reserved.</p>

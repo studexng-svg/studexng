@@ -32,6 +32,22 @@ export default function LayoutClient({ children }: { children: React.ReactNode }
     setMounted(true);
   }, []);
 
+  // Save scroll position when leaving a page; restore it when coming back
+  useEffect(() => {
+    const key = `scroll:${pathname}`;
+    const saved = sessionStorage.getItem(key);
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    if (saved) {
+      sessionStorage.removeItem(key);
+      const y = parseInt(saved, 10);
+      if (y > 0) timer = setTimeout(() => window.scrollTo({ top: y, behavior: "instant" }), 80);
+    }
+    return () => {
+      if (timer) clearTimeout(timer);
+      if (window.scrollY > 0) sessionStorage.setItem(key, String(window.scrollY));
+    };
+  }, [pathname]);
+
   const hideNav =
     pathname === "/" ||
     pathname === "/auth" ||
