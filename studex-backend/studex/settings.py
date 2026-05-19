@@ -266,6 +266,11 @@ ADMIN_EMAIL = config('ADMIN_EMAIL', default='studex.ng@gmail.com')
 FRONTEND_BASE_URL = config('FRONTEND_BASE_URL', default='https://studex.com.ng')
 
 # =======================================
+# GROQ AI
+# =======================================
+GROQ_API_KEY = config('GROQ_API_KEY', default='')
+
+# =======================================
 # PAYSTACK
 # =======================================
 PAYSTACK_SECRET_KEY = config('PAYSTACK_SECRET_KEY', default='')
