@@ -219,6 +219,20 @@ class SellerApplication(models.Model):
         return None
 
 
+class AdminChatSession(models.Model):
+    """Persisted admin AI chat sessions accessible via history."""
+    title = models.CharField(max_length=200)
+    messages = models.JSONField(default=list)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        app_label = 'accounts'
+
+    def __str__(self):
+        return f"AdminChat: {self.title[:60]}"
+
+
 # SIGNALS
 
 @receiver(post_save, sender=User)

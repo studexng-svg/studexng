@@ -36,6 +36,7 @@ from accounts.admin_views import (
     AdminPlatformSettingsView,
     AdminAIChatView,
     AdminAIActionView,
+    AdminAIChatHistoryView,
 )
 
 app_name = 'admin_api'
@@ -111,6 +112,8 @@ urlpatterns += [
     path('platform-settings/', AdminPlatformSettingsView.as_view(), name='platform-settings'),
     path('ai-chat/', AdminAIChatView.as_view(), name='ai-chat'),
     path('ai-action/', AdminAIActionView.as_view(), name='ai-action'),
+    path('ai-history/', AdminAIChatHistoryView.as_view(), name='ai-history-list'),
+    path('ai-history/<int:session_id>/', AdminAIChatHistoryView.as_view(), name='ai-history-detail'),
 ]
 
 if AdminCartListView is not None:

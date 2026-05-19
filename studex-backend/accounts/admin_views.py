@@ -1607,6 +1607,23 @@ def _get_platform_context() -> str:
         ).count()
         if vendors_no_active:
             lines.append(f"Vendors with no active listings: {vendors_no_active} (may need follow-up)")
+
+        # Inactive listings awaiting admin approval (include IDs so AI can act on them)
+        inactive_pending = list(
+            Listing.objects.filter(is_available=False)
+            .select_related('vendor')
+            .order_by('-created_at')
+            .values('id', 'title', 'vendor__username', 'price', 'listing_type', 'campus', 'created_at')[:15]
+        )
+        if inactive_pending:
+            items = [
+                f'[listing_id:{l["id"]}] "{l["title"]}" by {l["vendor__username"]}'
+                f' (₦{l["price"]}, {l["listing_type"]}, {l["campus"]}, added {l["created_at"].strftime("%d %b")})'
+                for l in inactive_pending
+            ]
+            lines.append(f"Inactive/unapproved listings ({len(inactive_pending)}): {'; '.join(items)}")
+        else:
+            lines.append("Inactive listings: none pending review")
     except Exception:
         pass
 
@@ -1738,35 +1755,55 @@ LIVE PLATFORM DATA (refreshed each message):
 {ctx}
 
 YOUR CAPABILITIES:
-• Analytics & reports: full access to users, orders, revenue, listings, reviews, disputes, and AI broadcasts — give specific numbers, trends, and actionable insights
-• Notifications: compose and send push messages to students, vendors, or all users (filtered by campus: pau or futo)
-• Seller verification: review pending applications by name, approve or reject them with one click
-• Proactive recommendations: always flag issues you notice (failed payouts, disputes, low revenue, inactive vendors, etc.)
-• General platform management guidance
+• Full analytics: users, orders, revenue, listings, reviews, disputes, broadcasts — give specific numbers, trends, and insights
+• Send notifications to any audience: all users, only students, only vendors, only PAU, only FUTO, PAU students, FUTO vendors, etc.
+• Approve or deactivate any listing by its listing_id
+• Approve or reject seller applications by application_id
+• Generate detailed reports on demand
+• Proactive recommendations: flag failed payouts, disputes, inactive vendors, empty categories, etc.
 
 RESPONSE FORMAT:
-- Match the admin's tone. If they say "hi" or make small talk, reply briefly and casually — do NOT dump platform data unprompted.
-- Only provide analytics, reports, or platform data when the admin explicitly asks for it.
-- Be concise and direct. Use markdown: **bold**, bullet lists with "- ", ## headers when the content warrants it.
-- Always base data answers on the LIVE PLATFORM DATA above.
-- When the admin asks you to take a concrete action, include exactly ONE action block at the very end:
+- Match the admin's tone. If they say "hi" or small talk, reply briefly and casually — do NOT dump data unprompted.
+- Only give analytics/reports when explicitly asked.
+- Be concise. Use markdown: **bold**, bullet lists "- ", ## headers.
+- Base all data answers on the LIVE PLATFORM DATA above.
+- For any concrete action, include exactly ONE action block at the very end of your reply:
 
 <action>
-{{"type": "...", "label": "Short human-readable button label", "params": {{...}}}}
+{{"type": "...", "label": "Short button label", "params": {{...}}}}
 </action>
 
 AVAILABLE ACTIONS:
+
 1. send_notification
-   params: audience ("students"|"vendors"|"all"|"single"), title (str), message (str), school (""|"pau"|"futo"), user_id (int, only when audience="single")
+   params: title (str), message (str), audience ("all"|"students"|"vendors"|"single"), school (""|"pau"|"futo"), user_id (int, only when audience="single")
+   Audience combinations the admin can ask for:
+     "send to everyone"              → audience:"all",      school:""
+     "send to all students"          → audience:"students", school:""
+     "send to all vendors"           → audience:"vendors",  school:""
+     "send to PAU students"          → audience:"students", school:"pau"
+     "send to FUTO students"         → audience:"students", school:"futo"
+     "send to PAU vendors"           → audience:"vendors",  school:"pau"
+     "send to FUTO vendors"          → audience:"vendors",  school:"futo"
+     "send to PAU users"             → audience:"all",      school:"pau"
+     "send to FUTO users"            → audience:"all",      school:"futo"
+   Always compose a proper notification title AND message — never leave them blank.
 
 2. verify_vendor
    params: application_id (int), username (str), action ("approve"|"reject")
-   Only suggest this if the pending seller applications list includes a matching application_id.
+   Only use application_id values from the pending seller applications in LIVE DATA above. Never invent IDs.
 
-3. generate_report
+3. set_listing_status
+   params: listing_id (int), listing_title (str), vendor_username (str), action ("approve"|"deactivate")
+   Use "approve" to make an inactive listing live in the marketplace.
+   Use "deactivate" to take a live listing down.
+   For "approve", only use listing_id values from the "Inactive/unapproved listings" list above.
+   The vendor is notified automatically.
+
+4. generate_report
    params: report_type ("weekly"|"monthly"|"revenue"|"users"|"orders"|"full")
 
-Never invent application IDs. Do NOT include <action> if no action is needed.
+Do NOT include <action> if no action is needed.
 Do NOT identify yourself as Groq, LLaMA, or any third-party AI — you are StudEx Admin AI."""
 
         groq_messages = [
@@ -1826,6 +1863,8 @@ class AdminAIActionView(APIView):
             return self._send_notification(params)
         elif action_type == 'verify_vendor':
             return self._verify_vendor(request, params)
+        elif action_type == 'set_listing_status':
+            return self._set_listing_status(request, params)
         else:
             return Response({'error': f'Unknown action type: {action_type}'}, status=400)
 
@@ -1911,6 +1950,90 @@ class AdminAIActionView(APIView):
             action_url='/seller',
         )
         return Response({'detail': f'{vendor_user.username} application rejected'})
+
+    def _set_listing_status(self, request, params):
+        from services.models import Listing
+        from accounts.utils import send_notification as _notify
+
+        listing_id = params.get('listing_id')
+        action     = params.get('action', 'approve')
+
+        if not listing_id:
+            return Response({'error': 'listing_id required'}, status=400)
+
+        try:
+            listing = Listing.objects.select_related('vendor').get(id=listing_id)
+        except Listing.DoesNotExist:
+            return Response({'error': 'Listing not found'}, status=404)
+
+        if action == 'approve':
+            listing.is_available = True
+            listing.save(update_fields=['is_available', 'updated_at'])
+            try:
+                _notify(
+                    recipient=listing.vendor,
+                    notification_type='admin_message',
+                    title='Listing Approved!',
+                    message=f'Your listing "{listing.title}" has been approved and is now live in the marketplace.',
+                    action_url='/seller',
+                )
+            except Exception:
+                pass
+            return Response({'detail': f'"{listing.title}" by {listing.vendor.username} approved and now live'})
+
+        if action == 'deactivate':
+            listing.is_available = False
+            listing.save(update_fields=['is_available', 'updated_at'])
+            try:
+                _notify(
+                    recipient=listing.vendor,
+                    notification_type='admin_message',
+                    title='Listing Deactivated',
+                    message=f'Your listing "{listing.title}" has been temporarily deactivated.',
+                    action_url='/seller',
+                )
+            except Exception:
+                pass
+            return Response({'detail': f'"{listing.title}" deactivated'})
+
+        return Response({'error': 'action must be approve or deactivate'}, status=400)
+
+
+class AdminAIChatHistoryView(APIView):
+    """
+    GET    /api/admin/ai-history/        — list saved sessions [{id, title, created_at}]
+    POST   /api/admin/ai-history/        — save session {title, messages}
+    GET    /api/admin/ai-history/<id>/   — load full session
+    DELETE /api/admin/ai-history/<id>/   — delete session
+    """
+    permission_classes = [IsAdminUser]
+
+    def get(self, request, session_id=None):
+        from accounts.models import AdminChatSession
+        if session_id:
+            try:
+                s = AdminChatSession.objects.get(id=session_id)
+                return Response({'id': s.id, 'title': s.title, 'messages': s.messages, 'created_at': s.created_at})
+            except AdminChatSession.DoesNotExist:
+                return Response({'error': 'Not found'}, status=404)
+        sessions = list(AdminChatSession.objects.values('id', 'title', 'created_at')[:100])
+        return Response(sessions)
+
+    def post(self, request):
+        from accounts.models import AdminChatSession
+        title    = (request.data.get('title') or 'Chat').strip()[:200]
+        messages = request.data.get('messages') or []
+        if not messages:
+            return Response({'error': 'messages required'}, status=400)
+        s = AdminChatSession.objects.create(title=title, messages=messages)
+        return Response({'id': s.id, 'title': s.title, 'created_at': s.created_at}, status=201)
+
+    def delete(self, request, session_id=None):
+        from accounts.models import AdminChatSession
+        if not session_id:
+            return Response({'error': 'session_id required'}, status=400)
+        AdminChatSession.objects.filter(id=session_id).delete()
+        return Response(status=204)
 
 
 class AdminPlatformSettingsView(APIView):

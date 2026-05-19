@@ -1,16 +1,17 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import {
   Send, Bot, User, Loader2, Sparkles,
   BarChart3, CheckCircle, X, BellRing, UserCheck,
+  History, Trash2, PackageCheck, ChevronDown,
 } from "lucide-react";
 import AdminTopBar from "@/components/layout/AdminTopBar";
 import { fetchWithAuth } from "@/lib/authStore";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
-type ActionType = "send_notification" | "verify_vendor" | "generate_report";
+type ActionType = "send_notification" | "verify_vendor" | "generate_report" | "set_listing_status";
 
 interface Action {
   type: ActionType;
@@ -27,12 +28,18 @@ interface Message {
   actionResult?: string;
 }
 
+interface ChatSession {
+  id: number;
+  title: string;
+  created_at: string;
+}
+
 const QUICK_PROMPTS = [
   { icon: "📊", label: "Weekly report",      prompt: "Generate a weekly performance report for the platform." },
   { icon: "✅", label: "Pending vendors",     prompt: "Who are the pending seller applications? Show details and give a recommendation for each." },
   { icon: "💰", label: "Revenue summary",     prompt: "Give me a revenue and earnings summary. How is the platform performing financially?" },
   { icon: "📢", label: "Message students",    prompt: "I want to send a motivational message to all students. Help me compose and send it." },
-  { icon: "💡", label: "Vendor tips",         prompt: "Send a practical business tip to all vendors." },
+  { icon: "📦", label: "Approve listings",    prompt: "Show me inactive listings that need approval and let me approve them." },
   { icon: "🔍", label: "Platform health",     prompt: "Give me a platform health check — highlight any issues or areas that need attention." },
 ];
 
@@ -78,19 +85,35 @@ function renderMd(text: string): string {
   return out.join("\n");
 }
 
+// ── ActionCard ────────────────────────────────────────────────────────────────
+
+const AUDIENCE_OPTS = [
+  { val: "all",      label: "Everyone" },
+  { val: "students", label: "Students" },
+  { val: "vendors",  label: "Vendors" },
+];
+const SCHOOL_OPTS = [
+  { val: "",     label: "All campuses" },
+  { val: "pau",  label: "PAU only" },
+  { val: "futo", label: "FUTO only" },
+];
+
 function ActionCard({ action, status, result, onConfirm, onDismiss }: {
   action: Action;
   status: "pending" | "done" | "dismissed";
   result?: string;
-  onConfirm: () => void;
+  onConfirm: (finalParams: Record<string, unknown>) => void;
   onDismiss: () => void;
 }) {
+  const [localParams, setLocalParams] = useState<Record<string, unknown>>(action.params);
+
   if (status === "dismissed") return null;
 
   const iconMap: Record<ActionType, React.ElementType> = {
-    send_notification: BellRing,
-    verify_vendor:     UserCheck,
-    generate_report:   BarChart3,
+    send_notification:  BellRing,
+    verify_vendor:      UserCheck,
+    generate_report:    BarChart3,
+    set_listing_status: PackageCheck,
   };
   const Icon = iconMap[action.type] || Sparkles;
 
@@ -104,9 +127,10 @@ function ActionCard({ action, status, result, onConfirm, onDismiss }: {
   }
 
   const gradients: Record<ActionType, string> = {
-    send_notification: "linear-gradient(135deg,#0D9488,#7C3AED)",
-    verify_vendor:     "linear-gradient(135deg,#0D9488,#059669)",
-    generate_report:   "linear-gradient(135deg,#7C3AED,#6D28D9)",
+    send_notification:  "linear-gradient(135deg,#0D9488,#7C3AED)",
+    verify_vendor:      "linear-gradient(135deg,#0D9488,#059669)",
+    generate_report:    "linear-gradient(135deg,#7C3AED,#6D28D9)",
+    set_listing_status: "linear-gradient(135deg,#0D9488,#0891b2)",
   };
 
   return (
@@ -118,9 +142,45 @@ function ActionCard({ action, status, result, onConfirm, onDismiss }: {
         </div>
         <p className="text-xs font-semibold text-stone-700 leading-snug">{action.label}</p>
       </div>
+
+      {/* Audience editor for send_notification */}
+      {action.type === "send_notification" && (
+        <div className="space-y-1.5">
+          <p className="text-[10px] font-semibold text-stone-500 uppercase tracking-wide">Send to</p>
+          <div className="flex gap-1 flex-wrap">
+            {AUDIENCE_OPTS.map(o => (
+              <button key={o.val}
+                onClick={() => setLocalParams(p => ({ ...p, audience: o.val }))}
+                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition ${
+                  localParams.audience === o.val
+                    ? "bg-teal-600 text-white"
+                    : "bg-white border border-stone-200 text-stone-600 hover:border-teal-300"
+                }`}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex gap-1 flex-wrap">
+            {SCHOOL_OPTS.map(o => (
+              <button key={o.val}
+                onClick={() => setLocalParams(p => ({ ...p, school: o.val }))}
+                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition ${
+                  localParams.school === o.val
+                    ? "bg-purple-600 text-white"
+                    : "bg-white border border-stone-200 text-stone-600 hover:border-purple-300"
+                }`}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="flex gap-2">
         <button
-          onClick={onConfirm}
+          onClick={() => onConfirm(localParams)}
           className="flex-1 py-2 rounded-xl text-xs font-bold text-white transition active:scale-[0.98]"
           style={{ background: gradients[action.type] }}
         >
@@ -137,29 +197,139 @@ function ActionCard({ action, status, result, onConfirm, onDismiss }: {
   );
 }
 
-const STORAGE_KEY = "admin_ai_chat_history";
+// ── History panel ─────────────────────────────────────────────────────────────
+
+function HistoryPanel({
+  sessions,
+  loading,
+  onLoad,
+  onDelete,
+  onClose,
+}: {
+  sessions: ChatSession[];
+  loading: boolean;
+  onLoad: (id: number) => void;
+  onDelete: (id: number) => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col justify-end">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative bg-white rounded-t-3xl max-h-[70vh] flex flex-col shadow-2xl">
+        <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-stone-100">
+          <div className="flex items-center gap-2">
+            <History className="w-4 h-4 text-stone-600" />
+            <h3 className="font-bold text-stone-900 text-sm">Chat History</h3>
+          </div>
+          <button onClick={onClose} className="w-7 h-7 rounded-lg bg-stone-100 flex items-center justify-center">
+            <ChevronDown className="w-4 h-4 text-stone-500" />
+          </button>
+        </div>
+
+        <div className="overflow-y-auto flex-1 px-4 py-3 space-y-1.5">
+          {loading ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="w-5 h-5 text-stone-400 animate-spin" />
+            </div>
+          ) : sessions.length === 0 ? (
+            <p className="text-center text-stone-400 text-sm py-8">No saved chats yet</p>
+          ) : (
+            sessions.map(s => (
+              <div key={s.id}
+                className="flex items-center gap-3 bg-stone-50 hover:bg-stone-100 rounded-xl px-3 py-2.5 transition group"
+              >
+                <button className="flex-1 text-left" onClick={() => onLoad(s.id)}>
+                  <p className="text-xs font-semibold text-stone-800 leading-snug line-clamp-1">{s.title}</p>
+                  <p className="text-[10px] text-stone-400 mt-0.5">
+                    {new Date(s.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                  </p>
+                </button>
+                <button
+                  onClick={() => onDelete(s.id)}
+                  className="w-7 h-7 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-red-100 transition"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function AdminAIPage() {
-  const [messages, setMessages] = useState<Message[]>(() => {
-    if (typeof window === "undefined") return [];
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      return saved ? JSON.parse(saved) : [];
-    } catch { return []; }
-  });
-  const [input, setInput]     = useState("");
-  const [loading, setLoading] = useState(false);
+  const [messages, setMessages]         = useState<Message[]>([]);
+  const [input, setInput]               = useState("");
+  const [loading, setLoading]           = useState(false);
+  const [showHistory, setShowHistory]   = useState(false);
+  const [sessions, setSessions]         = useState<ChatSession[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [saving, setSaving]             = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef  = useRef<HTMLInputElement>(null);
-
-  // Persist messages to localStorage whenever they change
-  useEffect(() => {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(messages)); } catch {}
-  }, [messages]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
+
+  const loadHistory = useCallback(async () => {
+    setLoadingHistory(true);
+    try {
+      const res  = await fetchWithAuth(`${API_URL}/api/admin/ai-history/`);
+      const data = await res.json();
+      if (res.ok) setSessions(data);
+    } catch {}
+    finally { setLoadingHistory(false); }
+  }, []);
+
+  const openHistory = async () => {
+    setShowHistory(true);
+    await loadHistory();
+  };
+
+  const saveCurrentSession = async () => {
+    if (messages.length === 0) return;
+    const firstUser = messages.find(m => m.role === "user");
+    const raw       = firstUser?.content || "Chat";
+    const title     = raw.length > 80 ? raw.slice(0, 77) + "…" : raw;
+    const payload   = messages.map(m => ({ id: m.id, role: m.role, content: m.content }));
+    try {
+      setSaving(true);
+      await fetchWithAuth(`${API_URL}/api/admin/ai-history/`, {
+        method: "POST",
+        body: JSON.stringify({ title, messages: payload }),
+      });
+    } catch {}
+    finally { setSaving(false); }
+  };
+
+  const handleNewChat = async () => {
+    await saveCurrentSession();
+    setMessages([]);
+    inputRef.current?.focus();
+  };
+
+  const loadSession = async (id: number) => {
+    try {
+      const res  = await fetchWithAuth(`${API_URL}/api/admin/ai-history/${id}/`);
+      const data = await res.json();
+      if (res.ok && data.messages) {
+        setMessages(data.messages as Message[]);
+        setShowHistory(false);
+      }
+    } catch {}
+  };
+
+  const deleteSession = async (id: number) => {
+    try {
+      await fetchWithAuth(`${API_URL}/api/admin/ai-history/${id}/`, { method: "DELETE" });
+      setSessions(prev => prev.filter(s => s.id !== id));
+    } catch {}
+  };
 
   const sendMessage = async (text: string) => {
     const trimmed = text.trim();
@@ -201,10 +371,10 @@ export default function AdminAIPage() {
     }
   };
 
-  const executeAction = async (msgId: string, action: Action) => {
+  const executeAction = async (msgId: string, action: Action, finalParams: Record<string, unknown>) => {
     if (action.type === "generate_report") {
       setMessages(prev => prev.map(m => m.id === msgId ? { ...m, actionStatus: "dismissed" } : m));
-      const type = (action.params.report_type as string) || "full";
+      const type = (finalParams.report_type as string) || "full";
       await sendMessage(REPORT_PROMPTS[type] ?? REPORT_PROMPTS.full);
       return;
     }
@@ -216,7 +386,7 @@ export default function AdminAIPage() {
     try {
       const res = await fetchWithAuth(`${API_URL}/api/admin/ai-action/`, {
         method: "POST",
-        body: JSON.stringify({ type: action.type, params: action.params }),
+        body: JSON.stringify({ type: action.type, params: finalParams }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Action failed");
@@ -248,7 +418,7 @@ export default function AdminAIPage() {
               </div>
               <h2 className="font-bold text-stone-900 text-lg">StudEx Admin AI</h2>
               <p className="text-stone-500 text-sm max-w-xs mx-auto">
-                Ask about your platform, generate reports, send notifications, or verify vendors.
+                Ask about your platform, generate reports, send notifications, approve listings, or verify vendors.
               </p>
             </div>
 
@@ -269,7 +439,6 @@ export default function AdminAIPage() {
         ) : (
           messages.map(msg => (
             <div key={msg.id} className={`flex gap-2.5 ${msg.role === "user" ? "flex-row-reverse" : ""}`}>
-              {/* Avatar */}
               <div
                 className="w-7 h-7 rounded-xl flex-shrink-0 flex items-center justify-center mt-0.5 self-start"
                 style={msg.role === "assistant"
@@ -282,7 +451,6 @@ export default function AdminAIPage() {
                 }
               </div>
 
-              {/* Bubble + action */}
               <div className={`flex flex-col max-w-[85%] ${msg.role === "user" ? "items-end" : "items-start"}`}>
                 <div className={`px-4 py-3 text-sm leading-relaxed ${
                   msg.role === "user"
@@ -301,7 +469,7 @@ export default function AdminAIPage() {
                       action={msg.action}
                       status={msg.actionStatus}
                       result={msg.actionResult}
-                      onConfirm={() => executeAction(msg.id, msg.action!)}
+                      onConfirm={(finalParams) => executeAction(msg.id, msg.action!, finalParams)}
                       onDismiss={() => dismissAction(msg.id)}
                     />
                   </div>
@@ -311,7 +479,6 @@ export default function AdminAIPage() {
           ))
         )}
 
-        {/* Typing indicator */}
         {loading && (
           <div className="flex gap-2.5">
             <div className="w-7 h-7 rounded-xl flex-shrink-0 flex items-center justify-center"
@@ -337,23 +504,31 @@ export default function AdminAIPage() {
       {/* Sticky input */}
       <div className="fixed bottom-0 left-0 right-0 bg-[#FFF8F0]/95 backdrop-blur-sm border-t border-stone-200 px-4 py-3">
         <div className="max-w-2xl mx-auto flex gap-2 items-center">
+          {/* History button */}
+          <button
+            onClick={openHistory}
+            className="w-9 h-9 rounded-xl bg-white border border-stone-200 flex items-center justify-center flex-shrink-0 hover:border-teal-300 transition"
+            title="Chat history"
+          >
+            <History className="w-4 h-4 text-stone-500" />
+          </button>
+
           {messages.length > 0 && (
             <button
-              onClick={() => {
-                setMessages([]);
-                try { localStorage.removeItem(STORAGE_KEY); } catch {}
-              }}
-              className="text-xs text-stone-400 hover:text-stone-600 transition flex-shrink-0"
+              onClick={handleNewChat}
+              disabled={saving}
+              className="text-xs text-stone-400 hover:text-stone-600 transition flex-shrink-0 whitespace-nowrap"
             >
-              Clear
+              {saving ? "Saving…" : "New chat"}
             </button>
           )}
+
           <input
             ref={inputRef}
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(input); } }}
-            placeholder="Ask anything about your platform…"
+            placeholder="Ask anything or give a command…"
             disabled={loading}
             className="flex-1 px-4 py-3 bg-white border border-stone-200 rounded-2xl text-sm text-stone-900 placeholder:text-stone-400 focus:outline-none focus:border-teal-400 disabled:opacity-60"
           />
@@ -370,6 +545,17 @@ export default function AdminAIPage() {
           </button>
         </div>
       </div>
+
+      {/* History panel */}
+      {showHistory && (
+        <HistoryPanel
+          sessions={sessions}
+          loading={loadingHistory}
+          onLoad={loadSession}
+          onDelete={deleteSession}
+          onClose={() => setShowHistory(false)}
+        />
+      )}
     </div>
   );
 }
