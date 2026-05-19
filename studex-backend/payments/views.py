@@ -1044,7 +1044,7 @@ def _create_order_from_paystack_data(paystack_data, buyer, listing_id, order_typ
                 loyalty_account.credit_balance -= credits_used
                 loyalty_account.save()
                 LoyaltyTransaction.objects.create(
-                    account=loyalty_account, transaction_type="redeemed",
+                    account=loyalty_account, type="redeemed",
                     amount=credits_used,
                     description=f"Credits used on order #{order_id}",
                 )

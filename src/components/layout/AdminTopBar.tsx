@@ -16,7 +16,7 @@ export default function AdminTopBar({ title = "Admin Panel", back }: Props) {
       style={{ fontFamily: "'DM Sans', sans-serif" }}>
       <div className="flex items-center gap-3 px-4 py-3 max-w-2xl mx-auto">
         <button
-          onClick={() => window.history.length > 1 ? router.back() : back ? router.push(back) : router.back()}
+          onClick={() => back ? router.push(back) : router.back()}
           className="p-2.5 bg-white border border-stone-200 hover:border-stone-300 rounded-full shadow-sm transition-all active:scale-95 flex-shrink-0"
         >
           <ChevronLeft className="w-5 h-5 text-stone-600" />

@@ -174,7 +174,7 @@ export default function VendorDashboard() {
       )}
 
       {/* Tab Content */}
-      <div className="max-w-5xl w-full mx-auto px-4 py-4">
+      <div className="max-w-5xl w-full mx-auto px-4 pt-4 pb-28">
         {activeTab === "messages" && <MessagesTab />}
         {activeTab === "bookings" && <BookingsTab />}
         {activeTab === "earnings" && <EarningsTab />}
@@ -333,7 +333,7 @@ function MessagesTab() {
         </div>
 
         {/* Input — sticky above bottom nav */}
-        <div className="sticky bottom-[5.5rem] bg-white border border-stone-200 rounded-2xl px-4 py-3 flex gap-3 shadow-md">
+        <div className="sticky bottom-28 bg-white border border-stone-200 rounded-2xl px-4 py-3 flex gap-3 shadow-md">
           <input value={text} onChange={e => setText(e.target.value)}
             onKeyDown={e => e.key === "Enter" && !e.shiftKey && (e.preventDefault(), sendMessage())}
             placeholder="Type a reply..."
@@ -632,7 +632,7 @@ function EarningsTab() {
           </div>
           <div className="flex items-start gap-3 bg-stone-50 border border-stone-100 rounded-xl p-3">
             <span className="text-teal-600 font-bold text-base leading-none">3</span>
-            <p><span className="text-teal-600 font-semibold">Everything else goes directly to your bank account</span> — no holding period on our end. Paystack's own settlement cycle applies (typically T+1 or T+2 business days).</p>
+            <p><span className="text-teal-600 font-semibold">Everything else goes directly to your bank account instantly</span> — Paystack now pays out in real time, usually within minutes of the order completing.</p>
           </div>
         </div>
       </div>

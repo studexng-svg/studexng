@@ -3,7 +3,7 @@
 
 import { Send, User, Users, Search, CheckCircle, Loader2 } from "lucide-react";
 import AdminTopBar from "@/components/layout/AdminTopBar";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { fetchWithAuth } from "@/lib/authStore";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
@@ -180,11 +180,26 @@ const SCHOOL_OPTIONS = [
   { value: "pau",  label: "PAU only" },
   { value: "futo", label: "FUTO only" },
 ];
+
 const TYPE_OPTIONS = [
-  { value: "",        label: "All Users" },
-  { value: "student", label: "Students only" },
-  { value: "vendor",  label: "Vendors only" },
+  { value: "",                      label: "All Users" },
+  { value: "student",               label: "Students only" },
+  { value: "vendor",                label: "Vendors only" },
+  { value: "vendors_no_listings",   label: "Vendors with no listings" },
+  { value: "vendors_with_listings", label: "Vendors with listings" },
+  { value: "vendors_inactive",      label: "Vendors with inactive listings" },
+  { value: "vendors_active",        label: "Vendors with active listings" },
+  { value: "students_no_orders",    label: "Students who have never ordered" },
+  { value: "students_with_orders",  label: "Students with at least one order" },
 ];
+
+type BroadcastCounts = Record<string, number>;
+
+function typeOptionLabel(value: string, label: string, counts: BroadcastCounts): string {
+  const key = value === "" ? "all" : value;
+  const n = counts[key];
+  return n !== undefined ? `${label} (${n})` : label;
+}
 
 function BroadcastCompose() {
   const [title, setTitle] = useState("");
@@ -195,6 +210,20 @@ function BroadcastCompose() {
   const [result, setResult] = useState<{ sent: number } | null>(null);
   const [error, setError] = useState("");
   const [confirmed, setConfirmed] = useState(false);
+  const [counts, setCounts] = useState<BroadcastCounts>({});
+  const [countsLoading, setCountsLoading] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setCountsLoading(true);
+    const qs = school ? `?school=${encodeURIComponent(school)}` : "";
+    fetchWithAuth(`${API_URL}/api/admin/broadcast-counts/${qs}`)
+      .then(r => r.json())
+      .then(data => { if (!cancelled) setCounts(data); })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setCountsLoading(false); });
+    return () => { cancelled = true; };
+  }, [school]);
 
   const send = async () => {
     if (!confirmed) { setConfirmed(true); return; }
@@ -224,6 +253,8 @@ function BroadcastCompose() {
     }
   };
 
+  const selectedLabel = TYPE_OPTIONS.find(o => o.value === userType)?.label ?? "users";
+
   return (
     <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm space-y-4">
       <p className="text-purple-600 text-xs tracking-[0.18em] uppercase font-semibold flex items-center gap-1.5">
@@ -245,20 +276,29 @@ function BroadcastCompose() {
         <Field label="Campus">
           <select
             value={school}
-            onChange={e => setSchool(e.target.value)}
+            onChange={e => { setSchool(e.target.value); setConfirmed(false); }}
             className="w-full px-3 py-2.5 bg-stone-50 border border-stone-200 rounded-xl text-sm text-stone-900 focus:outline-none focus:border-teal-400"
           >
             {SCHOOL_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
         </Field>
         <Field label="User Type">
-          <select
-            value={userType}
-            onChange={e => setUserType(e.target.value)}
-            className="w-full px-3 py-2.5 bg-stone-50 border border-stone-200 rounded-xl text-sm text-stone-900 focus:outline-none focus:border-teal-400"
-          >
-            {TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
+          <div className="relative">
+            <select
+              value={userType}
+              onChange={e => { setUserType(e.target.value); setConfirmed(false); }}
+              className="w-full px-3 py-2.5 bg-stone-50 border border-stone-200 rounded-xl text-sm text-stone-900 focus:outline-none focus:border-teal-400"
+            >
+              {TYPE_OPTIONS.map(o => (
+                <option key={o.value} value={o.value}>
+                  {typeOptionLabel(o.value, o.label, counts)}
+                </option>
+              ))}
+            </select>
+            {countsLoading && (
+              <Loader2 className="absolute right-8 top-1/2 -translate-y-1/2 w-3.5 h-3.5 animate-spin text-stone-400 pointer-events-none" />
+            )}
+          </div>
         </Field>
       </div>
 
@@ -284,7 +324,7 @@ function BroadcastCompose() {
 
       {confirmed && !sending && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800 font-medium">
-          ⚠️ This will notify{school ? ` all ${school.toUpperCase()}` : " all"}{userType ? ` ${userType}s` : " users"}.
+          ⚠️ This will notify {school ? `all ${school.toUpperCase()} ` : "all "}{selectedLabel.toLowerCase()}.
           Tap Send again to confirm.
         </div>
       )}

@@ -395,7 +395,7 @@ export default function ChatRoomPage() {
       )}
 
       {/* MESSAGES */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-1 pb-36">
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-1 pb-44">
         {messages.length === 0 && (
           <p className="text-center text-stone-400 text-sm py-10">No messages yet. Say hello! 👋</p>
         )}
@@ -588,7 +588,7 @@ export default function ChatRoomPage() {
       )}
 
       {/* INPUT BAR */}
-      <div className="fixed bottom-[80px] left-0 right-0 bg-white border-t border-stone-100 px-4 py-3 flex items-center gap-2 z-20">
+      <div className="fixed bottom-28 left-0 right-0 bg-white border-t border-stone-100 px-4 py-3 flex items-center gap-2 z-20">
         <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageSelect} />
         <button
           onClick={() => fileInputRef.current?.click()}

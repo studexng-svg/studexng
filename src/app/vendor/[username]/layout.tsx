@@ -16,20 +16,20 @@ export async function generateMetadata({
       const vendor = await res.json();
       const name = vendor.business_name || vendor.username || username;
       const school = vendor.school ? ` at ${vendor.school.toUpperCase()}` : "";
+      const image: string | undefined = vendor.profile_picture || undefined;
       return {
         title: `${name} — Vendor`,
         description: `Book services from ${name}${school} on StudEx, the campus marketplace. View listings, ratings, and more.`,
         openGraph: {
           title: `${name} | StudEx Vendor`,
           description: `Book services from ${name}${school} on StudEx campus marketplace.`,
-          images: vendor.profile_image
-            ? [{ url: vendor.profile_image, alt: name }]
-            : undefined,
+          images: image ? [{ url: image, width: 400, height: 400, alt: name }] : undefined,
         },
         twitter: {
+          card: "summary",
           title: `${name} | StudEx Vendor`,
           description: `Book services from ${name}${school} on StudEx campus marketplace.`,
-          images: vendor.profile_image ? [vendor.profile_image] : undefined,
+          images: image ? [image] : undefined,
         },
       };
     }

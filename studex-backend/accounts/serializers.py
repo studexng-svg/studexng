@@ -447,7 +447,7 @@ class VendorListSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'username', 'business_name', 'profile_picture',
             'bio', 'vendor_badge', 'rating', 'total_reviews',
-            'completion_rate', 'total_listings', 'hostel', 'is_online',
+            'completion_rate', 'total_listings', 'hostel', 'is_online', 'school',
         ]
 
     def get_is_online(self, obj):

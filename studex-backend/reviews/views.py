@@ -1,5 +1,4 @@
 # reviews/views.py
-import resend
 from django.conf import settings
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import api_view, permission_classes, action
@@ -101,29 +100,6 @@ def submit_app_feedback(request):
         rating=rating,
         comment=comment,
     )
-
-    try:
-        resend.api_key = settings.RESEND_API_KEY
-        stars = '⭐' * int(rating) if rating else 'No rating'
-        resend.Emails.send({
-            'from': 'StudEx <noreply@studex.com.ng>',
-            'to': ['studex.ng@gmail.com'],
-            'subject': f'New {feedback_type.title()} Feedback — {stars}',
-            'html': f'''
-                <div style="font-family: DM Sans, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
-                    <h2 style="color: #0D9488;">New {feedback_type.title()} Feedback</h2>
-                    <p><strong>From:</strong> {request.user.username} ({request.user.email})</p>
-                    <p><strong>Campus:</strong> {getattr(request.user, "school", "unknown").upper()}</p>
-                    <p><strong>Rating:</strong> {stars}</p>
-                    <div style="background: #f5f5f4; border-radius: 12px; padding: 16px; margin: 16px 0;">
-                        <p style="margin: 0; color: #1C1917;">{comment}</p>
-                    </div>
-                    <p style="color: #A8A29E; font-size: 12px;">Submitted on {feedback.created_at.strftime("%d %B %Y at %H:%M")}</p>
-                </div>
-            '''
-        })
-    except Exception as e:
-        print(f"Resend error: {e}")
 
     return Response({'message': 'Feedback submitted successfully'})
 

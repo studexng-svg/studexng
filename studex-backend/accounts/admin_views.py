@@ -11,7 +11,6 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.db.models import Q, Count, Sum
 from django.conf import settings
-import resend
 
 from studex.permissions import IsAdminUser, IsSuperAdminUser
 from accounts.models import User, Profile
@@ -257,41 +256,6 @@ class AdminUserDetailView(APIView):
                 if 'is_verified_vendor' in request.data['profile']:
                     user.is_verified_vendor = request.data['profile']['is_verified_vendor']
                     user.save()
-
-            if not was_vendor and user.user_type == 'vendor':
-                try:
-                    resend.api_key = settings.RESEND_API_KEY
-                    display_name = user.business_name or user.username
-                    resend.Emails.send({
-                        'from': 'StudEx <noreply@studex.com.ng>',
-                        'to': [user.email],
-                        'subject': 'You are now a verified vendor on StudEx!',
-                        'html': f'''
-                            <div style="font-family: DM Sans, sans-serif; max-width: 520px; margin: 0 auto; padding: 40px 32px; background: #ffffff;">
-                                <h1 style="font-size: 26px; color: #1C1917; margin-bottom: 8px;">Congratulations, {display_name}! 🎉</h1>
-                                <p style="font-size: 16px; color: #44403C; line-height: 1.6;">
-                                    We are thrilled to let you know that your vendor application has been <strong>approved</strong>.
-                                    You are now officially a verified vendor on <strong>StudEx</strong> and your profile is live on the marketplace.
-                                </p>
-                                <div style="background: linear-gradient(135deg, #0D9488, #7C3AED); border-radius: 16px; padding: 28px 24px; margin: 28px 0; text-align: center;">
-                                    <p style="color: #ffffff; font-size: 18px; font-weight: 600; margin: 0 0 6px 0;">You are verified ✓</p>
-                                    <p style="color: #e0f2fe; font-size: 14px; margin: 0;">Students on your campus can now discover and book your services.</p>
-                                </div>
-                                <p style="font-size: 15px; color: #44403C; line-height: 1.6;">
-                                    Head over to your seller dashboard to create your first listing, set your prices, and start receiving orders.
-                                    We built StudEx to help talented people like you grow, and we are excited to see what you bring to the community.
-                                </p>
-                                <a href="{settings.FRONTEND_BASE_URL}/seller" style="display: inline-block; margin-top: 20px; padding: 14px 28px; background: #0D9488; color: #ffffff; text-decoration: none; border-radius: 10px; font-size: 15px; font-weight: 600;">
-                                    Go to Seller Dashboard
-                                </a>
-                                <p style="margin-top: 36px; font-size: 13px; color: #A8A29E;">
-                                    If you have any questions, reach out to us anytime. Welcome to the StudEx vendor family!
-                                </p>
-                            </div>
-                        ''',
-                    })
-                except Exception as e:
-                    print(f"Resend vendor approval email error: {e}")
 
             serializer = UserSerializer(user)
             return Response(serializer.data, status=status.HTTP_200_OK)
@@ -1463,6 +1427,73 @@ class AdminActivityView(APIView):
         })
 
 
+def _broadcast_base_qs(school: str):
+    """Return the base active-user queryset filtered by school."""
+    qs = User.objects.filter(is_active=True)
+    if school == 'pau':
+        qs = qs.filter(Q(school__iexact='pau') | Q(school='') | Q(school__isnull=True))
+    elif school:
+        qs = qs.filter(school__iexact=school)
+    return qs
+
+
+def _apply_user_type_filter(qs, user_type: str):
+    """Apply user_type filter to a queryset. Returns (filtered_qs, needs_distinct)."""
+    if user_type == 'student':
+        return qs.filter(user_type='student'), False
+    if user_type == 'vendor':
+        return qs.filter(user_type='vendor'), False
+    if user_type == 'vendors_no_listings':
+        return qs.filter(user_type='vendor', listings__isnull=True), False
+    if user_type == 'vendors_with_listings':
+        return qs.filter(user_type='vendor', listings__isnull=False).distinct(), True
+    if user_type == 'vendors_active':
+        return qs.filter(user_type='vendor', listings__is_available=True).distinct(), True
+    if user_type == 'vendors_inactive':
+        active_ids = qs.filter(user_type='vendor', listings__is_available=True).values_list('id', flat=True)
+        return qs.filter(user_type='vendor', listings__isnull=False).exclude(id__in=active_ids).distinct(), True
+    if user_type == 'students_no_orders':
+        return qs.filter(user_type='student', orders__isnull=True), False
+    if user_type == 'students_with_orders':
+        return qs.filter(
+            user_type='student',
+            orders__status__in=('paid', 'seller_completed', 'completed'),
+        ).distinct(), True
+    return qs, False
+
+
+class AdminBroadcastCountsView(APIView):
+    """
+    GET /api/admin/broadcast-counts/?school=
+    Returns recipient counts for every broadcast filter type.
+    """
+    permission_classes = [IsAdminUser]
+
+    def get(self, request):
+        school = (request.query_params.get('school') or '').strip().lower()
+        base = _broadcast_base_qs(school)
+
+        vendors = base.filter(user_type='vendor')
+        students = base.filter(user_type='student')
+
+        active_vendor_ids = vendors.filter(listings__is_available=True).values_list('id', flat=True)
+
+        counts = {
+            'all':                    base.count(),
+            'student':                students.count(),
+            'vendor':                 vendors.count(),
+            'vendors_no_listings':    vendors.filter(listings__isnull=True).count(),
+            'vendors_with_listings':  vendors.filter(listings__isnull=False).distinct().count(),
+            'vendors_active':         vendors.filter(listings__is_available=True).distinct().count(),
+            'vendors_inactive':       vendors.filter(listings__isnull=False).exclude(id__in=active_vendor_ids).distinct().count(),
+            'students_no_orders':     students.filter(orders__isnull=True).count(),
+            'students_with_orders':   students.filter(
+                orders__status__in=('paid', 'seller_completed', 'completed')
+            ).distinct().count(),
+        }
+        return Response(counts)
+
+
 class AdminBroadcastMessageView(APIView):
     """
     POST /api/admin/notify-all/
@@ -1485,18 +1516,9 @@ class AdminBroadcastMessageView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        recipients = User.objects.filter(is_active=True)
-
-        if school:
-            if school == 'pau':
-                recipients = recipients.filter(
-                    Q(school__iexact='pau') | Q(school='') | Q(school__isnull=True)
-                )
-            else:
-                recipients = recipients.filter(school__iexact=school)
-
-        if user_type in ('student', 'vendor'):
-            recipients = recipients.filter(user_type=user_type)
+        recipients = _broadcast_base_qs(school)
+        if user_type:
+            recipients, _ = _apply_user_type_filter(recipients, user_type)
 
         sent = 0
         for user in recipients.iterator():
