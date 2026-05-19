@@ -11,7 +11,7 @@ import { fetchWithAuth } from "@/lib/authStore";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
-type ActionType = "send_notification" | "verify_vendor" | "generate_report" | "set_listing_status";
+type ActionType = "send_notification" | "verify_vendor" | "generate_report" | "set_listing_status" | "lookup_user";
 
 interface Action {
   type: ActionType;
@@ -26,6 +26,7 @@ interface Message {
   action?: Action;
   actionStatus?: "pending" | "done" | "dismissed";
   actionResult?: string;
+  hidden?: boolean;  // injected context messages — not rendered in UI
 }
 
 interface ChatSession {
@@ -114,6 +115,7 @@ function ActionCard({ action, status, result, onConfirm, onDismiss }: {
     verify_vendor:      UserCheck,
     generate_report:    BarChart3,
     set_listing_status: PackageCheck,
+    lookup_user:        User,
   };
   const Icon = iconMap[action.type] || Sparkles;
 
@@ -359,6 +361,54 @@ export default function AdminAIPage() {
         action: data.action ?? undefined,
         actionStatus: data.action ? "pending" : undefined,
       };
+
+      // Auto-execute lookup actions — no confirm card needed
+      if (data.action?.type === "lookup_user") {
+        setMessages(prev => [...prev, { ...aiMsg, actionStatus: "dismissed" }]);
+        try {
+          const lookupRes  = await fetchWithAuth(`${API_URL}/api/admin/ai-action/`, {
+            method: "POST",
+            body: JSON.stringify({ type: "lookup_user", params: data.action.params }),
+          });
+          const lookupData = await lookupRes.json();
+          const resultText = lookupData.detail || "No result";
+
+          // Hidden context message — included in API calls but not rendered
+          const hiddenMsg: Message = {
+            id: `${Date.now()}-lk`,
+            role: "user",
+            content: `[LOOKUP RESULT]: ${resultText}`,
+            hidden: true,
+          };
+          const withLookup = [...next, { ...aiMsg, actionStatus: "dismissed" as const }, hiddenMsg];
+          setMessages(withLookup);
+
+          // Call AI again with the lookup data so it can give a proper answer
+          const res2 = await fetchWithAuth(`${API_URL}/api/admin/ai-chat/`, {
+            method: "POST",
+            body: JSON.stringify({
+              messages: withLookup.map(m => ({ role: m.role, content: m.content })),
+            }),
+          });
+          const data2 = await res2.json();
+          if (!res2.ok) throw new Error(data2.error || "AI error");
+          setMessages(prev => [...prev, {
+            id: `${Date.now()}-a2`,
+            role: "assistant",
+            content: data2.message,
+            action: data2.action ?? undefined,
+            actionStatus: data2.action ? "pending" : undefined,
+          }]);
+        } catch (e2: any) {
+          setMessages(prev => [...prev, {
+            id: `${Date.now()}-e2`,
+            role: "assistant",
+            content: `Lookup failed: ${(e2 as any).message || "Please try again."}`,
+          }]);
+        }
+        return;
+      }
+
       setMessages(prev => [...prev, aiMsg]);
     } catch (e: any) {
       setMessages(prev => [...prev, {
@@ -437,7 +487,7 @@ export default function AdminAIPage() {
             </div>
           </div>
         ) : (
-          messages.map(msg => (
+          messages.filter(m => !m.hidden).map(msg => (
             <div key={msg.id} className={`flex gap-2.5 ${msg.role === "user" ? "flex-row-reverse" : ""}`}>
               <div
                 className="w-7 h-7 rounded-xl flex-shrink-0 flex items-center justify-center mt-0.5 self-start"

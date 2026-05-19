@@ -1803,6 +1803,12 @@ AVAILABLE ACTIONS:
 4. generate_report
    params: report_type ("weekly"|"monthly"|"revenue"|"users"|"orders"|"full")
 
+5. lookup_user
+   params: query (str) — username, partial name, or email to search
+   Use this IMMEDIATELY whenever the admin asks about any specific user by name or username.
+   Never say "I can't find them in the live data" — use this action instead and the full profile will be returned.
+   Examples: "check ugo", "who is ugochukwu", "find john", "what's ada's status"
+
 Do NOT include <action> if no action is needed.
 Do NOT identify yourself as Groq, LLaMA, or any third-party AI — you are StudEx Admin AI."""
 
@@ -1865,6 +1871,8 @@ class AdminAIActionView(APIView):
             return self._verify_vendor(request, params)
         elif action_type == 'set_listing_status':
             return self._set_listing_status(request, params)
+        elif action_type == 'lookup_user':
+            return self._lookup_user(params)
         else:
             return Response({'error': f'Unknown action type: {action_type}'}, status=400)
 
@@ -1997,6 +2005,68 @@ class AdminAIActionView(APIView):
             return Response({'detail': f'"{listing.title}" deactivated'})
 
         return Response({'error': 'action must be approve or deactivate'}, status=400)
+
+    def _lookup_user(self, params):
+        from django.db.models import Q
+        query = (params.get('query') or '').strip()
+        if len(query) < 2:
+            return Response({'error': 'query must be at least 2 characters'}, status=400)
+
+        users = list(
+            User.objects.filter(
+                Q(username__icontains=query) |
+                Q(first_name__icontains=query) |
+                Q(last_name__icontains=query) |
+                Q(email__icontains=query)
+            ).filter(is_active=True)
+            .select_related('profile')[:5]
+        )
+
+        if not users:
+            return Response({
+                'detail': f'No active user found matching "{query}". They may not exist or may be inactive.'
+            })
+
+        blocks = [f'Found {len(users)} user(s) matching "{query}":']
+        for u in users:
+            lines = [
+                f'\n{u.username} (user_id:{u.id})',
+                f'  Type: {u.user_type}',
+                f'  School: {u.school or "not set"}',
+                f'  Email: {u.email or "not set"}',
+                f'  Phone: {u.phone or "not set"}',
+                f'  Joined: {u.date_joined.strftime("%d %b %Y")}',
+                f'  Verified vendor: {u.is_verified_vendor}',
+                f'  Wallet balance: ₦{u.wallet_balance:,.2f}',
+            ]
+            if u.business_name:
+                lines.append(f'  Business name: {u.business_name}')
+            try:
+                p = u.profile
+                lines.append(f'  Orders placed: {p.total_orders}')
+                if u.user_type == 'vendor':
+                    lines.append(
+                        f'  Sales: {p.total_sales} | Badge: {p.vendor_badge} | '
+                        f'Completion rate: {p.completion_rate}% | '
+                        f'Rating: {p.rating}/5 ({p.total_reviews} reviews)'
+                    )
+            except Exception:
+                pass
+            try:
+                total_l  = u.listings.count()
+                active_l = u.listings.filter(is_available=True).count()
+                if total_l:
+                    lines.append(f'  Listings: {total_l} total, {active_l} active')
+            except Exception:
+                pass
+            try:
+                app = u.seller_application
+                lines.append(f'  Seller application: {app.status} (application_id:{app.id})')
+            except Exception:
+                pass
+            blocks.append('\n'.join(lines))
+
+        return Response({'detail': '\n'.join(blocks)})
 
 
 class AdminAIChatHistoryView(APIView):
