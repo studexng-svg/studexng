@@ -414,7 +414,7 @@ function GroqBroadcast() {
       if (!r.ok) throw new Error(d.error || "Failed");
       setPreview(d);
     } catch (e: any) {
-      setError(e.message || "Grok API error");
+      setError(e.message || "Groq API error");
     } finally { setLoading(false); }
   };
 
@@ -455,7 +455,7 @@ function GroqBroadcast() {
               <Bot className="w-4 h-4 text-white" />
             </div>
             <div>
-              <p className="font-bold text-stone-900 text-sm">Grok AI Broadcast</p>
+              <p className="font-bold text-stone-900 text-sm">Groq AI Broadcast</p>
               <p className="text-stone-400 text-xs">Auto-generates contextual tips for your users</p>
             </div>
           </div>
@@ -508,7 +508,7 @@ function GroqBroadcast() {
           <div className="bg-purple-50 border border-purple-200 rounded-xl p-4 space-y-2">
             <div className="flex items-center gap-1.5 mb-1">
               <Sparkles className="w-3.5 h-3.5 text-purple-500" />
-              <span className="text-xs font-semibold text-purple-600 uppercase tracking-wide">Grok generated</span>
+              <span className="text-xs font-semibold text-purple-600 uppercase tracking-wide">Groq generated</span>
             </div>
             <p className="font-bold text-stone-900 text-sm">{preview.title}</p>
             <p className="text-stone-600 text-sm">{preview.message}</p>

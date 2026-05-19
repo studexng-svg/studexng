@@ -30,6 +30,10 @@ export default function LayoutClient({ children }: { children: React.ReactNode }
 
   useEffect(() => {
     setMounted(true);
+    // Take manual control so the browser doesn't override our sessionStorage restoration
+    if (typeof history !== "undefined") {
+      history.scrollRestoration = "manual";
+    }
   }, []);
 
   // Save scroll position when leaving a page; restore it when coming back
@@ -42,11 +46,12 @@ export default function LayoutClient({ children }: { children: React.ReactNode }
       sessionStorage.removeItem(key);
       const y = parseInt(saved, 10);
       if (y > 0) {
-        // Try at 100ms, 300ms, and 600ms — pages with API fetches need the later attempts
+        // Retry at increasing intervals — later attempts handle pages that load API data slowly
         const attempt = () => window.scrollTo({ top: y, behavior: "instant" });
-        timers.push(setTimeout(attempt, 100));
-        timers.push(setTimeout(attempt, 300));
+        timers.push(setTimeout(attempt, 80));
+        timers.push(setTimeout(attempt, 250));
         timers.push(setTimeout(attempt, 600));
+        timers.push(setTimeout(attempt, 1200));
       }
     }
 
