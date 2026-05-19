@@ -363,6 +363,30 @@ def _alert_admin_transfer_failure(txn):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# JOB 5 & 6: Grok AI notification broadcasts
+# Students: Mon / Wed / Fri at 10:00 WAT
+# Vendors:  Tue / Thu / Sat at 10:00 WAT
+# ─────────────────────────────────────────────────────────────────────────────
+
+def grok_notify_students():
+    """Broadcast an AI-generated tip to all active students."""
+    try:
+        from grok_notifications import send_grok_notifications
+        send_grok_notifications(audience='students', triggered_by='scheduler')
+    except Exception as e:
+        logger.error(f'grok_notify_students failed: {e}', exc_info=True)
+
+
+def grok_notify_vendors():
+    """Broadcast an AI-generated tip to all active vendors."""
+    try:
+        from grok_notifications import send_grok_notifications
+        send_grok_notifications(audience='vendors', triggered_by='scheduler')
+    except Exception as e:
+        logger.error(f'grok_notify_vendors failed: {e}', exc_info=True)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Scheduler bootstrap — called by StudexConfig.ready()
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -414,12 +438,35 @@ def start():
         coalesce=True,
     )
 
+    # Mon / Wed / Fri 10:00 WAT — AI tips for students
+    scheduler.add_job(
+        grok_notify_students,
+        trigger=CronTrigger(day_of_week='mon,wed,fri', hour=10, minute=0, timezone=LAGOS_TZ),
+        id='grok_notify_students',
+        name='Grok AI tip — students (Mon/Wed/Fri 10:00 WAT)',
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+
+    # Tue / Thu / Sat 10:00 WAT — AI tips for vendors
+    scheduler.add_job(
+        grok_notify_vendors,
+        trigger=CronTrigger(day_of_week='tue,thu,sat', hour=10, minute=0, timezone=LAGOS_TZ),
+        id='grok_notify_vendors',
+        name='Grok AI tip — vendors (Tue/Thu/Sat 10:00 WAT)',
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+
     try:
         scheduler.start()
         logger.info(
             "Scheduler started: booking_reminders (60s), "
             "auto_release_orders (midnight), auto_cancel_pending_orders (midnight), "
-            "retry_failed_transfers (1h)."
+            "retry_failed_transfers (1h), "
+            "grok_notify_students (Mon/Wed/Fri 10:00), grok_notify_vendors (Tue/Thu/Sat 10:00)."
         )
     except Exception as e:
         logger.error(f"Failed to start scheduler: {e}", exc_info=True)

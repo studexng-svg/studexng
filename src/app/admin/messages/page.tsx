@@ -1,14 +1,14 @@
 // src/app/admin/messages/page.tsx
 "use client";
 
-import { Send, User, Users, Search, CheckCircle, Loader2 } from "lucide-react";
+import { Send, User, Users, Search, CheckCircle, Loader2, Sparkles, Bot, Clock } from "lucide-react";
 import AdminTopBar from "@/components/layout/AdminTopBar";
 import { useState, useCallback, useEffect } from "react";
 import { fetchWithAuth } from "@/lib/authStore";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
-type Mode = "single" | "broadcast";
+type Mode = "single" | "broadcast" | "ai";
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -343,6 +343,207 @@ function BroadcastCompose() {
   );
 }
 
+// ─── AI Broadcast section ────────────────────────────────────────────────────
+
+const AI_AUDIENCE_OPTIONS = [
+  { value: "students", label: "Students" },
+  { value: "vendors",  label: "Vendors"  },
+  { value: "all",      label: "All Users"},
+];
+
+type GrokLog = {
+  id: number; audience: string; school: string;
+  title: string; message: string; sent_count: number;
+  triggered_by: string; created_at: string;
+};
+
+type Preview = { title: string; message: string; recipient_count: number };
+
+function GrokBroadcast() {
+  const [audience, setAudience] = useState("students");
+  const [school, setSchool]     = useState("");
+  const [preview, setPreview]   = useState<Preview | null>(null);
+  const [loading, setLoading]   = useState(false);
+  const [sending, setSending]   = useState(false);
+  const [sent, setSent]         = useState<{ sent: number; title: string } | null>(null);
+  const [error, setError]       = useState("");
+  const [logs, setLogs]         = useState<GrokLog[]>([]);
+  const [logsLoading, setLogsLoading] = useState(true);
+
+  const fetchLogs = async () => {
+    try {
+      const r = await fetchWithAuth(`${API_URL}/api/admin/grok-notify/`);
+      const d = await r.json();
+      if (Array.isArray(d)) setLogs(d);
+    } catch {} finally { setLogsLoading(false); }
+  };
+
+  useEffect(() => { fetchLogs(); }, []);
+
+  const generate = async () => {
+    setLoading(true); setPreview(null); setError(""); setSent(null);
+    try {
+      const r = await fetchWithAuth(`${API_URL}/api/admin/grok-notify/`, {
+        method: "POST",
+        body: JSON.stringify({ audience, school: school || undefined, preview: true }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Failed");
+      setPreview(d);
+    } catch (e: any) {
+      setError(e.message || "Grok API error");
+    } finally { setLoading(false); }
+  };
+
+  const send = async () => {
+    if (!preview) return;
+    setSending(true); setError("");
+    try {
+      const r = await fetchWithAuth(`${API_URL}/api/admin/grok-notify/`, {
+        method: "POST",
+        body: JSON.stringify({ audience, school: school || undefined }),
+      });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Failed");
+      setSent(d); setPreview(null);
+      fetchLogs();
+    } catch (e: any) {
+      setError(e.message || "Send failed");
+    } finally { setSending(false); }
+  };
+
+  const timeAgo = (iso: string) => {
+    const diff = Date.now() - new Date(iso).getTime();
+    const m = Math.floor(diff / 60000);
+    if (m < 60) return `${m}m ago`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h}h ago`;
+    return `${Math.floor(h / 24)}d ago`;
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Generator card */}
+      <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm space-y-4">
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-xl flex items-center justify-center"
+               style={{ background: "linear-gradient(135deg,#7C3AED,#0D9488)" }}>
+            <Bot className="w-4 h-4 text-white" />
+          </div>
+          <div>
+            <p className="font-bold text-stone-900 text-sm">Grok AI Broadcast</p>
+            <p className="text-stone-400 text-xs">Auto-generates contextual tips for your users</p>
+          </div>
+        </div>
+
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-600 px-3 py-2 rounded-xl text-sm">{error}</div>
+        )}
+        {sent && (
+          <div className="bg-teal-50 border border-teal-200 text-teal-700 px-3 py-2 rounded-xl text-sm flex items-center gap-2">
+            <CheckCircle className="w-4 h-4" /> Sent "{sent.title}" to {sent.sent} user{sent.sent !== 1 ? "s" : ""}
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Audience">
+            <select value={audience} onChange={e => { setAudience(e.target.value); setPreview(null); }}
+              className="w-full px-3 py-2.5 bg-stone-50 border border-stone-200 rounded-xl text-sm text-stone-900 focus:outline-none focus:border-purple-400">
+              {AI_AUDIENCE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </Field>
+          <Field label="Campus">
+            <select value={school} onChange={e => { setSchool(e.target.value); setPreview(null); }}
+              className="w-full px-3 py-2.5 bg-stone-50 border border-stone-200 rounded-xl text-sm text-stone-900 focus:outline-none focus:border-purple-400">
+              {SCHOOL_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </Field>
+        </div>
+
+        {/* Preview area */}
+        {preview && (
+          <div className="bg-purple-50 border border-purple-200 rounded-xl p-4 space-y-2">
+            <div className="flex items-center gap-1.5 mb-1">
+              <Sparkles className="w-3.5 h-3.5 text-purple-500" />
+              <span className="text-xs font-semibold text-purple-600 uppercase tracking-wide">Grok generated</span>
+            </div>
+            <p className="font-bold text-stone-900 text-sm">{preview.title}</p>
+            <p className="text-stone-600 text-sm">{preview.message}</p>
+            <p className="text-stone-400 text-xs pt-1">
+              Will be sent to <span className="font-semibold text-stone-600">{preview.recipient_count} {audience}</span>
+              {school ? ` at ${school.toUpperCase()}` : ""}
+            </p>
+          </div>
+        )}
+
+        <div className="flex gap-2">
+          <button onClick={generate} disabled={loading || sending}
+            className="flex-1 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition disabled:opacity-40 bg-stone-100 hover:bg-stone-200 text-stone-700">
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+            {loading ? "Generating…" : preview ? "Regenerate" : "Generate Preview"}
+          </button>
+          {preview && (
+            <button onClick={send} disabled={sending}
+              className="flex-1 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition disabled:opacity-40 text-white"
+              style={{ background: "linear-gradient(135deg,#7C3AED,#0D9488)" }}>
+              {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              {sending ? "Sending…" : `Send to ${preview.recipient_count}`}
+            </button>
+          )}
+        </div>
+
+        <p className="text-xs text-stone-400 text-center">
+          Scheduler sends automatically — students Mon/Wed/Fri, vendors Tue/Thu/Sat at 10am
+        </p>
+      </div>
+
+      {/* Recent logs */}
+      <div className="bg-white border border-stone-200 rounded-2xl overflow-hidden shadow-sm">
+        <div className="px-5 py-3 border-b border-stone-100">
+          <p className="font-bold text-stone-800 text-sm flex items-center gap-2">
+            <Clock className="w-4 h-4 text-stone-400" /> Recent AI Broadcasts
+          </p>
+        </div>
+        {logsLoading ? (
+          <div className="p-6 flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-stone-300" /></div>
+        ) : logs.length === 0 ? (
+          <p className="text-stone-400 text-sm text-center py-6">No AI broadcasts yet</p>
+        ) : (
+          <div className="divide-y divide-stone-100">
+            {logs.map(log => (
+              <div key={log.id} className="px-5 py-3 flex items-start gap-3">
+                <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5"
+                     style={{ background: log.audience === "vendors" ? "#f3e8ff" : "#f0fdf4" }}>
+                  <Bot className="w-3.5 h-3.5" style={{ color: log.audience === "vendors" ? "#7C3AED" : "#0D9488" }} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="font-semibold text-stone-900 text-sm truncate">{log.title}</p>
+                    <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold flex-shrink-0 ${
+                      log.audience === "vendors" ? "bg-purple-100 text-purple-700"
+                      : log.audience === "all" ? "bg-stone-100 text-stone-600"
+                      : "bg-teal-100 text-teal-700"
+                    }`}>{log.audience}</span>
+                    {log.school && (
+                      <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-orange-100 text-orange-700 flex-shrink-0">
+                        {log.school.toUpperCase()}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-stone-500 text-xs mt-0.5 line-clamp-1">{log.message}</p>
+                  <p className="text-stone-400 text-xs mt-1">
+                    {log.sent_count} sent · {log.triggered_by} · {timeAgo(log.created_at)}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function AdminMessagesPage() {
@@ -359,6 +560,7 @@ export default function AdminMessagesPage() {
           {([
             { key: "single",    label: "Single User",  icon: User },
             { key: "broadcast", label: "Broadcast",    icon: Users },
+            { key: "ai",        label: "AI Broadcast", icon: Bot  },
           ] as { key: Mode; label: string; icon: React.ElementType }[]).map(({ key, label, icon: Icon }) => (
             <button
               key={key}
@@ -373,7 +575,9 @@ export default function AdminMessagesPage() {
           ))}
         </div>
 
-        {mode === "single" ? <SingleUserCompose /> : <BroadcastCompose />}
+        {mode === "single" && <SingleUserCompose />}
+        {mode === "broadcast" && <BroadcastCompose />}
+        {mode === "ai" && <GrokBroadcast />}
 
       </div>
     </div>

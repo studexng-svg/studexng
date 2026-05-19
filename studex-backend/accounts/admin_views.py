@@ -1427,6 +1427,58 @@ class AdminActivityView(APIView):
         })
 
 
+class AdminGrokNotifyView(APIView):
+    """
+    GET  /api/admin/grok-notify/  — last 20 AI broadcast logs
+    POST /api/admin/grok-notify/  — generate preview or generate + send
+      Body: { audience: 'students'|'vendors'|'all', school?: str, preview?: bool }
+    """
+    permission_classes = [IsAdminUser]
+
+    def get(self, request):
+        from notifications.models import GrokNotificationLog
+        logs = GrokNotificationLog.objects.all()[:20]
+        return Response([{
+            'id': log.id,
+            'audience': log.audience,
+            'school': log.school,
+            'title': log.title,
+            'message': log.message,
+            'sent_count': log.sent_count,
+            'triggered_by': log.triggered_by,
+            'created_at': log.created_at.isoformat(),
+        } for log in logs])
+
+    def post(self, request):
+        from grok_notifications import _call_grok, _build_recipients, send_grok_notifications
+
+        audience = (request.data.get('audience') or 'all').strip()
+        school = (request.data.get('school') or '').strip().lower()
+        preview_only = bool(request.data.get('preview', False))
+
+        if audience not in ('students', 'vendors', 'all'):
+            return Response({'error': 'audience must be students, vendors, or all'}, status=400)
+
+        if preview_only:
+            payload = _call_grok(audience)
+            if not payload:
+                return Response(
+                    {'error': 'Grok API unavailable — check XAI_API_KEY on Render'},
+                    status=503,
+                )
+            recipient_count = _build_recipients(audience, school).count()
+            return Response({
+                'title': payload['title'],
+                'message': payload['message'],
+                'recipient_count': recipient_count,
+            })
+
+        result = send_grok_notifications(audience=audience, school=school, triggered_by='admin')
+        if 'error' in result:
+            return Response(result, status=503)
+        return Response(result)
+
+
 def _broadcast_base_qs(school: str):
     """Return the base active-user queryset filtered by school."""
     qs = User.objects.filter(is_active=True)

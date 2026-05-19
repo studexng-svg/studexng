@@ -25,6 +25,7 @@ class Notification(models.Model):
         ('message', 'New Message'),
         ('admin_message', 'Message from Admin'),
         ('bank_account_added', 'Bank Account Added'),
+        ('ai_tip', 'AI Tip / Engagement Message'),
     )
 
     recipient = models.ForeignKey(
@@ -53,6 +54,29 @@ class Notification(models.Model):
         ordering = ['-created_at']
         verbose_name = "Notification"
         verbose_name_plural = "Notifications"
+
+
+class GrokNotificationLog(models.Model):
+    AUDIENCE_CHOICES = (
+        ('students', 'Students'),
+        ('vendors', 'Vendors'),
+        ('all', 'All Users'),
+    )
+    audience = models.CharField(max_length=20, choices=AUDIENCE_CHOICES)
+    school = models.CharField(max_length=20, blank=True, default='')
+    title = models.CharField(max_length=200)
+    message = models.TextField()
+    sent_count = models.IntegerField(default=0)
+    triggered_by = models.CharField(max_length=20, default='scheduler')
+    grok_model = models.CharField(max_length=50, default='grok-3-mini')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"[{self.audience}] {self.title} → {self.sent_count} sent"
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = "Grok Notification Log"
 
 
 class FCMToken(models.Model):
