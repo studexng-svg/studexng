@@ -137,12 +137,25 @@ function ActionCard({ action, status, result, onConfirm, onDismiss }: {
   );
 }
 
+const STORAGE_KEY = "admin_ai_chat_history";
+
 export default function AdminAIPage() {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput]       = useState("");
-  const [loading, setLoading]   = useState(false);
+  const [messages, setMessages] = useState<Message[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
+  const [input, setInput]     = useState("");
+  const [loading, setLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef  = useRef<HTMLInputElement>(null);
+
+  // Persist messages to localStorage whenever they change
+  useEffect(() => {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(messages)); } catch {}
+  }, [messages]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -326,7 +339,10 @@ export default function AdminAIPage() {
         <div className="max-w-2xl mx-auto flex gap-2 items-center">
           {messages.length > 0 && (
             <button
-              onClick={() => setMessages([])}
+              onClick={() => {
+                setMessages([]);
+                try { localStorage.removeItem(STORAGE_KEY); } catch {}
+              }}
               className="text-xs text-stone-400 hover:text-stone-600 transition flex-shrink-0"
             >
               Clear
