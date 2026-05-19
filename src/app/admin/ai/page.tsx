@@ -11,7 +11,7 @@ import { fetchWithAuth } from "@/lib/authStore";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
-type ActionType = "send_notification" | "verify_vendor" | "generate_report" | "set_listing_status" | "lookup_user";
+type ActionType = "send_notification" | "verify_vendor" | "generate_report" | "set_listing_status" | "lookup_user" | "lookup_order" | "lookup_conversation";
 
 interface Action {
   type: ActionType;
@@ -111,11 +111,13 @@ function ActionCard({ action, status, result, onConfirm, onDismiss }: {
   if (status === "dismissed") return null;
 
   const iconMap: Record<ActionType, React.ElementType> = {
-    send_notification:  BellRing,
-    verify_vendor:      UserCheck,
-    generate_report:    BarChart3,
-    set_listing_status: PackageCheck,
-    lookup_user:        User,
+    send_notification:    BellRing,
+    verify_vendor:        UserCheck,
+    generate_report:      BarChart3,
+    set_listing_status:   PackageCheck,
+    lookup_user:          User,
+    lookup_order:         BarChart3,
+    lookup_conversation:  BellRing,
   };
   const Icon = iconMap[action.type] || Sparkles;
 
@@ -362,8 +364,9 @@ export default function AdminAIPage() {
         actionStatus: data.action ? "pending" : undefined,
       };
 
-      // Auto-execute lookup actions — no confirm card needed
-      if (data.action?.type === "lookup_user") {
+      // Auto-execute all lookup actions — no confirm card needed
+      const AUTO_EXECUTE = ["lookup_user", "lookup_order", "lookup_conversation"];
+      if (data.action?.type && AUTO_EXECUTE.includes(data.action.type)) {
         setMessages(prev => [...prev, { ...aiMsg, actionStatus: "dismissed" }]);
         try {
           const lookupRes  = await fetchWithAuth(`${API_URL}/api/admin/ai-action/`, {

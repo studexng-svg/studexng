@@ -1480,249 +1480,286 @@ class AdminGroqNotifyView(APIView):
 
 
 def _get_platform_context() -> str:
-    """Gather comprehensive live platform metrics for the AI admin chat system prompt."""
+    """Full live snapshot of every entity on the platform for the AI admin assistant."""
     from django.utils import timezone as tz
     from datetime import timedelta
+    from django.db.models import Count as DjCount, Avg
 
     now       = tz.now()
     week_ago  = now - timedelta(days=7)
     month_ago = now - timedelta(days=30)
-    lines = [f"Current time: {now.strftime('%A %d %B %Y, %H:%M WAT')}"]
+    sections: list[str] = [f"=== StudEx Platform Snapshot — {now.strftime('%A %d %B %Y, %H:%M WAT')} ==="]
 
-    # ── Users ────────────────────────────────────────────────────────────────
+    # ── ALL USERS ────────────────────────────────────────────────────────────
     try:
-        total    = User.objects.filter(is_active=True).count()
-        students = User.objects.filter(is_active=True, user_type='student').count()
-        vendors  = User.objects.filter(is_active=True, user_type='vendor').count()
-        new_week = User.objects.filter(date_joined__gte=week_ago).count()
+        all_users = list(
+            User.objects.filter(is_active=True)
+            .select_related('profile')
+            .order_by('user_type', 'username')
+        )
+        vendors  = [u for u in all_users if u.user_type == 'vendor']
+        students = [u for u in all_users if u.user_type == 'student']
+        new_week  = User.objects.filter(date_joined__gte=week_ago).count()
         new_month = User.objects.filter(date_joined__gte=month_ago).count()
 
-        pau_count  = User.objects.filter(is_active=True, school__iexact='pau').count()
-        futo_count = User.objects.filter(is_active=True, school__iexact='futo').count()
-
-        lines.append(
-            f"Users: {total} active total — {students} students, {vendors} verified vendors"
+        hdr = (
+            f"USERS: {len(all_users)} active ({len(students)} students, {len(vendors)} vendors) | "
+            f"+{new_week} this week | +{new_month} this month"
         )
-        lines.append(f"New users: +{new_week} this week, +{new_month} this month")
-        lines.append(f"Campus split: PAU={pau_count}, FUTO={futo_count}")
+
+        vendor_lines = []
+        for u in vendors:
+            try:
+                p = u.profile
+                active_l = u.listings.filter(is_available=True).count()
+                total_l  = u.listings.count()
+                vl = (f"  [user_id:{u.id}] {u.username} | {u.school or '?'} | "
+                      f"{u.business_name or 'no biz'} | joined:{u.date_joined.strftime('%d %b %Y')} | "
+                      f"sales:{p.total_sales} rating:{p.rating}/5 badge:{p.vendor_badge} "
+                      f"listings:{active_l}/{total_l} | wallet:₦{u.wallet_balance:,.0f} | "
+                      f"verified:{u.is_verified_vendor}")
+            except Exception:
+                vl = f"  [user_id:{u.id}] {u.username} | {u.school or '?'}"
+            vendor_lines.append(vl)
+
+        student_lines = []
+        for u in students:
+            try:
+                p = u.profile
+                sl = (f"  [user_id:{u.id}] {u.username} | {u.school or '?'} | "
+                      f"joined:{u.date_joined.strftime('%d %b %Y')} | "
+                      f"orders:{p.total_orders} | wallet:₦{u.wallet_balance:,.0f}")
+            except Exception:
+                sl = f"  [user_id:{u.id}] {u.username} | {u.school or '?'}"
+            student_lines.append(sl)
+
+        sections.append(
+            hdr + f"\n\nALL VENDORS ({len(vendors)}):\n" + "\n".join(vendor_lines) +
+            f"\n\nALL STUDENTS ({len(students)}):\n" + "\n".join(student_lines)
+        )
     except Exception:
         pass
 
-    # ── Pending seller applications ──────────────────────────────────────────
+    # ── SELLER APPLICATIONS ──────────────────────────────────────────────────
     try:
         from accounts.models import SellerApplication
-        pending_apps = list(
+        pending = list(
             SellerApplication.objects.filter(status='pending')
-            .select_related('user')
-            .order_by('submitted_at')
-            .values('id', 'user__id', 'user__username', 'user__email', 'submitted_at')[:20]
+            .select_related('user').order_by('submitted_at')
+            .values('id', 'user__id', 'user__username', 'submitted_at')
         )
-        if pending_apps:
-            items = [
-                f"{a['user__username']} (application_id:{a['id']}, submitted:{a['submitted_at'].strftime('%d %b')})"
-                for a in pending_apps
-            ]
-            lines.append(f"Pending seller applications ({len(pending_apps)}): {'; '.join(items)}")
-        else:
-            lines.append("Pending seller applications: none")
+        all_apps = list(
+            SellerApplication.objects.select_related('user')
+            .order_by('-submitted_at')
+            .values('id', 'user__username', 'status', 'submitted_at', 'reviewed_at')[:100]
+        )
+        approved_month = sum(1 for a in all_apps if a['status'] == 'approved' and a['reviewed_at'] and a['reviewed_at'] >= month_ago)
+        rejected_month = sum(1 for a in all_apps if a['status'] == 'rejected' and a['reviewed_at'] and a['reviewed_at'] >= month_ago)
 
-        approved_month = SellerApplication.objects.filter(
-            status='approved', reviewed_at__gte=month_ago
-        ).count()
-        rejected_month = SellerApplication.objects.filter(
-            status='rejected', reviewed_at__gte=month_ago
-        ).count()
-        lines.append(f"Applications this month: {approved_month} approved, {rejected_month} rejected")
+        pending_items = [
+            f"  [application_id:{a['id']}] {a['user__username']} (user_id:{a['user__id']}, submitted:{a['submitted_at'].strftime('%d %b %Y')})"
+            for a in pending
+        ]
+        app_lines = [
+            f"  [application_id:{a['id']}] {a['user__username']} | {a['status']} | submitted:{a['submitted_at'].strftime('%d %b %Y')}"
+            for a in all_apps
+        ]
+        sections.append(
+            f"SELLER APPLICATIONS: {len(pending)} pending | {approved_month} approved this month | {rejected_month} rejected this month\n"
+            f"PENDING:\n" + ("\n".join(pending_items) if pending_items else "  none") +
+            f"\nALL APPLICATIONS ({len(all_apps)}):\n" + "\n".join(app_lines)
+        )
     except Exception:
-        lines.append("Pending seller applications: none")
+        sections.append("SELLER APPLICATIONS: unavailable")
 
-    # ── Listings & categories ─────────────────────────────────────────────────
+    # ── ALL LISTINGS & CATEGORIES ────────────────────────────────────────────
     try:
         from services.models import Listing, Category
-        from django.db.models import Count as DjCount
 
-        total_l    = Listing.objects.count()
-        active_l   = Listing.objects.filter(is_available=True).count()
-        inactive_l = total_l - active_l
-        new_week_l = Listing.objects.filter(created_at__gte=week_ago).count()
-        lines.append(
-            f"Listings: {total_l} total — {active_l} active, {inactive_l} inactive/out-of-stock, +{new_week_l} added this week"
-        )
-
-        # Breakdown by type
-        type_counts = (
-            Listing.objects.values('listing_type')
-            .annotate(n=DjCount('id'))
-            .order_by('-n')
-        )
-        if type_counts:
-            tc = ', '.join(f"{t['listing_type']}:{t['n']}" for t in type_counts)
-            lines.append(f"Listing types: {tc}")
-
-        # Campus breakdown
-        pau_l  = Listing.objects.filter(campus__iexact='pau').count()
-        futo_l = Listing.objects.filter(campus__iexact='futo').count()
-        lines.append(f"Listings by campus: PAU={pau_l}, FUTO={futo_l}")
-
-        # Categories with listing counts
-        cats = (
-            Category.objects.annotate(n=DjCount('listings'))
-            .order_by('-n')
-        )
-        if cats:
-            cat_items = [f"{c.title}({c.n})" for c in cats if c.n > 0]
-            no_listings = [c.title for c in cats if c.n == 0]
-            lines.append(f"Categories with listings: {', '.join(cat_items) or 'none'}")
-            if no_listings:
-                lines.append(f"Empty categories (no listings): {', '.join(no_listings)}")
-
-        # Recent 5 listings added
-        recent_listings = list(
+        all_listings = list(
             Listing.objects.select_related('vendor', 'category')
             .order_by('-created_at')
-            .values('title', 'vendor__username', 'category__title', 'price', 'is_available', 'listing_type')[:5]
+            .values('id', 'title', 'vendor__username', 'vendor__id', 'price',
+                    'listing_type', 'campus', 'is_available', 'category__title',
+                    'stock_quantity', 'track_inventory', 'created_at')
         )
-        if recent_listings:
-            rl = '; '.join(
-                f'"{r["title"]}" by {r["vendor__username"]} (₦{r["price"]}, {r["listing_type"]}, {"active" if r["is_available"] else "inactive"})'
-                for r in recent_listings
-            )
-            lines.append(f"5 most recent listings: {rl}")
+        total_l  = len(all_listings)
+        active_l = sum(1 for l in all_listings if l['is_available'])
+        new_w_l  = sum(1 for l in all_listings if l['created_at'] >= week_ago)
 
-        # Top vendors by listing count
-        top_vendors = (
-            Listing.objects.values('vendor__username')
-            .annotate(n=DjCount('id'))
-            .order_by('-n')[:5]
+        listing_lines = [
+            f"  [listing_id:{l['id']}] {l['title']} | by {l['vendor__username']} (user_id:{l['vendor__id']}) | "
+            f"₦{l['price']:,.0f} | {l['listing_type']} | {l['category__title']} | {l['campus']} | "
+            f"{'ACTIVE' if l['is_available'] else 'inactive'} | "
+            f"{'stock:' + str(l['stock_quantity']) if l['track_inventory'] else 'no inventory'} | "
+            f"added:{l['created_at'].strftime('%d %b %Y')}"
+            for l in all_listings
+        ]
+
+        cats = list(Category.objects.annotate(n=DjCount('listings')).order_by('-n'))
+        cat_lines = [
+            f"  [cat_id:{c.id}] {c.title} | {c.n} listings | campus:{c.campus}"
+            for c in cats
+        ]
+
+        sections.append(
+            f"LISTINGS: {total_l} total | {active_l} active | {total_l-active_l} inactive | +{new_w_l} this week\n"
+            f"ALL LISTINGS ({total_l}):\n" + "\n".join(listing_lines) +
+            f"\n\nALL CATEGORIES ({len(cats)}):\n" + "\n".join(cat_lines)
         )
-        if top_vendors:
-            tv = ', '.join(f"{v['vendor__username']}({v['n']})" for v in top_vendors)
-            lines.append(f"Top vendors by listing count: {tv}")
-
-        # Vendors with zero active listings (might need a nudge)
-        vendors_no_active = User.objects.filter(
-            user_type='vendor', is_active=True
-        ).exclude(
-            listings__is_available=True
-        ).count()
-        if vendors_no_active:
-            lines.append(f"Vendors with no active listings: {vendors_no_active} (may need follow-up)")
-
-        # Inactive listings awaiting admin approval (include IDs so AI can act on them)
-        inactive_pending = list(
-            Listing.objects.filter(is_available=False)
-            .select_related('vendor')
-            .order_by('-created_at')
-            .values('id', 'title', 'vendor__username', 'price', 'listing_type', 'campus', 'created_at')[:15]
-        )
-        if inactive_pending:
-            items = [
-                f'[listing_id:{l["id"]}] "{l["title"]}" by {l["vendor__username"]}'
-                f' (₦{l["price"]}, {l["listing_type"]}, {l["campus"]}, added {l["created_at"].strftime("%d %b")})'
-                for l in inactive_pending
-            ]
-            lines.append(f"Inactive/unapproved listings ({len(inactive_pending)}): {'; '.join(items)}")
-        else:
-            lines.append("Inactive listings: none pending review")
     except Exception:
         pass
 
-    # ── Orders ───────────────────────────────────────────────────────────────
+    # ── ALL ORDERS ───────────────────────────────────────────────────────────
     try:
         from orders.models import Order
-        total_o    = Order.objects.count()
-        week_o     = Order.objects.filter(created_at__gte=week_ago).count()
-        month_o    = Order.objects.filter(created_at__gte=month_ago).count()
-        pending_o  = Order.objects.filter(status='pending').count()
-        confirmed_o = Order.objects.filter(status='confirmed').count()
-        completed_o = Order.objects.filter(status='completed').count()
-        cancelled_o = Order.objects.filter(status='cancelled').count()
-        disputed_o  = Order.objects.filter(disputes__status__in=['open', 'under_review']).distinct().count()
-
-        lines.append(
-            f"Orders: {total_o} all-time — {week_o} this week, {month_o} this month"
+        all_orders = list(
+            Order.objects.select_related('buyer', 'listing', 'listing__vendor')
+            .order_by('-created_at')
+            .values('id', 'reference', 'buyer__username', 'buyer__id',
+                    'listing__title', 'listing__vendor__username', 'listing__vendor__id',
+                    'amount', 'status', 'created_at')[:500]
         )
-        lines.append(
-            f"Order status breakdown: {pending_o} pending (unpaid), {confirmed_o} confirmed, "
-            f"{completed_o} completed, {cancelled_o} cancelled, {disputed_o} disputed"
-        )
+        total_o = Order.objects.count()
+        sc = {s['status']: s['n'] for s in Order.objects.values('status').annotate(n=DjCount('id'))}
 
-        # Open disputes with reference info
-        if disputed_o > 0:
-            open_disputes = list(
-                Order.objects.filter(disputes__status__in=['open', 'under_review'])
-                .distinct()
-                .values('reference', 'buyer__username', 'listing__vendor__username')[:5]
-            )
-            d_items = [
-                f"order {d['reference']} (buyer:{d['buyer__username']}, vendor:{d['listing__vendor__username']})"
-                for d in open_disputes
-            ]
-            lines.append(f"Open disputes: {'; '.join(d_items)}")
+        order_lines = [
+            f"  [order_id:{o['id']} ref:{o['reference']}] {o['status']} | ₦{o['amount']:,.0f} | "
+            f"buyer:{o['buyer__username']} (user_id:{o['buyer__id']}) → "
+            f"vendor:{o['listing__vendor__username']} | {o['listing__title'][:40]} | "
+            f"{o['created_at'].strftime('%d %b %Y')}"
+            for o in all_orders
+        ]
+        sections.append(
+            f"ORDERS: {total_o} total | pending:{sc.get('pending',0)} confirmed:{sc.get('confirmed',0)} "
+            f"completed:{sc.get('completed',0)} cancelled:{sc.get('cancelled',0)} disputed:{sc.get('disputed',0)}\n"
+            f"ALL ORDERS (most recent {len(all_orders)}):\n" + "\n".join(order_lines)
+        )
     except Exception:
         pass
 
-    # ── Revenue & payments ───────────────────────────────────────────────────
+    # ── ALL DISPUTES ─────────────────────────────────────────────────────────
+    try:
+        from orders.models import Dispute
+        all_disputes = list(
+            Dispute.objects.select_related('order', 'order__buyer', 'order__listing', 'order__listing__vendor', 'filer')
+            .order_by('-created_at')
+        )
+        dispute_lines = [
+            f"  [dispute_id:{d.id}] order:{d.order.reference} | status:{d.status} | resolution:{d.resolution} | "
+            f"filed_by:{d.filer.username} ({d.filed_by}) | reason:{d.reason} | "
+            f"buyer:{d.order.buyer.username} → vendor:{d.order.listing.vendor.username} | "
+            f"₦{d.order.amount:,.0f} | {d.created_at.strftime('%d %b %Y')}"
+            for d in all_disputes
+        ]
+        open_count = sum(1 for d in all_disputes if d.status in ('open', 'under_review'))
+        sections.append(
+            f"DISPUTES: {len(all_disputes)} total | {open_count} open/under review\n"
+            f"ALL DISPUTES:\n" + ("\n".join(dispute_lines) if dispute_lines else "  none")
+        )
+    except Exception:
+        pass
+
+    # ── PAYMENTS & PAYOUTS ───────────────────────────────────────────────────
     try:
         from payments.models import PaymentTransaction
-        rev_total = PaymentTransaction.objects.filter(
-            status='success'
-        ).aggregate(t=Sum('platform_amount'))['t'] or 0
-        rev_month = PaymentTransaction.objects.filter(
-            status='success', created_at__gte=month_ago
-        ).aggregate(t=Sum('platform_amount'))['t'] or 0
-        rev_week = PaymentTransaction.objects.filter(
-            status='success', created_at__gte=week_ago
-        ).aggregate(t=Sum('platform_amount'))['t'] or 0
-        vol_total = PaymentTransaction.objects.filter(
-            status='success'
-        ).aggregate(t=Sum('amount'))['t'] or 0
-
-        lines.append(
-            f"Platform revenue (fees earned): ₦{rev_total:,.0f} all-time, "
-            f"₦{rev_month:,.0f} this month, ₦{rev_week:,.0f} this week"
+        txns = list(
+            PaymentTransaction.objects.select_related('buyer', 'seller')
+            .order_by('-created_at')
+            .values('id', 'reference', 'buyer__username', 'seller__username',
+                    'amount', 'seller_amount', 'platform_amount',
+                    'status', 'transfer_status', 'order_id', 'created_at')[:300]
         )
-        lines.append(f"Total transaction volume processed: ₦{vol_total:,.0f}")
+        agg_success = PaymentTransaction.objects.filter(status='success')
+        rev_total = agg_success.aggregate(t=Sum('platform_amount'))['t'] or 0
+        rev_month = agg_success.filter(created_at__gte=month_ago).aggregate(t=Sum('platform_amount'))['t'] or 0
+        rev_week  = agg_success.filter(created_at__gte=week_ago).aggregate(t=Sum('platform_amount'))['t'] or 0
+        vol_total = agg_success.aggregate(t=Sum('amount'))['t'] or 0
+        failed_payouts = sum(1 for t in txns if t['status'] == 'success' and t['transfer_status'] == 'failed')
 
-        failed_transfers = PaymentTransaction.objects.filter(
-            status='success', transfer_status='failed'
-        ).count()
-        if failed_transfers:
-            lines.append(f"WARNING: {failed_transfers} vendor payout(s) failed — manual action may be needed")
+        txn_lines = [
+            f"  [txn_id:{t['id']} ref:{t['reference']}] {t['status']} | ₦{t['amount']:,.0f} total "
+            f"(vendor:₦{t['seller_amount']:,.0f} fee:₦{t['platform_amount']:,.0f}) | "
+            f"buyer:{t['buyer__username'] or '?'} → seller:{t['seller__username'] or '?'} | "
+            f"payout:{t['transfer_status'] or 'pending'} | order_id:{t['order_id']} | "
+            f"{t['created_at'].strftime('%d %b %Y')}"
+            for t in txns
+        ]
+        sections.append(
+            f"PAYMENTS & REVENUE:\n"
+            f"  Platform fees earned: ₦{rev_total:,.0f} all-time | ₦{rev_month:,.0f} this month | ₦{rev_week:,.0f} this week\n"
+            f"  Total transaction volume: ₦{vol_total:,.0f}\n"
+            f"  {'⚠ WARNING: ' + str(failed_payouts) + ' failed vendor payout(s) need attention' if failed_payouts else 'All payouts healthy'}\n"
+            f"ALL TRANSACTIONS (most recent {len(txns)}):\n" + "\n".join(txn_lines)
+        )
     except Exception:
         pass
 
-    # ── Reviews ──────────────────────────────────────────────────────────────
+    # ── ALL REVIEWS ──────────────────────────────────────────────────────────
     try:
         from reviews.models import Review
-        from django.db.models import Avg
-        review_count = Review.objects.count()
-        avg_rating   = Review.objects.aggregate(a=Avg('rating'))['a'] or 0
-        week_reviews = Review.objects.filter(created_at__gte=week_ago).count()
-        lines.append(
-            f"Reviews: {review_count} total, avg rating {avg_rating:.1f}/5, +{week_reviews} this week"
+        all_reviews = list(
+            Review.objects.select_related('reviewer', 'vendor')
+            .order_by('-created_at')
+            .values('id', 'reviewer__username', 'reviewer__id', 'vendor__username', 'vendor__id',
+                    'rating', 'comment', 'created_at')[:300]
+        )
+        avg_r = Review.objects.aggregate(a=Avg('rating'))['a'] or 0
+        review_lines = [
+            f"  [review_id:{r['id']}] {r['reviewer__username']} (user_id:{r['reviewer__id']}) → "
+            f"{r['vendor__username']} (user_id:{r['vendor__id']}) | {r['rating']}/5 | "
+            f"{(r['comment'] or '')[:80]} | {r['created_at'].strftime('%d %b %Y')}"
+            for r in all_reviews
+        ]
+        sections.append(
+            f"REVIEWS: {len(all_reviews)} total | avg rating:{avg_r:.1f}/5\n"
+            f"ALL REVIEWS:\n" + ("\n".join(review_lines) if review_lines else "  none")
         )
     except Exception:
         pass
 
-    # ── Recent Groq AI broadcasts ────────────────────────────────────────────
+    # ── ALL CONVERSATIONS ────────────────────────────────────────────────────
+    try:
+        from chat.models import Conversation
+        all_convs = list(
+            Conversation.objects.select_related('buyer', 'seller')
+            .order_by('-last_message_at')
+            .values('id', 'buyer__username', 'buyer__id', 'seller__username', 'seller__id',
+                    'last_message', 'last_message_at', 'created_at')[:200]
+        )
+        conv_lines = [
+            f"  [conv_id:{c['id']}] {c['buyer__username']} (user_id:{c['buyer__id']}) ↔ "
+            f"{c['seller__username']} (user_id:{c['seller__id']}) | "
+            f"last msg: \"{(c['last_message'] or '')[:60]}\" | "
+            f"{c['last_message_at'].strftime('%d %b %Y') if c['last_message_at'] else 'no messages'}"
+            for c in all_convs
+        ]
+        sections.append(
+            f"CONVERSATIONS: {len(all_convs)} total\n"
+            f"ALL CONVERSATIONS (most recent {len(all_convs)}):\n" +
+            ("\n".join(conv_lines) if conv_lines else "  none")
+        )
+    except Exception:
+        pass
+
+    # ── GROQ AI BROADCASTS ───────────────────────────────────────────────────
     try:
         from notifications.models import GrokNotificationLog, PlatformSettings
         ai_enabled = PlatformSettings.get().grok_notifications_enabled
-        lines.append(f"Groq AI auto-broadcasts: {'enabled' if ai_enabled else 'DISABLED'}")
-
-        recent_logs = GrokNotificationLog.objects.order_by('-created_at')[:5]
-        if recent_logs:
-            log_items = [
-                f'"{log.title}" → {log.sent_count} {log.audience}'
-                f'{"/" + log.school.upper() if log.school else ""} ({log.triggered_by})'
-                for log in recent_logs
-            ]
-            lines.append(f"Recent AI broadcasts: {'; '.join(log_items)}")
+        logs = list(GrokNotificationLog.objects.order_by('-created_at')[:20])
+        log_lines = [
+            f"  \"{log.title}\" → {log.sent_count} {log.audience}"
+            f"{'/' + log.school.upper() if log.school else ''} ({log.triggered_by}, {log.created_at.strftime('%d %b %Y')})"
+            for log in logs
+        ]
+        sections.append(
+            f"AI BROADCASTS: {'enabled' if ai_enabled else 'DISABLED'}\n"
+            f"RECENT BROADCASTS:\n" + ("\n".join(log_lines) if log_lines else "  none")
+        )
     except Exception:
         pass
 
-    return '\n'.join(lines)
+    return '\n\n'.join(sections)
 
 
 class AdminAIChatView(APIView):
@@ -1805,9 +1842,20 @@ AVAILABLE ACTIONS:
 
 5. lookup_user
    params: query (str) — username, partial name, or email to search
-   Use this IMMEDIATELY whenever the admin asks about any specific user by name or username.
-   Never say "I can't find them in the live data" — use this action instead and the full profile will be returned.
-   Examples: "check ugo", "who is ugochukwu", "find john", "what's ada's status"
+   Use when the admin wants details about a specific user. The full profile is returned and injected back.
+   Examples: "check ugo", "who is ugochukwu", "show me john's details"
+
+6. lookup_order
+   params: query (str) — order reference, buyer username, or vendor username
+   Use when admin asks about a specific order or a user's order history.
+   Examples: "show me order ORD-123", "what orders has ada placed", "vendor ugo's orders"
+
+7. lookup_conversation
+   params: query (str) — buyer or seller username
+   Use when admin wants to see chat messages between two users.
+   Example: "show me the conversation between ada and ugo"
+
+The platform snapshot above already contains every user, listing, order, dispute, payment, review, and conversation — use that data to answer most questions directly. Only use lookup actions when the admin asks for deeper detail beyond what the snapshot shows.
 
 Do NOT include <action> if no action is needed.
 Do NOT identify yourself as Groq, LLaMA, or any third-party AI — you are StudEx Admin AI."""
@@ -1873,6 +1921,10 @@ class AdminAIActionView(APIView):
             return self._set_listing_status(request, params)
         elif action_type == 'lookup_user':
             return self._lookup_user(params)
+        elif action_type == 'lookup_order':
+            return self._lookup_order(params)
+        elif action_type == 'lookup_conversation':
+            return self._lookup_conversation(params)
         else:
             return Response({'error': f'Unknown action type: {action_type}'}, status=400)
 
@@ -2066,6 +2118,91 @@ class AdminAIActionView(APIView):
                 pass
             blocks.append('\n'.join(lines))
 
+        return Response({'detail': '\n'.join(blocks)})
+
+    def _lookup_order(self, params):
+        from django.db.models import Q
+        from orders.models import Order, Dispute
+        query = (params.get('query') or '').strip()
+        if len(query) < 2:
+            return Response({'error': 'query must be at least 2 characters'}, status=400)
+
+        orders = list(
+            Order.objects.filter(
+                Q(reference__icontains=query) |
+                Q(buyer__username__icontains=query) |
+                Q(listing__vendor__username__icontains=query) |
+                Q(listing__title__icontains=query)
+            ).select_related('buyer', 'listing', 'listing__vendor', 'listing__category')
+            .prefetch_related('disputes')
+            .order_by('-created_at')[:20]
+        )
+        if not orders:
+            return Response({'detail': f'No orders found matching "{query}".'})
+
+        blocks = [f'Found {len(orders)} order(s) matching "{query}":']
+        for o in orders:
+            lines = [
+                f'\n[order_id:{o.id} ref:{o.reference}]',
+                f'  Status: {o.status}',
+                f'  Amount: ₦{o.amount:,.2f}',
+                f'  Buyer: {o.buyer.username} (user_id:{o.buyer.id})',
+                f'  Listing: "{o.listing.title}" (listing_id:{o.listing.id})',
+                f'  Vendor: {o.listing.vendor.username} (user_id:{o.listing.vendor.id})',
+                f'  Category: {o.listing.category.title}',
+                f'  Campus: {o.listing.campus}',
+                f'  Placed: {o.created_at.strftime("%d %b %Y %H:%M")}',
+            ]
+            try:
+                from payments.models import PaymentTransaction
+                txn = PaymentTransaction.objects.filter(order_id=o.id).first()
+                if txn:
+                    lines.append(
+                        f'  Payment ref: {txn.reference} | status:{txn.status} | '
+                        f'vendor payout:₦{txn.seller_amount:,.0f} payout_status:{txn.transfer_status or "pending"}'
+                    )
+            except Exception:
+                pass
+            for d in o.disputes.all():
+                lines.append(
+                    f'  Dispute [id:{d.id}] status:{d.status} reason:{d.reason} '
+                    f'resolution:{d.resolution} filed_by:{d.filed_by}'
+                )
+            blocks.append('\n'.join(lines))
+        return Response({'detail': '\n'.join(blocks)})
+
+    def _lookup_conversation(self, params):
+        from django.db.models import Q
+        from chat.models import Conversation, Message as ChatMessage
+        query = (params.get('query') or '').strip()
+        if len(query) < 2:
+            return Response({'error': 'query must be at least 2 characters'}, status=400)
+
+        convs = list(
+            Conversation.objects.filter(
+                Q(buyer__username__icontains=query) |
+                Q(seller__username__icontains=query)
+            ).select_related('buyer', 'seller')
+            .order_by('-last_message_at')[:10]
+        )
+        if not convs:
+            return Response({'detail': f'No conversations found involving "{query}".'})
+
+        blocks = [f'Found {len(convs)} conversation(s) involving "{query}":']
+        for c in convs:
+            msgs = list(
+                ChatMessage.objects.filter(conversation=c)
+                .select_related('sender')
+                .order_by('-created_at')[:20]
+            )
+            msg_lines = [
+                f'  [{m.created_at.strftime("%d %b %H:%M")}] {m.sender.username}: {m.content[:100]}'
+                for m in reversed(msgs)
+            ]
+            blocks.append(
+                f'\n[conv_id:{c.id}] {c.buyer.username} ↔ {c.seller.username}\n'
+                + ('\n'.join(msg_lines) if msg_lines else '  (no messages)')
+            )
         return Response({'detail': '\n'.join(blocks)})
 
 
