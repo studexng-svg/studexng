@@ -9,7 +9,7 @@ These endpoints power the Next.js admin dashboard.
 from rest_framework import status, generics
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from django.db.models import Q, Count, Sum
+from django.db.models import Q, Count, Sum, Avg
 from django.conf import settings
 
 from studex.permissions import IsAdminUser, IsSuperAdminUser
@@ -1480,81 +1480,178 @@ class AdminGroqNotifyView(APIView):
 
 
 def _get_platform_context() -> str:
-    """Gather live platform metrics for the AI admin chat system prompt."""
+    """Gather comprehensive live platform metrics for the AI admin chat system prompt."""
     from django.utils import timezone as tz
     from datetime import timedelta
 
-    now = tz.now()
+    now       = tz.now()
     week_ago  = now - timedelta(days=7)
     month_ago = now - timedelta(days=30)
     lines = [f"Current time: {now.strftime('%A %d %B %Y, %H:%M WAT')}"]
 
+    # ── Users ────────────────────────────────────────────────────────────────
     try:
         total    = User.objects.filter(is_active=True).count()
         students = User.objects.filter(is_active=True, user_type='student').count()
         vendors  = User.objects.filter(is_active=True, user_type='vendor').count()
         new_week = User.objects.filter(date_joined__gte=week_ago).count()
-        lines.append(
-            f"Active users: {total} total — {students} students, {vendors} vendors (+{new_week} this week)"
-        )
-    except Exception as exc:
-        lines.append(f"Users: unavailable ({exc})")
+        new_month = User.objects.filter(date_joined__gte=month_ago).count()
 
+        pau_count  = User.objects.filter(is_active=True, school__iexact='pau').count()
+        futo_count = User.objects.filter(is_active=True, school__iexact='futo').count()
+
+        lines.append(
+            f"Users: {total} active total — {students} students, {vendors} verified vendors"
+        )
+        lines.append(f"New users: +{new_week} this week, +{new_month} this month")
+        lines.append(f"Campus split: PAU={pau_count}, FUTO={futo_count}")
+    except Exception:
+        pass
+
+    # ── Pending seller applications ──────────────────────────────────────────
     try:
         from accounts.models import SellerApplication
-        pending = list(
+        pending_apps = list(
             SellerApplication.objects.filter(status='pending')
             .select_related('user')
-            .values('id', 'user__id', 'user__username', 'user__email', 'created_at')[:10]
+            .order_by('submitted_at')
+            .values('id', 'user__id', 'user__username', 'user__email', 'submitted_at')[:20]
         )
-        if pending:
+        if pending_apps:
             items = [
-                f"{a['user__username']} (application_id:{a['id']}, user_id:{a['user__id']})"
-                for a in pending
+                f"{a['user__username']} (application_id:{a['id']}, submitted:{a['submitted_at'].strftime('%d %b')})"
+                for a in pending_apps
             ]
-            lines.append(f"Pending seller applications ({len(pending)}): {', '.join(items)}")
+            lines.append(f"Pending seller applications ({len(pending_apps)}): {'; '.join(items)}")
         else:
             lines.append("Pending seller applications: none")
-    except Exception as exc:
-        lines.append(f"Pending vendors: unavailable ({exc})")
 
+        approved_month = SellerApplication.objects.filter(
+            status='approved', reviewed_at__gte=month_ago
+        ).count()
+        rejected_month = SellerApplication.objects.filter(
+            status='rejected', reviewed_at__gte=month_ago
+        ).count()
+        lines.append(f"Applications this month: {approved_month} approved, {rejected_month} rejected")
+    except Exception:
+        lines.append("Pending seller applications: none")
+
+    # ── Listings ─────────────────────────────────────────────────────────────
     try:
-        from listings.models import Listing
-        active   = Listing.objects.filter(is_available=True).count()
-        pending_l = Listing.objects.filter(is_approved=False).count()
-        lines.append(f"Listings: {active} active, {pending_l} awaiting approval")
+        from services.models import Listing
+        total_l     = Listing.objects.count()
+        active_l    = Listing.objects.filter(is_available=True).count()
+        inactive_l  = total_l - active_l
+        new_week_l  = Listing.objects.filter(created_at__gte=week_ago).count()
+        lines.append(
+            f"Listings: {total_l} total — {active_l} active, {inactive_l} inactive/unavailable, +{new_week_l} added this week"
+        )
+
+        # Top vendors by listing count
+        from django.db.models import Count as DjCount
+        top_vendors = (
+            Listing.objects.values('vendor__username')
+            .annotate(n=DjCount('id'))
+            .order_by('-n')[:5]
+        )
+        if top_vendors:
+            tv = ', '.join(f"{v['vendor__username']}({v['n']})" for v in top_vendors)
+            lines.append(f"Top vendors by listing count: {tv}")
     except Exception:
         pass
 
+    # ── Orders ───────────────────────────────────────────────────────────────
     try:
         from orders.models import Order
-        total_orders   = Order.objects.count()
-        week_orders    = Order.objects.filter(created_at__gte=week_ago).count()
-        completed_week = Order.objects.filter(status='completed', buyer_confirmed_at__gte=week_ago).count()
-        disputed       = Order.objects.filter(disputes__status__in=['open', 'under_review']).distinct().count()
+        total_o    = Order.objects.count()
+        week_o     = Order.objects.filter(created_at__gte=week_ago).count()
+        month_o    = Order.objects.filter(created_at__gte=month_ago).count()
+        pending_o  = Order.objects.filter(status='pending').count()
+        confirmed_o = Order.objects.filter(status='confirmed').count()
+        completed_o = Order.objects.filter(status='completed').count()
+        cancelled_o = Order.objects.filter(status='cancelled').count()
+        disputed_o  = Order.objects.filter(disputes__status__in=['open', 'under_review']).distinct().count()
+
         lines.append(
-            f"Orders: {total_orders} all-time — {week_orders} this week "
-            f"({completed_week} completed), {disputed} active disputes"
+            f"Orders: {total_o} all-time — {week_o} this week, {month_o} this month"
+        )
+        lines.append(
+            f"Order status breakdown: {pending_o} pending (unpaid), {confirmed_o} confirmed, "
+            f"{completed_o} completed, {cancelled_o} cancelled, {disputed_o} disputed"
+        )
+
+        # Open disputes with reference info
+        if disputed_o > 0:
+            open_disputes = list(
+                Order.objects.filter(disputes__status__in=['open', 'under_review'])
+                .distinct()
+                .values('reference', 'buyer__username', 'listing__vendor__username')[:5]
+            )
+            d_items = [
+                f"order {d['reference']} (buyer:{d['buyer__username']}, vendor:{d['listing__vendor__username']})"
+                for d in open_disputes
+            ]
+            lines.append(f"Open disputes: {'; '.join(d_items)}")
+    except Exception:
+        pass
+
+    # ── Revenue & payments ───────────────────────────────────────────────────
+    try:
+        from payments.models import PaymentTransaction
+        rev_total = PaymentTransaction.objects.filter(
+            status='success'
+        ).aggregate(t=Sum('platform_amount'))['t'] or 0
+        rev_month = PaymentTransaction.objects.filter(
+            status='success', created_at__gte=month_ago
+        ).aggregate(t=Sum('platform_amount'))['t'] or 0
+        rev_week = PaymentTransaction.objects.filter(
+            status='success', created_at__gte=week_ago
+        ).aggregate(t=Sum('platform_amount'))['t'] or 0
+        vol_total = PaymentTransaction.objects.filter(
+            status='success'
+        ).aggregate(t=Sum('amount'))['t'] or 0
+
+        lines.append(
+            f"Platform revenue (fees earned): ₦{rev_total:,.0f} all-time, "
+            f"₦{rev_month:,.0f} this month, ₦{rev_week:,.0f} this week"
+        )
+        lines.append(f"Total transaction volume processed: ₦{vol_total:,.0f}")
+
+        failed_transfers = PaymentTransaction.objects.filter(
+            status='success', transfer_status='failed'
+        ).count()
+        if failed_transfers:
+            lines.append(f"WARNING: {failed_transfers} vendor payout(s) failed — manual action may be needed")
+    except Exception:
+        pass
+
+    # ── Reviews ──────────────────────────────────────────────────────────────
+    try:
+        from reviews.models import Review
+        from django.db.models import Avg
+        review_count = Review.objects.count()
+        avg_rating   = Review.objects.aggregate(a=Avg('rating'))['a'] or 0
+        week_reviews = Review.objects.filter(created_at__gte=week_ago).count()
+        lines.append(
+            f"Reviews: {review_count} total, avg rating {avg_rating:.1f}/5, +{week_reviews} this week"
         )
     except Exception:
         pass
 
+    # ── Recent Groq AI broadcasts ────────────────────────────────────────────
     try:
-        from payments.models import PaymentTransaction
-        rev_month = PaymentTransaction.objects.filter(
-            status='success', created_at__gte=month_ago
-        ).aggregate(t=Sum('platform_fee'))['t'] or 0
-        rev_total = PaymentTransaction.objects.filter(
-            status='success'
-        ).aggregate(t=Sum('platform_fee'))['t'] or 0
-        lines.append(f"Platform revenue: ₦{rev_total:,.0f} all-time, ₦{rev_month:,.0f} this month")
-    except Exception:
-        pass
+        from notifications.models import GrokNotificationLog, PlatformSettings
+        ai_enabled = PlatformSettings.get().grok_notifications_enabled
+        lines.append(f"Groq AI auto-broadcasts: {'enabled' if ai_enabled else 'DISABLED'}")
 
-    try:
-        from notifications.models import PlatformSettings
-        enabled = PlatformSettings.get().grok_notifications_enabled
-        lines.append(f"Groq AI auto-broadcasts: {'enabled' if enabled else 'disabled'}")
+        recent_logs = GrokNotificationLog.objects.order_by('-created_at')[:5]
+        if recent_logs:
+            log_items = [
+                f'"{log.title}" → {log.sent_count} {log.audience}'
+                f'{"/" + log.school.upper() if log.school else ""} ({log.triggered_by})'
+                for log in recent_logs
+            ]
+            lines.append(f"Recent AI broadcasts: {'; '.join(log_items)}")
     except Exception:
         pass
 
@@ -1591,10 +1688,11 @@ LIVE PLATFORM DATA (refreshed each message):
 {ctx}
 
 YOUR CAPABILITIES:
-• Analytics & reports: summarise stats, identify trends, flag issues, generate detailed reports
-• Notifications: compose and send push messages to students, vendors, or all users (optionally filtered by campus: pau or futo)
-• Seller verification: review pending applications and approve or reject them
-• General guidance on managing the platform
+• Analytics & reports: full access to users, orders, revenue, listings, reviews, disputes, and AI broadcasts — give specific numbers, trends, and actionable insights
+• Notifications: compose and send push messages to students, vendors, or all users (filtered by campus: pau or futo)
+• Seller verification: review pending applications by name, approve or reject them with one click
+• Proactive recommendations: always flag issues you notice (failed payouts, disputes, low revenue, inactive vendors, etc.)
+• General platform management guidance
 
 RESPONSE FORMAT:
 - Be concise and direct. Use markdown: **bold**, bullet lists with "- ", ## headers.
