@@ -1,8 +1,8 @@
 # grok_notifications.py
 """
-Grok AI notification system.
-Generates contextual push messages for students and vendors via xAI Grok API
-and broadcasts them through the existing send_notification() infrastructure.
+AI notification system using Groq (free, no card required).
+Generates contextual push messages for students and vendors and broadcasts
+them through the existing send_notification() infrastructure.
 """
 import json
 import logging
@@ -10,8 +10,8 @@ import requests
 
 logger = logging.getLogger(__name__)
 
-GROK_MODEL = 'grok-3-mini'
-GROK_API_URL = 'https://api.x.ai/v1/chat/completions'
+GROK_MODEL = 'llama-3.3-70b-versatile'
+GROK_API_URL = 'https://api.groq.com/openai/v1/chat/completions'
 
 _SYSTEM = (
     'You are a friendly assistant for StudEx, a campus marketplace in Nigeria. '
@@ -66,9 +66,9 @@ def _call_grok(audience: str) -> dict | None:
     """
     from django.conf import settings
 
-    api_key = getattr(settings, 'XAI_API_KEY', '').strip()
+    api_key = getattr(settings, 'GROQ_API_KEY', '').strip()
     if not api_key:
-        logger.warning('grok_notifications: XAI_API_KEY not set — skipping')
+        logger.warning('grok_notifications: GROQ_API_KEY not set — skipping')
         return None
 
     prompt = _PROMPTS.get(audience, _PROMPTS['all'])

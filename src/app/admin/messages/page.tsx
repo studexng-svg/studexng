@@ -493,7 +493,7 @@ function GrokBroadcast() {
         </div>
 
         <p className="text-xs text-stone-400 text-center">
-          Scheduler sends automatically — students Mon/Wed/Fri, vendors Tue/Thu/Sat at 10am
+          Powered by Groq · Auto-sends Mon/Wed/Fri (students) &amp; Tue/Thu/Sat (vendors) at 10am
         </p>
       </div>
 

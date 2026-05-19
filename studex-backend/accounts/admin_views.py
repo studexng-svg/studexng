@@ -1463,7 +1463,7 @@ class AdminGrokNotifyView(APIView):
             payload = _call_grok(audience)
             if not payload:
                 return Response(
-                    {'error': 'Grok API unavailable — check XAI_API_KEY on Render'},
+                    {'error': 'Groq API unavailable — check GROQ_API_KEY on Render'},
                     status=503,
                 )
             recipient_count = _build_recipients(audience, school).count()
