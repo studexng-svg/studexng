@@ -1479,6 +1479,29 @@ class AdminGrokNotifyView(APIView):
         return Response(result)
 
 
+class AdminPlatformSettingsView(APIView):
+    """
+    GET  /api/admin/platform-settings/ — returns { grok_notifications_enabled: bool }
+    PATCH /api/admin/platform-settings/ — body: { grok_notifications_enabled: bool }
+    """
+    permission_classes = [IsAdminUser]
+
+    def get(self, request):
+        from notifications.models import PlatformSettings
+        settings_obj = PlatformSettings.get()
+        return Response({'grok_notifications_enabled': settings_obj.grok_notifications_enabled})
+
+    def patch(self, request):
+        from notifications.models import PlatformSettings
+        enabled = request.data.get('grok_notifications_enabled')
+        if not isinstance(enabled, bool):
+            return Response({'error': 'grok_notifications_enabled must be a boolean'}, status=400)
+        settings_obj = PlatformSettings.get()
+        settings_obj.grok_notifications_enabled = enabled
+        settings_obj.save(update_fields=['grok_notifications_enabled'])
+        return Response({'grok_notifications_enabled': settings_obj.grok_notifications_enabled})
+
+
 def _broadcast_base_qs(school: str):
     """Return the base active-user queryset filtered by school."""
     qs = User.objects.filter(is_active=True)

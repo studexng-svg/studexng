@@ -369,6 +369,8 @@ function GrokBroadcast() {
   const [error, setError]       = useState("");
   const [logs, setLogs]         = useState<GrokLog[]>([]);
   const [logsLoading, setLogsLoading] = useState(true);
+  const [aiEnabled, setAiEnabled]   = useState<boolean | null>(null);
+  const [toggling, setToggling]     = useState(false);
 
   const fetchLogs = async () => {
     try {
@@ -378,7 +380,28 @@ function GrokBroadcast() {
     } catch {} finally { setLogsLoading(false); }
   };
 
-  useEffect(() => { fetchLogs(); }, []);
+  const fetchSettings = async () => {
+    try {
+      const r = await fetchWithAuth(`${API_URL}/api/admin/platform-settings/`);
+      const d = await r.json();
+      if (typeof d.grok_notifications_enabled === "boolean") setAiEnabled(d.grok_notifications_enabled);
+    } catch {}
+  };
+
+  const toggleAi = async () => {
+    if (aiEnabled === null || toggling) return;
+    setToggling(true);
+    try {
+      const r = await fetchWithAuth(`${API_URL}/api/admin/platform-settings/`, {
+        method: "PATCH",
+        body: JSON.stringify({ grok_notifications_enabled: !aiEnabled }),
+      });
+      const d = await r.json();
+      if (typeof d.grok_notifications_enabled === "boolean") setAiEnabled(d.grok_notifications_enabled);
+    } catch {} finally { setToggling(false); }
+  };
+
+  useEffect(() => { fetchLogs(); fetchSettings(); }, []);
 
   const generate = async () => {
     setLoading(true); setPreview(null); setError(""); setSent(null);
@@ -425,14 +448,34 @@ function GrokBroadcast() {
     <div className="space-y-4">
       {/* Generator card */}
       <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm space-y-4">
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-xl flex items-center justify-center"
-               style={{ background: "linear-gradient(135deg,#7C3AED,#0D9488)" }}>
-            <Bot className="w-4 h-4 text-white" />
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-xl flex items-center justify-center"
+                 style={{ background: "linear-gradient(135deg,#7C3AED,#0D9488)" }}>
+              <Bot className="w-4 h-4 text-white" />
+            </div>
+            <div>
+              <p className="font-bold text-stone-900 text-sm">Grok AI Broadcast</p>
+              <p className="text-stone-400 text-xs">Auto-generates contextual tips for your users</p>
+            </div>
           </div>
-          <div>
-            <p className="font-bold text-stone-900 text-sm">Grok AI Broadcast</p>
-            <p className="text-stone-400 text-xs">Auto-generates contextual tips for your users</p>
+          {/* AI on/off toggle */}
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <span className={`text-xs font-semibold ${aiEnabled ? "text-teal-600" : "text-stone-400"}`}>
+              {aiEnabled === null ? "…" : aiEnabled ? "ON" : "OFF"}
+            </span>
+            <button
+              onClick={toggleAi}
+              disabled={aiEnabled === null || toggling}
+              aria-label={aiEnabled ? "Disable AI broadcasts" : "Enable AI broadcasts"}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none disabled:opacity-50 ${
+                aiEnabled ? "bg-teal-500" : "bg-stone-300"
+              }`}
+            >
+              <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-200 ${
+                aiEnabled ? "translate-x-6" : "translate-x-1"
+              }`} />
+            </button>
           </div>
         </div>
 

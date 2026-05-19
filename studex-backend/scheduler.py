@@ -371,6 +371,10 @@ def _alert_admin_transfer_failure(txn):
 def grok_notify_students():
     """Broadcast an AI-generated tip to all active students."""
     try:
+        from notifications.models import PlatformSettings
+        if not PlatformSettings.get().grok_notifications_enabled:
+            logger.info('AI notifications disabled — skipping grok_notify_students')
+            return
         from grok_notifications import send_grok_notifications
         send_grok_notifications(audience='students', triggered_by='scheduler')
     except Exception as e:
@@ -380,6 +384,10 @@ def grok_notify_students():
 def grok_notify_vendors():
     """Broadcast an AI-generated tip to all active vendors."""
     try:
+        from notifications.models import PlatformSettings
+        if not PlatformSettings.get().grok_notifications_enabled:
+            logger.info('AI notifications disabled — skipping grok_notify_vendors')
+            return
         from grok_notifications import send_grok_notifications
         send_grok_notifications(audience='vendors', triggered_by='scheduler')
     except Exception as e:

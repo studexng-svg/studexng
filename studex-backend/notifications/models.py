@@ -56,6 +56,28 @@ class Notification(models.Model):
         verbose_name_plural = "Notifications"
 
 
+class PlatformSettings(models.Model):
+    """Singleton settings row — always pk=1. Use PlatformSettings.get()."""
+    grok_notifications_enabled = models.BooleanField(
+        default=True,
+        help_text="When off, the scheduled Groq AI broadcasts are silently skipped.",
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Platform Settings"
+        verbose_name_plural = "Platform Settings"
+
+    def __str__(self):
+        status = "ON" if self.grok_notifications_enabled else "OFF"
+        return f"Platform Settings (AI broadcasts: {status})"
+
+    @classmethod
+    def get(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+
 class GrokNotificationLog(models.Model):
     AUDIENCE_CHOICES = (
         ('students', 'Students'),
