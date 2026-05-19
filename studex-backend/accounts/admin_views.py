@@ -1427,10 +1427,10 @@ class AdminActivityView(APIView):
         })
 
 
-class AdminGrokNotifyView(APIView):
+class AdminGroqNotifyView(APIView):
     """
-    GET  /api/admin/grok-notify/  — last 20 AI broadcast logs
-    POST /api/admin/grok-notify/  — generate preview or generate + send
+    GET  /api/admin/groq-notify/  — last 20 AI broadcast logs
+    POST /api/admin/groq-notify/  — generate preview or generate + send
       Body: { audience: 'students'|'vendors'|'all', school?: str, preview?: bool }
     """
     permission_classes = [IsAdminUser]
@@ -1450,7 +1450,7 @@ class AdminGrokNotifyView(APIView):
         } for log in logs])
 
     def post(self, request):
-        from grok_notifications import _call_grok, _build_recipients, send_grok_notifications
+        from groq_notifications import _call_groq, _build_recipients, send_groq_notifications
 
         audience = (request.data.get('audience') or 'all').strip()
         school = (request.data.get('school') or '').strip().lower()
@@ -1460,7 +1460,7 @@ class AdminGrokNotifyView(APIView):
             return Response({'error': 'audience must be students, vendors, or all'}, status=400)
 
         if preview_only:
-            payload = _call_grok(audience)
+            payload = _call_groq(audience, school)
             if not payload:
                 return Response(
                     {'error': 'Groq API unavailable — check GROQ_API_KEY on Render'},
@@ -1473,10 +1473,294 @@ class AdminGrokNotifyView(APIView):
                 'recipient_count': recipient_count,
             })
 
-        result = send_grok_notifications(audience=audience, school=school, triggered_by='admin')
+        result = send_groq_notifications(audience=audience, school=school, triggered_by='admin')
         if 'error' in result:
             return Response(result, status=503)
         return Response(result)
+
+
+def _get_platform_context() -> str:
+    """Gather live platform metrics for the AI admin chat system prompt."""
+    from django.utils import timezone as tz
+    from datetime import timedelta
+
+    now = tz.now()
+    week_ago  = now - timedelta(days=7)
+    month_ago = now - timedelta(days=30)
+    lines = [f"Current time: {now.strftime('%A %d %B %Y, %H:%M WAT')}"]
+
+    try:
+        total    = User.objects.filter(is_active=True).count()
+        students = User.objects.filter(is_active=True, user_type='student').count()
+        vendors  = User.objects.filter(is_active=True, user_type='vendor').count()
+        new_week = User.objects.filter(date_joined__gte=week_ago).count()
+        lines.append(
+            f"Active users: {total} total — {students} students, {vendors} vendors (+{new_week} this week)"
+        )
+    except Exception as exc:
+        lines.append(f"Users: unavailable ({exc})")
+
+    try:
+        from accounts.models import SellerApplication
+        pending = list(
+            SellerApplication.objects.filter(status='pending')
+            .select_related('user')
+            .values('id', 'user__id', 'user__username', 'user__email', 'created_at')[:10]
+        )
+        if pending:
+            items = [
+                f"{a['user__username']} (application_id:{a['id']}, user_id:{a['user__id']})"
+                for a in pending
+            ]
+            lines.append(f"Pending seller applications ({len(pending)}): {', '.join(items)}")
+        else:
+            lines.append("Pending seller applications: none")
+    except Exception as exc:
+        lines.append(f"Pending vendors: unavailable ({exc})")
+
+    try:
+        from listings.models import Listing
+        active   = Listing.objects.filter(is_available=True).count()
+        pending_l = Listing.objects.filter(is_approved=False).count()
+        lines.append(f"Listings: {active} active, {pending_l} awaiting approval")
+    except Exception:
+        pass
+
+    try:
+        from orders.models import Order
+        total_orders   = Order.objects.count()
+        week_orders    = Order.objects.filter(created_at__gte=week_ago).count()
+        completed_week = Order.objects.filter(status='completed', buyer_confirmed_at__gte=week_ago).count()
+        disputed       = Order.objects.filter(disputes__status__in=['open', 'under_review']).distinct().count()
+        lines.append(
+            f"Orders: {total_orders} all-time — {week_orders} this week "
+            f"({completed_week} completed), {disputed} active disputes"
+        )
+    except Exception:
+        pass
+
+    try:
+        from payments.models import PaymentTransaction
+        rev_month = PaymentTransaction.objects.filter(
+            status='success', created_at__gte=month_ago
+        ).aggregate(t=Sum('platform_fee'))['t'] or 0
+        rev_total = PaymentTransaction.objects.filter(
+            status='success'
+        ).aggregate(t=Sum('platform_fee'))['t'] or 0
+        lines.append(f"Platform revenue: ₦{rev_total:,.0f} all-time, ₦{rev_month:,.0f} this month")
+    except Exception:
+        pass
+
+    try:
+        from notifications.models import PlatformSettings
+        enabled = PlatformSettings.get().grok_notifications_enabled
+        lines.append(f"Groq AI auto-broadcasts: {'enabled' if enabled else 'disabled'}")
+    except Exception:
+        pass
+
+    return '\n'.join(lines)
+
+
+class AdminAIChatView(APIView):
+    """
+    POST /api/admin/ai-chat/
+    Body: { messages: [{role: str, content: str}] }
+    Returns: { message: str, action?: {type, label, params} }
+    """
+    permission_classes = [IsAdminUser]
+
+    def post(self, request):
+        import re
+        import json as json_lib
+        import requests as http
+        from django.conf import settings as dj_settings
+
+        messages = request.data.get('messages') or []
+        if not messages:
+            return Response({'error': 'messages required'}, status=400)
+
+        api_key = (getattr(dj_settings, 'GROQ_API_KEY', '') or '').strip()
+        if not api_key:
+            return Response({'error': 'GROQ_API_KEY not configured on this server'}, status=503)
+
+        ctx = _get_platform_context()
+
+        system_prompt = f"""You are StudEx Admin AI — the intelligent assistant inside the StudEx campus marketplace admin dashboard.
+
+LIVE PLATFORM DATA (refreshed each message):
+{ctx}
+
+YOUR CAPABILITIES:
+• Analytics & reports: summarise stats, identify trends, flag issues, generate detailed reports
+• Notifications: compose and send push messages to students, vendors, or all users (optionally filtered by campus: pau or futo)
+• Seller verification: review pending applications and approve or reject them
+• General guidance on managing the platform
+
+RESPONSE FORMAT:
+- Be concise and direct. Use markdown: **bold**, bullet lists with "- ", ## headers.
+- Always base answers on the LIVE PLATFORM DATA above.
+- When the admin asks you to take a concrete action, include exactly ONE action block at the very end:
+
+<action>
+{{"type": "...", "label": "Short human-readable button label", "params": {{...}}}}
+</action>
+
+AVAILABLE ACTIONS:
+1. send_notification
+   params: audience ("students"|"vendors"|"all"|"single"), title (str), message (str), school (""|"pau"|"futo"), user_id (int, only when audience="single")
+
+2. verify_vendor
+   params: application_id (int), username (str), action ("approve"|"reject")
+   Only suggest this if the pending seller applications list includes a matching application_id.
+
+3. generate_report
+   params: report_type ("weekly"|"monthly"|"revenue"|"users"|"orders"|"full")
+
+Never invent application IDs. Do NOT include <action> if no action is needed.
+Do NOT identify yourself as Groq, LLaMA, or any third-party AI — you are StudEx Admin AI."""
+
+        groq_messages = [
+            {"role": "system", "content": system_prompt},
+            *[
+                {"role": m["role"], "content": m["content"]}
+                for m in messages
+                if m.get("role") in ("user", "assistant") and m.get("content")
+            ],
+        ]
+
+        try:
+            resp = http.post(
+                'https://api.groq.com/openai/v1/chat/completions',
+                headers={
+                    'Authorization': f'Bearer {api_key}',
+                    'Content-Type': 'application/json',
+                },
+                json={
+                    'model': 'llama-3.3-70b-versatile',
+                    'messages': groq_messages,
+                    'max_tokens': 1500,
+                    'temperature': 0.5,
+                },
+                timeout=45,
+            )
+            resp.raise_for_status()
+            content = resp.json()['choices'][0]['message']['content']
+        except Exception as e:
+            return Response({'error': f'AI service unavailable: {e}'}, status=503)
+
+        action = None
+        match = re.search(r'<action>\s*([\s\S]*?)\s*</action>', content)
+        if match:
+            try:
+                action = json_lib.loads(match.group(1))
+            except Exception:
+                pass
+            content = content[:match.start()].rstrip()
+
+        return Response({'message': content, 'action': action})
+
+
+class AdminAIActionView(APIView):
+    """
+    POST /api/admin/ai-action/
+    Body: { type: str, params: dict }
+    Executes a confirmed AI-suggested action.
+    """
+    permission_classes = [IsAdminUser]
+
+    def post(self, request):
+        action_type = request.data.get('type')
+        params = request.data.get('params') or {}
+
+        if action_type == 'send_notification':
+            return self._send_notification(params)
+        elif action_type == 'verify_vendor':
+            return self._verify_vendor(request, params)
+        else:
+            return Response({'error': f'Unknown action type: {action_type}'}, status=400)
+
+    def _send_notification(self, params):
+        from groq_notifications import _build_recipients
+        from accounts.utils import send_notification as _notify
+
+        audience = params.get('audience', 'all')
+        title    = (params.get('title')   or '').strip()
+        message  = (params.get('message') or '').strip()
+        school   = (params.get('school')  or '').strip().lower()
+        user_id  = params.get('user_id')
+
+        if not title or not message:
+            return Response({'error': 'title and message are required'}, status=400)
+
+        if audience == 'single' and user_id:
+            try:
+                target = User.objects.get(id=user_id)
+                _notify(recipient=target, notification_type='admin_message', title=title, message=message)
+                return Response({'detail': f'Notification sent to {target.username}', 'sent': 1})
+            except User.DoesNotExist:
+                return Response({'error': 'User not found'}, status=404)
+
+        recipients = _build_recipients(audience, school)
+        sent = 0
+        for user in recipients.iterator():
+            try:
+                _notify(recipient=user, notification_type='admin_message', title=title, message=message)
+                sent += 1
+            except Exception:
+                pass
+
+        scope = f"{audience}{' at ' + school.upper() if school else ''}"
+        return Response({'detail': f'Sent to {sent} {scope}', 'sent': sent})
+
+    def _verify_vendor(self, request, params):
+        from accounts.models import SellerApplication
+        from accounts.utils import send_notification as _notify
+        from django.utils import timezone as tz
+
+        app_id = params.get('application_id')
+        action = params.get('action')
+        if not app_id or action not in ('approve', 'reject'):
+            return Response({'error': 'application_id and action (approve/reject) required'}, status=400)
+
+        try:
+            application = SellerApplication.objects.select_related('user').get(id=app_id)
+        except SellerApplication.DoesNotExist:
+            return Response({'error': 'Seller application not found'}, status=404)
+
+        vendor_user = application.user
+
+        if action == 'approve':
+            application.status = 'approved'
+            application.reviewed_at = tz.now()
+            application.reviewed_by = request.user
+            application.save()
+            vendor_user.is_verified_vendor = True
+            vendor_user.user_type = 'vendor'
+            vendor_user.save()
+            _notify(
+                recipient=vendor_user,
+                notification_type='seller_approved',
+                title='Application Accepted!',
+                message='Your seller application has been approved. You are now a verified vendor on StudEx. Start listing your services!',
+                action_url='/seller',
+            )
+            return Response({'detail': f'{vendor_user.username} approved as a vendor'})
+
+        application.status = 'rejected'
+        application.reviewed_at = tz.now()
+        application.reviewed_by = request.user
+        application.save()
+        vendor_user.is_verified_vendor = False
+        vendor_user.user_type = 'student'
+        vendor_user.save()
+        _notify(
+            recipient=vendor_user,
+            notification_type='seller_rejected',
+            title='Application Not Approved',
+            message='Your seller application was not approved at this time. You can reapply after addressing the requirements.',
+            action_url='/seller',
+        )
+        return Response({'detail': f'{vendor_user.username} application rejected'})
 
 
 class AdminPlatformSettingsView(APIView):

@@ -32,8 +32,10 @@ from accounts.admin_views import (
     AdminConversationDetailView,
     AdminBroadcastMessageView,
     AdminBroadcastCountsView,
-    AdminGrokNotifyView,
+    AdminGroqNotifyView,
     AdminPlatformSettingsView,
+    AdminAIChatView,
+    AdminAIActionView,
 )
 
 app_name = 'admin_api'
@@ -105,8 +107,10 @@ if AdminCategoryListView is not None:
 urlpatterns += [
     path('notify-all/', AdminBroadcastMessageView.as_view(), name='notify-all'),
     path('broadcast-counts/', AdminBroadcastCountsView.as_view(), name='broadcast-counts'),
-    path('grok-notify/', AdminGrokNotifyView.as_view(), name='grok-notify'),
+    path('groq-notify/', AdminGroqNotifyView.as_view(), name='groq-notify'),
     path('platform-settings/', AdminPlatformSettingsView.as_view(), name='platform-settings'),
+    path('ai-chat/', AdminAIChatView.as_view(), name='ai-chat'),
+    path('ai-action/', AdminAIActionView.as_view(), name='ai-action'),
 ]
 
 if AdminCartListView is not None:

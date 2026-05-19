@@ -363,35 +363,40 @@ def _alert_admin_transfer_failure(txn):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# JOB 5 & 6: Grok AI notification broadcasts
+# JOB 5 & 6: Groq AI notification broadcasts — per campus
 # Students: Mon / Wed / Fri at 10:00 WAT
 # Vendors:  Tue / Thu / Sat at 10:00 WAT
 # ─────────────────────────────────────────────────────────────────────────────
 
-def grok_notify_students():
-    """Broadcast an AI-generated tip to all active students."""
+_CAMPUSES = ('pau', 'futo')
+
+
+def groq_notify_students():
+    """Broadcast AI-generated student tips — separate message per campus."""
     try:
         from notifications.models import PlatformSettings
         if not PlatformSettings.get().grok_notifications_enabled:
-            logger.info('AI notifications disabled — skipping grok_notify_students')
+            logger.info('AI notifications disabled — skipping groq_notify_students')
             return
-        from grok_notifications import send_grok_notifications
-        send_grok_notifications(audience='students', triggered_by='scheduler')
+        from groq_notifications import send_groq_notifications
+        for school in _CAMPUSES:
+            send_groq_notifications(audience='students', school=school, triggered_by='scheduler')
     except Exception as e:
-        logger.error(f'grok_notify_students failed: {e}', exc_info=True)
+        logger.error(f'groq_notify_students failed: {e}', exc_info=True)
 
 
-def grok_notify_vendors():
-    """Broadcast an AI-generated tip to all active vendors."""
+def groq_notify_vendors():
+    """Broadcast AI-generated vendor tips — separate message per campus."""
     try:
         from notifications.models import PlatformSettings
         if not PlatformSettings.get().grok_notifications_enabled:
-            logger.info('AI notifications disabled — skipping grok_notify_vendors')
+            logger.info('AI notifications disabled — skipping groq_notify_vendors')
             return
-        from grok_notifications import send_grok_notifications
-        send_grok_notifications(audience='vendors', triggered_by='scheduler')
+        from groq_notifications import send_groq_notifications
+        for school in _CAMPUSES:
+            send_groq_notifications(audience='vendors', school=school, triggered_by='scheduler')
     except Exception as e:
-        logger.error(f'grok_notify_vendors failed: {e}', exc_info=True)
+        logger.error(f'groq_notify_vendors failed: {e}', exc_info=True)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -446,23 +451,23 @@ def start():
         coalesce=True,
     )
 
-    # Mon / Wed / Fri 10:00 WAT — AI tips for students
+    # Mon / Wed / Fri 10:00 WAT — Groq AI tips for students (per campus)
     scheduler.add_job(
-        grok_notify_students,
+        groq_notify_students,
         trigger=CronTrigger(day_of_week='mon,wed,fri', hour=10, minute=0, timezone=LAGOS_TZ),
-        id='grok_notify_students',
-        name='Grok AI tip — students (Mon/Wed/Fri 10:00 WAT)',
+        id='groq_notify_students',
+        name='Groq AI tip — students (Mon/Wed/Fri 10:00 WAT)',
         replace_existing=True,
         max_instances=1,
         coalesce=True,
     )
 
-    # Tue / Thu / Sat 10:00 WAT — AI tips for vendors
+    # Tue / Thu / Sat 10:00 WAT — Groq AI tips for vendors (per campus)
     scheduler.add_job(
-        grok_notify_vendors,
+        groq_notify_vendors,
         trigger=CronTrigger(day_of_week='tue,thu,sat', hour=10, minute=0, timezone=LAGOS_TZ),
-        id='grok_notify_vendors',
-        name='Grok AI tip — vendors (Tue/Thu/Sat 10:00 WAT)',
+        id='groq_notify_vendors',
+        name='Groq AI tip — vendors (Tue/Thu/Sat 10:00 WAT)',
         replace_existing=True,
         max_instances=1,
         coalesce=True,
@@ -474,7 +479,7 @@ def start():
             "Scheduler started: booking_reminders (60s), "
             "auto_release_orders (midnight), auto_cancel_pending_orders (midnight), "
             "retry_failed_transfers (1h), "
-            "grok_notify_students (Mon/Wed/Fri 10:00), grok_notify_vendors (Tue/Thu/Sat 10:00)."
+            "groq_notify_students (Mon/Wed/Fri 10:00 per campus), groq_notify_vendors (Tue/Thu/Sat 10:00 per campus)."
         )
     except Exception as e:
         logger.error(f"Failed to start scheduler: {e}", exc_info=True)

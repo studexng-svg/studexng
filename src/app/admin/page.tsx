@@ -5,7 +5,7 @@ import {
   Users, Package, DollarSign, Store, FileText, Tag, TrendingUp,
   ChevronRight, AlertCircle, CheckCircle, Clock,
   CreditCard, Star, AlertTriangle, ArrowUpRight,
-  ShoppingCart, MessageCircle, Send, Radio,
+  ShoppingCart, MessageCircle, Send, Radio, Bot,
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -89,6 +89,7 @@ const QUICK_LINKS = [
   { label: "Cart Overview",      href: "/admin/cart",             icon: ShoppingCart, desc: "View all user cart items" },
   { label: "Conversations",      href: "/admin/conversations",    icon: MessageCircle,desc: "Monitor buyer/seller chats" },
   { label: "Messages",           href: "/admin/messages",         icon: Send,         desc: "Send notifications to users" },
+  { label: "AI Assistant",      href: "/admin/ai",               icon: Bot,          desc: "Chat with AI, get reports & take actions" },
 ];
 
 function LiveActivity() {

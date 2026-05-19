@@ -351,7 +351,7 @@ const AI_AUDIENCE_OPTIONS = [
   { value: "all",      label: "All Users"},
 ];
 
-type GrokLog = {
+type GroqLog = {
   id: number; audience: string; school: string;
   title: string; message: string; sent_count: number;
   triggered_by: string; created_at: string;
@@ -359,7 +359,7 @@ type GrokLog = {
 
 type Preview = { title: string; message: string; recipient_count: number };
 
-function GrokBroadcast() {
+function GroqBroadcast() {
   const [audience, setAudience] = useState("students");
   const [school, setSchool]     = useState("");
   const [preview, setPreview]   = useState<Preview | null>(null);
@@ -367,14 +367,14 @@ function GrokBroadcast() {
   const [sending, setSending]   = useState(false);
   const [sent, setSent]         = useState<{ sent: number; title: string } | null>(null);
   const [error, setError]       = useState("");
-  const [logs, setLogs]         = useState<GrokLog[]>([]);
+  const [logs, setLogs]         = useState<GroqLog[]>([]);
   const [logsLoading, setLogsLoading] = useState(true);
   const [aiEnabled, setAiEnabled]   = useState<boolean | null>(null);
   const [toggling, setToggling]     = useState(false);
 
   const fetchLogs = async () => {
     try {
-      const r = await fetchWithAuth(`${API_URL}/api/admin/grok-notify/`);
+      const r = await fetchWithAuth(`${API_URL}/api/admin/groq-notify/`);
       const d = await r.json();
       if (Array.isArray(d)) setLogs(d);
     } catch {} finally { setLogsLoading(false); }
@@ -406,7 +406,7 @@ function GrokBroadcast() {
   const generate = async () => {
     setLoading(true); setPreview(null); setError(""); setSent(null);
     try {
-      const r = await fetchWithAuth(`${API_URL}/api/admin/grok-notify/`, {
+      const r = await fetchWithAuth(`${API_URL}/api/admin/groq-notify/`, {
         method: "POST",
         body: JSON.stringify({ audience, school: school || undefined, preview: true }),
       });
@@ -422,7 +422,7 @@ function GrokBroadcast() {
     if (!preview) return;
     setSending(true); setError("");
     try {
-      const r = await fetchWithAuth(`${API_URL}/api/admin/grok-notify/`, {
+      const r = await fetchWithAuth(`${API_URL}/api/admin/groq-notify/`, {
         method: "POST",
         body: JSON.stringify({ audience, school: school || undefined }),
       });
@@ -620,7 +620,7 @@ export default function AdminMessagesPage() {
 
         {mode === "single" && <SingleUserCompose />}
         {mode === "broadcast" && <BroadcastCompose />}
-        {mode === "ai" && <GrokBroadcast />}
+        {mode === "ai" && <GroqBroadcast />}
 
       </div>
     </div>

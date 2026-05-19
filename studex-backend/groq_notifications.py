@@ -1,8 +1,6 @@
-# grok_notifications.py
 """
-AI notification system using Groq (free, no card required).
-Generates contextual push messages for students and vendors and broadcasts
-them through the existing send_notification() infrastructure.
+AI notification system using Groq API (free, no card required).
+Generates contextual push messages for students and vendors per campus.
 """
 import json
 import logging
@@ -10,8 +8,8 @@ import requests
 
 logger = logging.getLogger(__name__)
 
-GROK_MODEL = 'llama-3.3-70b-versatile'
-GROK_API_URL = 'https://api.groq.com/openai/v1/chat/completions'
+GROQ_MODEL = 'llama-3.3-70b-versatile'
+GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions'
 
 _SYSTEM = (
     'You are a friendly assistant for StudEx, a campus marketplace in Nigeria. '
@@ -58,33 +56,45 @@ _PROMPTS = {
     ),
 }
 
+_SCHOOL_NAMES = {
+    'pau':  'Pan-Atlantic University (PAU) in Lagos',
+    'futo': 'Federal University of Technology Owerri (FUTO)',
+}
 
-def _call_grok(audience: str) -> dict | None:
+
+def _call_groq(audience: str, school: str = '') -> dict | None:
     """
-    Call xAI Grok API for the given audience.
+    Call Groq API for the given audience and optional campus.
     Returns {'title': str, 'message': str} or None on any failure.
     """
     from django.conf import settings
 
     api_key = getattr(settings, 'GROQ_API_KEY', '').strip()
     if not api_key:
-        logger.warning('grok_notifications: GROQ_API_KEY not set — skipping')
+        logger.warning('groq_notifications: GROQ_API_KEY not set — skipping')
         return None
 
     prompt = _PROMPTS.get(audience, _PROMPTS['all'])
+    if school and school in _SCHOOL_NAMES:
+        campus = _SCHOOL_NAMES[school]
+        prompt = prompt.replace(
+            'Respond ONLY with valid JSON',
+            f'The campus is {campus} — mention the campus name once, subtly, where natural.\n'
+            'Respond ONLY with valid JSON',
+        )
 
     try:
         resp = requests.post(
-            GROK_API_URL,
+            GROQ_API_URL,
             headers={
                 'Authorization': f'Bearer {api_key}',
                 'Content-Type': 'application/json',
             },
             json={
-                'model': GROK_MODEL,
+                'model': GROQ_MODEL,
                 'messages': [
                     {'role': 'system', 'content': _SYSTEM},
-                    {'role': 'user', 'content': prompt},
+                    {'role': 'user',   'content': prompt},
                 ],
                 'max_tokens': 120,
                 'temperature': 0.9,
@@ -94,22 +104,20 @@ def _call_grok(audience: str) -> dict | None:
         resp.raise_for_status()
 
         content = resp.json()['choices'][0]['message']['content'].strip()
-
-        # Strip markdown fences if Grok wraps the JSON
         if content.startswith('```'):
             content = content.split('```')[1].lstrip('json').strip()
 
         data = json.loads(content)
-        title = str(data.get('title', '')).strip()[:200]
+        title   = str(data.get('title',   '')).strip()[:200]
         message = str(data.get('message', '')).strip()
 
         if not title or not message:
-            raise ValueError('Empty title or message from Grok')
+            raise ValueError('Empty title or message from Groq')
 
         return {'title': title, 'message': message}
 
     except Exception as e:
-        logger.error(f'grok_notifications: Grok API error ({audience}): {e}')
+        logger.error(f'groq_notifications: Groq API error ({audience}): {e}')
         return None
 
 
@@ -133,26 +141,25 @@ def _build_recipients(audience: str, school: str):
     return qs
 
 
-def send_grok_notifications(
+def send_groq_notifications(
     audience: str,
     school: str = '',
     triggered_by: str = 'scheduler',
 ) -> dict:
     """
-    Generate a Grok message for the audience and broadcast it.
+    Generate a Groq message for the audience and broadcast it.
     Returns {'sent': int, 'title': str, 'message': str} or {'error': str}.
     """
     from accounts.utils import send_notification
     from notifications.models import GrokNotificationLog
 
-    payload = _call_grok(audience)
+    payload = _call_groq(audience, school)
     if not payload:
-        return {'error': 'Grok API unavailable or XAI_API_KEY not configured'}
+        return {'error': 'Groq API unavailable or GROQ_API_KEY not configured'}
 
-    title = payload['title']
+    title   = payload['title']
     message = payload['message']
     recipients = _build_recipients(audience, school)
-
     action_url = '/categories' if audience == 'students' else '/vendor/dashboard'
 
     sent = 0
@@ -167,7 +174,7 @@ def send_grok_notifications(
             )
             sent += 1
         except Exception as e:
-            logger.warning(f'grok_notifications: failed to notify user {user.id}: {e}')
+            logger.warning(f'groq_notifications: failed to notify user {user.id}: {e}')
 
     GrokNotificationLog.objects.create(
         audience=audience,
@@ -176,11 +183,11 @@ def send_grok_notifications(
         message=message,
         sent_count=sent,
         triggered_by=triggered_by,
-        grok_model=GROK_MODEL,
+        grok_model=GROQ_MODEL,
     )
 
     logger.info(
-        f"grok_notifications: '{title}' → {sent} {audience}"
+        f"groq_notifications: '{title}' → {sent} {audience}"
         f"{' (' + school.upper() + ')' if school else ''} via {triggered_by}"
     )
     return {'sent': sent, 'title': title, 'message': message}
