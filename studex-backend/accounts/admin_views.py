@@ -1536,19 +1536,60 @@ def _get_platform_context() -> str:
     except Exception:
         lines.append("Pending seller applications: none")
 
-    # ── Listings ─────────────────────────────────────────────────────────────
+    # ── Listings & categories ─────────────────────────────────────────────────
     try:
-        from services.models import Listing
-        total_l     = Listing.objects.count()
-        active_l    = Listing.objects.filter(is_available=True).count()
-        inactive_l  = total_l - active_l
-        new_week_l  = Listing.objects.filter(created_at__gte=week_ago).count()
+        from services.models import Listing, Category
+        from django.db.models import Count as DjCount
+
+        total_l    = Listing.objects.count()
+        active_l   = Listing.objects.filter(is_available=True).count()
+        inactive_l = total_l - active_l
+        new_week_l = Listing.objects.filter(created_at__gte=week_ago).count()
         lines.append(
-            f"Listings: {total_l} total — {active_l} active, {inactive_l} inactive/unavailable, +{new_week_l} added this week"
+            f"Listings: {total_l} total — {active_l} active, {inactive_l} inactive/out-of-stock, +{new_week_l} added this week"
         )
 
+        # Breakdown by type
+        type_counts = (
+            Listing.objects.values('listing_type')
+            .annotate(n=DjCount('id'))
+            .order_by('-n')
+        )
+        if type_counts:
+            tc = ', '.join(f"{t['listing_type']}:{t['n']}" for t in type_counts)
+            lines.append(f"Listing types: {tc}")
+
+        # Campus breakdown
+        pau_l  = Listing.objects.filter(campus__iexact='pau').count()
+        futo_l = Listing.objects.filter(campus__iexact='futo').count()
+        lines.append(f"Listings by campus: PAU={pau_l}, FUTO={futo_l}")
+
+        # Categories with listing counts
+        cats = (
+            Category.objects.annotate(n=DjCount('listings'))
+            .order_by('-n')
+        )
+        if cats:
+            cat_items = [f"{c.title}({c.n})" for c in cats if c.n > 0]
+            no_listings = [c.title for c in cats if c.n == 0]
+            lines.append(f"Categories with listings: {', '.join(cat_items) or 'none'}")
+            if no_listings:
+                lines.append(f"Empty categories (no listings): {', '.join(no_listings)}")
+
+        # Recent 5 listings added
+        recent_listings = list(
+            Listing.objects.select_related('vendor', 'category')
+            .order_by('-created_at')
+            .values('title', 'vendor__username', 'category__title', 'price', 'is_available', 'listing_type')[:5]
+        )
+        if recent_listings:
+            rl = '; '.join(
+                f'"{r["title"]}" by {r["vendor__username"]} (₦{r["price"]}, {r["listing_type"]}, {"active" if r["is_available"] else "inactive"})'
+                for r in recent_listings
+            )
+            lines.append(f"5 most recent listings: {rl}")
+
         # Top vendors by listing count
-        from django.db.models import Count as DjCount
         top_vendors = (
             Listing.objects.values('vendor__username')
             .annotate(n=DjCount('id'))
@@ -1557,6 +1598,15 @@ def _get_platform_context() -> str:
         if top_vendors:
             tv = ', '.join(f"{v['vendor__username']}({v['n']})" for v in top_vendors)
             lines.append(f"Top vendors by listing count: {tv}")
+
+        # Vendors with zero active listings (might need a nudge)
+        vendors_no_active = User.objects.filter(
+            user_type='vendor', is_active=True
+        ).exclude(
+            listings__is_available=True
+        ).count()
+        if vendors_no_active:
+            lines.append(f"Vendors with no active listings: {vendors_no_active} (may need follow-up)")
     except Exception:
         pass
 
