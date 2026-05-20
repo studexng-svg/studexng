@@ -577,33 +577,17 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                     </motion.div>
                   </Link>
                 ) : (
-                  /* Fallback — photo mosaic from live listings */
+                  /* Fallback — Unsplash campus photo */
                   <Link href="/categories">
                     <motion.div whileTap={{ scale: 0.98 }}
                       className="relative rounded-3xl overflow-hidden cursor-pointer shadow-sm"
                       style={{ aspectRatio: "16/9" }}>
-                      {allListings.length >= 4 ? (
-                        <div className="grid grid-cols-2 grid-rows-2 w-full h-full">
-                          {allListings.slice(0, 4).map((l, i) => (
-                            <div key={i} className="overflow-hidden">
-                              {l.image?.startsWith("http") ? (
-                                <img src={l.image} alt={l.title} className="w-full h-full object-cover" />
-                              ) : (
-                                <div className="w-full h-full" style={{
-                                  background: i % 2 === 0
-                                    ? "linear-gradient(135deg,#0D9488,#7C3AED)"
-                                    : "linear-gradient(135deg,#7C3AED,#0D9488)",
-                                  opacity: 0.7,
-                                }} />
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="w-full h-full" style={{ background: "linear-gradient(135deg,#0D9488,#7C3AED)" }} />
-                      )}
-                      {/* Overlay */}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+                      <img
+                        src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=900&q=80"
+                        alt="Campus marketplace"
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
                       <div className="absolute bottom-0 left-0 right-0 px-5 pb-5">
                         <p className="text-white/70 text-[10px] tracking-[0.25em] uppercase font-bold mb-0.5">Campus Marketplace</p>
                         <p className="text-white font-black text-xl leading-tight">Every service, one tap away.</p>
