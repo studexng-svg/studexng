@@ -3,6 +3,7 @@ from django.urls import path
 from accounts.admin_views import (
     AdminDashboardView,
     AdminAnalyticsTimeSeriesView,
+    AdminVendorOfMonthView,
     AdminActivityView,
     AdminUserListView,
     AdminUserDetailView,
@@ -37,6 +38,7 @@ from accounts.admin_views import (
     AdminAIChatView,
     AdminAIActionView,
     AdminAIChatHistoryView,
+    AdminTestEmailView,
 )
 
 app_name = 'admin_api'
@@ -45,6 +47,7 @@ urlpatterns = [
     # Dashboard
     path('dashboard/', AdminDashboardView.as_view(), name='dashboard'),
     path('analytics/timeseries/', AdminAnalyticsTimeSeriesView.as_view(), name='analytics-timeseries'),
+    path('vendor-of-month/', AdminVendorOfMonthView.as_view(), name='vendor-of-month'),
     path('activity/', AdminActivityView.as_view(), name='activity'),
 
     # Users
@@ -114,6 +117,7 @@ urlpatterns += [
     path('ai-action/', AdminAIActionView.as_view(), name='ai-action'),
     path('ai-history/', AdminAIChatHistoryView.as_view(), name='ai-history-list'),
     path('ai-history/<int:session_id>/', AdminAIChatHistoryView.as_view(), name='ai-history-detail'),
+    path('test-email/', AdminTestEmailView.as_view(), name='test-email'),
 ]
 
 if AdminCartListView is not None:

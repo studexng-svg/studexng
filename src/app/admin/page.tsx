@@ -5,7 +5,7 @@ import {
   Users, Package, DollarSign, Store, FileText, Tag, TrendingUp,
   ChevronRight, AlertCircle, CheckCircle, Clock,
   CreditCard, Star, AlertTriangle, ArrowUpRight,
-  ShoppingCart, MessageCircle, Send, Radio, Bot, RefreshCw,
+  ShoppingCart, MessageCircle, Send, Radio, Bot, RefreshCw, Mail,
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -90,6 +90,7 @@ const QUICK_LINKS = [
   { label: "Conversations",      href: "/admin/conversations",    icon: MessageCircle,desc: "Monitor buyer/seller chats" },
   { label: "Messages",           href: "/admin/messages",         icon: Send,         desc: "Send notifications to users" },
   { label: "AI Assistant",      href: "/admin/ai",               icon: Bot,          desc: "Chat with AI, get reports & take actions" },
+  { label: "Vendor of Month",  href: "/admin/vendor-of-month",  icon: TrendingUp,   desc: "See, pick or override the monthly winner" },
 ];
 
 function LiveActivity() {
@@ -169,6 +170,9 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState<DashStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [emailTo, setEmailTo] = useState("");
+  const [emailTesting, setEmailTesting] = useState(false);
+  const [emailResult, setEmailResult] = useState<any>(null);
 
   const load = (manual = false) => {
     if (manual) setRefreshing(true);
@@ -184,6 +188,23 @@ export default function AdminDashboard() {
     const id = setInterval(() => load(), 60_000);
     return () => clearInterval(id);
   }, []);
+
+  const testEmail = async () => {
+    setEmailTesting(true);
+    setEmailResult(null);
+    try {
+      const r = await fetchWithAuth(`${API_URL}/api/admin/test-email/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to: emailTo.trim() || undefined }),
+      });
+      setEmailResult(await r.json());
+    } catch {
+      setEmailResult({ overall_success: false, error: "Network error" });
+    } finally {
+      setEmailTesting(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#FFF8F0]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
@@ -336,6 +357,52 @@ export default function AdminDashboard() {
 
         {/* Live activity */}
         <LiveActivity />
+
+        {/* Email diagnostics */}
+        <div className="bg-white rounded-2xl border border-stone-200 shadow-sm overflow-hidden">
+          <div className="px-4 py-3 border-b border-stone-100 flex items-center gap-2">
+            <Mail className="w-4 h-4 text-teal-600" />
+            <p className="font-semibold text-stone-900 text-sm">Email Delivery Test</p>
+          </div>
+          <div className="p-4 space-y-3">
+            <p className="text-xs text-stone-400">Send a test email to verify Resend / Brevo are configured. Leave blank to send to your own account.</p>
+            <div className="flex gap-2">
+              <input
+                value={emailTo}
+                onChange={e => setEmailTo(e.target.value)}
+                placeholder="recipient@example.com (optional)"
+                className="flex-1 px-3 py-2 border border-stone-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/30 bg-stone-50"
+              />
+              <button
+                onClick={testEmail}
+                disabled={emailTesting}
+                className="px-4 py-2 rounded-xl text-white text-sm font-semibold flex items-center gap-1.5 disabled:opacity-60 flex-shrink-0"
+                style={{ background: GRAD }}
+              >
+                {emailTesting ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                {emailTesting ? "Sending…" : "Send"}
+              </button>
+            </div>
+            {emailResult && (
+              <div className={`rounded-xl border p-3 text-xs space-y-1.5 ${emailResult.overall_success ? "bg-teal-50 border-teal-200" : "bg-red-50 border-red-200"}`}>
+                <p className={`font-bold ${emailResult.overall_success ? "text-teal-700" : "text-red-700"}`}>
+                  {emailResult.overall_success ? "✓ At least one provider succeeded" : "✗ All providers failed"}
+                </p>
+                {emailResult.to && <p className="text-stone-500">To: {emailResult.to}</p>}
+                {emailResult.resend && (
+                  <p className={emailResult.resend.success ? "text-teal-700" : "text-red-600"}>
+                    Resend: {emailResult.resend.success ? "✓ sent" : `✗ ${emailResult.resend.error}`}
+                  </p>
+                )}
+                {emailResult.brevo && (
+                  <p className={emailResult.brevo.success ? "text-teal-700" : "text-red-600"}>
+                    Brevo: {emailResult.brevo.success ? "✓ sent" : `✗ ${emailResult.brevo.error}`}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
 
         {/* Quick links */}
         <div>

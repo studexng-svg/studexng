@@ -6,7 +6,7 @@ from django.http import HttpResponse
 from django.db.models import Count, Sum
 from django import forms
 import csv
-from .models import Category, Listing, Transaction
+from .models import Category, Listing, Transaction, VendorOfTheMonth
 
 
 class CategoryImageForm(forms.ModelForm):
@@ -470,3 +470,55 @@ class TransactionAdmin(admin.ModelAdmin):
 
     def has_add_permission(self, request):
         return False
+
+
+@admin.register(VendorOfTheMonth)
+class VendorOfTheMonthAdmin(admin.ModelAdmin):
+    list_display = ('vendor_name', 'month_display', 'score', 'total_orders', 'avg_rating_display', 'completion_rate_display', 'is_manual_override', 'nominated_at')
+    list_filter = ('is_manual_override', 'month')
+    search_fields = ('vendor__username', 'vendor__business_name')
+    raw_id_fields = ('vendor',)
+    readonly_fields = ('score', 'nominated_at', 'vendor_photo')
+    ordering = ('-month',)
+
+    fieldsets = (
+        ('Award', {
+            'fields': ('vendor', 'vendor_photo', 'month', 'is_manual_override'),
+        }),
+        ('Scores (auto-calculated)', {
+            'fields': ('score', 'total_orders', 'avg_rating', 'completion_rate'),
+        }),
+        ('Meta', {
+            'fields': ('nominated_at',),
+            'classes': ('collapse',),
+        }),
+    )
+
+    def vendor_name(self, obj):
+        if not obj.vendor:
+            return '—'
+        name = getattr(obj.vendor, 'business_name', None) or obj.vendor.username
+        return format_html('<strong>{}</strong><br/><small>@{}</small>', name, obj.vendor.username)
+    vendor_name.short_description = 'Vendor'
+
+    def vendor_photo(self, obj):
+        if not obj.vendor:
+            return '—'
+        profile = getattr(obj.vendor, 'profile', None)
+        pic = getattr(profile, 'profile_picture', None)
+        if pic:
+            return format_html('<img src="{}" style="height:80px;width:80px;object-fit:cover;border-radius:50%;"/>', pic)
+        return 'No photo'
+    vendor_photo.short_description = 'Photo'
+
+    def month_display(self, obj):
+        return obj.month.strftime('%B %Y')
+    month_display.short_description = 'Month'
+
+    def avg_rating_display(self, obj):
+        return f'⭐ {obj.avg_rating:.1f}'
+    avg_rating_display.short_description = 'Rating'
+
+    def completion_rate_display(self, obj):
+        return f'{obj.completion_rate:.0f}%'
+    completion_rate_display.short_description = 'Completion'

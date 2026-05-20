@@ -1404,6 +1404,123 @@ except ImportError:
 # BROADCAST MESSAGING
 # ============================================
 
+class AdminVendorOfMonthView(APIView):
+    """
+    GET  /api/admin/vendor-of-month/  — current winner + last 6 months history
+    POST /api/admin/vendor-of-month/  — manually set or trigger auto-pick
+      Body (manual override): { vendor_id: int }
+      Body (trigger auto-pick): { action: 'pick_now' }
+    """
+    permission_classes = [IsAdminUser]
+
+    def _serialize(self, votm, request):
+        if not votm or not votm.vendor:
+            return None
+        vendor = votm.vendor
+        profile = getattr(vendor, 'profile', None)
+        pic = getattr(profile, 'profile_picture', None)
+        if pic:
+            pic = str(pic)
+            if pic and not pic.startswith('http'):
+                pic = request.build_absolute_uri(f'/media/{pic}')
+        return {
+            'id': votm.id,
+            'vendor_id': vendor.id,
+            'vendor_username': vendor.username,
+            'business_name': getattr(profile, 'business_name', None) or vendor.username,
+            'profile_picture': pic,
+            'rating': float(getattr(profile, 'rating', 0) or 0),
+            'total_reviews': int(getattr(profile, 'total_reviews', 0) or 0),
+            'vendor_badge': getattr(profile, 'vendor_badge', 'none') or 'none',
+            'month': votm.month.strftime('%B %Y'),
+            'month_raw': votm.month.isoformat(),
+            'score': round(votm.score, 1),
+            'total_orders': votm.total_orders,
+            'avg_rating': round(votm.avg_rating, 2),
+            'completion_rate': round(votm.completion_rate, 1),
+            'is_manual_override': votm.is_manual_override,
+            'nominated_at': votm.nominated_at.isoformat(),
+        }
+
+    def get(self, request):
+        from services.models import VendorOfTheMonth
+        records = VendorOfTheMonth.objects.select_related('vendor', 'vendor__profile').order_by('-month')[:6]
+        current = records[0] if records else None
+        return Response({
+            'current': self._serialize(current, request),
+            'history': [self._serialize(r, request) for r in records],
+        })
+
+    def post(self, request):
+        from services.models import VendorOfTheMonth
+        action = request.data.get('action')
+
+        if action == 'pick_now':
+            try:
+                from scheduler import pick_vendor_of_month
+                pick_vendor_of_month()
+                records = VendorOfTheMonth.objects.select_related('vendor', 'vendor__profile').order_by('-month')[:6]
+                current = records[0] if records else None
+                return Response({
+                    'message': 'Vendor of the Month picked successfully.',
+                    'current': self._serialize(current, request),
+                    'history': [self._serialize(r, request) for r in records],
+                })
+            except Exception as e:
+                return Response({'error': str(e)}, status=500)
+
+        # Manual override: set a specific vendor
+        vendor_id = request.data.get('vendor_id')
+        if not vendor_id:
+            return Response({'error': 'vendor_id or action required.'}, status=400)
+
+        try:
+            vendor = User.objects.select_related('profile').get(id=vendor_id)
+        except User.DoesNotExist:
+            return Response({'error': 'Vendor not found.'}, status=404)
+
+        from datetime import date
+        today = date.today()
+        month_start = date(today.year, today.month, 1)
+
+        from orders.models import Order
+        profile = getattr(vendor, 'profile', None)
+        completed = Order.objects.filter(listing__vendor=vendor, status='completed').count()
+
+        votm, created = VendorOfTheMonth.objects.update_or_create(
+            month=month_start,
+            defaults={
+                'vendor': vendor,
+                'score': 0,
+                'total_orders': completed,
+                'avg_rating': float(getattr(profile, 'rating', 0) or 0),
+                'completion_rate': float(getattr(profile, 'completion_rate', 0) or 0),
+                'is_manual_override': True,
+            }
+        )
+
+        try:
+            from accounts.utils import send_notification
+            send_notification(
+                recipient=vendor,
+                notification_type='vendor_of_month',
+                title='🏆 You are Vendor of the Month!',
+                message=(
+                    f'Congratulations {vendor.username}! You have been selected as '
+                    f'Vendor of the Month for {month_start.strftime("%B %Y")}. '
+                    f'Your profile is now featured on the StudEx home page!'
+                ),
+                action_url='/seller',
+            )
+        except Exception:
+            pass
+
+        return Response({
+            'message': f'{vendor.username} set as Vendor of the Month for {month_start.strftime("%B %Y")}.',
+            'current': self._serialize(votm, request),
+        }, status=201 if created else 200)
+
+
 class AdminActivityView(APIView):
     """GET /api/admin/activity/ — real-time online/offline counts."""
     permission_classes = [IsAdminUser]
@@ -2358,3 +2475,80 @@ class AdminBroadcastMessageView(APIView):
                 pass
 
         return Response({'sent': sent})
+
+
+class AdminTestEmailView(APIView):
+    """
+    POST /api/admin/test-email/
+    Send a test email to verify Resend and Brevo are configured correctly.
+    Body: { to?: str }  — defaults to the requesting admin's email.
+    Returns a detailed report of which provider succeeded or failed.
+    """
+    permission_classes = [IsAdminUser]
+
+    def post(self, request):
+        from studex.email import _try_resend, _try_brevo, _html_wrapper
+        from django.conf import settings as s
+
+        to = (request.data.get('to') or '').strip() or request.user.email
+        if not to:
+            return Response({'error': 'No recipient email — provide "to" or log in with an email account.'}, status=400)
+
+        subject = 'StudEx — Email Delivery Test'
+        html = _html_wrapper(
+            'Email delivery test',
+            '<p style="font-size:15px;color:#44403C;line-height:1.7;margin:0;">This is a test email sent from the StudEx admin panel to verify that your email provider is configured correctly.</p>',
+        )
+
+        resend_key = getattr(s, 'RESEND_API_KEY', '') or ''
+        brevo_key  = getattr(s, 'BREVO_API_KEY',  '') or ''
+
+        resend_result = {'configured': bool(resend_key), 'success': False, 'error': None}
+        brevo_result  = {'configured': bool(brevo_key),  'success': False, 'error': None}
+
+        # Test Resend
+        if resend_key:
+            try:
+                import resend as resend_lib
+                resend_lib.api_key = resend_key
+                resend_lib.Emails.send({
+                    'from': 'StudEx <noreply@studex.com.ng>',
+                    'to': [to],
+                    'subject': subject,
+                    'html': html,
+                })
+                resend_result['success'] = True
+            except Exception as e:
+                resend_result['error'] = str(e)
+        else:
+            resend_result['error'] = 'RESEND_API_KEY is not set in environment variables.'
+
+        # Test Brevo
+        if brevo_key:
+            try:
+                import requests as http
+                resp = http.post(
+                    'https://api.brevo.com/v3/smtp/email',
+                    headers={'api-key': brevo_key, 'Content-Type': 'application/json'},
+                    json={
+                        'sender': {'name': 'StudEx', 'email': 'noreply@studex.com.ng'},
+                        'to': [{'email': to}],
+                        'subject': subject + ' (Brevo)',
+                        'htmlContent': html,
+                    },
+                    timeout=10,
+                )
+                resp.raise_for_status()
+                brevo_result['success'] = True
+            except Exception as e:
+                brevo_result['error'] = str(e)
+        else:
+            brevo_result['error'] = 'BREVO_API_KEY is not set in environment variables.'
+
+        overall = resend_result['success'] or brevo_result['success']
+        return Response({
+            'to': to,
+            'overall_success': overall,
+            'resend': resend_result,
+            'brevo': brevo_result,
+        }, status=200 if overall else 207)
