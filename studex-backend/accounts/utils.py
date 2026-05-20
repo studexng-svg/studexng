@@ -45,7 +45,7 @@ def send_notification(
             if cache.get(dedup_key):
                 logger.debug(f"[notify] Duplicate suppressed for user {recipient.id}: {title}")
                 return None
-            cache.set(dedup_key, 1, timeout=60)
+            cache.set(dedup_key, 1, timeout=30)
         except Exception:
             pass  # Cache down — proceed without dedup rather than dropping the notification
 

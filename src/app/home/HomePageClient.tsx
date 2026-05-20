@@ -535,71 +535,79 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                 )}
               </motion.div>
 
-              {/* ── HERO BANNER ── */}
+              {/* ── HERO ── */}
               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
                 {vendorOfMonth ? (
-                  /* Vendor of the Month hero */
+                  /* Vendor of the Month — card layout */
                   <Link href={`/vendor/${vendorOfMonth.username}`}>
-                    <motion.div whileHover={{ y: -3 }} whileTap={{ scale: 0.98 }}
-                      className="relative rounded-2xl overflow-hidden h-44 cursor-pointer shadow-md">
-                      {/* Background image or gradient */}
-                      {vendorOfMonth.profile_picture ? (
-                        <img
-                          src={vendorOfMonth.profile_picture}
-                          alt={vendorOfMonth.business_name}
-                          className="absolute inset-0 w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="absolute inset-0" style={{ background: GRAD }} />
-                      )}
-                      {/* Dark overlay */}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-black/10" />
-                      {/* Trophy badge */}
-                      <div className="absolute top-3 left-3 flex items-center gap-1.5 bg-amber-400 text-amber-900 px-2.5 py-1 rounded-full text-[10px] font-bold shadow">
-                        <Trophy className="w-3 h-3" />
-                        Vendor of the Month · {vendorOfMonth.month}
+                    <motion.div whileTap={{ scale: 0.98 }}
+                      className="bg-white rounded-3xl overflow-hidden border border-stone-100 shadow-sm cursor-pointer">
+                      {/* Photo */}
+                      <div className="relative w-full overflow-hidden" style={{ aspectRatio: "4/3" }}>
+                        {vendorOfMonth.profile_picture ? (
+                          <img src={vendorOfMonth.profile_picture} alt={vendorOfMonth.business_name}
+                            className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full" style={{ background: GRAD }} />
+                        )}
+                        <div className="absolute top-3 left-3 flex items-center gap-1.5 bg-amber-400 text-amber-900 px-2.5 py-1 rounded-full text-[10px] font-bold shadow">
+                          <Trophy className="w-3 h-3" />
+                          Vendor of the Month · {vendorOfMonth.month}
+                        </div>
                       </div>
-                      {/* Content */}
-                      <div className="absolute bottom-0 left-0 right-0 px-4 pb-4 flex items-end justify-between">
-                        <div>
-                          <p className="text-white font-black text-xl leading-tight">{vendorOfMonth.business_name}</p>
-                          <div className="flex items-center gap-1.5 mt-1">
+                      {/* Info panel */}
+                      <div className="px-4 py-3.5 flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-black text-stone-900 text-base leading-tight truncate">{vendorOfMonth.business_name}</p>
+                          <div className="flex items-center gap-2 mt-1 flex-wrap">
                             {vendorOfMonth.rating > 0 && (
                               <div className="flex items-center gap-0.5">
                                 <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
-                                <span className="text-white/80 text-xs font-medium">{vendorOfMonth.rating.toFixed(1)}</span>
+                                <span className="text-stone-500 text-xs font-medium">{vendorOfMonth.rating.toFixed(1)}</span>
                               </div>
                             )}
-                            <span className="text-white/60 text-xs">·</span>
-                            <span className="text-white/80 text-xs">{vendorOfMonth.total_orders} orders last month</span>
+                            <span className="text-stone-400 text-xs">{vendorOfMonth.total_orders} orders last month</span>
                           </div>
                         </div>
-                        <div className="bg-white/20 backdrop-blur-sm border border-white/30 px-3 py-1.5 rounded-full flex items-center gap-1 flex-shrink-0">
-                          <span className="text-white text-xs font-semibold">Shop now</span>
-                          <ChevronRight className="w-3 h-3 text-white" />
+                        <div className="flex items-center gap-1 px-3 py-1.5 rounded-full text-white text-xs font-semibold flex-shrink-0"
+                          style={{ background: GRAD }}>
+                          Shop now <ChevronRight className="w-3 h-3" />
                         </div>
                       </div>
                     </motion.div>
                   </Link>
                 ) : (
-                  /* Fallback hero when no vendor of month yet */
+                  /* Fallback — photo mosaic from live listings */
                   <Link href="/categories">
-                    <motion.div whileHover={{ y: -3 }} whileTap={{ scale: 0.98 }}
-                      className="relative rounded-2xl overflow-hidden h-36 cursor-pointer shadow-md bg-gradient-to-br from-teal-500 to-purple-600">
-                      <div className="absolute top-0 right-0 w-48 h-48 rounded-full bg-white/10 blur-3xl pointer-events-none" />
-                      <div className="absolute bottom-0 left-0 w-40 h-40 rounded-full bg-white/10 blur-3xl pointer-events-none" />
-                      <div className="relative z-10 h-full flex flex-col justify-center px-6">
-                        <p className="text-white/80 text-xs tracking-[0.25em] uppercase font-semibold mb-1">Campus Marketplace</p>
-                        <h2 className="text-xl font-bold text-white" style={SERIF}>
-                          Every service,{" "}
-                          <span className="italic" style={{
-                            background: "linear-gradient(135deg, #2dd4bf 0%, #a78bfa 100%)",
-                            WebkitBackgroundClip: "text",
-                            WebkitTextFillColor: "transparent",
-                            backgroundClip: "text",
-                          }}>one tap away.</span>
-                        </h2>
-                        <p className="text-white/70 text-xs mt-2 flex items-center gap-1">
+                    <motion.div whileTap={{ scale: 0.98 }}
+                      className="relative rounded-3xl overflow-hidden cursor-pointer shadow-sm"
+                      style={{ aspectRatio: "16/9" }}>
+                      {allListings.length >= 4 ? (
+                        <div className="grid grid-cols-2 grid-rows-2 w-full h-full">
+                          {allListings.slice(0, 4).map((l, i) => (
+                            <div key={i} className="overflow-hidden">
+                              {l.image?.startsWith("http") ? (
+                                <img src={l.image} alt={l.title} className="w-full h-full object-cover" />
+                              ) : (
+                                <div className="w-full h-full" style={{
+                                  background: i % 2 === 0
+                                    ? "linear-gradient(135deg,#0D9488,#7C3AED)"
+                                    : "linear-gradient(135deg,#7C3AED,#0D9488)",
+                                  opacity: 0.7,
+                                }} />
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="w-full h-full" style={{ background: "linear-gradient(135deg,#0D9488,#7C3AED)" }} />
+                      )}
+                      {/* Overlay */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+                      <div className="absolute bottom-0 left-0 right-0 px-5 pb-5">
+                        <p className="text-white/70 text-[10px] tracking-[0.25em] uppercase font-bold mb-0.5">Campus Marketplace</p>
+                        <p className="text-white font-black text-xl leading-tight">Every service, one tap away.</p>
+                        <p className="text-white/60 text-xs mt-1.5 flex items-center gap-0.5">
                           Browse all categories <ChevronRight className="w-3 h-3" />
                         </p>
                       </div>
