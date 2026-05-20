@@ -470,12 +470,11 @@ export default function HomePageClient({ initialVendors, initialListings, initia
 
               {/* HERO */}
               <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
-                className="relative rounded-3xl overflow-hidden min-h-[220px] lg:min-h-[260px]">
-                <img src="https://images.unsplash.com/_jFGWIE6fg?auto=format&fit=crop&w=1200&q=80"
-                  alt="Campus marketplace" className="absolute inset-0 w-full h-full object-cover" />
-                <div className="absolute inset-0"
-                  style={{ background: "linear-gradient(135deg,rgba(13,148,136,0.88) 0%,rgba(124,58,237,0.82) 100%)" }} />
-                <div className="relative z-10 h-full flex flex-col justify-center px-7 py-8 max-w-xl">
+                className="rounded-3xl overflow-hidden flex min-h-[220px] lg:min-h-[280px]">
+
+                {/* Left — gradient + text */}
+                <div className="flex-1 flex flex-col justify-center px-7 py-8"
+                  style={{ background: "linear-gradient(135deg,#0D9488 0%,#7C3AED 100%)" }}>
                   {vendorOfMonth ? (
                     <>
                       <div className="flex items-center gap-1.5 bg-amber-400 w-fit px-3 py-1 rounded-full mb-4">
@@ -505,7 +504,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                         style={{ fontFamily: "var(--font-jakarta),'Plus Jakarta Sans',sans-serif" }}>
                         Shop Smart.<br />Live Campus.
                       </h1>
-                      <p className="text-white/75 text-sm mb-5 leading-relaxed max-w-sm">
+                      <p className="text-white/75 text-sm mb-5 leading-relaxed max-w-xs">
                         Discover services and products from verified vendors on your campus.
                       </p>
                       <Link href="/categories">
@@ -516,6 +515,15 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                       </Link>
                     </>
                   )}
+                </div>
+
+                {/* Right — product image (desktop only) */}
+                <div className="hidden lg:block w-72 xl:w-80 flex-shrink-0 relative overflow-hidden">
+                  <img
+                    src="https://images.unsplash.com/photo-6ScsjjO9ysM?auto=format&fit=crop&w=640&q=80"
+                    alt="Shop on StudEx"
+                    className="w-full h-full object-cover object-center"
+                  />
                 </div>
               </motion.div>
 
