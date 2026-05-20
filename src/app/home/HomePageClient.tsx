@@ -583,7 +583,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                       className="relative rounded-3xl overflow-hidden cursor-pointer shadow-sm"
                       style={{ aspectRatio: "16/9" }}>
                       <img
-                        src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=900&q=80"
+                        src="https://images.unsplash.com/_jFGWIE6fg?auto=format&fit=crop&w=900&q=80"
                         alt="Campus marketplace"
                         className="w-full h-full object-cover"
                       />
