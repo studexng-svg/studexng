@@ -9,7 +9,7 @@ import { useEffect, useState } from "react";
 import { useNotifications } from "@/hooks/useNotifications";
 import { NotificationToastContainer } from "@/components/NotificationToast";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
-import AdminBar from "@/components/AdminBar";
+import DraggableAdminShield from "@/components/admin/DraggableAdminShield";
 import { useHeartbeat } from "@/hooks/useHeartbeat";
 
 function NotificationProvider({ children }: { children: React.ReactNode }) {
@@ -91,7 +91,7 @@ export default function LayoutClient({ children }: { children: React.ReactNode }
           </div>
         )}
 
-        <AdminBar />
+        <DraggableAdminShield />
         <CookieConsent />
         <Toaster position="top-center" richColors closeButton />
       </NotificationProvider>

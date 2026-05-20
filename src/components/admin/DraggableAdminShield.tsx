@@ -1,15 +1,20 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { Shield } from "lucide-react";
 import { GRAD } from "@/lib/tokens";
+import { useAdminMode } from "@/hooks/useAdminMode";
 
 const MARGIN = 14;
 const STORAGE_KEY = "admin-shield-pos";
 
 export default function DraggableAdminShield() {
+  const { isAdmin } = useAdminMode();
+  const router = useRouter();
   const ref = useRef<HTMLDivElement>(null);
   const dragOffset = useRef({ x: 0, y: 0 });
+  const didDrag = useRef(false);
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
   const [dragging, setDragging] = useState(false);
 
@@ -40,6 +45,7 @@ export default function DraggableAdminShield() {
   // ── Mouse ────────────────────────────────────────────────────────────────
   const onMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
+    didDrag.current = false;
     const rect = ref.current!.getBoundingClientRect();
     dragOffset.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
     setDragging(true);
@@ -48,6 +54,7 @@ export default function DraggableAdminShield() {
   useEffect(() => {
     if (!dragging) return;
     const onMove = (e: MouseEvent) => {
+      didDrag.current = true;
       setPos({ x: e.clientX - dragOffset.current.x, y: e.clientY - dragOffset.current.y });
     };
     const onUp = (e: MouseEvent) => {
@@ -69,6 +76,7 @@ export default function DraggableAdminShield() {
 
   // ── Touch ────────────────────────────────────────────────────────────────
   const onTouchStart = (e: React.TouchEvent) => {
+    didDrag.current = false;
     const t = e.touches[0];
     const rect = ref.current!.getBoundingClientRect();
     dragOffset.current = { x: t.clientX - rect.left, y: t.clientY - rect.top };
@@ -79,6 +87,7 @@ export default function DraggableAdminShield() {
     if (!dragging) return;
     const onMove = (e: TouchEvent) => {
       e.preventDefault();
+      didDrag.current = true;
       const t = e.touches[0];
       setPos({ x: t.clientX - dragOffset.current.x, y: t.clientY - dragOffset.current.y });
     };
@@ -90,6 +99,7 @@ export default function DraggableAdminShield() {
       );
       setPos(snapped);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(snapped));
+      if (!didDrag.current) router.push("/admin");
       setDragging(false);
     };
     window.addEventListener("touchmove", onMove, { passive: false });
@@ -100,13 +110,14 @@ export default function DraggableAdminShield() {
     };
   }, [dragging, snapToCorner]);
 
-  if (pos === null) return null;
+  if (!isAdmin || pos === null) return null;
 
   return (
     <div
       ref={ref}
       onMouseDown={onMouseDown}
       onTouchStart={onTouchStart}
+      onClick={() => { if (!didDrag.current) router.push("/admin"); }}
       className="fixed z-[9999] w-11 h-11 rounded-2xl flex items-center justify-center shadow-lg select-none"
       style={{
         left: pos.x,
