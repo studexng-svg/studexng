@@ -4,6 +4,9 @@ import { useEffect, useState, useRef } from "react";
 import {
   Search, ArrowRight, Heart, X, Sparkles, Star, Shield,
   ChevronRight, Clock, Plus, Trophy, ShieldCheck, Tag, Zap, Headphones,
+  Shirt, Monitor, UtensilsCrossed, Smartphone, Scissors, WashingMachine,
+  Flower2, Dumbbell, BookOpen, Package, Palette, Bike, Music, Camera,
+  type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
@@ -58,6 +61,39 @@ const BADGE_STYLES: Record<string, string> = {
   trusted: "bg-teal-50 text-teal-700 border border-teal-200",
   rising: "bg-purple-50 text-purple-700 border border-purple-200",
 };
+
+const CATEGORY_ICONS: Record<string, LucideIcon> = {
+  "fashion":            Shirt,
+  "fashion-clothing":   Shirt,
+  "food":               UtensilsCrossed,
+  "food-snacks":        UtensilsCrossed,
+  "gadgets":            Smartphone,
+  "gadgets-accessories":Smartphone,
+  "electronics":        Monitor,
+  "digital":            Monitor,
+  "digital-products":   Monitor,
+  "editing":            Scissors,
+  "hair":               Scissors,
+  "hair-beauty":        Scissors,
+  "laundry":            WashingMachine,
+  "perfumes":           Flower2,
+  "perfumes-cosmetics": Flower2,
+  "cosmetics":          Flower2,
+  "sports":             Dumbbell,
+  "books":              BookOpen,
+  "music":              Music,
+  "art":                Palette,
+  "photography":        Camera,
+  "transport":          Bike,
+};
+
+function getCategoryIcon(slug: string): LucideIcon {
+  const key = slug.toLowerCase();
+  for (const [k, icon] of Object.entries(CATEGORY_ICONS)) {
+    if (key.includes(k)) return icon;
+  }
+  return Package;
+}
 
 const TRUST_ITEMS = [
   { icon: ShieldCheck, title: "Verified Vendors", desc: "Every vendor is campus-verified" },
@@ -351,24 +387,22 @@ export default function HomePageClient({ initialVendors, initialListings, initia
       <div className="min-h-screen bg-[#F8F7F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
 
         {/* ── HEADER ── */}
-        <header className="sticky top-0 bg-white/95 backdrop-blur-md z-40 border-b border-stone-100 shadow-sm">
+        <header className="sticky top-0 z-40 shadow-md" style={{ background: "linear-gradient(135deg,#0D9488 0%,#4F46E5 55%,#7C3AED 100%)" }}>
           <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-3">
             <Link href="/home" className="flex items-center gap-2 flex-shrink-0">
-              <div className="w-9 h-9 rounded-full bg-white border border-stone-200 flex items-center justify-center p-1 shadow-sm overflow-hidden">
+              <div className="w-9 h-9 rounded-full bg-white/20 backdrop-blur border border-white/30 flex items-center justify-center p-1 overflow-hidden">
                 <img src="/images/logo-1.jpg" alt="StudEx" loading="lazy" className="w-full h-full object-contain" />
               </div>
-              <span className="font-bold text-lg text-stone-900 hidden sm:block" style={SERIF}>
-                Stud<span style={GRAD_TEXT}>Ex</span>
-              </span>
+              <span className="font-bold text-lg text-white hidden sm:block" style={SERIF}>StudEx</span>
             </Link>
 
             <div className="relative flex-1 max-w-lg">
-              <Search className="w-4 h-4 absolute left-3 top-3 text-stone-400 pointer-events-none" />
+              <Search className="w-4 h-4 absolute left-3 top-3 text-white/60 pointer-events-none" />
               <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
                 onFocus={() => searchResults.length > 0 && setShowResults(true)}
                 onBlur={() => setTimeout(() => setShowResults(false), 200)}
                 placeholder="Search services..."
-                className="w-full pl-9 pr-8 py-2.5 bg-stone-50 text-stone-900 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/30 border border-stone-200 placeholder:text-stone-400 transition-all" />
+                className="w-full pl-9 pr-8 py-2.5 bg-white/15 backdrop-blur text-white rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-white/40 border border-white/25 placeholder:text-white/50 transition-all" />
               {searchQuery && (
                 <button onClick={() => { setSearchQuery(""); setShowResults(false); }}
                   className="absolute right-3 top-3 text-stone-400 hover:text-stone-600">
@@ -404,14 +438,14 @@ export default function HomePageClient({ initialVendors, initialListings, initia
 
             <div className="flex items-center gap-3 flex-shrink-0">
               {isLoggedIn && user && (
-                <span className="hidden lg:block text-sm text-stone-500">
-                  Hi, <span className="font-semibold text-stone-900">{(user as any).username}</span>
+                <span className="hidden lg:block text-sm text-white/80">
+                  Hi, <span className="font-semibold text-white">{(user as any).username}</span>
                 </span>
               )}
               {!isLoggedIn && (
                 <Link href="/auth">
                   <motion.button whileTap={{ scale: 0.97 }}
-                    className="px-4 py-2 text-white font-medium rounded-full text-sm shadow-sm" style={{ background: GRAD }}>
+                    className="px-4 py-2 text-white font-semibold rounded-full text-sm border border-white/40 bg-white/15 backdrop-blur hover:bg-white/25 transition">
                     Login
                   </motion.button>
                 </Link>
@@ -430,21 +464,33 @@ export default function HomePageClient({ initialVendors, initialListings, initia
 
                 {/* Categories */}
                 <div className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden">
-                  <div className="px-4 py-3 border-b border-stone-50">
-                    <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">Categories</p>
+                  <div className="px-4 py-3 border-b border-stone-100" style={{ background: "linear-gradient(135deg,#0D9488,#7C3AED)" }}>
+                    <p className="text-[10px] font-bold text-white/80 uppercase tracking-widest">Categories</p>
                   </div>
                   <button onClick={() => handleFilter("All")}
-                    className={`w-full flex items-center justify-between px-4 py-2.5 text-sm font-semibold border-b border-stone-50 transition ${activeFilter === "All" && activeTab === "listings" ? "text-teal-600 bg-teal-50/60" : "text-stone-700 hover:bg-stone-50"}`}>
+                    className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold border-b border-stone-50 transition ${activeFilter === "All" && activeTab === "listings" ? "text-teal-600 bg-teal-50/60" : "text-stone-700 hover:bg-stone-50"}`}>
+                    <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+                      style={{ background: activeFilter === "All" && activeTab === "listings" ? "linear-gradient(135deg,#0D9488,#7C3AED)" : "#f3f4f6" }}>
+                      <Package className={`w-3.5 h-3.5 ${activeFilter === "All" && activeTab === "listings" ? "text-white" : "text-stone-400"}`} />
+                    </div>
                     All
-                    {activeFilter === "All" && activeTab === "listings" && <ChevronRight className="w-3.5 h-3.5" />}
+                    {activeFilter === "All" && activeTab === "listings" && <ChevronRight className="w-3.5 h-3.5 ml-auto" />}
                   </button>
-                  {categories.map(cat => (
-                    <button key={cat.slug} onClick={() => handleFilter(cat.slug)}
-                      className={`w-full flex items-center justify-between px-4 py-2.5 text-sm font-medium border-b border-stone-50 last:border-0 transition ${activeFilter === cat.slug && activeTab === "listings" ? "text-teal-600 bg-teal-50/60" : "text-stone-600 hover:bg-stone-50"}`}>
-                      {cat.title}
-                      {activeFilter === cat.slug && activeTab === "listings" && <ChevronRight className="w-3.5 h-3.5" />}
-                    </button>
-                  ))}
+                  {categories.map(cat => {
+                    const Icon = getCategoryIcon(cat.slug);
+                    const isActive = activeFilter === cat.slug && activeTab === "listings";
+                    return (
+                      <button key={cat.slug} onClick={() => handleFilter(cat.slug)}
+                        className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium border-b border-stone-50 last:border-0 transition ${isActive ? "text-teal-600 bg-teal-50/60" : "text-stone-600 hover:bg-stone-50"}`}>
+                        <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+                          style={{ background: isActive ? "linear-gradient(135deg,#0D9488,#7C3AED)" : "#f3f4f6" }}>
+                          <Icon className={`w-3.5 h-3.5 ${isActive ? "text-white" : "text-stone-400"}`} />
+                        </div>
+                        {cat.title}
+                        {isActive && <ChevronRight className="w-3.5 h-3.5 ml-auto" />}
+                      </button>
+                    );
+                  })}
                 </div>
 
                 {/* Campus toggle */}
