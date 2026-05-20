@@ -1014,18 +1014,30 @@ def _create_order_from_paystack_data(paystack_data, buyer, listing_id, order_typ
 
             try:
                 from accounts.utils import send_notification
+                # Notify vendor
                 send_notification(
                     recipient=listing.vendor,
                     notification_type='new_order',
-                    title=f'💰 Payment Received — {listing.title}',
+                    title=f'New Order — {listing.title}',
                     message=(
                         f'{buyer.username} just paid for "{listing.title}". '
                         f'Your payout of ₦{vendor_amount:,.0f} will be transferred to your bank shortly.'
                     ),
                     action_url='/vendor/dashboard',
                 )
+                # Notify buyer
+                send_notification(
+                    recipient=buyer,
+                    notification_type='order_placed',
+                    title=f'Order Confirmed — {listing.title}',
+                    message=(
+                        f'Your payment of ₦{amount_paid:,.0f} for "{listing.title}" was successful. '
+                        f'The vendor has been notified and will begin your order shortly.'
+                    ),
+                    action_url='/account/orders',
+                )
             except Exception as ne:
-                logger.warning(f"Vendor notification failed: {ne}")
+                logger.warning(f"Order notification failed: {ne}")
 
     except Exception as e:
         logger.error(f"Order creation failed: {e}", exc_info=True)

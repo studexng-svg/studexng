@@ -71,26 +71,25 @@ def send_otp(request):
     cache.set(f'otp_{email}', otp, timeout=600)
 
     try:
-        resend.api_key = settings.RESEND_API_KEY
-        resend.Emails.send({
-            'from': 'StudEx <noreply@studex.com.ng>',
-            'to': [email],
-            'subject': 'Your StudEx Verification Code',
-            'html': f'''
-                <div style="font-family: DM Sans, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
-                    <h1 style="font-size: 24px; color: #1C1917;">Welcome to StudEx 🎓</h1>
-                    <p style="color: #78716C;">Your verification code is:</p>
-                    <div style="background: linear-gradient(135deg, #0D9488, #7C3AED); border-radius: 12px; padding: 24px; text-align: center; margin: 24px 0;">
-                        <span style="font-size: 48px; font-weight: bold; color: white; letter-spacing: 12px;">{otp}</span>
-                    </div>
-                    <p style="color: #78716C;">This code expires in <strong>10 minutes</strong>.</p>
-                    <p style="color: #A8A29E; font-size: 12px;">If you didn&apos;t request this, ignore this email.</p>
+        from studex.email import send_email
+        otp_html = f'''
+            <div style="font-family:DM Sans,sans-serif;max-width:480px;margin:0 auto;padding:32px;">
+                <p style="color:#0D9488;font-size:11px;font-weight:700;letter-spacing:.15em;
+                          text-transform:uppercase;margin:0 0 6px;">StudEx</p>
+                <h1 style="font-size:24px;color:#1C1917;margin:0 0 12px;">Your verification code</h1>
+                <p style="color:#78716C;">Enter this code to verify your email address:</p>
+                <div style="background:linear-gradient(135deg,#0D9488,#7C3AED);border-radius:12px;
+                            padding:24px;text-align:center;margin:24px 0;">
+                    <span style="font-size:48px;font-weight:bold;color:white;letter-spacing:12px;">{otp}</span>
                 </div>
-            ''',
-        })
+                <p style="color:#78716C;">This code expires in <strong>10 minutes</strong>.</p>
+                <p style="color:#A8A29E;font-size:12px;">If you didn&apos;t request this, ignore this email.</p>
+            </div>
+        '''
+        send_email(to=email, subject='Your StudEx Verification Code', html=otp_html, _async=False)
         return Response({'message': 'OTP sent successfully'})
     except Exception as e:
-        print(f"Resend error: {e}")
+        print(f"Email error: {e}")
         return Response({'error': 'Failed to send OTP. Please try again.'}, status=500)
 
 
@@ -546,35 +545,32 @@ class ForgotPasswordView(APIView):
         reset_url = f"{settings.FRONTEND_BASE_URL}/reset-password?uid={uid}&token={token}"
 
         try:
-            resend.api_key = settings.RESEND_API_KEY
-            resend.Emails.send({
-                'from': 'StudEx <noreply@studex.com.ng>',
-                'to': [email],
-                'subject': 'Reset your StudEx password',
-                'html': f'''
-                    <div style="font-family: DM Sans, sans-serif; max-width: 520px; margin: 0 auto; padding: 40px 32px; background: #ffffff;">
-                        <p style="color: #0D9488; font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; margin: 0 0 8px;">StudEx</p>
-                        <h1 style="font-size: 24px; color: #1C1917; margin: 0 0 12px;">Reset your password</h1>
-                        <p style="font-size: 15px; color: #44403C; line-height: 1.6; margin: 0 0 28px;">
-                            Hi {user.username}, we received a request to reset your StudEx password.
-                            Click the button below — the link expires in <strong>24 hours</strong>.
-                        </p>
-                        <a href="{reset_url}"
-                           style="display: inline-block; padding: 14px 28px;
-                                  background: linear-gradient(135deg, #0D9488, #7C3AED);
-                                  color: #ffffff; text-decoration: none; border-radius: 10px;
-                                  font-size: 15px; font-weight: 600;">
-                            Reset Password
-                        </a>
-                        <p style="margin-top: 28px; font-size: 13px; color: #A8A29E;">
-                            If you did not request this, you can safely ignore this email.
-                            Your password will not change.
-                        </p>
-                    </div>
-                ''',
-            })
+            from studex.email import send_email
+            reset_html = f'''
+                <div style="font-family:DM Sans,sans-serif;max-width:520px;margin:0 auto;
+                            padding:40px 32px;background:#ffffff;">
+                    <p style="color:#0D9488;font-size:11px;font-weight:700;letter-spacing:.15em;
+                              text-transform:uppercase;margin:0 0 6px;">StudEx</p>
+                    <h1 style="font-size:24px;color:#1C1917;margin:0 0 12px;">Reset your password</h1>
+                    <p style="font-size:15px;color:#44403C;line-height:1.6;margin:0 0 28px;">
+                        Hi {user.username}, we received a request to reset your StudEx password.
+                        Click the button below — the link expires in <strong>24 hours</strong>.
+                    </p>
+                    <a href="{reset_url}"
+                       style="display:inline-block;padding:14px 28px;
+                              background:linear-gradient(135deg,#0D9488,#7C3AED);
+                              color:#ffffff;text-decoration:none;border-radius:10px;
+                              font-size:15px;font-weight:600;">
+                        Reset Password
+                    </a>
+                    <p style="margin-top:28px;font-size:13px;color:#A8A29E;">
+                        If you did not request this, you can safely ignore this email.
+                    </p>
+                </div>
+            '''
+            send_email(to=email, subject='Reset your StudEx password', html=reset_html, _async=False)
         except Exception as e:
-            print(f"Resend password reset email error: {e}")
+            print(f"Password reset email error: {e}")
 
         return Response({'detail': 'If this email exists, a reset link has been sent.'})
 

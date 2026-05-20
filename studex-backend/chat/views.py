@@ -136,12 +136,12 @@ class ConversationViewSet(viewsets.ModelViewSet):
         conversation.last_message_at = timezone.now()
         conversation.save()
 
-        # Notify the other participant
+        # Notify the other participant (SSE + FCM + email)
         recipient = conversation.seller if request.user == conversation.buyer else conversation.buyer
         try:
-            from notifications.models import Notification
+            from accounts.utils import send_notification
             preview = '📷 Image' if image else (content[:60] + ('...' if len(content) > 60 else ''))
-            Notification.objects.create(
+            send_notification(
                 recipient=recipient,
                 notification_type='message',
                 title=f'New message from {request.user.username}',

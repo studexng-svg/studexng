@@ -6,7 +6,7 @@ Provides aggregated statistics and metrics for the admin panel.
 All calculations happen at the database level for performance.
 """
 
-from django.db.models import Count, Sum, Avg, Q
+from django.db.models import Count, Sum, Avg, Q, F
 from django.utils import timezone
 from datetime import timedelta
 from accounts.models import User, Profile
@@ -161,7 +161,6 @@ class AdminAnalytics:
         try:
             from payments.models import PaymentTransaction
             from orders.models import Order
-            from django.db.models import F
 
             thirty_days_ago = timezone.now() - timedelta(days=30)
 
@@ -195,10 +194,7 @@ class AdminAnalytics:
 
             def _order_financials(qs):
                 vol = float(qs.aggregate(t=Sum('amount'))['t'] or 0)
-                vendor = float(
-                    qs.annotate(listing_price=F('listing__price'))
-                      .aggregate(t=Sum('listing_price'))['t'] or 0
-                )
+                vendor = float(qs.aggregate(t=Sum(F('listing__price')))['t'] or 0)
                 return vol, vendor, max(vol - vendor, 0.0)
 
             paid_orders = Order.objects.filter(status__in=PAID_STATUSES)

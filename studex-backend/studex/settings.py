@@ -259,9 +259,10 @@ SIMPLE_JWT = {
 }
 
 # =======================================
-# RESEND EMAIL
+# EMAIL (Resend primary, Brevo fallback)
 # =======================================
 RESEND_API_KEY = config('RESEND_API_KEY', default='')
+BREVO_API_KEY  = config('BREVO_API_KEY',  default='')
 ADMIN_EMAIL = config('ADMIN_EMAIL', default='studex.ng@gmail.com')
 FRONTEND_BASE_URL = config('FRONTEND_BASE_URL', default='https://studex.com.ng')
 

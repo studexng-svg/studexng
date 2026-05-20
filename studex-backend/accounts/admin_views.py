@@ -1522,20 +1522,13 @@ def _get_platform_context() -> str:
                 vl = f"  [user_id:{u.id}] {u.username} | {u.school or '?'}"
             vendor_lines.append(vl)
 
-        student_lines = []
-        for u in students:
-            try:
-                p = u.profile
-                sl = (f"  [user_id:{u.id}] {u.username} | {u.school or '?'} | "
-                      f"joined:{u.date_joined.strftime('%d %b %Y')} | "
-                      f"orders:{p.total_orders} | wallet:₦{u.wallet_balance:,.0f}")
-            except Exception:
-                sl = f"  [user_id:{u.id}] {u.username} | {u.school or '?'}"
-            student_lines.append(sl)
+        # Students: summary only — individual lines would bloat the context
+        pau_students = sum(1 for u in students if (u.school or '').lower() == 'pau')
+        futo_students = sum(1 for u in students if (u.school or '').lower() == 'futo')
 
         sections.append(
             hdr + f"\n\nALL VENDORS ({len(vendors)}):\n" + "\n".join(vendor_lines) +
-            f"\n\nALL STUDENTS ({len(students)}):\n" + "\n".join(student_lines)
+            f"\n\nSTUDENTS: {len(students)} total (PAU:{pau_students} FUTO:{futo_students}) — use lookup_user for individual student details"
         )
     except Exception:
         pass
@@ -1618,7 +1611,7 @@ def _get_platform_context() -> str:
             .order_by('-created_at')
             .values('id', 'reference', 'buyer__username', 'buyer__id',
                     'listing__title', 'listing__vendor__username', 'listing__vendor__id',
-                    'amount', 'status', 'created_at')[:500]
+                    'amount', 'status', 'created_at')[:50]
         )
         total_o = Order.objects.count()
         sc = {s['status']: s['n'] for s in Order.objects.values('status').annotate(n=DjCount('id'))}
@@ -1668,7 +1661,7 @@ def _get_platform_context() -> str:
             .order_by('-created_at')
             .values('id', 'reference', 'buyer__username', 'seller__username',
                     'amount', 'seller_amount', 'platform_amount',
-                    'status', 'transfer_status', 'order_id', 'created_at')[:300]
+                    'status', 'transfer_status', 'order_id', 'created_at')[:50]
         )
         agg_success = PaymentTransaction.objects.filter(status='success')
         rev_total = agg_success.aggregate(t=Sum('platform_amount'))['t'] or 0
@@ -1702,7 +1695,7 @@ def _get_platform_context() -> str:
             Review.objects.select_related('reviewer', 'vendor')
             .order_by('-created_at')
             .values('id', 'reviewer__username', 'reviewer__id', 'vendor__username', 'vendor__id',
-                    'rating', 'comment', 'created_at')[:300]
+                    'rating', 'comment', 'created_at')[:30]
         )
         avg_r = Review.objects.aggregate(a=Avg('rating'))['a'] or 0
         review_lines = [
@@ -1718,26 +1711,12 @@ def _get_platform_context() -> str:
     except Exception:
         pass
 
-    # ── ALL CONVERSATIONS ────────────────────────────────────────────────────
+    # ── CONVERSATIONS ────────────────────────────────────────────────────────
     try:
         from chat.models import Conversation
-        all_convs = list(
-            Conversation.objects.select_related('buyer', 'seller')
-            .order_by('-last_message_at')
-            .values('id', 'buyer__username', 'buyer__id', 'seller__username', 'seller__id',
-                    'last_message', 'last_message_at', 'created_at')[:200]
-        )
-        conv_lines = [
-            f"  [conv_id:{c['id']}] {c['buyer__username']} (user_id:{c['buyer__id']}) ↔ "
-            f"{c['seller__username']} (user_id:{c['seller__id']}) | "
-            f"last msg: \"{(c['last_message'] or '')[:60]}\" | "
-            f"{c['last_message_at'].strftime('%d %b %Y') if c['last_message_at'] else 'no messages'}"
-            for c in all_convs
-        ]
+        total_convs = Conversation.objects.count()
         sections.append(
-            f"CONVERSATIONS: {len(all_convs)} total\n"
-            f"ALL CONVERSATIONS (most recent {len(all_convs)}):\n" +
-            ("\n".join(conv_lines) if conv_lines else "  none")
+            f"CONVERSATIONS: {total_convs} total — use lookup_conversation action for message content"
         )
     except Exception:
         pass
@@ -1785,6 +1764,9 @@ class AdminAIChatView(APIView):
             return Response({'error': 'GROQ_API_KEY not configured on this server'}, status=503)
 
         ctx = _get_platform_context()
+        # Hard cap: prevent 413s as platform data grows
+        if len(ctx) > 14_000:
+            ctx = ctx[:14_000] + "\n\n[Context truncated to fit model limits — use lookup actions for deeper detail]"
 
         system_prompt = f"""You are StudEx Admin AI — the intelligent assistant inside the StudEx campus marketplace admin dashboard.
 
@@ -1860,13 +1842,15 @@ The platform snapshot above already contains every user, listing, order, dispute
 Do NOT include <action> if no action is needed.
 Do NOT identify yourself as Groq, LLaMA, or any third-party AI — you are StudEx Admin AI."""
 
+        # Keep only the last 20 turns to avoid conversation-history bloat
+        trimmed_messages = [
+            m for m in messages
+            if m.get("role") in ("user", "assistant") and m.get("content")
+        ][-20:]
+
         groq_messages = [
             {"role": "system", "content": system_prompt},
-            *[
-                {"role": m["role"], "content": m["content"]}
-                for m in messages
-                if m.get("role") in ("user", "assistant") and m.get("content")
-            ],
+            *[{"role": m["role"], "content": m["content"]} for m in trimmed_messages],
         ]
 
         try:

@@ -1,9 +1,20 @@
 # accounts/utils.py
 """
 send_notification — creates a DB notification AND instantly pushes it
-to any open browser tabs via SSE. This is the single function to call
-from anywhere in the codebase whenever you want to notify a user.
+to any open browser tabs via SSE, FCM, and email.
+
+Deduplication: identical notifications to the same recipient within 60 seconds
+are silently dropped — prevents duplicates from signals, retries, or double-calls.
 """
+import hashlib
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+def _dedup_key(recipient_id, notification_type, title):
+    h = hashlib.md5(f"{notification_type}:{title}".encode()).hexdigest()[:12]
+    return f"notif_dedup:{recipient_id}:{h}"
 
 
 def send_notification(
@@ -12,19 +23,32 @@ def send_notification(
     title: str,
     message: str,
     action_url: str = "",
+    send_email: bool = True,
 ):
     """
-    Creates a Notification record and immediately pushes it to the
-    recipient's open browser connections via SSE (real-time).
+    Creates a Notification record and immediately pushes it via SSE, FCM, and email.
 
     Args:
         recipient:          User instance
-        notification_type:  String slug e.g. 'welcome', 'booking_reminder'
-        title:              Short bold heading shown in the toast
+        notification_type:  String slug e.g. 'new_order', 'order_update'
+        title:              Short heading shown in the toast / push
         message:            Body text
-        action_url:         Optional URL the user navigates to on click
+        action_url:         Optional deep-link URL
+        send_email:         Set False for admin-only notifications to skip email
     """
     try:
+        # ── Deduplication ────────────────────────────────────────────────────
+        # Drop duplicate notifications fired within 60 s (signals, retries, etc.)
+        try:
+            from django.core.cache import cache
+            dedup_key = _dedup_key(recipient.id, notification_type, title)
+            if cache.get(dedup_key):
+                logger.debug(f"[notify] Duplicate suppressed for user {recipient.id}: {title}")
+                return None
+            cache.set(dedup_key, 1, timeout=60)
+        except Exception:
+            pass  # Cache down — proceed without dedup rather than dropping the notification
+
         from notifications.models import Notification
         n = Notification.objects.create(
             recipient=recipient,
@@ -34,7 +58,7 @@ def send_notification(
             action_url=action_url,
         )
 
-        # Push to any open SSE connections immediately
+        # ── SSE real-time push ───────────────────────────────────────────────
         try:
             from notifications.views import push_notification_to_user
             push_notification_to_user(recipient.id, {
@@ -47,9 +71,9 @@ def send_notification(
                 "created_at": n.created_at.isoformat(),
             })
         except Exception:
-            pass  # SSE push failure must never break the main flow
+            pass
 
-        # Send FCM push notification to all registered devices
+        # ── FCM push to all registered devices ──────────────────────────────
         try:
             import firebase_admin
             from firebase_admin import messaging as fcm_messaging
@@ -70,10 +94,18 @@ def send_notification(
                     if invalid:
                         FCMToken.objects.filter(token__in=invalid).delete()
         except Exception:
-            pass  # FCM failure must never break the main flow
+            pass
+
+        # ── Email (Resend → Brevo fallback) ──────────────────────────────────
+        # Skipped for admin-facing notifications (send_email=False)
+        if send_email:
+            try:
+                from studex.email import send_notification_email
+                send_notification_email(recipient, title, message, action_url)
+            except Exception:
+                pass
 
         return n
     except Exception as e:
-        import logging
-        logging.getLogger(__name__).error(f"send_notification failed: {e}")
+        logger.error(f"send_notification failed: {e}")
         return None

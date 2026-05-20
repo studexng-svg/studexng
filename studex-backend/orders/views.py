@@ -27,13 +27,13 @@ TRACKING_NOTIFICATIONS = {
 
 def _notify(recipient, notification_type, title, message, action_url=""):
     try:
-        from notifications.models import Notification
-        Notification.objects.create(
+        from accounts.utils import send_notification
+        send_notification(
             recipient=recipient, notification_type=notification_type,
             title=title, message=message, action_url=action_url,
         )
     except Exception as e:
-        logger.warning(f"Notification creation failed: {e}")
+        logger.warning(f"Notification failed: {e}")
 
 
 class OrderViewSet(viewsets.ModelViewSet):

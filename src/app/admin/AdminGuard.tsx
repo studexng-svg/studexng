@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/authStore";
 import { useAdminMode } from "@/hooks/useAdminMode";
 import { Shield } from "lucide-react";
+import DraggableAdminShield from "@/components/admin/DraggableAdminShield";
 
 export default function AdminGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -48,5 +49,10 @@ export default function AdminGuard({ children }: { children: React.ReactNode }) 
     );
   }
 
-  return <>{children}</>;
+  return (
+    <>
+      <DraggableAdminShield />
+      {children}
+    </>
+  );
 }

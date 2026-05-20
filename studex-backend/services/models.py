@@ -85,16 +85,16 @@ class Listing(models.Model):
         self.save()
         if sold_out:
             try:
-                from notifications.models import Notification
-                Notification.objects.create(
+                from accounts.utils import send_notification
+                send_notification(
                     recipient=self.vendor,
-                    notification_type='new_listing',
-                    title=f'⚠️ "{self.title}" is sold out!',
+                    notification_type='sold_out',
+                    title=f'"{self.title}" is sold out!',
                     message=(
                         f'Your listing "{self.title}" has sold out and has been automatically '
                         f'marked as unavailable. Restock and update your quantity to make it live again.'
                     ),
-                    action_url='/vendor/dashboard',
+                    action_url='/seller',
                 )
             except Exception:
                 pass

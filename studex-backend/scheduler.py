@@ -326,37 +326,37 @@ def retry_failed_transfers():
 def _alert_admin_transfer_failure(txn):
     """Sends an email to the admin when a transfer has exhausted all retries."""
     try:
-        import resend
+        from studex.email import send_email
         from django.conf import settings
 
-        resend.api_key = settings.RESEND_API_KEY
         admin_email = getattr(settings, 'ADMIN_EMAIL', 'studex.ng@gmail.com')
+        seller_name  = txn.seller.username if txn.seller else 'Unknown (deleted)'
+        seller_email = txn.seller.email    if txn.seller else 'N/A'
 
-        seller_name = txn.seller.username if txn.seller else 'Unknown (deleted)'
-        seller_email = txn.seller.email if txn.seller else 'N/A'
-
-        resend.Emails.send({
-            'from': 'StudEx Alerts <noreply@studex.com.ng>',
-            'to': [admin_email],
-            'subject': f'[ACTION REQUIRED] Vendor payout failed after {MAX_TRANSFER_RETRIES} retries',
-            'html': f'''
-                <div style="font-family: DM Sans, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px;">
-                    <h2 style="color: #DC2626;">Vendor Payout Failed — Manual Action Required</h2>
-                    <p>A vendor transfer has failed after <strong>{MAX_TRANSFER_RETRIES} automated retry attempts</strong> and requires manual intervention.</p>
-                    <table style="border-collapse: collapse; width: 100%; margin-top: 16px;">
-                        <tr><td style="padding: 8px; border: 1px solid #E5E7EB; font-weight: 600;">Transaction Ref</td><td style="padding: 8px; border: 1px solid #E5E7EB;">{txn.reference}</td></tr>
-                        <tr><td style="padding: 8px; border: 1px solid #E5E7EB; font-weight: 600;">Order ID</td><td style="padding: 8px; border: 1px solid #E5E7EB;">#{txn.order_id}</td></tr>
-                        <tr><td style="padding: 8px; border: 1px solid #E5E7EB; font-weight: 600;">Vendor</td><td style="padding: 8px; border: 1px solid #E5E7EB;">{seller_name} ({seller_email})</td></tr>
-                        <tr><td style="padding: 8px; border: 1px solid #E5E7EB; font-weight: 600;">Amount Owed</td><td style="padding: 8px; border: 1px solid #E5E7EB;">₦{txn.seller_amount:,.2f}</td></tr>
-                        <tr><td style="padding: 8px; border: 1px solid #E5E7EB; font-weight: 600;">Last Transfer Ref</td><td style="padding: 8px; border: 1px solid #E5E7EB;">{txn.transfer_reference or "N/A"}</td></tr>
-                        <tr><td style="padding: 8px; border: 1px solid #E5E7EB; font-weight: 600;">Retry Count</td><td style="padding: 8px; border: 1px solid #E5E7EB;">{txn.transfer_retry_count}</td></tr>
-                    </table>
-                    <p style="margin-top: 24px; color: #6B7280; font-size: 14px;">
-                        Please log in to the Django admin or Paystack dashboard and process this payout manually.
-                    </p>
-                </div>
-            ''',
-        })
+        html = f'''
+            <div style="font-family:DM Sans,sans-serif;max-width:560px;margin:0 auto;padding:32px;">
+                <h2 style="color:#DC2626;">Vendor Payout Failed — Manual Action Required</h2>
+                <p>A vendor transfer has failed after <strong>{MAX_TRANSFER_RETRIES} automated retry attempts</strong>
+                   and requires manual intervention.</p>
+                <table style="border-collapse:collapse;width:100%;margin-top:16px;">
+                    <tr><td style="padding:8px;border:1px solid #E5E7EB;font-weight:600;">Transaction Ref</td><td style="padding:8px;border:1px solid #E5E7EB;">{txn.reference}</td></tr>
+                    <tr><td style="padding:8px;border:1px solid #E5E7EB;font-weight:600;">Order ID</td><td style="padding:8px;border:1px solid #E5E7EB;">#{txn.order_id}</td></tr>
+                    <tr><td style="padding:8px;border:1px solid #E5E7EB;font-weight:600;">Vendor</td><td style="padding:8px;border:1px solid #E5E7EB;">{seller_name} ({seller_email})</td></tr>
+                    <tr><td style="padding:8px;border:1px solid #E5E7EB;font-weight:600;">Amount Owed</td><td style="padding:8px;border:1px solid #E5E7EB;">₦{txn.seller_amount:,.2f}</td></tr>
+                    <tr><td style="padding:8px;border:1px solid #E5E7EB;font-weight:600;">Last Transfer Ref</td><td style="padding:8px;border:1px solid #E5E7EB;">{txn.transfer_reference or 'N/A'}</td></tr>
+                    <tr><td style="padding:8px;border:1px solid #E5E7EB;font-weight:600;">Retry Count</td><td style="padding:8px;border:1px solid #E5E7EB;">{txn.transfer_retry_count}</td></tr>
+                </table>
+                <p style="margin-top:24px;color:#6B7280;font-size:14px;">
+                    Please log in to the Django admin or Paystack dashboard and process this payout manually.
+                </p>
+            </div>
+        '''
+        send_email(
+            to=admin_email,
+            subject=f'[ACTION REQUIRED] Vendor payout failed after {MAX_TRANSFER_RETRIES} retries',
+            html=html,
+            _async=False,
+        )
         logger.info(f"Admin transfer-failure alert sent for txn {txn.reference}")
     except Exception as e:
         logger.error(f"Failed to send admin transfer-failure email for txn {txn.reference}: {e}")
