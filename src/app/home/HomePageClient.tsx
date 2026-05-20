@@ -470,57 +470,66 @@ export default function HomePageClient({ initialVendors, initialListings, initia
 
               {/* HERO */}
               <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
-                className="rounded-3xl overflow-hidden flex min-h-[220px] lg:min-h-[280px]">
+                className="relative rounded-3xl overflow-hidden flex items-center min-h-[260px] lg:min-h-[340px]"
+                style={{ background: "linear-gradient(135deg,#0D9488 0%,#4F46E5 55%,#7C3AED 100%)" }}>
 
-                {/* Left — gradient + text */}
-                <div className="flex-1 flex flex-col justify-center px-7 py-8"
-                  style={{ background: "linear-gradient(135deg,#0D9488 0%,#7C3AED 100%)" }}>
+                {/* Decorative blobs */}
+                <div className="absolute -top-20 right-[38%] w-96 h-96 rounded-full pointer-events-none"
+                  style={{ background: "radial-gradient(circle,rgba(139,92,246,0.45) 0%,transparent 70%)" }} />
+                <div className="absolute -bottom-20 left-[30%] w-72 h-72 rounded-full pointer-events-none"
+                  style={{ background: "radial-gradient(circle,rgba(20,184,166,0.3) 0%,transparent 70%)" }} />
+
+                {/* Text */}
+                <div className="relative z-10 flex-1 px-8 py-10 lg:max-w-[56%]">
                   {vendorOfMonth ? (
                     <>
-                      <div className="flex items-center gap-1.5 bg-amber-400 w-fit px-3 py-1 rounded-full mb-4">
+                      <div className="flex items-center gap-1.5 bg-amber-400 w-fit px-3 py-1 rounded-full mb-5">
                         <Trophy className="w-3 h-3 text-amber-900" />
                         <span className="text-amber-900 text-xs font-bold">Vendor of the Month · {vendorOfMonth.month}</span>
                       </div>
-                      <h1 className="text-3xl lg:text-4xl font-black text-white leading-tight mb-2"
+                      <h1 className="text-3xl lg:text-5xl font-black text-white leading-[1.1] mb-3"
                         style={{ fontFamily: "var(--font-jakarta),'Plus Jakarta Sans',sans-serif" }}>
                         {vendorOfMonth.business_name}
                       </h1>
-                      <p className="text-white/75 text-sm mb-5">
+                      <p className="text-white/75 text-sm mb-6">
                         {vendorOfMonth.total_orders} orders last month{vendorOfMonth.rating > 0 && ` · ⭐ ${vendorOfMonth.rating.toFixed(1)}`}
                       </p>
                       <Link href={`/vendor/${vendorOfMonth.username}`}>
                         <motion.button whileTap={{ scale: 0.97 }}
-                          className="bg-white text-stone-900 font-bold px-6 py-3 rounded-full text-sm inline-flex items-center gap-2 shadow-md w-fit">
+                          className="bg-white text-stone-900 font-bold px-7 py-3.5 rounded-full text-sm inline-flex items-center gap-2 shadow-lg w-fit">
                           Shop Now <ArrowRight className="w-4 h-4" />
                         </motion.button>
                       </Link>
                     </>
                   ) : (
                     <>
-                      <div className="bg-white/20 backdrop-blur-sm w-fit px-3 py-1 rounded-full mb-4">
+                      <div className="bg-white/20 backdrop-blur-sm border border-white/20 w-fit px-3 py-1 rounded-full mb-5">
                         <span className="text-white text-[10px] font-bold tracking-[0.2em] uppercase">Campus Marketplace</span>
                       </div>
-                      <h1 className="text-3xl lg:text-4xl font-black text-white leading-tight mb-3"
+                      <h1 className="text-3xl lg:text-5xl font-black text-white leading-[1.1] mb-4"
                         style={{ fontFamily: "var(--font-jakarta),'Plus Jakarta Sans',sans-serif" }}>
                         Shop Smart.<br />Live Campus.
                       </h1>
-                      <p className="text-white/75 text-sm mb-5 leading-relaxed max-w-xs">
+                      <p className="text-white/75 text-sm lg:text-base mb-7 leading-relaxed max-w-sm">
                         Discover services and products from verified vendors on your campus.
                       </p>
                       <Link href="/categories">
                         <motion.button whileTap={{ scale: 0.97 }}
-                          className="bg-white text-stone-900 font-bold px-6 py-3 rounded-full text-sm inline-flex items-center gap-2 shadow-md w-fit">
-                          Browse All <ArrowRight className="w-4 h-4" />
+                          className="bg-white text-stone-900 font-bold px-7 py-3.5 rounded-full text-sm inline-flex items-center gap-2 shadow-lg w-fit">
+                          Shop Now <ArrowRight className="w-4 h-4" />
                         </motion.button>
                       </Link>
                     </>
                   )}
                 </div>
 
-                {/* Right — product image (desktop only) */}
-                <div className="hidden lg:block w-72 xl:w-80 flex-shrink-0 relative overflow-hidden">
+                {/* Product image — desktop only */}
+                <div className="hidden lg:block absolute right-0 top-0 bottom-0 w-[44%] pointer-events-none">
+                  {/* Left-edge blend */}
+                  <div className="absolute inset-y-0 left-0 w-28 z-10"
+                    style={{ background: "linear-gradient(to right,#4F46E5,transparent)" }} />
                   <img
-                    src="https://images.unsplash.com/photo-6ScsjjO9ysM?auto=format&fit=crop&w=640&q=80"
+                    src="https://plus.unsplash.com/premium_photo-1681487865280-c2b836dd83e8?fm=jpg&q=80&w=900&auto=format&fit=crop"
                     alt="Shop on StudEx"
                     className="w-full h-full object-cover object-center"
                   />
