@@ -388,9 +388,14 @@ try:
             try:
                 listing = Listing.objects.get(id=listing_id)
 
+                # Track availability change before saving
+                was_available = listing.is_available
+                becoming_available = False
+
                 # Update fields
                 if 'is_available' in request.data:
                     listing.is_available = request.data['is_available']
+                    becoming_available = not was_available and listing.is_available
 
                 if 'title' in request.data:
                     listing.title = request.data['title']
@@ -402,6 +407,14 @@ try:
                     listing.price = request.data['price']
 
                 listing.save()
+
+                # Notify vendor when listing goes live for the first time
+                if becoming_available:
+                    try:
+                        from studex.notifications import notify_vendor_listing_approved
+                        notify_vendor_listing_approved(listing)
+                    except Exception:
+                        pass
 
                 serializer = ListingSerializer(listing)
                 return Response(serializer.data, status=status.HTTP_200_OK)
