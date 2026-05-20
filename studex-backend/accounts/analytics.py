@@ -6,10 +6,13 @@ Provides aggregated statistics and metrics for the admin panel.
 All calculations happen at the database level for performance.
 """
 
+import logging
 from django.db.models import Count, Sum, Avg, Q, F
 from django.utils import timezone
 from datetime import timedelta
 from accounts.models import User, Profile
+
+logger = logging.getLogger(__name__)
 
 
 class AdminAnalytics:
@@ -212,7 +215,8 @@ class AdminAnalytics:
                 'platform_fees_30d': fees_30d,
             }
 
-        except Exception:
+        except Exception as e:
+            logger.error(f"get_payment_stats failed: {e}", exc_info=True)
             return {
                 'transaction_volume': 0.0,
                 'vendor_payouts': 0.0,

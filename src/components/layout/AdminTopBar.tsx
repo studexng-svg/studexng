@@ -1,8 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { ChevronLeft, Shield } from "lucide-react";
-import { GRAD } from "@/lib/tokens";
+import { ChevronLeft, Home } from "lucide-react";
 
 interface Props {
   title?: string;
@@ -21,13 +20,14 @@ export default function AdminTopBar({ title = "Admin Panel", back }: Props) {
         >
           <ChevronLeft className="w-5 h-5 text-stone-600" />
         </button>
-        <div className="flex items-center gap-2 flex-1">
-          <div className="w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0"
-            style={{ background: GRAD }}>
-            <Shield className="w-3.5 h-3.5 text-white" />
-          </div>
-          <h1 className="font-bold text-stone-900 text-base truncate">{title}</h1>
-        </div>
+        <h1 className="font-bold text-stone-900 text-base truncate flex-1">{title}</h1>
+        <button
+          onClick={() => router.push("/home")}
+          className="p-2.5 bg-white border border-stone-200 hover:border-teal-300 rounded-full shadow-sm transition-all active:scale-95 flex-shrink-0"
+          title="Go to Home"
+        >
+          <Home className="w-5 h-5 text-stone-600" />
+        </button>
       </div>
     </div>
   );

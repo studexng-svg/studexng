@@ -5,7 +5,7 @@ import {
   Users, Package, DollarSign, Store, FileText, Tag, TrendingUp,
   ChevronRight, AlertCircle, CheckCircle, Clock,
   CreditCard, Star, AlertTriangle, ArrowUpRight,
-  ShoppingCart, MessageCircle, Send, Radio, Bot,
+  ShoppingCart, MessageCircle, Send, Radio, Bot, RefreshCw,
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -168,16 +168,20 @@ function LiveActivity() {
 export default function AdminDashboard() {
   const [stats, setStats] = useState<DashStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const load = (manual = false) => {
+    if (manual) setRefreshing(true);
+    return fetchWithAuth(`${API_URL}/api/admin/dashboard/`)
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(d => setStats(d))
+      .catch(() => {})
+      .finally(() => { setLoading(false); setRefreshing(false); });
+  };
 
   useEffect(() => {
-    const load = () =>
-      fetchWithAuth(`${API_URL}/api/admin/dashboard/`)
-        .then(r => r.ok ? r.json() : Promise.reject())
-        .then(d => setStats(d))
-        .catch(() => {})
-        .finally(() => setLoading(false));
     load();
-    const id = setInterval(load, 60_000);
+    const id = setInterval(() => load(), 60_000);
     return () => clearInterval(id);
   }, []);
 
@@ -212,7 +216,17 @@ export default function AdminDashboard() {
             {/* Financial breakdown */}
             {stats.payments && (
               <>
-                <p className="text-teal-600 text-xs tracking-[0.2em] uppercase font-semibold">Financials</p>
+                <div className="flex items-center justify-between">
+                  <p className="text-teal-600 text-xs tracking-[0.2em] uppercase font-semibold">Financials</p>
+                  <button
+                    onClick={() => load(true)}
+                    disabled={refreshing}
+                    className="flex items-center gap-1.5 text-xs text-stone-400 hover:text-teal-600 transition-colors"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} />
+                    {refreshing ? "Refreshing…" : "Refresh"}
+                  </button>
+                </div>
                 <div className="grid grid-cols-1 gap-3">
                   <StatCard
                     label="Transaction Volume"
