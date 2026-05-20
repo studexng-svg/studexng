@@ -33,6 +33,7 @@ export default async function HomePage() {
   let initialVendors: any[] = [];
   let initialListings: any[] = [];
   let initialCategories: any[] = [];
+  let vendorOfMonth: any = null;
 
   try {
     const res = await fetch(`${API_URL}/api/auth/vendors/?campus=${campus}`, {
@@ -67,11 +68,23 @@ export default async function HomePage() {
     }
   } catch {}
 
+  try {
+    const res = await fetch(`${API_URL}/api/services/vendor-of-month/`, {
+      cache: 'no-store',
+      headers: { "Content-Type": "application/json" },
+    });
+    if (res.ok) {
+      const data = await res.json();
+      vendorOfMonth = data || null;
+    }
+  } catch {}
+
   return (
     <HomePageClient
       initialVendors={initialVendors}
       initialListings={initialListings}
       initialCategories={initialCategories}
+      vendorOfMonth={vendorOfMonth}
     />
   );
 }

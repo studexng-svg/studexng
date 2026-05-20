@@ -153,3 +153,33 @@ class Transaction(models.Model):
             models.Index(fields=['vendor']),
             models.Index(fields=['status']),
         ]
+
+
+class VendorOfTheMonth(models.Model):
+    """
+    Stores the winning vendor for each month.
+    Picked automatically on the 1st of each month by the scheduler,
+    based on completed orders, rating, and completion rate from the previous month.
+    Admin can also set a manual override from the Django admin.
+    """
+    vendor = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True,
+        related_name='vendor_of_month_awards',
+    )
+    month = models.DateField(help_text="First day of the month this award covers")
+    score = models.FloatField(default=0)
+    total_orders = models.IntegerField(default=0)
+    avg_rating = models.FloatField(default=0)
+    completion_rate = models.FloatField(default=0)
+    is_manual_override = models.BooleanField(default=False)
+    nominated_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-month']
+        unique_together = ['month']
+        verbose_name = "Vendor of the Month"
+        verbose_name_plural = "Vendors of the Month"
+
+    def __str__(self):
+        vendor_name = self.vendor.username if self.vendor else "Unknown"
+        return f"{vendor_name} — {self.month.strftime('%B %Y')}"

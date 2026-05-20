@@ -363,7 +363,106 @@ def _alert_admin_transfer_failure(txn):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# JOB 5 & 6: Groq AI notification broadcasts — per campus
+# JOB 5: Pick vendor of the month — 1st of each month at 00:05 WAT
+# ─────────────────────────────────────────────────────────────────────────────
+
+def pick_vendor_of_month():
+    """
+    Runs on the 1st of each month. Scores all verified vendors based on
+    their completed orders, avg rating, and completion rate from the previous
+    month, then creates a VendorOfTheMonth record for the winner.
+    Idempotent — skips if a record for the previous month already exists.
+    """
+    from datetime import date
+    from django.contrib.auth import get_user_model
+    from orders.models import Order
+    from services.models import VendorOfTheMonth
+    from accounts.utils import send_notification
+
+    User = get_user_model()
+    today = date.today()
+
+    # The award covers the previous calendar month
+    if today.month == 1:
+        month_start = date(today.year - 1, 12, 1)
+        month_end   = date(today.year, 1, 1)
+    else:
+        month_start = date(today.year, today.month - 1, 1)
+        month_end   = date(today.year, today.month, 1)
+
+    if VendorOfTheMonth.objects.filter(month=month_start).exists():
+        logger.info(f"pick_vendor_of_month: already picked for {month_start.strftime('%B %Y')}")
+        return
+
+    vendors = User.objects.filter(is_verified_vendor=True).select_related('profile')
+
+    best_vendor = None
+    best_score  = -1
+    best_stats  = {}
+
+    for vendor in vendors:
+        completed = Order.objects.filter(
+            listing__vendor=vendor,
+            status='completed',
+            created_at__date__gte=month_start,
+            created_at__date__lt=month_end,
+        ).count()
+
+        if completed == 0:
+            continue  # must have made at least one sale to qualify
+
+        profile = getattr(vendor, 'profile', None)
+        avg_rating      = float(getattr(profile, 'rating', 0) or 0)
+        completion_rate = float(getattr(profile, 'completion_rate', 0) or 0)
+
+        # Weighted score: orders drive most of it, rating and completion fine-tune
+        score = completed * 5 + avg_rating * 10 + completion_rate * 0.5
+
+        if score > best_score:
+            best_score  = score
+            best_vendor = vendor
+            best_stats  = {
+                'total_orders': completed,
+                'avg_rating':   avg_rating,
+                'completion_rate': completion_rate,
+            }
+
+    if not best_vendor:
+        logger.info("pick_vendor_of_month: no qualifying vendor found (no completed orders last month)")
+        return
+
+    VendorOfTheMonth.objects.create(
+        vendor=best_vendor,
+        month=month_start,
+        score=best_score,
+        **best_stats,
+    )
+
+    try:
+        send_notification(
+            recipient=best_vendor,
+            notification_type='vendor_of_month',
+            title='🏆 You are Vendor of the Month!',
+            message=(
+                f'Congratulations {best_vendor.username}! You have been selected as '
+                f'Vendor of the Month for {month_start.strftime("%B %Y")} based on '
+                f'your sales, ratings, and reliability. '
+                f'Your profile is now featured on the StudEx home page!'
+            ),
+            action_url='/seller',
+        )
+    except Exception as ne:
+        logger.warning(f"pick_vendor_of_month: notification failed: {ne}")
+
+    logger.info(
+        f"pick_vendor_of_month: {best_vendor.username} wins {month_start.strftime('%B %Y')} "
+        f"(score={best_score:.1f}, orders={best_stats['total_orders']}, "
+        f"rating={best_stats['avg_rating']}, completion={best_stats['completion_rate']}%)"
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# JOB 6 & 7: Groq AI notification broadcasts — per campus
 # Students: Mon / Wed / Fri at 10:00 WAT
 # Vendors:  Tue / Thu / Sat at 10:00 WAT
 # ─────────────────────────────────────────────────────────────────────────────
@@ -446,6 +545,17 @@ def start():
         trigger=IntervalTrigger(hours=1),
         id="retry_failed_transfers",
         name="Retry failed vendor Paystack transfers (max 3 attempts)",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+
+    # 1st of each month at 00:05 WAT — Vendor of the Month
+    scheduler.add_job(
+        pick_vendor_of_month,
+        trigger=CronTrigger(day=1, hour=0, minute=5, timezone=LAGOS_TZ),
+        id='pick_vendor_of_month',
+        name='Pick Vendor of the Month (1st of month 00:05 WAT)',
         replace_existing=True,
         max_instances=1,
         coalesce=True,

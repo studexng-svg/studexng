@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useState, Suspense, useRef } from "react";
-import { Search, ArrowRight, Heart, X, Sparkles, Star, Shield, ChevronRight, Clock, Plus } from "lucide-react";
+import { Search, ArrowRight, Heart, X, Sparkles, Star, Shield, ChevronRight, Clock, Plus, Trophy } from "lucide-react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth, fetchWithAuth } from "@/lib/authStore";
 import { useWishlistStore } from "@/lib/wishlistStore";
 import { useCart } from "@/lib/cartStore";
 import { GRAD, GRAD_TEXT, SERIF } from "@/lib/tokens";
+import VendorOfMonthModal from "@/components/VendorOfMonthModal";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -116,9 +117,10 @@ interface Props {
   initialVendors: Vendor[];
   initialListings: any[];
   initialCategories: Category[];
+  vendorOfMonth?: any;
 }
 
-export default function HomePageClient({ initialVendors, initialListings, initialCategories }: Props) {
+export default function HomePageClient({ initialVendors, initialListings, initialCategories, vendorOfMonth = null }: Props) {
   const { isLoggedIn, user, isHydrated } = useAuth();
   const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlistStore();
   const { addToCart, cart } = useCart();
@@ -388,6 +390,8 @@ export default function HomePageClient({ initialVendors, initialListings, initia
 
   return (
     <>
+      <VendorOfMonthModal vendor={vendorOfMonth} />
+
       {toast && (
         <motion.div initial={{ y: -50, opacity: 0 }} animate={{ y: 60, opacity: 1 }}
           className="fixed top-4 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full shadow-lg z-50 font-medium text-sm text-white"
@@ -533,28 +537,75 @@ export default function HomePageClient({ initialVendors, initialListings, initia
 
               {/* ── HERO BANNER ── */}
               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-                <Link href="/categories">
-                  <motion.div whileHover={{ y: -3 }} whileTap={{ scale: 0.98 }}
-                    className="relative rounded-2xl overflow-hidden h-36 cursor-pointer shadow-md bg-gradient-to-br from-teal-500 to-purple-600">
-                    <div className="absolute top-0 right-0 w-48 h-48 rounded-full bg-white/10 blur-3xl pointer-events-none" />
-                    <div className="absolute bottom-0 left-0 w-40 h-40 rounded-full bg-white/10 blur-3xl pointer-events-none" />
-                    <div className="relative z-10 h-full flex flex-col justify-center px-6">
-                      <p className="text-white/80 text-xs tracking-[0.25em] uppercase font-semibold mb-1">Campus Marketplace</p>
-                      <h2 className="text-xl font-bold text-white" style={SERIF}>
-                        Every service,{" "}
-                        <span className="italic" style={{
-                          background: "linear-gradient(135deg, #2dd4bf 0%, #a78bfa 100%)",
-                          WebkitBackgroundClip: "text",
-                          WebkitTextFillColor: "transparent",
-                          backgroundClip: "text",
-                        }}>one tap away.</span>
-                      </h2>
-                      <p className="text-white/70 text-xs mt-2 flex items-center gap-1">
-                        Browse all categories <ChevronRight className="w-3 h-3" />
-                      </p>
-                    </div>
-                  </motion.div>
-                </Link>
+                {vendorOfMonth ? (
+                  /* Vendor of the Month hero */
+                  <Link href={`/vendor/${vendorOfMonth.username}`}>
+                    <motion.div whileHover={{ y: -3 }} whileTap={{ scale: 0.98 }}
+                      className="relative rounded-2xl overflow-hidden h-44 cursor-pointer shadow-md">
+                      {/* Background image or gradient */}
+                      {vendorOfMonth.profile_picture ? (
+                        <img
+                          src={vendorOfMonth.profile_picture}
+                          alt={vendorOfMonth.business_name}
+                          className="absolute inset-0 w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="absolute inset-0" style={{ background: GRAD }} />
+                      )}
+                      {/* Dark overlay */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-black/10" />
+                      {/* Trophy badge */}
+                      <div className="absolute top-3 left-3 flex items-center gap-1.5 bg-amber-400 text-amber-900 px-2.5 py-1 rounded-full text-[10px] font-bold shadow">
+                        <Trophy className="w-3 h-3" />
+                        Vendor of the Month · {vendorOfMonth.month}
+                      </div>
+                      {/* Content */}
+                      <div className="absolute bottom-0 left-0 right-0 px-4 pb-4 flex items-end justify-between">
+                        <div>
+                          <p className="text-white font-black text-xl leading-tight">{vendorOfMonth.business_name}</p>
+                          <div className="flex items-center gap-1.5 mt-1">
+                            {vendorOfMonth.rating > 0 && (
+                              <div className="flex items-center gap-0.5">
+                                <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                                <span className="text-white/80 text-xs font-medium">{vendorOfMonth.rating.toFixed(1)}</span>
+                              </div>
+                            )}
+                            <span className="text-white/60 text-xs">·</span>
+                            <span className="text-white/80 text-xs">{vendorOfMonth.total_orders} orders last month</span>
+                          </div>
+                        </div>
+                        <div className="bg-white/20 backdrop-blur-sm border border-white/30 px-3 py-1.5 rounded-full flex items-center gap-1 flex-shrink-0">
+                          <span className="text-white text-xs font-semibold">Shop now</span>
+                          <ChevronRight className="w-3 h-3 text-white" />
+                        </div>
+                      </div>
+                    </motion.div>
+                  </Link>
+                ) : (
+                  /* Fallback hero when no vendor of month yet */
+                  <Link href="/categories">
+                    <motion.div whileHover={{ y: -3 }} whileTap={{ scale: 0.98 }}
+                      className="relative rounded-2xl overflow-hidden h-36 cursor-pointer shadow-md bg-gradient-to-br from-teal-500 to-purple-600">
+                      <div className="absolute top-0 right-0 w-48 h-48 rounded-full bg-white/10 blur-3xl pointer-events-none" />
+                      <div className="absolute bottom-0 left-0 w-40 h-40 rounded-full bg-white/10 blur-3xl pointer-events-none" />
+                      <div className="relative z-10 h-full flex flex-col justify-center px-6">
+                        <p className="text-white/80 text-xs tracking-[0.25em] uppercase font-semibold mb-1">Campus Marketplace</p>
+                        <h2 className="text-xl font-bold text-white" style={SERIF}>
+                          Every service,{" "}
+                          <span className="italic" style={{
+                            background: "linear-gradient(135deg, #2dd4bf 0%, #a78bfa 100%)",
+                            WebkitBackgroundClip: "text",
+                            WebkitTextFillColor: "transparent",
+                            backgroundClip: "text",
+                          }}>one tap away.</span>
+                        </h2>
+                        <p className="text-white/70 text-xs mt-2 flex items-center gap-1">
+                          Browse all categories <ChevronRight className="w-3 h-3" />
+                        </p>
+                      </div>
+                    </motion.div>
+                  </Link>
+                )}
               </motion.div>
 
               {/* ── VENDORS ROW — mobile only ── */}

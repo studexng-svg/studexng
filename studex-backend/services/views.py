@@ -5,7 +5,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
 from rest_framework.pagination import PageNumberPagination
 from django.db.models import Q
-from .models import Category, Listing, Transaction
+from .models import Category, Listing, Transaction, VendorOfTheMonth
 from .serializers import CategorySerializer, ListingSerializer, TransactionSerializer
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
@@ -217,3 +217,41 @@ class ChangePasswordView(APIView):
         user.set_password(new_password)
         user.save()
         return Response({"message": "Password updated successfully"})
+
+
+class VendorOfMonthView(APIView):
+    """GET /api/services/vendor-of-month/ — returns the current vendor of the month."""
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        try:
+            votm = VendorOfTheMonth.objects.select_related(
+                'vendor', 'vendor__profile'
+            ).first()
+            if not votm or not votm.vendor:
+                return Response(None)
+
+            vendor = votm.vendor
+            profile = getattr(vendor, 'profile', None)
+            pic = getattr(profile, 'profile_picture', None)
+            if pic:
+                pic = str(pic)
+                if not pic.startswith('http') and pic:
+                    pic = request.build_absolute_uri(f'/media/{pic}')
+
+            return Response({
+                'id': vendor.id,
+                'username': vendor.username,
+                'business_name': (getattr(profile, 'business_name', None) or vendor.username),
+                'profile_picture': pic,
+                'rating': float(getattr(profile, 'rating', 0) or 0),
+                'total_reviews': int(getattr(profile, 'total_reviews', 0) or 0),
+                'vendor_badge': getattr(profile, 'vendor_badge', 'none') or 'none',
+                'month': votm.month.strftime('%B %Y'),
+                'total_orders': votm.total_orders,
+                'completion_rate': votm.completion_rate,
+            })
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"VendorOfMonthView error: {e}", exc_info=True)
+            return Response(None)
