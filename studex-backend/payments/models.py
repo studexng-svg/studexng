@@ -34,7 +34,7 @@ class PaymentTransaction(models.Model):
     vendor gets: listing_price (their full price, paid by StudEx manually)
     platform keeps: service_charge - discount_amount (min ₦0)
 
-    service_charge: 5% of listing price, minimum ₦50, maximum ₦1,500.
+    service_charge: 8% of listing price (covers platform margin + Paystack processing fee), minimum ₦50, maximum ₦1,500.
     discount_amount: profile-completion 5% discount applied to listing price.
                      Comes entirely from the platform fee — vendor is unaffected.
     """
@@ -68,7 +68,7 @@ class PaymentTransaction(models.Model):
     # Vendor's full listing price — what StudEx owes the vendor
     seller_amount = models.DecimalField(max_digits=12, decimal_places=2)
 
-    # 5% service charge (min ₦50, max ₦1,500) — set explicitly on every new record
+    # 8% service charge (min ₦50, max ₦1,500) — set explicitly on every new record
     service_charge = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 
     # Discount applied from platform fee (5% of listing price, capped at service_charge)

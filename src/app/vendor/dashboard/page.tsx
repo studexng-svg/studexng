@@ -508,7 +508,7 @@ function BookingsTab() {
                     ₦{Number(booking.listing_price || 0).toLocaleString()}
                   </p>
                   <p className="text-stone-400 text-xs mt-0.5">
-                    Your full listing price (5% service fee charged to buyer)
+                    Your full listing price (8% service fee charged to buyer)
                   </p>
                 </div>
               </div>
@@ -587,7 +587,7 @@ function EarningsTab() {
     },
     {
       label: "Service Fee",
-      value: "5%",
+      value: "8%",
       color: "text-stone-600",
       bg: "bg-stone-50 border-stone-100",
       note: "Min ₦50 · Max ₦1,500 per transaction",
@@ -619,7 +619,7 @@ function EarningsTab() {
           </div>
           <div className="flex items-start gap-3 bg-stone-50 border border-stone-100 rounded-xl p-3">
             <span className="text-teal-600 font-bold text-base leading-none">2</span>
-            <p>StudEx collects a <span className="text-stone-800 font-semibold">5% service fee</span> (min ₦50, max ₦1,500) from the buyer — your listing price is transferred to your bank in full.</p>
+            <p>StudEx collects an <span className="text-stone-800 font-semibold">8% service fee</span> (min ₦50, max ₦1,500) from the buyer — this covers the platform and Paystack's processing cost. Your full listing price is transferred to your bank.</p>
           </div>
           <div className="flex items-start gap-3 bg-stone-50 border border-stone-100 rounded-xl p-3">
             <span className="text-teal-600 font-bold text-base leading-none">3</span>

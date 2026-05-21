@@ -21,15 +21,17 @@ logger = logging.getLogger(__name__)
 PAYSTACK_BASE = "https://api.paystack.co"
 
 # ─────────────────────────────────────────
-# Dynamic service fee: 5% of the base amount, min ₦50, capped at ₦1,500.
+# Dynamic service fee: 8% of the base amount, min ₦50, capped at ₦1,500.
+# The 8% covers both the StudEx platform margin and Paystack's processing fee
+# (1.5% + ₦100), which StudEx absorbs so buyers see no hidden charges.
 # Full payment goes to StudEx balance (no subaccount split at charge time).
 # After charge.success webhook, StudEx immediately transfers vendor_amount
 # to the vendor's bank via the Paystack Transfer API using their RCP_xxx code.
 # ─────────────────────────────────────────
 
 def calc_service_fee(base: Decimal) -> Decimal:
-    """StudEx fee: 5% of base amount, minimum ₦50, maximum ₦1,500."""
-    fee = (base * Decimal("0.05")).quantize(Decimal("0.01"))
+    """StudEx fee: 8% of base amount, minimum ₦50, maximum ₦1,500."""
+    fee = (base * Decimal("0.08")).quantize(Decimal("0.01"))
     return max(Decimal("50"), min(fee, Decimal("1500")))
 
 
@@ -38,15 +40,15 @@ def _split_amounts(total_amount: Decimal):
     Returns (vendor_amount, platform_amount) from the total checkout amount
     (base + fee). Inverts the fee formula to recover the original base.
     """
-    # Region 1: base < ₦1,000 → fee was ₦50 (the minimum)
+    # Region 1: base < ₦625 → fee was ₦50 (the minimum)
     base1 = total_amount - Decimal("50")
-    if Decimal("0") < base1 < Decimal("1000"):
+    if Decimal("0") < base1 < Decimal("625"):
         return base1, Decimal("50")
-    # Region 2: ₦1,000 ≤ base ≤ ₦30,000 → fee was 5%
-    base2 = (total_amount / Decimal("1.05")).quantize(Decimal("0.01"))
-    if Decimal("1000") <= base2 <= Decimal("30000"):
+    # Region 2: ₦625 ≤ base ≤ ₦18,750 → fee was 8%
+    base2 = (total_amount / Decimal("1.08")).quantize(Decimal("0.01"))
+    if Decimal("625") <= base2 <= Decimal("18750"):
         return base2, calc_service_fee(base2)
-    # Region 3: base > ₦30,000 → fee was ₦1,500 (the cap)
+    # Region 3: base > ₦18,750 → fee was ₦1,500 (the cap)
     base3 = total_amount - Decimal("1500")
     if base3 > Decimal("0"):
         return base3, Decimal("1500")
@@ -650,7 +652,7 @@ def seller_earnings(request):
     return Response({
         "total_earned": float(total_earned),
         "total_orders": total_orders,
-        "service_fee_description": "5% (min ₦50, max ₦1,500)",
+        "service_fee_description": "8% (min ₦50, max ₦1,500)",
     })
 
 
@@ -1217,7 +1219,7 @@ def _create_or_update_paystack_subaccount(user, bank_code, account_number, accou
 
     Paystack subaccount split config (set at payment time via PaystackPop.setup):
       subaccount = ACCT_xxx  (the subaccount code returned here)
-      transaction_charge = dynamic (5% of base, min ₦50, max ₦1,500) → goes to StudEx
+      transaction_charge = dynamic (8% of base, min ₦50, max ₦1,500) → goes to StudEx
       bearer = "account"    → StudEx bears Paystack's processing fee
 
     Returns (subaccount_code, error_message).

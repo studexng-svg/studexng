@@ -12,7 +12,7 @@ import { useBookingStore } from "@/lib/bookingStore";
 import { useRouter } from "next/navigation";
 import { useAuth, fetchWithAuth } from "@/lib/authStore";
 import Script from "next/script";
-import { GRAD, GRAD_TEXT, SERIF, calcServiceFee, calcPaystackFee } from "@/lib/tokens";
+import { GRAD, GRAD_TEXT, SERIF, calcServiceFee } from "@/lib/tokens";
 import TopNav from "@/components/layout/TopNav";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
@@ -47,9 +47,7 @@ export default function CheckoutPage() {
 
   const discountedBase = discount ? discount.finalBase : baseTotal;
   const serviceFee = calcServiceFee(discountedBase);
-  const checkoutAmount = discountedBase + serviceFee;
-  const paystackFee = calcPaystackFee(checkoutAmount);
-  const finalTotal = checkoutAmount + paystackFee;
+  const finalTotal = discountedBase + serviceFee;
 
   useEffect(() => {
     if (!isLoggedIn || !isHydrated || baseTotal <= 0) return;
@@ -159,7 +157,7 @@ export default function CheckoutPage() {
         key: paystackKey,
         access_code,
         email: user?.email || "user@studex.ng",
-        amount: amount_kobo ?? Math.round(checkoutAmount * 100),
+        amount: amount_kobo ?? Math.round(finalTotal * 100),
         currency: "NGN",
         ref: reference,
         callback: function(response: any) {
@@ -311,15 +309,11 @@ export default function CheckoutPage() {
               </div>
             )}
             <div className="flex justify-between items-center text-sm">
-              <span className="text-stone-500">StudEx service fee (5%)</span>
+              <span className="text-stone-500">Service fee (8%)</span>
               <span className="text-stone-700 font-medium">₦{serviceFee.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
-            <div className="flex justify-between items-center text-sm">
-              <span className="text-stone-500">Paystack processing fee</span>
-              <span className="text-stone-700 font-medium">₦{paystackFee.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-            </div>
             <div className="border-t border-stone-100 pt-3 flex justify-between items-center">
-              <span className="font-bold text-stone-900" style={SERIF}>Total charged</span>
+              <span className="font-bold text-stone-900" style={SERIF}>Total</span>
               <span className="text-2xl font-bold" style={GRAD_TEXT}>
                 ₦{finalTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
@@ -362,7 +356,7 @@ export default function CheckoutPage() {
             <div>
               <p className="font-semibold text-teal-800 text-sm">Transparent Pricing</p>
               <p className="text-xs text-teal-600 mt-0.5 leading-relaxed">
-                A <strong>5% StudEx fee</strong> (min ₦50, max ₦1,500) covers platform services. Paystack also charges a <strong>1.5% + ₦100</strong> processing fee. The vendor receives their full listed price.
+                Our <strong>8% service fee</strong> (min ₦50, max ₦1,500) covers both the StudEx platform and Paystack's payment processing cost — so there are <strong>no hidden charges</strong> on top of what you see here. The vendor receives their full listed price.
                 {discount?.hasDiscount && " Your 5% profile completion bonus has been applied."}
               </p>
             </div>
