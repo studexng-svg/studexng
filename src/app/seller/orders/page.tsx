@@ -90,8 +90,6 @@ export default function SellerOrdersPage() {
           </button>
         </Link>
       </div>
-        </div>
-      </div>
 
       <div className="px-4 pt-6 pb-32 space-y-5 max-w-2xl mx-auto">
         {/* STATS */}

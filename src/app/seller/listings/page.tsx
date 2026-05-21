@@ -96,7 +96,6 @@ export default function SellerListings() {
           </button>
         </Link>
       </div>
-      </div>
 
       <div className="px-4 pt-6 pb-32 max-w-2xl mx-auto space-y-4">
         {error ? (
