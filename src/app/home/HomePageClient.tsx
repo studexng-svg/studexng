@@ -7,7 +7,7 @@ import {
   ShieldCheck, Tag, Zap, Headphones,
   Shirt, Monitor, Home, BookOpen, Car,
   UtensilsCrossed, Smartphone, Scissors, WashingMachine,
-  Flower2, Dumbbell, Package, Palette, Music, Camera, MoreHorizontal,
+  Flower2, Dumbbell, Package, Palette, Music, Camera,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -257,16 +257,26 @@ export default function HomePageClient({ initialVendors, initialListings, initia
               </div>
             )}
 
-            <div className="flex items-center justify-between mt-2">
+            <div className="mt-2 space-y-2">
               <p className="font-bold text-stone-900 text-sm">₦{Number(listing.price).toLocaleString()}</p>
               {isReserved ? (
                 <span className="text-[10px] text-stone-400 font-semibold flex items-center gap-0.5">
                   <Clock className="w-3 h-3" /> Reserved
                 </span>
               ) : (
-                <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded-lg text-white" style={{ background: GRAD }}>
-                  {isOwn ? "Manage" : isService ? "Book" : "Order"}
-                </span>
+                <button
+                  onClick={e => {
+                    e.preventDefault(); e.stopPropagation();
+                    if (!isOwn) {
+                      addToCart({ id: listing.id, title: listing.title, price: listing.price, img: listing.image || "" });
+                      showToast(inCart ? "Cart updated" : "Added to cart");
+                    }
+                  }}
+                  className="w-full py-2 rounded-xl text-white text-xs font-bold flex items-center justify-center gap-1.5 hover:opacity-90 transition-opacity"
+                  style={{ background: "linear-gradient(135deg,#2DD4BF 0%,#0D9488 100%)" }}>
+                  <ShoppingCart className="w-3.5 h-3.5" />
+                  {isOwn ? "Manage" : isService ? "Book Now" : "Add to Cart"}
+                </button>
               )}
             </div>
           </div>
@@ -317,9 +327,6 @@ export default function HomePageClient({ initialVendors, initialListings, initia
     );
   };
 
-  const SHOWN_CATEGORIES = categories.slice(0, 8);
-  const hasMore = categories.length > 8;
-
   return (
     <>
       <VendorOfMonthModal vendor={vendorOfMonth} />
@@ -345,6 +352,22 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                 Stud<span className="text-transparent bg-clip-text" style={{ backgroundImage: GRAD }}>Ex</span>
               </span>
             </Link>
+
+            {/* Nav links — desktop */}
+            <nav className="hidden lg:flex items-center gap-6 flex-shrink-0">
+              <button onClick={() => { setActiveTab("listings"); handleFilter("All"); }}
+                className="text-sm font-semibold text-teal-600 border-b-2 border-teal-500 pb-0.5">
+                New Arrivals
+              </button>
+              <button onClick={() => setActiveTab("listings")}
+                className="text-sm font-medium text-stone-500 hover:text-stone-700 transition">
+                Services
+              </button>
+              <button onClick={() => setActiveTab("vendors")}
+                className="text-sm font-medium text-stone-500 hover:text-stone-700 transition">
+                Vendors
+              </button>
+            </nav>
 
             {/* Search */}
             <div className="relative flex-1 max-w-2xl">
@@ -428,76 +451,23 @@ export default function HomePageClient({ initialVendors, initialListings, initia
 
         <div className="max-w-7xl mx-auto px-4 pt-5 pb-32">
 
-          {/* ── HERO ROW ── */}
-          <div className="flex gap-4">
+          {/* ── HERO ── */}
+          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+            className="relative rounded-2xl overflow-hidden"
+            style={{ background: HERO_GRAD }}>
 
-            {/* Left category panel — desktop only */}
-            <aside className="hidden lg:block w-52 flex-shrink-0 bg-white rounded-2xl border border-stone-200 shadow-sm overflow-hidden self-stretch">
-              <button onClick={() => handleFilter("All")}
-                className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold border-b border-stone-100 transition ${activeFilter === "All" && activeTab === "listings" ? "text-teal-600 bg-teal-50/50" : "text-stone-700 hover:bg-stone-50"}`}>
-                <div className={`w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 ${activeFilter === "All" && activeTab === "listings" ? "bg-teal-100" : "bg-stone-100"}`}>
-                  <Package className={`w-3.5 h-3.5 ${activeFilter === "All" && activeTab === "listings" ? "text-teal-600" : "text-stone-400"}`} />
-                </div>
-                All Categories
-              </button>
+            {/* Blobs */}
+            <div className="absolute top-1/2 left-[45%] -translate-y-1/2 w-80 h-80 rounded-full pointer-events-none"
+              style={{ background: "radial-gradient(circle,rgba(165,180,252,0.35) 0%,transparent 70%)" }} />
+            <div className="absolute bottom-0 left-[20%] w-56 h-56 rounded-full pointer-events-none"
+              style={{ background: "radial-gradient(circle,rgba(103,232,249,0.25) 0%,transparent 70%)" }} />
 
-              {SHOWN_CATEGORIES.map(cat => {
-                const Icon = getCategoryIcon(cat.slug);
-                const isActive = activeFilter === cat.slug && activeTab === "listings";
-                return (
-                  <button key={cat.slug} onClick={() => handleFilter(cat.slug)}
-                    className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium border-b border-stone-50 last:border-0 transition ${isActive ? "text-teal-600 bg-teal-50/50" : "text-stone-600 hover:bg-stone-50"}`}>
-                    <div className={`w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 ${isActive ? "bg-teal-100" : "bg-stone-100"}`}>
-                      <Icon className={`w-3.5 h-3.5 ${isActive ? "text-teal-600" : "text-stone-400"}`} />
-                    </div>
-                    {cat.title}
-                  </button>
-                );
-              })}
-
-              {hasMore && (
-                <button onClick={() => handleFilter("All")}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-stone-500 hover:bg-stone-50 transition">
-                  <div className="w-6 h-6 rounded-lg bg-stone-100 flex items-center justify-center flex-shrink-0">
-                    <MoreHorizontal className="w-3.5 h-3.5 text-stone-400" />
-                  </div>
-                  More Categories
-                </button>
-              )}
-
-              {/* Campus toggle */}
-              {mounted && (!isLoggedIn || !(user as any)?.school) && (
-                <div className="px-4 py-3 border-t border-stone-100 mt-auto">
-                  <p className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-2">Campus</p>
-                  <div className="flex gap-2">
-                    {(["pau", "futo"] as const).map(c => (
-                      <button key={c} onClick={() => switchCampus(c)}
-                        className={`flex-1 py-1.5 rounded-lg text-xs font-bold uppercase transition ${currentCampus === c ? "text-white" : "bg-stone-100 text-stone-500"}`}
-                        style={currentCampus === c ? { background: GRAD } : {}}>
-                        {c}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </aside>
-
-            {/* Hero banner */}
-            <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
-              className="flex-1 relative rounded-2xl overflow-hidden flex items-center min-h-[200px] lg:min-h-[360px]"
-              style={{ background: HERO_GRAD }}>
-
-              {/* Blobs */}
-              <div className="absolute top-1/2 left-[45%] -translate-y-1/2 w-80 h-80 rounded-full pointer-events-none"
-                style={{ background: "radial-gradient(circle,rgba(165,180,252,0.35) 0%,transparent 70%)" }} />
-              <div className="absolute bottom-0 left-[20%] w-56 h-56 rounded-full pointer-events-none"
-                style={{ background: "radial-gradient(circle,rgba(103,232,249,0.25) 0%,transparent 70%)" }} />
-
-              {/* Text */}
-              <div className="relative z-10 flex flex-col justify-center px-8 py-10 lg:max-w-[52%]">
+            <div className="relative z-10 flex items-center gap-4 px-6 py-8 lg:px-10 lg:py-12 min-h-[200px] lg:min-h-[280px]">
+              {/* Left text */}
+              <div className="flex-1">
                 {vendorOfMonth ? (
                   <>
-                    <div className="flex items-center gap-1.5 bg-amber-400 w-fit px-3 py-1 rounded-full mb-5">
+                    <div className="flex items-center gap-1.5 bg-amber-400 w-fit px-3 py-1 rounded-full mb-4">
                       <Trophy className="w-3 h-3 text-amber-900" />
                       <span className="text-amber-900 text-xs font-bold">Vendor of the Month · {vendorOfMonth.month}</span>
                     </div>
@@ -505,69 +475,69 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                       style={{ fontFamily: "var(--font-jakarta),'Plus Jakarta Sans',sans-serif" }}>
                       {vendorOfMonth.business_name}
                     </h1>
-                    <p className="text-white/75 text-sm mb-6">
+                    <p className="text-white/75 text-sm mb-5">
                       {vendorOfMonth.total_orders} orders last month{vendorOfMonth.rating > 0 && ` · ⭐ ${vendorOfMonth.rating.toFixed(1)}`}
                     </p>
-                    <Link href={`/vendor/${vendorOfMonth.username}`}>
-                      <motion.button whileTap={{ scale: 0.97 }}
-                        className="bg-white text-stone-900 font-bold px-7 py-3.5 rounded-full text-sm inline-flex items-center gap-2 shadow-lg w-fit">
-                        Shop Now <ArrowRight className="w-4 h-4" />
-                      </motion.button>
-                    </Link>
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <Link href={`/vendor/${vendorOfMonth.username}`}>
+                        <motion.button whileTap={{ scale: 0.97 }}
+                          className="bg-white text-stone-900 font-bold px-6 py-2.5 rounded-full text-sm inline-flex items-center gap-2 shadow-lg">
+                          Shop Now <ArrowRight className="w-4 h-4" />
+                        </motion.button>
+                      </Link>
+                    </div>
                   </>
                 ) : (
                   <>
-                    <div className="bg-white/20 border border-white/30 backdrop-blur-sm w-fit px-4 py-1.5 rounded-full mb-5">
-                      <span className="text-white text-xs font-semibold">Big Savings</span>
+                    <div className="bg-white/20 border border-white/30 backdrop-blur-sm w-fit px-4 py-1.5 rounded-full mb-4">
+                      <span className="text-white text-xs font-semibold">New Collection 2024</span>
                     </div>
-                    <h1 className="text-4xl lg:text-5xl font-black text-white leading-[1.05] mb-4"
+                    <h1 className="text-3xl lg:text-5xl font-black text-white leading-[1.05] mb-3"
                       style={{ fontFamily: "var(--font-jakarta),'Plus Jakarta Sans',sans-serif" }}>
-                      Shop Smart.<br />Live Campus.
+                      Shop Smart.<br className="hidden sm:block" /> Live Campus.
                     </h1>
-                    <p className="text-white/80 text-sm lg:text-base mb-7 leading-relaxed max-w-sm">
+                    <p className="text-white/80 text-sm lg:text-base mb-6 leading-relaxed max-w-sm hidden sm:block">
                       Explore hundreds of services from verified vendors on your campus, every day.
                     </p>
-                    <Link href="/categories">
-                      <motion.button whileTap={{ scale: 0.97 }}
-                        className="bg-white text-stone-900 font-bold px-7 py-3.5 rounded-full text-sm inline-flex items-center gap-2 shadow-lg w-fit">
-                        Shop Now <ArrowRight className="w-4 h-4" />
-                      </motion.button>
-                    </Link>
-                    {/* Carousel dots */}
-                    <div className="flex items-center gap-2 mt-8">
-                      {[0, 1, 2, 3].map(i => (
-                        <div key={i} className={`rounded-full transition-all ${i === 0 ? "w-5 h-2 bg-white" : "w-2 h-2 bg-white/35"}`} />
-                      ))}
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <Link href="/categories">
+                        <motion.button whileTap={{ scale: 0.97 }}
+                          className="bg-white text-stone-900 font-bold px-6 py-2.5 rounded-full text-sm inline-flex items-center gap-2 shadow-lg">
+                          Shop Now <ArrowRight className="w-4 h-4" />
+                        </motion.button>
+                      </Link>
+                      <button onClick={() => setActiveTab("vendors")}
+                        className="bg-white/20 border border-white/30 text-white font-semibold px-6 py-2.5 rounded-full text-sm inline-flex items-center gap-2 backdrop-blur-sm hover:bg-white/30 transition">
+                        View Vendors
+                      </button>
                     </div>
                   </>
                 )}
               </div>
 
-              {/* Product image — desktop */}
-              <div className="hidden lg:block absolute right-0 top-0 bottom-0 w-[48%] pointer-events-none">
-                <div className="absolute inset-y-0 left-0 w-24 z-10"
-                  style={{ background: "linear-gradient(to right,#4F46E5,transparent)" }} />
+              {/* Right image — visible on all screens */}
+              <div className="w-32 h-40 sm:w-44 sm:h-56 lg:w-56 lg:h-72 rounded-2xl overflow-hidden shadow-2xl border-2 border-white/20 flex-shrink-0">
                 <img
                   src="https://plus.unsplash.com/premium_photo-1681487865280-c2b836dd83e8?fm=jpg&q=80&w=900&auto=format&fit=crop"
                   alt="Shop on StudEx"
-                  className="w-full h-full object-cover object-center"
+                  className="w-full h-full object-cover object-top"
                 />
               </div>
-            </motion.div>
-          </div>
+            </div>
+          </motion.div>
 
-          {/* MOBILE chips + campus */}
-          <div className="lg:hidden mt-4 flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
-            {[{ slug: "All", title: "All" }, ...categories.map(c => ({ slug: c.slug, title: c.title }))].map(tab => (
+          {/* ── CATEGORY TABS ── */}
+          <div className="mt-4 flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
+            {[{ slug: "All", title: "All Products" }, ...categories.map(c => ({ slug: c.slug, title: c.title }))].map(tab => (
               <button key={tab.slug} onClick={() => { setActiveTab("listings"); handleFilter(tab.slug); }}
-                className={`flex-shrink-0 px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${activeFilter === tab.slug && activeTab === "listings" ? "text-white shadow-sm" : "bg-white text-stone-500 border border-stone-200"}`}
+                className={`flex-shrink-0 px-4 py-1.5 rounded-full text-xs font-semibold transition-all border ${activeFilter === tab.slug && activeTab === "listings" ? "text-white shadow-sm border-transparent" : "bg-white text-stone-500 border-stone-200 hover:border-stone-300"}`}
                 style={activeFilter === tab.slug && activeTab === "listings" ? { background: GRAD } : {}}>
                 {tab.title}
               </button>
             ))}
           </div>
           {mounted && (!isLoggedIn || !(user as any)?.school) && (
-            <div className="lg:hidden flex items-center gap-2 mt-3">
+            <div className="flex items-center gap-2 mt-3">
               <span className="text-[11px] text-stone-400 font-medium">Campus:</span>
               {(["pau", "futo"] as const).map(c => (
                 <button key={c} onClick={() => switchCampus(c)}
@@ -599,11 +569,16 @@ export default function HomePageClient({ initialVendors, initialListings, initia
           {/* ── FEATURED SECTION ── */}
           <div className="mt-8" ref={featuredRef}>
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-xl font-bold text-stone-900">
-                {activeTab === "listings"
-                  ? activeFilter === "All" ? "Featured Services" : categories.find(c => c.slug === activeFilter)?.title || activeFilter
-                  : "Campus Vendors"}
-              </h2>
+              <div>
+                <h2 className="text-xl font-bold text-stone-900">
+                  {activeTab === "listings"
+                    ? activeFilter === "All" ? "Featured Services" : categories.find(c => c.slug === activeFilter)?.title || activeFilter
+                    : "Campus Vendors"}
+                </h2>
+                <p className="text-stone-400 text-sm mt-0.5">
+                  {activeTab === "listings" ? "Selected by our team for you." : "Verified campus vendors."}
+                </p>
+              </div>
               <div className="flex items-center gap-4">
                 {/* Tab switcher */}
                 <div className="flex bg-stone-100 rounded-full p-1">
@@ -700,6 +675,22 @@ export default function HomePageClient({ initialVendors, initialListings, initia
               </motion.div>
             )}
           </div>
+
+          {/* ── NEWSLETTER ── */}
+          <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
+            className="mt-10 bg-indigo-50 border border-indigo-100 rounded-2xl px-6 py-8 lg:px-10 flex flex-col lg:flex-row items-center gap-5 lg:gap-10">
+            <div className="flex-1 text-center lg:text-left">
+              <h3 className="text-xl font-black text-stone-900">Get 20% Off Your First Order</h3>
+              <p className="text-stone-500 text-sm mt-1">Join our community of over 10k students and stay updated on the latest drops and exclusive deals.</p>
+            </div>
+            <div className="flex gap-2 w-full lg:w-auto">
+              <input type="email" placeholder="Enter your email"
+                className="flex-1 lg:w-60 px-4 py-2.5 rounded-xl border border-indigo-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300/40 placeholder:text-stone-400" />
+              <button className="px-5 py-2.5 rounded-xl text-white font-semibold text-sm flex-shrink-0" style={{ background: GRAD }}>
+                Subscribe
+              </button>
+            </div>
+          </motion.div>
 
           {/* ── CTA BANNER ── */}
           <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
