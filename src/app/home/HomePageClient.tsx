@@ -232,11 +232,11 @@ export default function HomePageClient({ initialVendors, initialListings, initia
               <Heart className={`w-3.5 h-3.5 ${wishlisted ? "fill-red-500 text-red-500" : "text-stone-400"}`} />
             </motion.button>
 
-            {!isOwn && (
+            {!isOwn && !isService && (
               <motion.button onClick={e => {
                 e.preventDefault(); e.stopPropagation();
                 addToCart({ id: listing.id, title: listing.title, price: listing.price, img: listing.image || "" });
-                showToast(inCart ? "Cart updated" : "Added to cart");
+                showToast(inCart ? "Added again (+1)" : "Added to cart");
               }} whileTap={{ scale: 0.85 }}
                 className="absolute bottom-2.5 right-2.5 z-10 w-7 h-7 rounded-full shadow flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                 style={{ background: GRAD }}>
@@ -266,11 +266,11 @@ export default function HomePageClient({ initialVendors, initialListings, initia
               ) : (
                 <button
                   onClick={e => {
+                    // Services and own listings: let the outer Link navigate to the detail page
+                    if (isOwn || isService) return;
                     e.preventDefault(); e.stopPropagation();
-                    if (!isOwn) {
-                      addToCart({ id: listing.id, title: listing.title, price: listing.price, img: listing.image || "" });
-                      showToast(inCart ? "Cart updated" : "Added to cart");
-                    }
+                    addToCart({ id: listing.id, title: listing.title, price: listing.price, img: listing.image || "" });
+                    showToast(inCart ? "Added again (+1)" : "Added to cart");
                   }}
                   className="w-full py-2 rounded-xl text-white text-xs font-bold flex items-center justify-center gap-1.5 hover:opacity-90 transition-opacity"
                   style={{ background: "linear-gradient(135deg,#2DD4BF 0%,#0D9488 100%)" }}>
@@ -296,8 +296,8 @@ export default function HomePageClient({ initialVendors, initialListings, initia
           <div className="bg-white rounded-xl border border-stone-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow group cursor-pointer">
             <div className="relative w-full aspect-square overflow-hidden bg-stone-50">
               {displaySrc
-                ? <img src={displaySrc} alt={vendor.business_name || vendor.username} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                : <div className="w-full h-full flex items-center justify-center text-white text-3xl font-black" style={{ background: GRAD }}>{initials}</div>
+                ? <img src={displaySrc} alt={vendor.business_name || vendor.username} className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                : <div className="absolute inset-0 flex items-center justify-center text-white text-3xl font-black" style={{ background: GRAD }}>{initials}</div>
               }
               {vendor.is_online && (
                 <div className="absolute top-2.5 right-2.5 flex items-center gap-1 bg-white/90 px-2 py-0.5 rounded-full shadow-sm">
@@ -516,8 +516,8 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                 {/* Image — always visible, smaller on mobile */}
                 <div className="w-28 h-36 sm:w-44 sm:h-56 lg:w-56 lg:h-72 rounded-xl sm:rounded-2xl overflow-hidden shadow-2xl border-2 border-white/20 flex-shrink-0">
                   <img
-                    src="https://plus.unsplash.com/premium_photo-1681487865280-c2b836dd83e8?fm=jpg&q=80&w=900&auto=format&fit=crop"
-                    alt="Shop on StudEx"
+                    src={vendorOfMonth?.profile_picture || "https://plus.unsplash.com/premium_photo-1681487865280-c2b836dd83e8?fm=jpg&q=80&w=900&auto=format&fit=crop"}
+                    alt={vendorOfMonth?.business_name || "Shop on StudEx"}
                     className="w-full h-full object-cover object-top"
                   />
                 </div>
