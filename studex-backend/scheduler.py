@@ -394,24 +394,33 @@ def pick_vendor_of_month():
         logger.info(f"pick_vendor_of_month: already picked for {month_start.strftime('%B %Y')}")
         return
 
-    vendors = User.objects.filter(is_verified_vendor=True).select_related('profile')
+    from django.db.models import Count, Q
+
+    # Single query: annotate each vendor with their completed order count for the month
+    vendors = (
+        User.objects
+        .filter(is_verified_vendor=True)
+        .select_related('profile')
+        .annotate(
+            monthly_orders=Count(
+                'listing__orders',
+                filter=Q(
+                    listing__orders__status='completed',
+                    listing__orders__created_at__date__gte=month_start,
+                    listing__orders__created_at__date__lt=month_end,
+                )
+            )
+        )
+        .filter(monthly_orders__gt=0)  # skip vendors with no sales that month
+    )
 
     best_vendor = None
     best_score  = -1
     best_stats  = {}
 
     for vendor in vendors:
-        completed = Order.objects.filter(
-            listing__vendor=vendor,
-            status='completed',
-            created_at__date__gte=month_start,
-            created_at__date__lt=month_end,
-        ).count()
-
-        if completed == 0:
-            continue  # must have made at least one sale to qualify
-
-        profile = getattr(vendor, 'profile', None)
+        completed       = vendor.monthly_orders
+        profile         = getattr(vendor, 'profile', None)
         avg_rating      = float(getattr(profile, 'rating', 0) or 0)
         completion_rate = float(getattr(profile, 'completion_rate', 0) or 0)
 

@@ -45,10 +45,11 @@ class OrderViewSet(viewsets.ModelViewSet):
         user = self.request.user
         from services.models import Listing
         role = self.request.query_params.get('role')
+        base = self.queryset.select_related('buyer', 'listing', 'listing__vendor')
         if role == 'buyer':
-            return self.queryset.filter(buyer=user).order_by('-created_at')
+            return base.filter(buyer=user).order_by('-created_at')
         vendor_listing_ids = Listing.objects.filter(vendor=user).values_list('id', flat=True)
-        return self.queryset.filter(
+        return base.filter(
             models.Q(buyer=user) | models.Q(listing__id__in=vendor_listing_ids)
         ).order_by('-created_at')
 

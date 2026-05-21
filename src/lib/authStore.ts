@@ -236,13 +236,15 @@ const refreshAccessToken = async (): Promise<string | null> => {
  * Fetches all pages of a paginated DRF list endpoint.
  * Keeps following `next` until exhausted, then returns the full results array.
  */
-export const fetchAllPages = async (url: string): Promise<any[]> => {
+export const fetchAllPages = async (url: string, maxPages = 20): Promise<any[]> => {
   const all: any[] = [];
   let nextUrl: string | null = url;
-  while (nextUrl) {
+  let pages = 0;
+  while (nextUrl && pages < maxPages) {
     const res = await fetchWithAuth(nextUrl);
     if (!res.ok) break;
     const data = await res.json();
+    pages++;
     if (Array.isArray(data)) {
       all.push(...data);
       break;

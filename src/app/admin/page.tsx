@@ -105,7 +105,7 @@ function LiveActivity() {
         .catch(() => {});
     };
     fetch_();
-    const id = setInterval(fetch_, 30_000);
+    const id = setInterval(fetch_, 60_000);
     return () => clearInterval(id);
   }, []);
 

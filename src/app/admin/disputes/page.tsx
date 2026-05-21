@@ -53,7 +53,7 @@ export default function AdminDisputesPage() {
     const interval = setInterval(() => {
       const f = filtersRef.current;
       load(f.search, f.tab, f.campus, true);
-    }, 15000);
+    }, 60000);
     return () => clearInterval(interval);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 

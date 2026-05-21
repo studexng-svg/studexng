@@ -56,7 +56,7 @@ export default function AdminOrders() {
     const interval = setInterval(() => {
       const f = filtersRef.current;
       load(undefined, f.statusFilter || undefined, f.campus || undefined, true);
-    }, 15000);
+    }, 60000);
     return () => clearInterval(interval);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 

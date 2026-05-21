@@ -21,7 +21,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useAuth, getToken } from "@/lib/authStore";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
-const POLL_INTERVAL = 30_000;
+const POLL_INTERVAL = 60_000;
 
 export interface NotificationPayload {
   id: number;
