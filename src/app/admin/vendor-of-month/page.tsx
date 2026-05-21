@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import AdminTopBar from "@/components/layout/AdminTopBar";
 import { fetchWithAuth } from "@/lib/authStore";
 import { GRAD } from "@/lib/tokens";
-import { Trophy, Star, RefreshCw, Search, CheckCircle } from "lucide-react";
+import { Trophy, Star, RefreshCw, Search, CheckCircle, Trash2 } from "lucide-react";
 import { motion } from "framer-motion";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
@@ -41,6 +41,7 @@ export default function AdminVendorOfMonthPage() {
   const [loading, setLoading] = useState(true);
   const [picking, setPicking] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [removing, setRemoving] = useState(false);
   const [msg, setMsg] = useState("");
 
   // Manual override search
@@ -121,6 +122,23 @@ export default function AdminVendorOfMonthPage() {
     } finally { setSaving(false); }
   };
 
+  const removeCurrent = async () => {
+    if (!confirm("Remove the current Vendor of the Month? The hero will revert to the generic banner.")) return;
+    setRemoving(true);
+    setMsg("");
+    try {
+      const r = await fetchWithAuth(`${API_URL}/api/admin/vendor-of-month/`, { method: "DELETE" });
+      const d = await r.json();
+      if (r.ok) {
+        setCurrent(null);
+        setHistory(prev => prev.slice(1));
+        setMsg(d.message || "Removed.");
+      } else {
+        setMsg(d.error || "Failed to remove.");
+      }
+    } finally { setRemoving(false); }
+  };
+
   return (
     <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       <AdminTopBar title="Vendor of the Month" back="/admin" />
@@ -194,9 +212,19 @@ export default function AdminVendorOfMonthPage() {
                 </div>
               </div>
 
-              <div className="text-right flex-shrink-0">
-                <p className="text-2xl font-black text-stone-900">{current.score.toFixed(0)}</p>
-                <p className="text-[10px] text-stone-400 uppercase tracking-wide">Score</p>
+              <div className="text-right flex-shrink-0 space-y-2">
+                <div>
+                  <p className="text-2xl font-black text-stone-900">{current.score.toFixed(0)}</p>
+                  <p className="text-[10px] text-stone-400 uppercase tracking-wide">Score</p>
+                </div>
+                <button
+                  onClick={removeCurrent}
+                  disabled={removing}
+                  className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700 font-semibold transition disabled:opacity-50"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  {removing ? "Removing…" : "Remove"}
+                </button>
               </div>
             </div>
           ) : (

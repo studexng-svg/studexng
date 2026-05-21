@@ -1533,6 +1533,17 @@ class AdminVendorOfMonthView(APIView):
             'current': self._serialize(votm, request),
         }, status=201 if created else 200)
 
+    def delete(self, request):
+        """DELETE /api/admin/vendor-of-month/ — remove the current month's winner."""
+        from services.models import VendorOfTheMonth
+        from datetime import date
+        today = date.today()
+        month_start = date(today.year, today.month, 1)
+        deleted, _ = VendorOfTheMonth.objects.filter(month=month_start).delete()
+        if deleted:
+            return Response({'message': 'Vendor of the Month removed.'})
+        return Response({'error': 'No vendor of the month set for this month.'}, status=404)
+
 
 class AdminActivityView(APIView):
     """GET /api/admin/activity/ — real-time online/offline counts."""
