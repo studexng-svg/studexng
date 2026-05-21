@@ -139,6 +139,9 @@ export default function HomePageClient({ initialVendors, initialListings, initia
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [searching, setSearching] = useState(false);
   const [showResults, setShowResults] = useState(false);
+  const [showAllVendors, setShowAllVendors] = useState(false);
+
+  const VENDOR_PREVIEW_COUNT = 6;
 
   useEffect(() => {
     setMounted(true);
@@ -624,7 +627,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                       </div>
 
                       <div className="flex gap-4 overflow-x-auto pb-2" style={{ scrollbarWidth: "none" }}>
-                        {vendors.map((vendor, i) => (
+                        {(showAllVendors ? vendors : vendors.slice(0, VENDOR_PREVIEW_COUNT)).map((vendor, i) => (
                           <motion.div
                             key={vendor.id}
                             initial={{ opacity: 0, scale: 0.9 }}
@@ -675,6 +678,22 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                             )}
                           </motion.div>
                         ))}
+                        {!showAllVendors && vendors.length > VENDOR_PREVIEW_COUNT && (
+                          <motion.div
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            whileInView={{ opacity: 1, scale: 1 }}
+                            viewport={{ once: true }}
+                            className="flex-shrink-0 flex flex-col items-center gap-2 w-20">
+                            <motion.button
+                              whileTap={{ scale: 0.95 }}
+                              onClick={() => setShowAllVendors(true)}
+                              className="w-[70px] h-[70px] rounded-full border-2 border-dashed border-teal-300 flex flex-col items-center justify-center gap-1 bg-teal-50 hover:bg-teal-100 transition">
+                              <Plus className="w-5 h-5 text-teal-600" />
+                              <span className="text-[9px] font-bold text-teal-600 leading-none">{vendors.length - VENDOR_PREVIEW_COUNT} more</span>
+                            </motion.button>
+                            <p className="text-xs text-teal-600 font-semibold text-center leading-tight">View More</p>
+                          </motion.div>
+                        )}
                       </div>
                     </motion.div>
                   )}
@@ -801,8 +820,14 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                     style={{ fontFamily: "var(--font-jakarta), 'Plus Jakarta Sans', sans-serif" }}>
                     Vendors
                   </h2>
-                  <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1" style={{ scrollbarWidth: "thin", scrollbarColor: "#d1d5db transparent" }}>
-                    {vendors.map(vendor => (
+                  <div
+                    className="space-y-3 overflow-y-auto pr-1"
+                    style={{
+                      maxHeight: showAllVendors ? "none" : "420px",
+                      scrollbarWidth: "thin",
+                      scrollbarColor: "#d1d5db transparent",
+                    }}>
+                    {(showAllVendors ? vendors : vendors.slice(0, VENDOR_PREVIEW_COUNT)).map(vendor => (
                       <Link key={vendor.id} href={`/vendor/${vendor.username}`}>
                         <div className="flex items-center gap-3 hover:bg-stone-50 rounded-xl p-2 transition cursor-pointer">
                           <div className="relative flex-shrink-0">
@@ -834,6 +859,13 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                       </Link>
                     ))}
                   </div>
+                  {!showAllVendors && vendors.length > VENDOR_PREVIEW_COUNT && (
+                    <button
+                      onClick={() => setShowAllVendors(true)}
+                      className="w-full mt-3 py-2 text-xs font-semibold text-teal-600 border border-teal-200 rounded-xl hover:bg-teal-50 transition flex items-center justify-center gap-1">
+                      View More <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </div>
               )}
 
