@@ -27,6 +27,17 @@
   html {
     scroll-behavior: smooth;
   }
+
+  input,
+  textarea,
+  select {
+    color: #1c1917; /* always dark text regardless of OS dark mode */
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: #a8a29e;
+  }
 }
 
 /* ==================================================================
