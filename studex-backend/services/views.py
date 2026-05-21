@@ -233,11 +233,19 @@ class VendorOfMonthView(APIView):
 
             vendor = votm.vendor
             profile = getattr(vendor, 'profile', None)
-            pic = getattr(profile, 'profile_picture', None)
-            if pic:
-                pic = str(pic)
-                if not pic.startswith('http') and pic:
-                    pic = request.build_absolute_uri(f'/media/{pic}')
+            pic = None
+            img = getattr(vendor, 'profile_image', None)
+            if img:
+                name = getattr(img, 'name', None)
+                if name and name != 'profiles/default.jpg':
+                    if name.startswith('http'):
+                        pic = name
+                    else:
+                        try:
+                            url = img.url
+                            pic = url if url.startswith('http') else request.build_absolute_uri(url)
+                        except Exception:
+                            pass
 
             return Response({
                 'id': vendor.id,
