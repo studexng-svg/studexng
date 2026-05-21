@@ -474,13 +474,35 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                         <Trophy className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-amber-900" />
                         <span className="text-amber-900 text-[10px] sm:text-xs font-bold">Vendor of the Month · {vendorOfMonth.month}</span>
                       </div>
-                      <h1 className="text-lg sm:text-3xl lg:text-5xl font-black text-white leading-[1.1] mb-1.5 sm:mb-3"
+                      <h1 className="text-lg sm:text-3xl lg:text-5xl font-black text-white leading-[1.1]"
                         style={{ fontFamily: "var(--font-jakarta),'Plus Jakarta Sans',sans-serif" }}>
                         {vendorOfMonth.business_name}
                       </h1>
-                      <p className="text-white/75 text-[11px] sm:text-sm mb-3 sm:mb-4 line-clamp-2 sm:line-clamp-none">
-                        {vendorOfMonth.total_orders} orders last month{vendorOfMonth.rating > 0 && ` · ⭐ ${vendorOfMonth.rating.toFixed(1)}`}
-                      </p>
+                      <p className="text-white/50 text-[10px] sm:text-sm mt-0.5 mb-2 sm:mb-3">@{vendorOfMonth.username}</p>
+
+                      {/* Stats row */}
+                      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mb-3 sm:mb-4">
+                        <span className="flex items-center gap-1 bg-white/15 rounded-full px-2 py-0.5 sm:px-3 sm:py-1 text-[10px] sm:text-xs text-white font-semibold">
+                          🛒 {vendorOfMonth.total_orders} orders
+                        </span>
+                        {vendorOfMonth.rating > 0 && (
+                          <span className="flex items-center gap-1 bg-white/15 rounded-full px-2 py-0.5 sm:px-3 sm:py-1 text-[10px] sm:text-xs text-white font-semibold">
+                            ⭐ {vendorOfMonth.rating.toFixed(1)}
+                            {vendorOfMonth.total_reviews > 0 && <span className="text-white/60">({vendorOfMonth.total_reviews})</span>}
+                          </span>
+                        )}
+                        {vendorOfMonth.completion_rate > 0 && (
+                          <span className="flex items-center gap-1 bg-white/15 rounded-full px-2 py-0.5 sm:px-3 sm:py-1 text-[10px] sm:text-xs text-white font-semibold">
+                            ✅ {Math.round(vendorOfMonth.completion_rate)}% completion
+                          </span>
+                        )}
+                        {vendorOfMonth.vendor_badge && vendorOfMonth.vendor_badge !== "none" && (
+                          <span className="flex items-center gap-1 bg-amber-400/90 rounded-full px-2 py-0.5 sm:px-3 sm:py-1 text-[10px] sm:text-xs text-amber-900 font-bold">
+                            {vendorOfMonth.vendor_badge === "top" ? "🏆 Top Vendor" : vendorOfMonth.vendor_badge === "trusted" ? "✅ Trusted" : "⭐ Rising"}
+                          </span>
+                        )}
+                      </div>
+
                       <Link href={`/vendor/${vendorOfMonth.username}`}>
                         <motion.button whileTap={{ scale: 0.97 }}
                           className="bg-white text-stone-900 font-bold px-3 py-1.5 sm:px-6 sm:py-2.5 rounded-full text-[11px] sm:text-sm inline-flex items-center gap-1.5 sm:gap-2 shadow-lg">
