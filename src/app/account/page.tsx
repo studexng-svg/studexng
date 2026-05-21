@@ -4,7 +4,7 @@ import {
   Package, Heart, Settings, HelpCircle, LogOut, ChevronRight,
   Store, Clock, ArrowRight, Banknote, LayoutDashboard,
   Calendar, Gift, Bell, X, CheckCheck, ExternalLink, Camera,
-  Trash2, ZoomIn, Move, MessageCircle, ArrowUpRight
+  Trash2, ZoomIn, Move, MessageCircle, ArrowUpRight, BadgeCheck
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -512,13 +512,21 @@ export default function AccountPage() {
                 </motion.button>
               </div>
               <div className="flex-1 min-w-0 text-center sm:text-left">
-                <h2 className="text-2xl font-black italic tracking-tight uppercase text-stone-900 truncate"
-                  style={{ fontFamily: "var(--font-jakarta), 'Plus Jakarta Sans', sans-serif" }}>
-                  {currentUser?.username || "Campus User"}
-                </h2>
+                <div className="flex items-center gap-1.5 justify-center sm:justify-start">
+                  <h2 className="text-2xl font-black italic tracking-tight uppercase text-stone-900 truncate"
+                    style={{ fontFamily: "var(--font-jakarta), 'Plus Jakarta Sans', sans-serif" }}>
+                    {currentUser?.username || "Campus User"}
+                  </h2>
+                  {vendorApproved && (
+                    <BadgeCheck
+                      className="w-6 h-6 flex-shrink-0"
+                      style={{ color: "#10b981" }}
+                      title="Verified Vendor"
+                    />
+                  )}
+                </div>
                 <p className="text-sm text-stone-400 mt-0.5 truncate">{currentUser?.email}</p>
                 <div className="mt-2 flex flex-wrap gap-2 justify-center sm:justify-start">
-                  {vendorApproved && <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-teal-50 text-teal-700 border border-teal-200">✓ Verified Vendor</span>}
                   {vendorPending && <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">⏳ Pending Approval</span>}
                 </div>
                 <button onClick={() => setViewModalOpen(true)} className="mt-2 text-xs text-teal-600 hover:underline font-medium">

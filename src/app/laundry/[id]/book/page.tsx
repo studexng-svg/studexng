@@ -7,8 +7,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { 
-  Calendar, Clock, MapPin, Truck, Plus, Minus, 
-  ChevronLeft, Shield, Check, CreditCard, Package, Zap 
+  Calendar, Clock, MapPin, Truck, Plus, Minus,
+  ChevronLeft, Shield, Check, CreditCard, Package, Zap, BadgeCheck
 } from "lucide-react";
 import { useState } from "react";
 import { useBookingStore } from "@/lib/bookingStore";
@@ -115,9 +115,10 @@ export default function LaundryBookingPage() {
               <MapPin className="w-5 h-5" /> {v.location}
             </p>
             {v.verified && (
-              <p className="text-sm text-blue-600 font-bold mt-2 flex items-center gap-1">
-                <Check className="w-4 h-4" /> Verified Vendor
-              </p>
+              <div className="flex items-center gap-1 mt-2">
+                <BadgeCheck className="w-5 h-5" style={{ color: "#10b981" }} title="Verified Vendor" />
+                <span className="text-sm font-semibold" style={{ color: "#10b981" }}>Verified</span>
+              </div>
             )}
           </div>
         </motion.div>
