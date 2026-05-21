@@ -21,20 +21,36 @@ logger = logging.getLogger(__name__)
 PAYSTACK_BASE = "https://api.paystack.co"
 
 # ─────────────────────────────────────────
-# ₦215.56 flat service fee per transaction.
+# Dynamic service fee: 2% of the base amount, min ₦50, capped at ₦1,500.
 # Full payment goes to StudEx balance (no subaccount split at charge time).
 # After charge.success webhook, StudEx immediately transfers vendor_amount
 # to the vendor's bank via the Paystack Transfer API using their RCP_xxx code.
 # ─────────────────────────────────────────
-SERVICE_FEE = Decimal("215.56")
+
+def calc_service_fee(base: Decimal) -> Decimal:
+    """StudEx fee: 2% of base amount, minimum ₦50, maximum ₦1,500."""
+    fee = (base * Decimal("0.02")).quantize(Decimal("0.01"))
+    return max(Decimal("50"), min(fee, Decimal("1500")))
 
 
-def _split_amounts(amount: Decimal):
-    """Returns (vendor_amount, platform_amount) in naira."""
-    vendor_amount = amount - SERVICE_FEE
-    if vendor_amount < Decimal("0"):
-        return Decimal("0"), amount
-    return vendor_amount, SERVICE_FEE
+def _split_amounts(total_amount: Decimal):
+    """
+    Returns (vendor_amount, platform_amount) from the total checkout amount
+    (base + fee). Inverts the fee formula to recover the original base.
+    """
+    # Region 1: base < ₦2,500 → fee was ₦50 (the minimum)
+    base1 = total_amount - Decimal("50")
+    if Decimal("0") < base1 < Decimal("2500"):
+        return base1, Decimal("50")
+    # Region 2: ₦2,500 ≤ base ≤ ₦75,000 → fee was 2%
+    base2 = (total_amount / Decimal("1.02")).quantize(Decimal("0.01"))
+    if Decimal("2500") <= base2 <= Decimal("75000"):
+        return base2, calc_service_fee(base2)
+    # Region 3: base > ₦75,000 → fee was ₦1,500 (the cap)
+    base3 = total_amount - Decimal("1500")
+    if base3 > Decimal("0"):
+        return base3, Decimal("1500")
+    return Decimal("0"), total_amount
 
 
 def _normalize_order_type(raw_type: str) -> str:
@@ -226,7 +242,8 @@ def get_checkout_config(request):
         pass
 
     final_amount = amount - discount_amount
-    checkout_amount = final_amount + SERVICE_FEE
+    service_fee = calc_service_fee(final_amount)
+    checkout_amount = final_amount + service_fee
 
     return Response({
         "listing_id": listing.id,
@@ -234,7 +251,7 @@ def get_checkout_config(request):
         "listing_price": float(amount),
         "discount_amount": float(discount_amount),
         "vendor_receives": float(final_amount),
-        "service_fee": float(SERVICE_FEE),
+        "service_fee": float(service_fee),
         "checkout_amount": float(checkout_amount),
         "checkout_amount_kobo": int(checkout_amount * 100),
         "currency": "NGN",
@@ -287,7 +304,7 @@ def initialize_payment(request):
         pass
 
     final_amount = amount - discount_amount
-    checkout_amount = final_amount + SERVICE_FEE
+    checkout_amount = final_amount + calc_service_fee(final_amount)
     total_amount_kobo = int(checkout_amount * 100)
 
     if total_amount_kobo < 10000:  # Paystack minimum is ₦100 (10000 kobo)
@@ -507,7 +524,8 @@ def verify_payment(request):
             _listing = Listing.objects.get(id=actual_listing_id)
             _base = Decimal(str(_listing.price))
             _max_discount = (_base * Decimal("0.05")).quantize(Decimal("0.01"))
-            _net = _base - _max_discount + SERVICE_FEE
+            _discounted = _base - _max_discount
+            _net = _discounted + calc_service_fee(_discounted)
             _rate = Decimal("0.015")
             _flat = Decimal("100") if _net >= Decimal("2500") else Decimal("0")
             _gross = ((_net + _flat) / (1 - _rate)).quantize(Decimal("0.01"))
@@ -632,7 +650,7 @@ def seller_earnings(request):
     return Response({
         "total_earned": float(total_earned),
         "total_orders": total_orders,
-        "service_fee": float(SERVICE_FEE),
+        "service_fee_description": "2% (min ₦50, max ₦1,500)",
     })
 
 
@@ -855,6 +873,7 @@ def paystack_webhook(request):
                     "amount": amount,
                     "seller_amount": vendor_amount,
                     "platform_amount": platform_amount,
+                    "service_charge": platform_amount,
                     "status": "success",
                     "order_type": order_type,
                     "buyer_email": customer_email,
@@ -975,6 +994,7 @@ def _create_order_from_paystack_data(paystack_data, buyer, listing_id, order_typ
             "amount": amount_paid,
             "seller_amount": vendor_amount,
             "platform_amount": platform_amount,
+            "service_charge": platform_amount,
             "status": "success",
             "order_type": order_type,
             "buyer_email": buyer_email,
@@ -1197,7 +1217,7 @@ def _create_or_update_paystack_subaccount(user, bank_code, account_number, accou
 
     Paystack subaccount split config (set at payment time via PaystackPop.setup):
       subaccount = ACCT_xxx  (the subaccount code returned here)
-      transaction_charge = 20000 kobo (₦200) → goes to StudEx
+      transaction_charge = dynamic (2% of base, min ₦50, max ₦1,500) → goes to StudEx
       bearer = "account"    → StudEx bears Paystack's processing fee
 
     Returns (subaccount_code, error_message).
