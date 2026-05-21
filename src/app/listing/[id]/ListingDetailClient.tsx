@@ -4,11 +4,12 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  ChevronLeft, Star, MessageCircle, ShoppingCart, Calendar,
+  Star, MessageCircle, ShoppingCart, Calendar,
   Clock, FileText, CheckCircle, AlertCircle,
   ChevronDown, ChevronUp, Send, MapPin, Sparkles, ZoomIn, X as XIcon,
   Shield
 } from "lucide-react";
+import TopNav from "@/components/layout/TopNav";
 import { useAuth, fetchWithAuth } from "@/lib/authStore";
 import { useCartStore } from "@/lib/cartStore";
 import { GRAD, GRAD_TEXT, SERIF } from "@/lib/tokens";
@@ -279,21 +280,9 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
         />
       )}
 
-      <div className="min-h-screen bg-[#FAFAF9]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+      <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
 
-        {/* ── STICKY HEADER ── */}
-        <div className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-stone-100 shadow-sm">
-          <div className="flex items-center gap-3 px-4 py-3">
-            <button onClick={() => router.back()}
-              className="p-2.5 bg-white border border-stone-200 hover:border-stone-300 rounded-full shadow-sm transition-all active:scale-95 flex-shrink-0">
-              <ChevronLeft className="w-5 h-5 text-stone-600" />
-            </button>
-            <h1 className="font-bold text-stone-900 text-base truncate flex-1"
-              style={SERIF}>
-              {listing.title}
-            </h1>
-          </div>
-        </div>
+        <TopNav showBack />
 
         <div className="pb-28 max-w-2xl mx-auto">
 

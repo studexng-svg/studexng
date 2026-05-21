@@ -4,9 +4,10 @@ import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  Search, ChevronLeft, Sparkles, Heart, Star, MessageCircle, X,
+  Search, Sparkles, Heart, Star, MessageCircle, X,
   ChevronRight, ArrowRight, Shield, Clock,
 } from "lucide-react";
+import TopNav from "@/components/layout/TopNav";
 import { useState, useEffect } from "react";
 import { useCartStore } from "@/lib/cartStore";
 import { useAuth, fetchWithAuth } from "@/lib/authStore";
@@ -236,7 +237,7 @@ export default function CategoryPageClient({ slug, initialListings }: Props) {
   });
 
   return (
-    <div className="min-h-screen bg-[#FAFAF9]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+    <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
 
       {/* Toast */}
       {toast && (
@@ -298,45 +299,21 @@ export default function CategoryPageClient({ slug, initialListings }: Props) {
         )}
       </AnimatePresence>
 
-      {/* ── STICKY HEADER ── */}
-      <div className="sticky top-0 bg-white/80 backdrop-blur-md z-40 border-b border-stone-100 shadow-sm">
-        <div className="max-w-6xl mx-auto">
-          <div className="flex items-center gap-3 px-4 py-3">
-            <button
-              onClick={() => router.back()}
-              className="p-2 hover:bg-stone-100 rounded-full transition flex-shrink-0 active:scale-95">
-              <ChevronLeft className="w-5 h-5 text-stone-600" />
-            </button>
+      <TopNav showBack backHref="/categories" activeNav="services" />
 
-            {/* Category title — desktop only */}
-            <span
-              className="hidden lg:block font-black italic tracking-tighter uppercase text-stone-900 text-lg flex-shrink-0"
-              style={{ fontFamily: "var(--font-jakarta), 'Plus Jakarta Sans', sans-serif" }}>
-              {categoryName}
-            </span>
-
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 pointer-events-none" />
-              <input
-                type="text"
-                placeholder={`Search ${categoryName.toLowerCase()}...`}
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                className="w-full pl-9 pr-4 py-2.5 bg-stone-50 border border-stone-200 rounded-full text-sm focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100 transition"
-              />
-            </div>
-
-            {!isLoggedIn && (
-              <Link href="/auth" className="hidden lg:block flex-shrink-0">
-                <motion.button
-                  whileHover={{ scale: 1.03 }}
-                  whileTap={{ scale: 0.97 }}
-                  className="px-4 py-2 text-white font-medium rounded-full text-sm shadow-sm"
-                  style={{ background: GRAD }}>
-                  Login
-                </motion.button>
-              </Link>
-            )}
+      {/* ── SEARCH SUB-BAR ── */}
+      <div className="bg-white border-b border-stone-100">
+        <div className="max-w-6xl mx-auto px-4 py-2.5 flex items-center gap-3">
+          <span className="hidden lg:block font-bold text-stone-900 text-sm flex-shrink-0">{categoryName}</span>
+          <div className="relative flex-1 max-w-xl">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 pointer-events-none" />
+            <input
+              type="text"
+              placeholder={`Search ${categoryName.toLowerCase()}...`}
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 bg-stone-50 border border-stone-200 rounded-full text-sm focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100 transition"
+            />
           </div>
         </div>
       </div>

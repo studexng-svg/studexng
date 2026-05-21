@@ -1,6 +1,7 @@
 "use client";
 
-import { Heart, Package, ChevronLeft } from "lucide-react";
+import { Heart, Package } from "lucide-react";
+import TopNav from "@/components/layout/TopNav";
 import Link from "next/link";
 import { useAuth } from "@/lib/authStore";
 import { useCartStore } from "@/lib/cartStore";
@@ -79,35 +80,23 @@ export default function WishlistPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#FAFAF9]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-      {/* TOAST */}
+    <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       {toast && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full shadow-lg z-50 font-medium text-sm text-white bg-teal-600 animate-fadeIn">
           {toast}
         </div>
       )}
 
-      {/* STICKY HEADER */}
-      <div className="sticky top-0 bg-white/80 backdrop-blur-md z-40 border-b border-stone-100 shadow-sm">
-        <div className="flex items-center justify-between px-4 py-3 max-w-2xl mx-auto">
-          <button
-            onClick={() => router.back()}
-            className="p-2.5 bg-white border border-stone-200 hover:border-stone-300 rounded-full shadow-sm transition-all active:scale-95">
-            <ChevronLeft className="w-5 h-5 text-stone-600" />
-          </button>
-          <h1 className="text-base font-bold text-stone-900" style={SERIF}>
-            Wishlist ({wishlist.length})
-          </h1>
-          <button
-            onClick={clearWishlist}
-            className="text-red-500 text-sm font-medium">
-            Clear
-          </button>
-        </div>
-      </div>
+      <TopNav showBack activeNav="arrivals" />
 
-      {/* WISHLIST ITEMS */}
-      <div className="px-4 pt-4 pb-32 space-y-4 max-w-2xl mx-auto">
+      <div className="px-4 pt-6 pb-32 space-y-4 max-w-2xl mx-auto">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold">Saved Items</p>
+            <h2 className="text-xl font-bold text-stone-900 mt-0.5" style={SERIF}>Wishlist ({wishlist.length})</h2>
+          </div>
+          <button onClick={clearWishlist} className="text-red-500 text-sm font-medium hover:text-red-600 transition">Clear</button>
+        </div>
         {wishlist.map((item, index) => (
           <div
             key={`${item.id}-${index}`}
