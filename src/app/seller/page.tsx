@@ -134,7 +134,7 @@ export default function SellerDashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#FAFAF9] flex items-center justify-center">
+      <div className="min-h-screen bg-[#F5F5F5] flex items-center justify-center">
         <div className="w-10 h-10 border-2 border-teal-600 border-t-transparent rounded-full animate-spin" />
       </div>
     );
@@ -183,21 +183,16 @@ export default function SellerDashboard() {
   const maxHeight = Math.max(...graphData);
 
   return (
-    <div className="min-h-screen bg-[#FAFAF9]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+    <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       {/* HEADER */}
-      <div className="sticky top-0 bg-white/80 backdrop-blur-md z-40 border-b border-stone-100 shadow-sm">
+      <div className="sticky top-0 bg-white z-40 border-b border-stone-100 shadow-sm">
         <div className="flex items-center justify-between px-4 py-3 max-w-2xl mx-auto">
           <div className="flex items-center gap-2">
             <Store className="w-5 h-5 text-teal-600" />
-            <h1 className="text-base font-bold text-stone-900" style={SERIF}>
-              Seller Hub
-            </h1>
+            <h1 className="text-base font-bold text-stone-900">Seller Hub</h1>
           </div>
           <Link href="/seller/orders">
-            <button
-              className="relative p-2.5 text-white rounded-full shadow-sm active:scale-95 transition-all"
-              style={{ background: GRAD }}
-            >
+            <button className="relative p-2.5 text-white rounded-full shadow-sm active:scale-95 transition-all" style={{ background: GRAD }}>
               <Bell className="w-4 h-4" />
               {pendingOrders.length > 0 && (
                 <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center text-xs font-bold text-white">

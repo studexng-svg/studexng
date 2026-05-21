@@ -2,7 +2,8 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Gift, Star, ChevronLeft, Loader } from "lucide-react";
+import { Gift, Star, Loader } from "lucide-react";
+import TopNav from "@/components/layout/TopNav";
 import { useAuth, fetchWithAuth } from "@/lib/authStore";
 import { GRAD, SERIF } from "@/lib/tokens";
 
@@ -38,22 +39,8 @@ export default function LoyaltyPage() {
   const progress = data ? Math.round((completedInCycle / MILESTONE) * 100) : 0;
 
   return (
-    <div className="min-h-screen bg-[#FAFAF9]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-      {/* HEADER */}
-      <div className="sticky top-0 bg-white/80 backdrop-blur-md z-40 border-b border-stone-100 shadow-sm">
-        <div className="flex items-center justify-between px-4 py-3 max-w-2xl mx-auto">
-          <button
-            onClick={() => router.back()}
-            className="p-2.5 bg-white border border-stone-200 rounded-full shadow-sm active:scale-95 transition-all"
-          >
-            <ChevronLeft className="w-5 h-5 text-stone-600" />
-          </button>
-          <h1 className="text-base font-bold text-stone-900" style={SERIF}>
-            Loyalty Rewards
-          </h1>
-          <div className="w-10" />
-        </div>
-      </div>
+    <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+      <TopNav showBack backHref="/account" />
 
       <div className="pb-24 p-4 space-y-4 max-w-2xl mx-auto">
         {loading ? (

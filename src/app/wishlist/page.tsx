@@ -44,7 +44,7 @@ export default function WishlistPage() {
   // Not logged in
   if (!isLoggedIn) {
     return (
-      <div className="min-h-screen bg-[#FAFAF9] flex items-center justify-center p-6" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+      <div className="min-h-screen bg-[#F5F5F5] flex items-center justify-center p-6" style={{ fontFamily: "'DM Sans', sans-serif" }}>
         <div className="text-center">
           <Heart className="w-16 h-16 text-stone-300 mx-auto mb-4" />
           <p className="text-stone-500 text-lg mb-5">Please login to view your wishlist</p>
@@ -63,7 +63,7 @@ export default function WishlistPage() {
   // Empty wishlist
   if (wishlist.length === 0) {
     return (
-      <div className="min-h-screen bg-[#FAFAF9] flex items-center justify-center p-6" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+      <div className="min-h-screen bg-[#F5F5F5] flex items-center justify-center p-6" style={{ fontFamily: "'DM Sans', sans-serif" }}>
         <div className="text-center">
           <Heart className="w-16 h-16 text-stone-300 mx-auto mb-4" />
           <p className="text-stone-500 text-lg mb-5">Your wishlist is empty</p>

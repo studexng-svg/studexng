@@ -322,19 +322,19 @@ export default function ChatRoomPage() {
   };
 
   if (loading) return (
-    <div className="flex justify-center items-center min-h-screen bg-[#FAFAF9]">
+    <div className="flex justify-center items-center min-h-screen bg-[#F5F5F5]">
       <Loader className="w-8 h-8 text-teal-600 animate-spin" />
     </div>
   );
 
   return (
-    <div className="flex flex-col bg-[#FAFAF9]" style={{ height: "100dvh", fontFamily: "'DM Sans', sans-serif" }}>
+    <div className="flex flex-col bg-[#F5F5F5]" style={{ height: "100dvh", fontFamily: "'DM Sans', sans-serif" }}>
 
       {/* HEADER */}
-      <div className="bg-white/80 backdrop-blur-md border-b border-stone-100 px-4 py-3 flex items-center gap-3 flex-shrink-0 shadow-sm">
+      <div className="bg-white border-b border-stone-100 px-4 py-3 flex items-center gap-3 flex-shrink-0 shadow-sm">
         <button
           onClick={() => router.back()}
-          className="p-2.5 bg-white border border-stone-200 rounded-full shadow-sm active:scale-95 transition-all flex-shrink-0"
+          className="p-2 bg-stone-100 hover:bg-stone-200 rounded-full transition-all active:scale-95 flex-shrink-0"
         >
           <ChevronLeft className="w-5 h-5 text-stone-600" />
         </button>

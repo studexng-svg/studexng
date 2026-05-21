@@ -4,7 +4,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { fetchWithAuth } from "@/lib/authStore";
-import { Lock, ChevronLeft, Save, Eye, EyeOff, CheckCircle, XCircle } from "lucide-react";
+import { Lock, Save, Eye, EyeOff, CheckCircle, XCircle } from "lucide-react";
+import TopNav from "@/components/layout/TopNav";
 import { GRAD, SERIF } from "@/lib/tokens";
 
 export default function ChangePasswordPage() {
@@ -89,22 +90,8 @@ export default function ChangePasswordPage() {
   const { minLength, hasNumber, hasSpecial } = validatePassword(passwords.newPassword);
 
   return (
-    <div className="min-h-screen bg-[#FAFAF9]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-      {/* HEADER */}
-      <div className="sticky top-0 bg-white/80 backdrop-blur-md z-40 border-b border-stone-100 shadow-sm">
-        <div className="flex items-center justify-between px-4 py-3 max-w-2xl mx-auto">
-          <button
-            onClick={() => router.back()}
-            className="p-2.5 bg-white border border-stone-200 rounded-full shadow-sm active:scale-95 transition-all"
-          >
-            <ChevronLeft className="w-5 h-5 text-stone-600" />
-          </button>
-          <h1 className="text-base font-bold text-stone-900" style={SERIF}>
-            Change Password
-          </h1>
-          <div className="w-10" />
-        </div>
-      </div>
+    <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+      <TopNav showBack backHref="/account" />
 
       <div className="px-4 pt-6 pb-32">
         <div className="max-w-md mx-auto space-y-8">

@@ -3,10 +3,11 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Package, CheckCircle, Clock, ChevronLeft, AlertCircle } from "lucide-react";
+import { Package, CheckCircle, Clock, AlertCircle } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAuth, fetchWithAuth } from "@/lib/authStore";
 import { GRAD, SERIF } from "@/lib/tokens";
+import TopNav from "@/components/layout/TopNav";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -101,7 +102,7 @@ export default function OrdersPage() {
 
   if (!isHydrated || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#FAFAF9]">
+      <div className="min-h-screen flex items-center justify-center bg-[#F5F5F5]">
         <div className="animate-spin">
           <Clock className="w-12 h-12 text-teal-600" />
         </div>
@@ -110,21 +111,8 @@ export default function OrdersPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#FAFAF9]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-      {/* HEADER */}
-      <div className="sticky top-0 bg-white/80 backdrop-blur-md z-40 border-b border-stone-100 shadow-sm">
-        <div className="flex items-center justify-between px-4 py-3 max-w-4xl mx-auto">
-          <Link href="/account">
-            <button className="p-2.5 bg-white border border-stone-200 rounded-full shadow-sm active:scale-95 transition-all">
-              <ChevronLeft className="w-5 h-5 text-stone-600" />
-            </button>
-          </Link>
-          <h1 className="text-base font-bold text-stone-900" style={SERIF}>
-            My Orders
-          </h1>
-          <div className="w-10" />
-        </div>
-      </div>
+    <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+      <TopNav showBack backHref="/account" />
 
       <div className="px-4 pt-6 pb-32 space-y-4 max-w-4xl mx-auto">
         {error && (

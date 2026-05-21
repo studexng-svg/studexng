@@ -60,7 +60,7 @@ export default function AdminTransactionsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#FFF8F0]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+    <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       <AdminTopBar title="Payout Transactions" back="/admin" />
 
       <div className="px-4 pt-4 pb-28 max-w-2xl mx-auto space-y-3">

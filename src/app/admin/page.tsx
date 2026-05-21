@@ -207,7 +207,7 @@ export default function AdminDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-[#FFF8F0]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+    <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       <AdminTopBar title="Admin Dashboard" back="/home" />
 
       <div className="px-4 pt-5 pb-28 max-w-2xl mx-auto space-y-5">

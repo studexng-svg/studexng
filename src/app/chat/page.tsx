@@ -3,7 +3,8 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { MessageCircle, ChevronLeft, Search, X } from "lucide-react";
+import { MessageCircle, Search, X } from "lucide-react";
+import TopNav from "@/components/layout/TopNav";
 import { useState, useEffect } from "react";
 import { useAuth, fetchWithAuth } from "@/lib/authStore";
 import { GRAD, SERIF } from "@/lib/tokens";
@@ -52,51 +53,27 @@ export default function ChatListPage() {
   const totalUnread = conversations.reduce((sum, c) => sum + (c.unread_count || 0), 0);
 
   return (
-    <div className="min-h-screen bg-[#FAFAF9]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+    <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
 
-      {/* ── STICKY HEADER ── */}
-      <div className="sticky top-0 bg-white/80 backdrop-blur-md z-40 border-b border-stone-100 shadow-sm">
-        <div className="flex items-center justify-between px-4 py-3">
-          <button onClick={() => router.back()}
-            className="p-2.5 bg-white border border-stone-200 hover:border-stone-300 rounded-full shadow-sm transition-all active:scale-95">
-            <ChevronLeft className="w-5 h-5 text-stone-600" />
-          </button>
+      <TopNav showBack />
 
-          <div className="flex items-center gap-2">
-            <h1 className="text-base font-bold text-stone-900" style={SERIF}>
-              Messages
-            </h1>
-            {totalUnread > 0 && (
-              <span className="bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-4 flex items-center justify-center px-1">
-                {totalUnread > 99 ? "99+" : totalUnread}
-              </span>
-            )}
-          </div>
-
-          <div className="w-10" />
-        </div>
+      <div className="px-4 pt-4 pb-28 max-w-2xl mx-auto space-y-4">
 
         {/* Search */}
-        <div className="px-4 pb-3">
-          <div className="relative">
-            <Search className="absolute left-3 top-3 w-4 h-4 text-stone-400 pointer-events-none" />
-            <input
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Search conversations..."
-              className="w-full pl-9 pr-8 py-2.5 bg-stone-50 text-stone-900 rounded-full text-sm border border-stone-200 focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 placeholder:text-stone-400 transition-all"
-            />
-            {search && (
-              <button onClick={() => setSearch("")}
-                className="absolute right-3 top-3 text-stone-400 hover:text-stone-600">
-                <X className="w-4 h-4" />
-              </button>
-            )}
-          </div>
+        <div className="relative">
+          <Search className="absolute left-3 top-3 w-4 h-4 text-stone-400 pointer-events-none" />
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search conversations..."
+            className="w-full pl-9 pr-8 py-2.5 bg-white text-stone-900 rounded-full text-sm border border-stone-200 focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 placeholder:text-stone-400 transition-all shadow-sm"
+          />
+          {search && (
+            <button onClick={() => setSearch("")} className="absolute right-3 top-3 text-stone-400 hover:text-stone-600">
+              <X className="w-4 h-4" />
+            </button>
+          )}
         </div>
-      </div>
-
-      <div className="px-4 pt-6 pb-28 max-w-2xl mx-auto space-y-4">
 
         {/* ── SECTION HEADER ── */}
         <div className="animate-fadeUp">

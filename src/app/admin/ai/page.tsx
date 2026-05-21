@@ -457,7 +457,7 @@ export default function AdminAIPage() {
     setMessages(prev => prev.map(m => m.id === msgId ? { ...m, actionStatus: "dismissed" } : m));
 
   return (
-    <div className="min-h-screen bg-[#FFF8F0] flex flex-col" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+    <div className="min-h-screen bg-[#F5F5F5] flex flex-col" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       <AdminTopBar title="AI Assistant" back="/admin" />
 
       <div className="flex-1 overflow-y-auto px-4 pt-4 pb-28 max-w-2xl mx-auto w-full space-y-3">
@@ -555,7 +555,7 @@ export default function AdminAIPage() {
       </div>
 
       {/* Sticky input */}
-      <div className="fixed bottom-0 left-0 right-0 bg-[#FFF8F0]/95 backdrop-blur-sm border-t border-stone-200 px-4 py-3">
+      <div className="fixed bottom-0 left-0 right-0 bg-[#F5F5F5]/95 backdrop-blur-sm border-t border-stone-200 px-4 py-3">
         <div className="max-w-2xl mx-auto flex gap-2 items-center">
           {/* History button */}
           <button

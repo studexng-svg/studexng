@@ -110,7 +110,7 @@ export default function CartPage() {
   // ── EMPTY STATE ──────────────────────────────────────────────────────────
   if (cart.length === 0) {
     return (
-      <div className="min-h-screen bg-[#FAFAF9] flex flex-col items-center justify-center px-6 pb-28" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+      <div className="min-h-screen bg-[#F5F5F5] flex flex-col items-center justify-center px-6 pb-28" style={{ fontFamily: "'DM Sans', sans-serif" }}>
         <div className="text-center animate-fadeUp">
           <div className="w-24 h-24 mx-auto mb-6 rounded-2xl flex items-center justify-center"
             style={{ background: GRAD }}>
