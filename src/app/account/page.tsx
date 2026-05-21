@@ -16,21 +16,16 @@ import { GRAD, GRAD_TEXT, SERIF } from "@/lib/tokens";
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 function VerifiedTick({ color, label }: { color: string; label: string }) {
-  // Rosette/seal shape: 12-point star polygon, same as TikTok/Instagram verified badge
   return (
-    <svg viewBox="0 0 24 24" className="w-5 h-5 flex-shrink-0" title={label} fill="none">
-      <path
-        d="M12 2l1.8 1.6 2.4-.5.8 2.3 2.2 1.1-.4 2.4 1.4 2-1.4 2 .4 2.4-2.2 1.1-.8 2.3-2.4-.5L12 22l-1.8-1.6-2.4.5-.8-2.3-2.2-1.1.4-2.4-1.4-2 1.4-2-.4-2.4 2.2-1.1.8-2.3 2.4.5z"
-        fill={color}
-      />
-      <path
-        d="M8.5 12.3l2.2 2.2 4.8-5"
-        stroke="white"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
+    <span
+      className="inline-flex items-center justify-center w-5 h-5 rounded-full flex-shrink-0"
+      style={{ background: color }}
+      title={label}
+    >
+      <svg viewBox="0 0 12 12" className="w-3 h-3" fill="none">
+        <path d="M2.5 6L4.5 8.5L9.5 3.5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </span>
   );
 }
 const POLL_INTERVAL = 30_000;
@@ -537,7 +532,7 @@ export default function AccountPage() {
                     style={{ fontFamily: "var(--font-jakarta), 'Plus Jakarta Sans', sans-serif" }}>
                     {currentUser?.username || "Campus User"}
                   </h2>
-                  {isAdmin && <VerifiedTick color="#7C3AED" label="StudEx Administrator" />}
+                  {isAdmin && <VerifiedTick color="#F59E0B" label="StudEx Administrator" />}
                   {!isAdmin && vendorApproved && <VerifiedTick color="#10b981" label="Verified Vendor" />}
                 </div>
                 <p className="text-sm text-stone-400 mt-0.5 truncate">{currentUser?.email}</p>
