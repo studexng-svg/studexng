@@ -283,6 +283,7 @@ export default function AccountPage() {
   const currentUser = useAuth.getState().user ?? user;
   const vendorApproved = isApprovedVendor(currentUser);
   const vendorPending = isPendingVendor(currentUser);
+  const isAdmin = currentUser?.email === "studex.ng@gmail.com";
   const initials = (currentUser?.username?.[0] || currentUser?.email?.[0] || "U").toUpperCase();
 
   const menuItems = MENU_ITEMS.map(item => ({
@@ -517,7 +518,14 @@ export default function AccountPage() {
                     style={{ fontFamily: "var(--font-jakarta), 'Plus Jakarta Sans', sans-serif" }}>
                     {currentUser?.username || "Campus User"}
                   </h2>
-                  {vendorApproved && (
+                  {isAdmin && (
+                    <BadgeCheck
+                      className="w-6 h-6 flex-shrink-0"
+                      style={{ color: "#7C3AED" }}
+                      title="StudEx Administrator"
+                    />
+                  )}
+                  {!isAdmin && vendorApproved && (
                     <BadgeCheck
                       className="w-6 h-6 flex-shrink-0"
                       style={{ color: "#10b981" }}
