@@ -352,11 +352,10 @@ export default function CheckoutPage() {
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
           className="bg-teal-50 border border-teal-200 rounded-2xl p-4">
           <div className="flex items-start gap-3">
-            <Sparkles className="w-4 h-4 text-teal-600 flex-shrink-0 mt-0.5" />
             <div>
               <p className="font-semibold text-teal-800 text-sm">Transparent Pricing</p>
               <p className="text-xs text-teal-600 mt-0.5 leading-relaxed">
-                Our <strong>8% service fee</strong> (min ₦50, max ₦3,500) covers both the StudEx platform and Paystack's payment processing cost — so there are <strong>no hidden charges</strong> on top of what you see here. The vendor receives their full listed price.
+                Our <strong>8% service fee</strong> (min ₦50, max ₦3,500) covers both the StudEx platform and Paystack's payment processing cost so there are <strong>no hidden charges</strong> on top of what you see here. The vendor receives their full listed price.
                 {discount?.hasDiscount && " Your 5% profile completion bonus has been applied."}
               </p>
             </div>
