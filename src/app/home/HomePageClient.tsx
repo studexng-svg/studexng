@@ -490,9 +490,6 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                     </>
                   ) : (
                     <>
-                      <div className="bg-white/20 border border-white/30 backdrop-blur-sm w-fit px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full mb-2 sm:mb-3">
-                        <span className="text-white text-[10px] sm:text-xs font-semibold">New Collection 2024</span>
-                      </div>
                       <h1 className="text-xl sm:text-3xl lg:text-5xl font-black text-white leading-[1.1] mb-1.5 sm:mb-3"
                         style={{ fontFamily: "var(--font-jakarta),'Plus Jakarta Sans',sans-serif" }}>
                         Shop Smart.<br className="sm:hidden" /> Live Campus.
@@ -570,7 +567,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
 
           {/* ── FEATURED SECTION ── */}
           <div className="mt-8" ref={featuredRef}>
-            <div className="flex items-center justify-between mb-5">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
               <div>
                 <h2 className="text-xl font-bold text-stone-900">
                   {activeTab === "listings"
@@ -581,7 +578,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                   {activeTab === "listings" ? "Selected by our team for you." : "Verified campus vendors."}
                 </p>
               </div>
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3">
                 {/* Tab switcher */}
                 <div className="flex bg-stone-100 rounded-full p-1">
                   {(["listings", "vendors"] as const).map(tab => (
@@ -678,26 +675,10 @@ export default function HomePageClient({ initialVendors, initialListings, initia
             )}
           </div>
 
-          {/* ── NEWSLETTER ── */}
-          <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
-            className="mt-10 bg-indigo-50 border border-indigo-100 rounded-2xl px-6 py-8 lg:px-10 flex flex-col lg:flex-row items-center gap-5 lg:gap-10">
-            <div className="flex-1 text-center lg:text-left">
-              <h3 className="text-xl font-black text-stone-900">Get 20% Off Your First Order</h3>
-              <p className="text-stone-500 text-sm mt-1">Join our community of over 10k students and stay updated on the latest drops and exclusive deals.</p>
-            </div>
-            <div className="flex gap-2 w-full lg:w-auto">
-              <input type="email" placeholder="Enter your email"
-                className="flex-1 lg:w-60 px-4 py-2.5 rounded-xl border border-indigo-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300/40 placeholder:text-stone-400" />
-              <button className="px-5 py-2.5 rounded-xl text-white font-semibold text-sm flex-shrink-0" style={{ background: GRAD }}>
-                Subscribe
-              </button>
-            </div>
-          </motion.div>
-
           {/* ── CTA BANNER ── */}
           <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
             className="mt-10 rounded-2xl overflow-hidden" style={{ background: HERO_GRAD }}>
-            <div className="px-6 lg:px-10 py-8 lg:py-10 flex flex-col lg:flex-row items-center justify-between gap-6">
+            <div className="px-6 lg:px-10 py-8 lg:py-10 flex flex-col sm:flex-row items-center justify-between gap-5">
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0">
                   <Tag className="w-6 h-6 text-white" />
@@ -708,14 +689,6 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                     {isLoggedIn ? "Discover hundreds of campus services." : "Join our marketplace and start selling to students on campus."}
                   </p>
                 </div>
-              </div>
-              <div className="flex items-center gap-8 lg:gap-12">
-                {[["500+", "Active Vendors"], ["10K+", "Listings"], ["2", "Campuses"]].map(([num, label]) => (
-                  <div key={label} className="text-center">
-                    <p className="text-white font-black text-2xl">{num}</p>
-                    <p className="text-white/60 text-xs mt-0.5">{label}</p>
-                  </div>
-                ))}
               </div>
               <Link href={isLoggedIn ? "/categories" : "/auth"} className="flex-shrink-0">
                 <motion.button whileTap={{ scale: 0.97 }}
