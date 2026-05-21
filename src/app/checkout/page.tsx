@@ -311,7 +311,7 @@ export default function CheckoutPage() {
               </div>
             )}
             <div className="flex justify-between items-center text-sm">
-              <span className="text-stone-500">StudEx service fee (2%)</span>
+              <span className="text-stone-500">StudEx service fee (5%)</span>
               <span className="text-stone-700 font-medium">₦{serviceFee.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
             <div className="flex justify-between items-center text-sm">
@@ -362,7 +362,7 @@ export default function CheckoutPage() {
             <div>
               <p className="font-semibold text-teal-800 text-sm">Transparent Pricing</p>
               <p className="text-xs text-teal-600 mt-0.5 leading-relaxed">
-                A <strong>2% StudEx fee</strong> (min ₦50, max ₦1,500) covers platform services. Paystack also charges a <strong>1.5% + ₦100</strong> processing fee. The vendor receives their full listed price.
+                A <strong>5% StudEx fee</strong> (min ₦50, max ₦1,500) covers platform services. Paystack also charges a <strong>1.5% + ₦100</strong> processing fee. The vendor receives their full listed price.
                 {discount?.hasDiscount && " Your 5% profile completion bonus has been applied."}
               </p>
             </div>
