@@ -184,9 +184,14 @@ export default function HomePageClient({ initialVendors, initialListings, initia
   };
 
   const filteredListings   = activeFilter === "All" ? allListings : allListings.filter(l => l.category === activeFilter);
-  const categorySections   = categories.map(cat => ({ ...cat, items: allListings.filter(l => l.category === cat.slug) })).filter(s => s.items.length > 0);
+  const FORTY_EIGHT_HOURS  = 48 * 60 * 60 * 1000;
+  const newArrivals        = allListings.filter(l => Date.now() - new Date(l.created_at).getTime() < FORTY_EIGHT_HOURS);
+  const newArrivalIds      = new Set(newArrivals.map(l => l.id));
+  const olderListings      = allListings.filter(l => !newArrivalIds.has(l.id));
+
+  const categorySections   = categories.map(cat => ({ ...cat, items: olderListings.filter(l => l.category === cat.slug) })).filter(s => s.items.length > 0);
   const categorisedSlugs   = new Set(categories.map(c => c.slug));
-  const uncategorised      = allListings.filter(l => !categorisedSlugs.has(l.category));
+  const uncategorised      = olderListings.filter(l => !categorisedSlugs.has(l.category));
   const allSections        = uncategorised.length > 0 ? [...categorySections, { id: 0, title: "Other", slug: "__other__", image: null, items: uncategorised }] : categorySections;
 
   const renderListingCard = (listing: any, i: number) => {
@@ -640,6 +645,20 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                     </div>
                   ) : (
                     <div className="space-y-10">
+                      {/* New Arrivals — listings posted within 48 hours */}
+                      {newArrivals.length > 0 && (
+                        <div>
+                          <div className="flex items-center justify-between mb-4">
+                            <div>
+                              <p className="text-teal-600 text-xs tracking-widest uppercase font-bold">{newArrivals.length} new</p>
+                              <h3 className="text-lg font-bold text-stone-900 mt-0.5">New Arrivals</h3>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                            {newArrivals.map((l, i) => renderListingCard(l, i))}
+                          </div>
+                        </div>
+                      )}
                       {allSections.map(section => (
                         <div key={section.slug}>
                           <div className="flex items-center justify-between mb-4">
