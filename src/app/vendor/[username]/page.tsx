@@ -11,6 +11,20 @@ import { useAdminMode } from "@/hooks/useAdminMode";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
+function VerifiedTick() {
+  return (
+    <span
+      className="inline-flex items-center justify-center w-4 h-4 rounded-full flex-shrink-0"
+      style={{ background: "#10b981" }}
+      title="Verified Vendor"
+    >
+      <svg viewBox="0 0 12 12" className="w-2.5 h-2.5" fill="none">
+        <path d="M2.5 6L4.5 8.5L9.5 3.5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </span>
+  );
+}
+
 function SafeImage({ src, alt, className }: { src: string | null | undefined; alt: string; className?: string }) {
   const [error, setError] = useState(false);
   if (!src || error || !src.startsWith("http")) {
@@ -187,7 +201,10 @@ export default function VendorProfilePage() {
               )}
             </div>
             <div>
-              <p className="font-bold text-stone-900">{vendor.business_name || vendor.username}</p>
+              <div className="flex items-center gap-1">
+                <p className="font-bold text-stone-900">{vendor.business_name || vendor.username}</p>
+                <VerifiedTick />
+              </div>
               <p className="text-xs text-stone-400">@{vendor.username}</p>
               {vendor.vendor_badge && vendor.vendor_badge !== "none" && (
                 <span className={`inline-flex items-center gap-0.5 mt-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${
