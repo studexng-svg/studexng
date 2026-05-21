@@ -426,11 +426,11 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                     </div>
                     <span className="text-[10px] font-medium">Cart</span>
                   </Link>
-                  <div className="flex items-center gap-1.5 text-sm text-stone-600 cursor-pointer">
+                  <Link href="/account/address" className="flex items-center gap-1.5 text-sm text-stone-600 hover:text-teal-600 transition cursor-pointer">
                     <User className="w-4 h-4 text-stone-400" />
                     <span>Hi, <span className="font-semibold text-stone-900">{(user as any).username}</span></span>
                     <ChevronDown className="w-3.5 h-3.5 text-stone-400" />
-                  </div>
+                  </Link>
                 </>
               ) : (
                 <>
@@ -462,7 +462,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
             <div className="absolute bottom-0 left-[20%] w-56 h-56 rounded-full pointer-events-none"
               style={{ background: "radial-gradient(circle,rgba(103,232,249,0.25) 0%,transparent 70%)" }} />
 
-            <div className="relative z-10 px-4 py-5 sm:px-8 sm:py-10 lg:px-10 lg:py-12">
+            <div className="relative z-10 px-4 py-10 sm:px-8 sm:py-10 lg:px-10 lg:py-12">
               {/* Always side-by-side — scaled down on mobile */}
               <div className="flex items-center gap-3 sm:gap-6">
 
