@@ -4,7 +4,7 @@ import {
   Package, Heart, Settings, HelpCircle, LogOut, ChevronRight,
   Store, Clock, ArrowRight, Banknote, LayoutDashboard,
   Calendar, Gift, Bell, X, CheckCheck, ExternalLink, Camera,
-  Trash2, ZoomIn, Move, MessageCircle, ArrowUpRight, BadgeCheck
+  Trash2, ZoomIn, Move, MessageCircle, ArrowUpRight
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -14,6 +14,20 @@ import { useAuth, fetchWithAuth } from "@/lib/authStore";
 import { GRAD, GRAD_TEXT, SERIF } from "@/lib/tokens";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+
+function VerifiedTick({ color, label }: { color: string; label: string }) {
+  return (
+    <span
+      className="inline-flex items-center justify-center w-5 h-5 rounded-full flex-shrink-0"
+      style={{ background: color }}
+      title={label}
+    >
+      <svg viewBox="0 0 12 12" className="w-3 h-3" fill="none">
+        <path d="M2.5 6L4.5 8.5L9.5 3.5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </span>
+  );
+}
 const POLL_INTERVAL = 30_000;
 
 const isApprovedVendor = (u: any) => !!u?.is_verified_vendor;
@@ -514,24 +528,12 @@ export default function AccountPage() {
               </div>
               <div className="flex-1 min-w-0 text-center sm:text-left">
                 <div className="flex items-center gap-1.5 justify-center sm:justify-start">
-                  <h2 className="text-2xl font-black italic tracking-tight uppercase text-stone-900 truncate"
+                  <h2 className="text-2xl font-black italic tracking-tight uppercase text-stone-900 pr-1"
                     style={{ fontFamily: "var(--font-jakarta), 'Plus Jakarta Sans', sans-serif" }}>
                     {currentUser?.username || "Campus User"}
                   </h2>
-                  {isAdmin && (
-                    <BadgeCheck
-                      className="w-6 h-6 flex-shrink-0"
-                      style={{ color: "#7C3AED" }}
-                      title="StudEx Administrator"
-                    />
-                  )}
-                  {!isAdmin && vendorApproved && (
-                    <BadgeCheck
-                      className="w-6 h-6 flex-shrink-0"
-                      style={{ color: "#10b981" }}
-                      title="Verified Vendor"
-                    />
-                  )}
+                  {isAdmin && <VerifiedTick color="#7C3AED" label="StudEx Administrator" />}
+                  {!isAdmin && vendorApproved && <VerifiedTick color="#10b981" label="Verified Vendor" />}
                 </div>
                 <p className="text-sm text-stone-400 mt-0.5 truncate">{currentUser?.email}</p>
                 <div className="mt-2 flex flex-wrap gap-2 justify-center sm:justify-start">
