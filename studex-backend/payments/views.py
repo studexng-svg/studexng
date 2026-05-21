@@ -30,9 +30,9 @@ PAYSTACK_BASE = "https://api.paystack.co"
 # ─────────────────────────────────────────
 
 def calc_service_fee(base: Decimal) -> Decimal:
-    """StudEx fee: 8% of base amount, minimum ₦50, maximum ₦3,000."""
+    """StudEx fee: 8% of base amount, minimum ₦50, maximum ₦3,500."""
     fee = (base * Decimal("0.08")).quantize(Decimal("0.01"))
-    return max(Decimal("50"), min(fee, Decimal("3000")))
+    return max(Decimal("50"), min(fee, Decimal("3500")))
 
 
 def _split_amounts(total_amount: Decimal):
@@ -44,14 +44,14 @@ def _split_amounts(total_amount: Decimal):
     base1 = total_amount - Decimal("50")
     if Decimal("0") < base1 < Decimal("625"):
         return base1, Decimal("50")
-    # Region 2: ₦625 ≤ base ≤ ₦37,500 → fee was 8%
+    # Region 2: ₦625 ≤ base ≤ ₦43,750 → fee was 8%
     base2 = (total_amount / Decimal("1.08")).quantize(Decimal("0.01"))
-    if Decimal("625") <= base2 <= Decimal("37500"):
+    if Decimal("625") <= base2 <= Decimal("43750"):
         return base2, calc_service_fee(base2)
-    # Region 3: base > ₦37,500 → fee was ₦3,000 (the cap)
-    base3 = total_amount - Decimal("3000")
+    # Region 3: base > ₦43,750 → fee was ₦3,500 (the cap)
+    base3 = total_amount - Decimal("3500")
     if base3 > Decimal("0"):
-        return base3, Decimal("3000")
+        return base3, Decimal("3500")
     return Decimal("0"), total_amount
 
 
@@ -652,7 +652,7 @@ def seller_earnings(request):
     return Response({
         "total_earned": float(total_earned),
         "total_orders": total_orders,
-        "service_fee_description": "8% (min ₦50, max ₦3,000)",
+        "service_fee_description": "8% (min ₦50, max ₦3,500)",
     })
 
 

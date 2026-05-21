@@ -356,7 +356,7 @@ export default function CheckoutPage() {
             <div>
               <p className="font-semibold text-teal-800 text-sm">Transparent Pricing</p>
               <p className="text-xs text-teal-600 mt-0.5 leading-relaxed">
-                Our <strong>8% service fee</strong> (min ₦50, max ₦3,000) covers both the StudEx platform and Paystack's payment processing cost — so there are <strong>no hidden charges</strong> on top of what you see here. The vendor receives their full listed price.
+                Our <strong>8% service fee</strong> (min ₦50, max ₦3,500) covers both the StudEx platform and Paystack's payment processing cost — so there are <strong>no hidden charges</strong> on top of what you see here. The vendor receives their full listed price.
                 {discount?.hasDiscount && " Your 5% profile completion bonus has been applied."}
               </p>
             </div>
