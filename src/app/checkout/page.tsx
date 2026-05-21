@@ -12,7 +12,7 @@ import { useBookingStore } from "@/lib/bookingStore";
 import { useRouter } from "next/navigation";
 import { useAuth, fetchWithAuth } from "@/lib/authStore";
 import Script from "next/script";
-import { GRAD, GRAD_TEXT, SERIF, calcServiceFee } from "@/lib/tokens";
+import { GRAD, GRAD_TEXT, SERIF, calcServiceFee, calcPaystackFee } from "@/lib/tokens";
 import TopNav from "@/components/layout/TopNav";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
@@ -47,7 +47,9 @@ export default function CheckoutPage() {
 
   const discountedBase = discount ? discount.finalBase : baseTotal;
   const serviceFee = calcServiceFee(discountedBase);
-  const finalTotal = discountedBase + serviceFee;
+  const checkoutAmount = discountedBase + serviceFee;
+  const paystackFee = calcPaystackFee(checkoutAmount);
+  const finalTotal = checkoutAmount + paystackFee;
 
   useEffect(() => {
     if (!isLoggedIn || !isHydrated || baseTotal <= 0) return;
@@ -157,7 +159,7 @@ export default function CheckoutPage() {
         key: paystackKey,
         access_code,
         email: user?.email || "user@studex.ng",
-        amount: amount_kobo ?? Math.round(finalTotal * 100),
+        amount: amount_kobo ?? Math.round(checkoutAmount * 100),
         currency: "NGN",
         ref: reference,
         callback: function(response: any) {
@@ -309,11 +311,15 @@ export default function CheckoutPage() {
               </div>
             )}
             <div className="flex justify-between items-center text-sm">
-              <span className="text-stone-500">Service fee</span>
-              <span className="text-stone-700 font-medium">₦{serviceFee.toLocaleString()}</span>
+              <span className="text-stone-500">StudEx service fee (2%)</span>
+              <span className="text-stone-700 font-medium">₦{serviceFee.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            </div>
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-stone-500">Paystack processing fee</span>
+              <span className="text-stone-700 font-medium">₦{paystackFee.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
             <div className="border-t border-stone-100 pt-3 flex justify-between items-center">
-              <span className="font-bold text-stone-900" style={SERIF}>Total</span>
+              <span className="font-bold text-stone-900" style={SERIF}>Total charged</span>
               <span className="text-2xl font-bold" style={GRAD_TEXT}>
                 ₦{finalTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
@@ -356,10 +362,8 @@ export default function CheckoutPage() {
             <div>
               <p className="font-semibold text-teal-800 text-sm">Transparent Pricing</p>
               <p className="text-xs text-teal-600 mt-0.5 leading-relaxed">
-                A <strong>2% service fee</strong> (min ₦50, max ₦1,500) is included in your total.
-                The vendor receives their full listed price.
-                {discount?.hasDiscount && " Your 5% profile completion bonus has been applied and will be used on this order."}
-                {" "}Refunds are processed back to your original payment method.
+                A <strong>2% StudEx fee</strong> (min ₦50, max ₦1,500) covers platform services. Paystack also charges a <strong>1.5% + ₦100</strong> processing fee. The vendor receives their full listed price.
+                {discount?.hasDiscount && " Your 5% profile completion bonus has been applied."}
               </p>
             </div>
           </div>
@@ -392,12 +396,19 @@ export default function CheckoutPage() {
           </form>
         </motion.div>
 
-        <p className="text-center text-xs text-stone-400 pb-4">
-          By completing this purchase you agree to StudEx{" "}
-          <Link href="/terms" className="text-teal-600 hover:underline font-medium">
-            Terms & Conditions
-          </Link>
-        </p>
+        <div className="flex flex-col items-center gap-3 pb-4">
+          <button
+            onClick={() => router.back()}
+            className="flex items-center gap-2 text-sm text-stone-500 hover:text-stone-700 transition font-medium">
+            ← Cancel and go back
+          </button>
+          <p className="text-center text-xs text-stone-400">
+            By completing this purchase you agree to StudEx{" "}
+            <Link href="/terms" className="text-teal-600 hover:underline font-medium">
+              Terms & Conditions
+            </Link>
+          </p>
+        </div>
 
       </div>
 

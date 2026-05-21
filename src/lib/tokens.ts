@@ -28,5 +28,16 @@ export function calcServiceFee(amount: number): number {
   return Math.min(Math.max(amount * 0.02, 50), 1500);
 }
 
+/**
+ * Paystack processing fee passed to customer:
+ * 1.5% of checkout amount + ₦100 flat (for amounts ≥ ₦2,500).
+ * This is what Paystack adds on top of our checkout amount before charging the card.
+ */
+export function calcPaystackFee(checkoutAmount: number): number {
+  const flat = checkoutAmount >= 2500 ? 100 : 0;
+  const gross = (checkoutAmount + flat) / (1 - 0.015);
+  return Math.round((gross - checkoutAmount) * 100) / 100;
+}
+
 export const ACCENT = "#f97316"; // orange-500
 export const ACCENT_DARK = "#ea580c"; // orange-600

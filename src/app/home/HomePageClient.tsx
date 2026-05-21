@@ -184,8 +184,8 @@ export default function HomePageClient({ initialVendors, initialListings, initia
   };
 
   const filteredListings   = activeFilter === "All" ? allListings : allListings.filter(l => l.category === activeFilter);
-  const FORTY_EIGHT_HOURS  = 48 * 60 * 60 * 1000;
-  const newArrivals        = allListings.filter(l => Date.now() - new Date(l.created_at).getTime() < FORTY_EIGHT_HOURS);
+  const TWENTY_FOUR_HOURS  = 24 * 60 * 60 * 1000;
+  const newArrivals        = allListings.filter(l => Date.now() - new Date(l.created_at).getTime() < TWENTY_FOUR_HOURS);
   const newArrivalIds      = new Set(newArrivals.map(l => l.id));
   const olderListings      = allListings.filter(l => !newArrivalIds.has(l.id));
 
