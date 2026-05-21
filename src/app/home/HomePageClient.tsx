@@ -83,10 +83,8 @@ function getCategoryIcon(slug: string): LucideIcon {
 }
 
 const TRUST_ITEMS = [
-  { icon: ShieldCheck, title: "Trusted Vendors",  desc: "Verified sellers you can trust" },
-  { icon: Tag,         title: "Best Prices",      desc: "Competitive prices every day" },
-  { icon: Zap,         title: "Fast Service",     desc: "Get it done on campus quickly" },
-  { icon: Headphones,  title: "24/7 Support",     desc: "We're here to help you anytime" },
+  { icon: ShieldCheck, title: "Trusted Vendors", desc: "Verified sellers you can trust" },
+  { icon: Zap,         title: "Fast Service",    desc: "Get it done on campus quickly" },
 ];
 
 const HERO_GRAD = "linear-gradient(135deg,#6D28D9 0%,#4F46E5 45%,#06B6D4 100%)";
@@ -572,7 +570,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
 
           {/* ── TRUST BAR ── */}
           <div className="mt-4 bg-white border border-stone-200 rounded-2xl overflow-hidden shadow-sm">
-            <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-y lg:divide-y-0 divide-stone-100">
+            <div className="grid grid-cols-2 divide-x divide-stone-100">
               {TRUST_ITEMS.map(({ icon: Icon, title, desc }) => (
                 <div key={title} className="flex items-center gap-3 px-5 py-4">
                   <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 bg-teal-50 border border-teal-100">
