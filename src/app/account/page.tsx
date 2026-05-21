@@ -17,22 +17,15 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 function VerifiedTick({ color, label }: { color: string; label: string }) {
   return (
-    <svg viewBox="0 0 24 24" className="w-5 h-5 flex-shrink-0" title={label}>
-      {/* Filled wavy badge shape */}
-      <path
-        d="M12 2l2.4 2.1 3.1-.6 1.1 3 2.8 1.5-.6 3.1 1.7 2.8-1.7 2.8.6 3.1-2.8 1.5-1.1 3-3.1-.6L12 22l-2.4-2.1-3.1.6-1.1-3-2.8-1.5.6-3.1L1.5 10l1.7-2.8-.6-3.1 2.8-1.5 1.1-3 3.1.6z"
-        fill={color}
-      />
-      {/* White checkmark */}
-      <path
-        d="M8.5 12l2.5 2.5 4.5-5"
-        stroke="white"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        fill="none"
-      />
-    </svg>
+    <span
+      className="inline-flex items-center justify-center w-5 h-5 rounded-full flex-shrink-0"
+      style={{ background: color }}
+      title={label}
+    >
+      <svg viewBox="0 0 12 12" className="w-3 h-3" fill="none">
+        <path d="M2.5 6L4.5 8.5L9.5 3.5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </span>
   );
 }
 const POLL_INTERVAL = 30_000;
