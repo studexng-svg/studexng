@@ -29,7 +29,7 @@ export default function TopNav({ showBack = false, backHref, activeNav }: TopNav
 
         {showBack && (
           <button onClick={handleBack}
-            className="lg:hidden p-2 rounded-xl border border-stone-200 hover:bg-stone-50 transition flex-shrink-0">
+            className="p-2 rounded-xl border border-stone-200 hover:bg-stone-50 transition flex-shrink-0">
             <ChevronLeft className="w-5 h-5 text-stone-600" />
           </button>
         )}
