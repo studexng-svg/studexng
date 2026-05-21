@@ -230,7 +230,7 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
 
   // ── NOT FOUND ──────────────────────────────────────────────────────────────
   if (!listing) return (
-    <div className="min-h-screen bg-[#FAFAF9] flex items-center justify-center p-6"
+    <div className="min-h-screen bg-[#F5F5F5] flex items-center justify-center p-6"
       style={{ fontFamily: "'DM Sans', sans-serif" }}>
       <div className="text-center">
         <div className="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center bg-red-50">
