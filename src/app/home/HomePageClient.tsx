@@ -359,11 +359,11 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                 className="text-sm font-semibold text-teal-600 border-b-2 border-teal-500 pb-0.5">
                 New Arrivals
               </button>
-              <button onClick={() => setActiveTab("listings")}
+              <button onClick={() => { setActiveTab("listings"); setActiveFilter("All"); setTimeout(() => featuredRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); }}
                 className="text-sm font-medium text-stone-500 hover:text-stone-700 transition">
                 Services
               </button>
-              <button onClick={() => setActiveTab("vendors")}
+              <button onClick={() => { setActiveTab("vendors"); setTimeout(() => featuredRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); }}
                 className="text-sm font-medium text-stone-500 hover:text-stone-700 transition">
                 Vendors
               </button>
