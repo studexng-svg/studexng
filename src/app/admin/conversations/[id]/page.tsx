@@ -38,7 +38,7 @@ export default function AdminConversationDetail() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#FFF8F0] flex items-center justify-center">
+      <div className="min-h-screen bg-[#F5F5F5] flex items-center justify-center">
         <div className="w-8 h-8 border-4 border-stone-200 border-t-teal-500 rounded-full animate-spin" />
       </div>
     );
@@ -46,7 +46,7 @@ export default function AdminConversationDetail() {
 
   if (!data) {
     return (
-      <div className="min-h-screen bg-[#FFF8F0] flex flex-col items-center justify-center gap-4 px-6">
+      <div className="min-h-screen bg-[#F5F5F5] flex flex-col items-center justify-center gap-4 px-6">
         <AlertTriangle className="w-12 h-12 text-stone-300" />
         <p className="text-stone-500 font-medium">Conversation not found</p>
         <button onClick={() => router.push("/admin/conversations")}
@@ -61,7 +61,7 @@ export default function AdminConversationDetail() {
   const participants = new Set([data.buyer, data.seller]);
 
   return (
-    <div className="min-h-screen bg-[#FFF8F0] flex flex-col" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+    <div className="min-h-screen bg-[#F5F5F5] flex flex-col" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       <AdminTopBar title="Conversation" back="/admin/conversations" />
 
       {/* Header */}

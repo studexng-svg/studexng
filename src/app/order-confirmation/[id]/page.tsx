@@ -12,12 +12,12 @@ import {
   Home,
   MessageCircle,
   Star,
-  ChevronLeft,
   Shield,
 } from "lucide-react";
 
 import { fetchWithAuth } from "@/lib/authStore";
 import { GRAD, SERIF } from "@/lib/tokens";
+import TopNav from "@/components/layout/TopNav";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -90,7 +90,7 @@ export default function OrderConfirmationPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#FAFAF9] flex items-center justify-center">
+      <div className="min-h-screen bg-[#F5F5F5] flex items-center justify-center">
         <div className="w-10 h-10 border-2 border-teal-600 border-t-transparent rounded-full animate-spin" />
       </div>
     );
@@ -98,7 +98,7 @@ export default function OrderConfirmationPage() {
 
   if (error || !order) {
     return (
-      <div className="min-h-screen bg-[#FAFAF9] flex flex-col items-center justify-center px-6 text-center"
+      <div className="min-h-screen bg-[#F5F5F5] flex flex-col items-center justify-center px-6 text-center"
         style={{ fontFamily: "'DM Sans', sans-serif" }}>
         <div className="w-16 h-16 bg-stone-100 rounded-full flex items-center justify-center mb-4">
           <Package className="w-8 h-8 text-stone-400" />
@@ -122,23 +122,8 @@ export default function OrderConfirmationPage() {
   const vendorName = order.listing.vendor.business_name || order.listing.vendor.username;
 
   return (
-    <div className="min-h-screen bg-[#FAFAF9]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-
-      {/* STICKY HEADER */}
-      <div className="sticky top-0 bg-white/80 backdrop-blur-md z-40 border-b border-stone-100 shadow-sm">
-        <div className="flex items-center justify-between px-4 py-3 max-w-2xl mx-auto">
-          <button
-            onClick={() => router.push("/home")}
-            className="p-2.5 bg-white border border-stone-200 rounded-full shadow-sm active:scale-95 transition-all"
-          >
-            <ChevronLeft className="w-5 h-5 text-stone-600" />
-          </button>
-          <h1 className="text-base font-bold text-stone-900"
-            style={SERIF}>
-            Order Confirmed
-          </h1>
-          <div className="w-10" />
-        </div>
+    <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+      <TopNav showBack backHref="/home" />
       </div>
 
       <div className="px-4 pt-6 pb-56 md:pb-16 max-w-2xl mx-auto space-y-5">

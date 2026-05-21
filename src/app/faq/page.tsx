@@ -4,7 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { GRAD, SERIF } from "@/lib/tokens";
-import { ChevronLeft, ChevronDown, ChevronUp, HelpCircle, MessageCircle, Shield, CreditCard, Star, Package, Calendar } from "lucide-react";
+import { ChevronDown, ChevronUp, HelpCircle, MessageCircle, Shield, CreditCard, Star, Package, Calendar } from "lucide-react";
+import TopNav from "@/components/layout/TopNav";
 
 const faqs = [
   {
@@ -124,21 +125,8 @@ export default function FAQPage() {
   const toggle = (key: string) => setOpenItem(prev => prev === key ? null : key);
 
   return (
-    <div className="min-h-screen bg-[#FAFAF9]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-      {/* STICKY HEADER */}
-      <div className="sticky top-0 bg-white/80 backdrop-blur-md z-40 border-b border-stone-100 shadow-sm">
-        <div className="flex items-center justify-between px-4 py-3 max-w-2xl mx-auto">
-          <button
-            onClick={() => router.back()}
-            className="p-2.5 bg-white border border-stone-200 hover:border-stone-300 rounded-full shadow-sm transition-all active:scale-95">
-            <ChevronLeft className="w-5 h-5 text-stone-600" />
-          </button>
-          <h1 className="text-base font-bold text-stone-900" style={SERIF}>
-            Help & FAQ
-          </h1>
-          <div className="w-10" />
-        </div>
-      </div>
+    <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+      <TopNav showBack />
 
       <div className="pb-28 p-4 space-y-5 max-w-2xl mx-auto">
 

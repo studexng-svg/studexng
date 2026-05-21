@@ -274,7 +274,7 @@ export default function AccountPage() {
 
   if (!isHydrated || loading) {
     return (
-      <div className="min-h-screen bg-[#FAFAF9] flex items-center justify-center">
+      <div className="min-h-screen bg-[#F5F5F5] flex items-center justify-center">
         <div className="w-10 h-10 border-4 border-stone-200 border-t-teal-500 rounded-full animate-spin" />
       </div>
     );
@@ -399,21 +399,26 @@ export default function AccountPage() {
         )}
       </AnimatePresence>
 
-      <div className="min-h-screen bg-[#FAFAF9]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+      <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
 
         {/* ── STICKY HEADER ── */}
-        <div className="sticky top-0 bg-white/80 backdrop-blur-md z-40 border-b border-stone-100 shadow-sm">
-          <div className="max-w-6xl mx-auto">
-            <div className="flex items-center justify-between px-4 py-3">
-              <Link href="/home" className="flex items-center gap-2">
-                <div className="w-9 h-9 rounded-full bg-white border border-stone-200 flex items-center justify-center p-1 shadow-sm overflow-hidden flex-shrink-0">
-                  <img src="/images/logo-1.jpg" alt="StudEx" className="w-full h-full object-contain" />
-                </div>
-                <span className="font-bold text-lg text-stone-900" style={SERIF}>Stud<span style={GRAD_TEXT}>Ex</span></span>
-              </Link>
-              <h1 className="text-base font-black italic tracking-tight uppercase text-stone-900"
-                style={{ fontFamily: "var(--font-jakarta), 'Plus Jakarta Sans', sans-serif" }}>My Account</h1>
-              <div className="relative">
+        <div className="sticky top-0 bg-white z-40 border-b border-stone-200 shadow-sm">
+          <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-4">
+            <Link href="/home" className="flex items-center gap-2 flex-shrink-0">
+              <div className="w-9 h-9 rounded-xl overflow-hidden border border-stone-100 shadow-sm flex items-center justify-center p-1 bg-white">
+                <img src="/images/logo-1.jpg" alt="StudEx" loading="lazy" className="w-full h-full object-contain" />
+              </div>
+              <span className="font-black text-lg text-stone-900 hidden sm:block" style={SERIF}>
+                Stud<span className="text-transparent bg-clip-text" style={{ backgroundImage: GRAD }}>Ex</span>
+              </span>
+            </Link>
+            <nav className="hidden lg:flex items-center gap-6 flex-shrink-0">
+              <Link href="/home" className="text-sm font-medium text-stone-500 hover:text-stone-700 transition">New Arrivals</Link>
+              <Link href="/categories" className="text-sm font-medium text-stone-500 hover:text-stone-700 transition">Services</Link>
+              <Link href="/home" className="text-sm font-medium text-stone-500 hover:text-stone-700 transition">Vendors</Link>
+            </nav>
+            <div className="flex-1" />
+            <div className="relative">
                 <button onClick={() => setShowNotifications(v => !v)}
                   className="relative w-9 h-9 bg-stone-100 hover:bg-stone-200 rounded-full flex items-center justify-center transition-colors">
                   <Bell className="w-4 h-4 text-stone-600" />
@@ -471,7 +476,6 @@ export default function AccountPage() {
                     </motion.div>
                   )}
                 </AnimatePresence>
-              </div>
             </div>
           </div>
         </div>

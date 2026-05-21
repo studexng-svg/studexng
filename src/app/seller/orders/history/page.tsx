@@ -1,7 +1,8 @@
 // src/app/seller/orders/history/page.tsx
 "use client";
 
-import { ChevronLeft, TrendingUp, DollarSign, Calendar, User, Package, Download } from "lucide-react";
+import { TrendingUp, DollarSign, Calendar, User, Package, Download } from "lucide-react";
+import TopNav from "@/components/layout/TopNav";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -133,7 +134,7 @@ export default function SellerOrderHistoryPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#FAFAF9]">
+      <div className="min-h-screen flex items-center justify-center bg-[#F5F5F5]">
         <div className="animate-spin">
           <Package className="w-10 h-10 text-teal-600" />
         </div>
@@ -142,19 +143,8 @@ export default function SellerOrderHistoryPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#FAFAF9]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-      {/* HEADER */}
-      <div className="sticky top-0 bg-white/80 backdrop-blur-md z-40 border-b border-stone-100 shadow-sm">
-        <div className="flex items-center justify-between px-4 py-3 max-w-2xl mx-auto">
-          <button onClick={() => router.back()} className="p-2.5 bg-white border border-stone-200 rounded-full shadow-sm active:scale-95 transition-all">
-            <ChevronLeft className="w-5 h-5 text-stone-600" />
-          </button>
-          <h1 className="text-base font-bold text-stone-900" style={SERIF}>
-            Order History
-          </h1>
-          <div className="w-10" />
-        </div>
-      </div>
+    <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+      <TopNav showBack backHref="/seller/orders" />
 
       <div className="px-4 pt-6 pb-32 space-y-5 max-w-2xl mx-auto">
         {/* REVENUE SUMMARY */}

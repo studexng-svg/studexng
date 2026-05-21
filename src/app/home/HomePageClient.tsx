@@ -1,7 +1,15 @@
 "use client";
 
-import { useEffect, useState, Suspense, useRef } from "react";
-import { Search, ArrowRight, Heart, X, Sparkles, Star, Shield, ChevronRight, Clock, Plus, Trophy } from "lucide-react";
+import { useEffect, useState, useRef } from "react";
+import {
+  Search, ArrowRight, Heart, X, Sparkles, Star,
+  ChevronRight, ChevronDown, Clock, Plus, Trophy, ShoppingCart, User,
+  ShieldCheck, Tag, Zap, Headphones,
+  Shirt, Monitor, Home, BookOpen, Car,
+  UtensilsCrossed, Smartphone, Scissors, WashingMachine,
+  Flower2, Dumbbell, Package, Palette, Music, Camera,
+  type LucideIcon,
+} from "lucide-react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth, fetchWithAuth } from "@/lib/authStore";
@@ -33,11 +41,7 @@ interface Category {
   image: string | null;
 }
 
-function SafeImage({ src, alt, className }: {
-  src: string | null | undefined;
-  alt: string;
-  className?: string;
-}) {
+function SafeImage({ src, alt, className }: { src: string | null | undefined; alt: string; className?: string }) {
   const [error, setError] = useState(false);
   if (!src || error || !src.startsWith("http")) {
     return (
@@ -46,72 +50,46 @@ function SafeImage({ src, alt, className }: {
       </div>
     );
   }
-  return (
-    <img
-      src={src}
-      alt={alt}
-      loading="lazy"
-      decoding="async"
-      className={`w-full h-full object-cover ${className || ""}`}
-      onError={() => setError(true)}
-    />
-  );
+  return <img src={src} alt={alt} loading="lazy" decoding="async" className={`w-full h-full object-cover ${className || ""}`} onError={() => setError(true)} />;
 }
 
-function VendorAvatar({ src, name }: { src: string | null; name: string }) {
-  const [error, setError] = useState(false);
-  const initials = (name || "??").slice(0, 2).toUpperCase();
-  const resolvedSrc = src
-    ? src.startsWith("http")
-      ? src
-      : `${API_URL}${src}`
-    : null;
-  if (!resolvedSrc || error) {
-    return (
-      <div className="w-16 h-16 rounded-full flex items-center justify-center text-white font-bold text-lg flex-shrink-0"
-        style={{ background: GRAD }}>
-        {initials}
-      </div>
-    );
-  }
-  return (
-    <div className="w-16 h-16 rounded-full overflow-hidden flex-shrink-0">
-      <img src={resolvedSrc} alt={name} className="w-full h-full object-cover block" onError={() => setError(true)} />
-    </div>
-  );
-}
-
-const BADGE_LABELS: Record<string, string> = {
-  top: "⭐ Top Vendor",
-  trusted: "✓ Trusted",
-  rising: "↑ Rising",
-};
-
+const BADGE_LABELS: Record<string, string> = { top: "Top Vendor", trusted: "Trusted", rising: "Rising" };
 const BADGE_STYLES: Record<string, string> = {
   top: "bg-amber-50 text-amber-700 border border-amber-200",
   trusted: "bg-teal-50 text-teal-700 border border-teal-200",
   rising: "bg-purple-50 text-purple-700 border border-purple-200",
 };
 
-function ListingSkeletons() {
-  return (
-    <div className="grid grid-cols-2 gap-3 lg:gap-4">
-      {[0, 1, 2, 3].map(i => (
-        <div key={i} className="bg-white rounded-2xl border border-stone-100 overflow-hidden animate-pulse">
-          <div className="w-full h-40 sm:h-44 lg:h-48 bg-stone-100" />
-          <div className="px-2.5 pt-2 pb-3 sm:px-4 sm:pt-3 sm:pb-4 space-y-2">
-            <div className="h-3 bg-stone-100 rounded-full w-3/4" />
-            <div className="h-2.5 bg-stone-100 rounded-full w-1/2" />
-            <div className="flex justify-between items-center mt-1.5">
-              <div className="h-5 sm:h-7 bg-stone-100 rounded-full w-14 sm:w-20" />
-              <div className="h-7 sm:h-9 bg-stone-100 rounded-full w-16 sm:w-24" />
-            </div>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
+const CATEGORY_ICONS: Record<string, LucideIcon> = {
+  fashion: Shirt, "fashion-clothing": Shirt,
+  food: UtensilsCrossed, "food-snacks": UtensilsCrossed,
+  gadgets: Smartphone, "gadgets-accessories": Smartphone,
+  electronics: Monitor, digital: Monitor, "digital-products": Monitor,
+  editing: Scissors, hair: Scissors, "hair-beauty": Scissors,
+  laundry: WashingMachine,
+  perfumes: Flower2, "perfumes-cosmetics": Flower2, cosmetics: Flower2,
+  sports: Dumbbell,
+  books: BookOpen,
+  music: Music, art: Palette, photography: Camera,
+  transport: Car, home: Home,
+};
+
+function getCategoryIcon(slug: string): LucideIcon {
+  const key = slug.toLowerCase();
+  for (const [k, icon] of Object.entries(CATEGORY_ICONS)) {
+    if (key.includes(k)) return icon;
+  }
+  return Package;
 }
+
+const TRUST_ITEMS = [
+  { icon: ShieldCheck, title: "Trusted Vendors",  desc: "Verified sellers you can trust" },
+  { icon: Tag,         title: "Best Prices",      desc: "Competitive prices every day" },
+  { icon: Zap,         title: "Fast Service",     desc: "Get it done on campus quickly" },
+  { icon: Headphones,  title: "24/7 Support",     desc: "We're here to help you anytime" },
+];
+
+const HERO_GRAD = "linear-gradient(135deg,#6D28D9 0%,#4F46E5 45%,#06B6D4 100%)";
 
 interface Props {
   initialVendors: Vendor[];
@@ -125,184 +103,112 @@ export default function HomePageClient({ initialVendors, initialListings, initia
   const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlistStore();
   const { addToCart, cart } = useCart();
 
-  const [mounted, setMounted] = useState(false);
-  const [campusReady, setCampusReady] = useState(false);
-  const [toast, setToast] = useState("");
+  const [mounted, setMounted]           = useState(false);
+  const [campusReady, setCampusReady]   = useState(false);
+  const [toast, setToast]               = useState("");
+  const [activeTab, setActiveTab]       = useState<"listings" | "vendors">("listings");
 
-  const [vendors, setVendors] = useState<Vendor[]>(initialVendors);
-  const [allListings, setAllListings] = useState<any[]>(initialListings);
-  const [categories, setCategories] = useState<Category[]>(initialCategories);
+  const [vendors, setVendors]           = useState<Vendor[]>(initialVendors);
+  const [allListings, setAllListings]   = useState<any[]>(initialListings);
+  const [categories, setCategories]     = useState<Category[]>(initialCategories);
   const [activeFilter, setActiveFilter] = useState("All");
-  const [currentCampus, setCurrentCampus] = useState<'pau' | 'futo'>('pau');
+  const [currentCampus, setCurrentCampus] = useState<"pau" | "futo">("pau");
 
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery]     = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [searching, setSearching] = useState(false);
-  const [showResults, setShowResults] = useState(false);
-  const [showAllVendors, setShowAllVendors] = useState(false);
+  const [searching, setSearching]         = useState(false);
+  const [showResults, setShowResults]     = useState(false);
 
-  const VENDOR_PREVIEW_COUNT = 6;
+  const featuredRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setMounted(true);
-    const c = document.cookie.split(';').find(s => s.trim().startsWith('studex_campus='))?.split('=')?.[1]?.toLowerCase();
-    if (c === 'pau' || c === 'futo') setCurrentCampus(c);
+    const c = document.cookie.split(";").find(s => s.trim().startsWith("studex_campus="))?.split("=")?.[1]?.toLowerCase();
+    if (c === "pau" || c === "futo") setCurrentCampus(c);
   }, []);
 
-  const switchCampus = async (campus: 'pau' | 'futo') => {
+  const switchCampus = async (campus: "pau" | "futo") => {
     if (campus === currentCampus) return;
-    const isHttps = window.location.protocol === 'https:';
-    document.cookie = `studex_campus=${campus}; path=/; max-age=31536000; SameSite=Lax${isHttps ? '; Secure' : ''}`;
-    setCurrentCampus(campus);
-    setCampusReady(false);
-    setActiveFilter('All');
+    const isHttps = window.location.protocol === "https:";
+    document.cookie = `studex_campus=${campus}; path=/; max-age=31536000; SameSite=Lax${isHttps ? "; Secure" : ""}`;
+    setCurrentCampus(campus); setCampusReady(false); setActiveFilter("All");
     try {
-      const [listRes, vendorRes, catRes] = await Promise.all([
+      const [l, v, c] = await Promise.all([
         fetch(`${API_URL}/api/services/listings/?campus=${campus}&page_size=500`),
         fetch(`${API_URL}/api/auth/vendors/?campus=${campus}`),
         fetch(`${API_URL}/api/services/categories/?campus=${campus}`),
       ]);
-      if (listRes.ok) { const d = await listRes.json(); setAllListings(d.results || d || []); }
-      if (vendorRes.ok) { const d = await vendorRes.json(); setVendors(d.results || d || []); }
-      if (catRes.ok) { const d = await catRes.json(); setCategories(d.results || d || []); }
-    } catch {}
-    finally { setCampusReady(true); }
+      if (l.ok) { const d = await l.json(); setAllListings(d.results || d || []); }
+      if (v.ok) { const d = await v.json(); setVendors(d.results || d || []); }
+      if (c.ok) { const d = await c.json(); setCategories(d.results || d || []); }
+    } catch {} finally { setCampusReady(true); }
   };
 
   useEffect(() => {
     if (!isHydrated) return;
-
-    if (!isLoggedIn || !user) {
-      setCampusReady(true);
-      return;
-    }
-
-    const userSchool = ((user as any).school || '').toLowerCase();
-    // Admin users have no school — trust the existing cookie, don't override it
-    if (userSchool !== 'pau' && userSchool !== 'futo') {
-      setCampusReady(true);
-      return;
-    }
-
-    const cookieCampus =
-      document.cookie
-        .split(';')
-        .find(c => c.trim().startsWith('studex_campus='))
-        ?.split('=')?.[1]
-        ?.toLowerCase() || 'pau';
-
-    if (cookieCampus === userSchool) {
-      setCampusReady(true);
-      return;
-    }
-
-    const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
-    document.cookie = `studex_campus=${userSchool}; path=/; max-age=31536000; SameSite=Lax${isHttps ? '; Secure' : ''}`;
-
+    if (!isLoggedIn || !user) { setCampusReady(true); return; }
+    const school = ((user as any).school || "").toLowerCase();
+    if (school !== "pau" && school !== "futo") { setCampusReady(true); return; }
+    const cookie = document.cookie.split(";").find(c => c.trim().startsWith("studex_campus="))?.split("=")?.[1]?.toLowerCase() || "pau";
+    if (cookie === school) { setCampusReady(true); return; }
+    const https = typeof window !== "undefined" && window.location.protocol === "https:";
+    document.cookie = `studex_campus=${school}; path=/; max-age=31536000; SameSite=Lax${https ? "; Secure" : ""}`;
     Promise.all([
-      fetchWithAuth(`${API_URL}/api/services/listings/?campus=${userSchool}&page_size=500`),
-      fetchWithAuth(`${API_URL}/api/auth/vendors/?campus=${userSchool}`),
-      fetchWithAuth(`${API_URL}/api/services/categories/?campus=${userSchool}`),
-    ])
-      .then(async ([listRes, vendorRes, catRes]) => {
-        if (listRes.ok) {
-          const d = await listRes.json();
-          setAllListings(d.results || d || []);
-        }
-        if (vendorRes.ok) {
-          const d = await vendorRes.json();
-          setVendors(d.results || d || []);
-        }
-        if (catRes.ok) {
-          const d = await catRes.json();
-          setCategories(d.results || d || []);
-        }
-      })
-      .catch(() => {})
-      .finally(() => setCampusReady(true));
+      fetchWithAuth(`${API_URL}/api/services/listings/?campus=${school}&page_size=500`),
+      fetchWithAuth(`${API_URL}/api/auth/vendors/?campus=${school}`),
+      fetchWithAuth(`${API_URL}/api/services/categories/?campus=${school}`),
+    ]).then(async ([l, v, c]) => {
+      if (l.ok) { const d = await l.json(); setAllListings(d.results || d || []); }
+      if (v.ok) { const d = await v.json(); setVendors(d.results || d || []); }
+      if (c.ok) { const d = await c.json(); setCategories(d.results || d || []); }
+    }).catch(() => {}).finally(() => setCampusReady(true));
   }, [isHydrated, isLoggedIn, (user as any)?.school]);
-
-  const listingsSectionRef = useRef<HTMLDivElement>(null);
-
-  const handleFilter = (filter: string) => {
-    setActiveFilter(filter);
-    setTimeout(() => {
-      listingsSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 50);
-  };
 
   useEffect(() => {
     if (!searchQuery.trim()) { setSearchResults([]); setShowResults(false); return; }
-    const timer = setTimeout(async () => {
+    const t = setTimeout(async () => {
       setSearching(true);
       try {
         const url = `${API_URL}/api/services/listings/?search=${encodeURIComponent(searchQuery)}`;
-        const res = isLoggedIn
-          ? await fetchWithAuth(url)
-          : await fetch(url);
+        const res = isLoggedIn ? await fetchWithAuth(url) : await fetch(url);
         const data = await res.json();
-        setSearchResults(data.results || data || []);
-        setShowResults(true);
-      } catch { setSearchResults([]); }
-      finally { setSearching(false); }
+        setSearchResults(data.results || data || []); setShowResults(true);
+      } catch { setSearchResults([]); } finally { setSearching(false); }
     }, 400);
-    return () => clearTimeout(timer);
+    return () => clearTimeout(t);
   }, [searchQuery, isLoggedIn]);
 
-  const showToast = (msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(""), 2000);
+  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 2000); };
+
+  const handleFilter = (f: string) => {
+    setActiveFilter(f); setActiveTab("listings");
+    setTimeout(() => featuredRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
   };
 
-  // Listings filtered for the active category (when not "All")
-  const filteredListings = activeFilter === "All"
-    ? allListings
-    : allListings.filter(l => l.category === activeFilter);
-
-  // Category sections for "All" view: only show categories that have listings
-  const categorySections = categories
-    .map(cat => ({ ...cat, items: allListings.filter(l => l.category === cat.slug) }))
-    .filter(s => s.items.length > 0);
-
-  // Listings with no matching category bucket (show under "Other")
-  const categorisedSlugs = new Set(categories.map(c => c.slug));
-  const uncategorisedListings = allListings.filter(l => !categorisedSlugs.has(l.category));
-
-  const allSections = uncategorisedListings.length > 0
-    ? [...categorySections, { id: 0, title: "Other", slug: "__other__", image: null, items: uncategorisedListings }]
-    : categorySections;
-
-  const filterTabs = [
-    { slug: "All", title: "All" },
-    ...categories.map(c => ({ slug: c.slug, title: c.title })),
-  ];
+  const filteredListings   = activeFilter === "All" ? allListings : allListings.filter(l => l.category === activeFilter);
+  const categorySections   = categories.map(cat => ({ ...cat, items: allListings.filter(l => l.category === cat.slug) })).filter(s => s.items.length > 0);
+  const categorisedSlugs   = new Set(categories.map(c => c.slug));
+  const uncategorised      = allListings.filter(l => !categorisedSlugs.has(l.category));
+  const allSections        = uncategorised.length > 0 ? [...categorySections, { id: 0, title: "Other", slug: "__other__", image: null, items: uncategorised }] : categorySections;
 
   const renderListingCard = (listing: any, i: number) => {
-    const badge = listing.vendor?.profile?.vendor_badge;
-    const rating = listing.vendor?.profile?.rating;
+    const badge        = listing.vendor?.profile?.vendor_badge;
+    const rating       = listing.vendor?.profile?.rating;
     const totalReviews = listing.vendor?.profile?.total_reviews;
-    const wishlisted = mounted && isInWishlist(listing.id);
-    const isService = (listing.listing_type || "").toLowerCase() === "service";
-    const isOwnListing = !!(user?.id && user.id === listing.vendor?.id);
-    const isReserved = !isService && !isOwnListing && !!listing.is_reserved;
-    const inCart = cart.some((ci) => ci.id === listing.id);
+    const wishlisted   = mounted && isInWishlist(listing.id);
+    const isService    = (listing.listing_type || "").toLowerCase() === "service";
+    const isOwn        = !!(user?.id && user.id === listing.vendor?.id);
+    const isReserved   = !isService && !isOwn && !!listing.is_reserved;
+    const inCart       = cart.some(ci => ci.id === listing.id);
 
     return (
-      <motion.div
-        key={listing.id}
-        initial={{ opacity: 0, y: 16 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true }}
-        transition={{ delay: Math.min(i * 0.04, 0.2) }}
-        className="bg-white rounded-2xl shadow-sm border border-stone-100 overflow-hidden">
+      <motion.div key={listing.id} initial={{ opacity: 0, y: 12 }} whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }} transition={{ delay: Math.min(i * 0.04, 0.2) }}
+        className="bg-white rounded-xl border border-stone-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow group">
 
         <Link href={`/listing/${listing.id}`} className="block">
-          <div className="relative w-full h-40 sm:h-44 lg:h-48 overflow-hidden">
-            <SafeImage
-              src={listing.image?.startsWith("http") ? listing.image : null}
-              alt={listing.title}
-              className="object-cover"
-            />
+          <div className="relative w-full aspect-square overflow-hidden bg-stone-50">
+            <SafeImage src={listing.image?.startsWith("http") ? listing.image : null} alt={listing.title} />
 
             {!listing.is_available && (
               <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
@@ -311,82 +217,112 @@ export default function HomePageClient({ initialVendors, initialListings, initia
             )}
 
             {badge && badge !== "none" && (
-              <div className="absolute top-2 left-2">
-                <span className={`text-[8px] sm:text-[9px] font-semibold px-1.5 sm:px-2 py-0.5 rounded-full backdrop-blur-sm ${BADGE_STYLES[badge]}`}>
-                  {BADGE_LABELS[badge]}
-                </span>
+              <div className="absolute top-2.5 left-2.5 z-10 px-2 py-0.5 rounded-md text-[10px] font-bold text-white" style={{ background: GRAD }}>
+                {BADGE_LABELS[badge]}
               </div>
             )}
 
-            <motion.button
-              onClick={(e) => {
-                e.preventDefault(); e.stopPropagation();
-                const item = { id: listing.id, title: listing.title, price: listing.price, img: listing.image };
-                if (wishlisted) { removeFromWishlist(listing.id); showToast("Removed from Wishlist"); }
-                else { addToWishlist(item); showToast("Added to Wishlist ❤️"); }
-              }}
-              whileTap={{ scale: 0.85 }}
-              className="absolute top-2 right-2 w-7 h-7 sm:top-3 sm:right-3 sm:w-8 sm:h-8 bg-white/90 backdrop-blur-sm rounded-full shadow flex items-center justify-center z-10">
-              <Heart className={`w-3.5 h-3.5 sm:w-4 sm:h-4 transition-colors ${wishlisted ? "fill-red-500 text-red-500" : "text-stone-400"}`} />
+            <motion.button onClick={e => {
+              e.preventDefault(); e.stopPropagation();
+              const item = { id: listing.id, title: listing.title, price: listing.price, img: listing.image };
+              if (wishlisted) { removeFromWishlist(listing.id); showToast("Removed from Wishlist"); }
+              else { addToWishlist(item); showToast("Added to Wishlist ❤️"); }
+            }} whileTap={{ scale: 0.85 }}
+              className="absolute top-2.5 right-2.5 z-10 w-7 h-7 bg-white rounded-full shadow-sm flex items-center justify-center">
+              <Heart className={`w-3.5 h-3.5 ${wishlisted ? "fill-red-500 text-red-500" : "text-stone-400"}`} />
             </motion.button>
 
-            {!isOwnListing && (
-              <motion.button
-                onClick={(e) => {
-                  e.preventDefault(); e.stopPropagation();
-                  addToCart({ id: listing.id, title: listing.title, price: listing.price, img: listing.image || "" });
-                  showToast(inCart ? "Cart updated" : "Added to cart");
-                }}
-                whileTap={{ scale: 0.85 }}
-                className="absolute bottom-2 right-2 w-7 h-7 sm:bottom-3 sm:right-3 sm:w-8 sm:h-8 rounded-full shadow-lg flex items-center justify-center z-10 transition-opacity hover:opacity-90"
+            {!isOwn && (
+              <motion.button onClick={e => {
+                e.preventDefault(); e.stopPropagation();
+                addToCart({ id: listing.id, title: listing.title, price: listing.price, img: listing.image || "" });
+                showToast(inCart ? "Cart updated" : "Added to cart");
+              }} whileTap={{ scale: 0.85 }}
+                className="absolute bottom-2.5 right-2.5 z-10 w-7 h-7 rounded-full shadow flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                 style={{ background: GRAD }}>
-                <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
+                <Plus className="w-3.5 h-3.5 text-white" />
               </motion.button>
             )}
-
-            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent pt-6 pb-2 px-2.5 sm:pt-8 sm:pb-3 sm:px-4">
-              <p className="text-white font-bold text-xs sm:text-base leading-tight line-clamp-1">{listing.title}</p>
-              <p className="text-white/75 text-[10px] sm:text-xs mt-0.5 line-clamp-1">@{listing.vendor?.username || listing.vendor}</p>
-            </div>
           </div>
 
-          <div className="px-2.5 pt-2 pb-0.5 sm:px-4 sm:pt-3 sm:pb-1">
+          <div className="p-3">
+            <p className="font-bold text-stone-900 text-sm line-clamp-1">{listing.title}</p>
+            <p className="text-stone-400 text-xs mt-0.5 truncate">@{listing.vendor?.username || listing.vendor}</p>
+
             {totalReviews > 0 && (
-              <div className="flex items-center gap-0.5 sm:gap-1 mb-1 sm:mb-1.5">
-                <Star className="w-3 h-3 sm:w-3.5 sm:h-3.5 fill-amber-400 text-amber-400" />
-                <span className="text-[10px] sm:text-xs text-stone-500 font-medium">{rating}</span>
-                <span className="text-[10px] sm:text-xs text-stone-400">({totalReviews})</span>
+              <div className="flex items-center gap-0.5 mt-1.5">
+                <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                <span className="text-xs text-stone-600 font-medium">{rating}</span>
+                <span className="text-xs text-stone-400">({totalReviews})</span>
               </div>
             )}
-            <p className="text-[11px] sm:text-sm text-stone-500 line-clamp-2 leading-relaxed">
-              {listing.description || "Tap to view details."}
-            </p>
+
+            <div className="mt-2 space-y-2">
+              <p className="font-bold text-stone-900 text-sm">₦{Number(listing.price).toLocaleString()}</p>
+              {isReserved ? (
+                <span className="text-[10px] text-stone-400 font-semibold flex items-center gap-0.5">
+                  <Clock className="w-3 h-3" /> Reserved
+                </span>
+              ) : (
+                <button
+                  onClick={e => {
+                    e.preventDefault(); e.stopPropagation();
+                    if (!isOwn) {
+                      addToCart({ id: listing.id, title: listing.title, price: listing.price, img: listing.image || "" });
+                      showToast(inCart ? "Cart updated" : "Added to cart");
+                    }
+                  }}
+                  className="w-full py-2 rounded-xl text-white text-xs font-bold flex items-center justify-center gap-1.5 hover:opacity-90 transition-opacity"
+                  style={{ background: "linear-gradient(135deg,#2DD4BF 0%,#0D9488 100%)" }}>
+                  <ShoppingCart className="w-3.5 h-3.5" />
+                  {isOwn ? "Manage" : isService ? "Book Now" : "Add to Cart"}
+                </button>
+              )}
+            </div>
           </div>
         </Link>
+      </motion.div>
+    );
+  };
 
-        <div className="px-2.5 py-2 sm:px-4 sm:py-3 flex items-center justify-between gap-1">
-          <div className="min-w-0">
-            <p className="text-[10px] sm:text-xs text-stone-400 font-medium">Price</p>
-            <p className="text-sm sm:text-xl font-bold text-stone-900 truncate">
-              ₦{Number(listing.price).toLocaleString()}
-            </p>
-          </div>
-          {isReserved ? (
-            <div className="flex items-center gap-1 px-2 py-1.5 sm:px-4 sm:py-2.5 bg-stone-100 border border-stone-200 rounded-full text-stone-400 font-semibold text-[10px] sm:text-xs uppercase tracking-wide cursor-not-allowed select-none shrink-0">
-              <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> Reserved
+  const renderVendorCard = (vendor: Vendor, i: number) => {
+    const src = vendor.username === (user as any)?.username && (user as any)?.profile_image ? (user as any).profile_image : vendor.profile_picture;
+    const displaySrc = src?.startsWith("http") ? src : null;
+    const initials = (vendor.business_name || vendor.username || "??").slice(0, 2).toUpperCase();
+    return (
+      <motion.div key={vendor.id} initial={{ opacity: 0, y: 12 }} whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }} transition={{ delay: Math.min(i * 0.05, 0.3) }}>
+        <Link href={`/vendor/${vendor.username}`}>
+          <div className="bg-white rounded-xl border border-stone-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow group cursor-pointer">
+            <div className="relative w-full aspect-square overflow-hidden bg-stone-50">
+              {displaySrc
+                ? <img src={displaySrc} alt={vendor.business_name || vendor.username} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                : <div className="w-full h-full flex items-center justify-center text-white text-3xl font-black" style={{ background: GRAD }}>{initials}</div>
+              }
+              {vendor.is_online && (
+                <div className="absolute top-2.5 right-2.5 flex items-center gap-1 bg-white/90 px-2 py-0.5 rounded-full shadow-sm">
+                  <div className="w-1.5 h-1.5 rounded-full bg-green-400" />
+                  <span className="text-[10px] font-semibold text-stone-700">Online</span>
+                </div>
+              )}
+              {vendor.vendor_badge && vendor.vendor_badge !== "none" && (
+                <div className="absolute bottom-2.5 left-2.5">
+                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${BADGE_STYLES[vendor.vendor_badge]}`}>{BADGE_LABELS[vendor.vendor_badge]}</span>
+                </div>
+              )}
             </div>
-          ) : (
-            <Link href={isOwnListing ? "/seller/listings" : `/listing/${listing.id}`} className="shrink-0">
-              <motion.button
-                whileHover={{ scale: 1.04 }}
-                whileTap={{ scale: 0.96 }}
-                className="px-3 py-2 sm:px-6 sm:py-2.5 text-white rounded-full font-black text-[11px] sm:text-sm shadow-sm uppercase tracking-wide transition-opacity hover:opacity-90"
-                style={{ background: GRAD }}>
-                {isOwnListing ? "Manage" : isService ? "Book" : "Order"}
-              </motion.button>
-            </Link>
-          )}
-        </div>
+            <div className="p-3">
+              <p className="font-bold text-stone-900 text-sm truncate">{vendor.business_name || vendor.username}</p>
+              <p className="text-stone-400 text-xs truncate">@{vendor.username}</p>
+              <div className="flex items-center justify-between mt-2">
+                {vendor.total_reviews > 0
+                  ? <div className="flex items-center gap-0.5"><Star className="w-3 h-3 fill-amber-400 text-amber-400" /><span className="text-xs text-stone-600 font-medium">{vendor.rating}</span><span className="text-xs text-stone-400">({vendor.total_reviews})</span></div>
+                  : <span className="text-xs text-stone-400">New vendor</span>}
+                <span className="text-xs text-stone-400">{vendor.total_listings} listings</span>
+              </div>
+            </div>
+          </div>
+        </Link>
       </motion.div>
     );
   };
@@ -397,501 +333,372 @@ export default function HomePageClient({ initialVendors, initialListings, initia
 
       {toast && (
         <motion.div initial={{ y: -50, opacity: 0 }} animate={{ y: 60, opacity: 1 }}
-          className="fixed top-4 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full shadow-lg z-50 font-medium text-sm text-white"
-          style={{ background: GRAD }}>
+          className="fixed top-4 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full shadow-lg z-50 font-medium text-sm text-white" style={{ background: GRAD }}>
           {toast}
         </motion.div>
       )}
 
-      <div className="min-h-screen bg-[#FAFAF9]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+      <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
 
-        {/* ── STICKY HEADER ── */}
-        <div className="sticky top-0 bg-white/80 backdrop-blur-md z-40 border-b border-stone-100 shadow-sm">
-          <div className="max-w-6xl mx-auto">
-            <div className="flex items-center justify-between px-4 py-3 gap-3">
-              <Link href="/home" className="flex items-center gap-2 flex-shrink-0">
-                <div className="w-9 h-9 rounded-full bg-white border border-stone-200 flex items-center justify-center p-1 shadow-sm overflow-hidden flex-shrink-0">
-                  <img src="/images/logo-1.jpg" alt="StudEx" loading="lazy" className="w-full h-full object-contain" />
-                </div>
-                <span className="font-bold text-lg text-stone-900" style={SERIF}>
-                  Stud<span style={GRAD_TEXT}>Ex</span>
-                </span>
-              </Link>
+        {/* ── HEADER (white, like prototype) ── */}
+        <header className="sticky top-0 bg-white z-40 border-b border-stone-200 shadow-sm">
+          <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-4">
 
-              <div className="relative flex-1 max-w-xs">
-                <Search className="w-4 h-4 absolute left-3 top-3 text-stone-400 pointer-events-none" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                  onFocus={() => searchResults.length > 0 && setShowResults(true)}
-                  onBlur={() => setTimeout(() => setShowResults(false), 200)}
-                  placeholder="Search services..."
-                  className="w-full pl-9 pr-8 py-2.5 bg-stone-50 text-stone-900 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 border border-stone-200 placeholder:text-stone-400 transition-all"
-                />
-                {searchQuery && (
-                  <button onClick={() => { setSearchQuery(""); setShowResults(false); }}
-                    className="absolute right-3 top-3 text-stone-400 hover:text-stone-600">
-                    <X className="w-4 h-4" />
-                  </button>
-                )}
-                <AnimatePresence>
-                  {showResults && (
-                    <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                      className="absolute top-full mt-2 left-0 right-0 bg-white rounded-2xl shadow-xl border border-stone-100 z-50 overflow-hidden max-h-72 overflow-y-auto">
-                      {searching ? (
-                        <div className="p-4 text-center text-stone-400 text-sm">Searching...</div>
-                      ) : searchResults.length === 0 ? (
-                        <div className="p-4 text-center text-stone-400 text-sm">No results for "{searchQuery}"</div>
-                      ) : (
-                        searchResults.map(item => (
-                          <Link key={item.id} href={`/listing/${item.id}`}
-                            onClick={() => { setShowResults(false); setSearchQuery(""); }}>
-                            <div className="flex items-center gap-3 p-3 hover:bg-stone-50 transition border-b border-stone-50 last:border-0 cursor-pointer">
-                              <div className="w-10 h-10 rounded-xl overflow-hidden flex-shrink-0">
-                                <SafeImage src={item.image?.startsWith("http") ? item.image : null} alt={item.title} />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="font-semibold text-stone-900 text-sm truncate">{item.title}</p>
-                                <p className="text-xs text-stone-400">@{item.vendor?.username || item.vendor}</p>
-                              </div>
-                              <p className="font-bold text-sm flex-shrink-0" style={GRAD_TEXT}>₦{Number(item.price).toLocaleString()}</p>
-                            </div>
-                          </Link>
-                        ))
-                      )}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+            <Link href="/home" className="flex items-center gap-2 flex-shrink-0">
+              <div className="w-9 h-9 rounded-xl overflow-hidden border border-stone-100 shadow-sm flex items-center justify-center p-1 bg-white">
+                <img src="/images/logo-1.jpg" alt="StudEx" loading="lazy" className="w-full h-full object-contain" />
               </div>
+              <span className="font-black text-lg text-stone-900 hidden sm:block" style={SERIF}>
+                Stud<span className="text-transparent bg-clip-text" style={{ backgroundImage: GRAD }}>Ex</span>
+              </span>
+            </Link>
 
-              {!isLoggedIn && (
-                <Link href="/auth">
-                  <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
-                    className="px-4 py-2 text-white font-medium rounded-full text-sm shadow-sm flex-shrink-0"
-                    style={{ background: GRAD }}>
-                    Login
-                  </motion.button>
-                </Link>
+            {/* Nav links — desktop */}
+            <nav className="hidden lg:flex items-center gap-6 flex-shrink-0">
+              <button onClick={() => { setActiveTab("listings"); handleFilter("All"); }}
+                className="text-sm font-semibold text-teal-600 border-b-2 border-teal-500 pb-0.5">
+                New Arrivals
+              </button>
+              <button onClick={() => setActiveTab("listings")}
+                className="text-sm font-medium text-stone-500 hover:text-stone-700 transition">
+                Services
+              </button>
+              <button onClick={() => setActiveTab("vendors")}
+                className="text-sm font-medium text-stone-500 hover:text-stone-700 transition">
+                Vendors
+              </button>
+            </nav>
+
+            {/* Search */}
+            <div className="relative flex-1 max-w-2xl">
+              <Search className="w-4 h-4 absolute left-4 top-3 text-stone-400 pointer-events-none" />
+              <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+                onFocus={() => searchResults.length > 0 && setShowResults(true)}
+                onBlur={() => setTimeout(() => setShowResults(false), 200)}
+                placeholder="Search for services, vendors and more..."
+                className="w-full pl-11 pr-9 py-2.5 bg-stone-50 border border-stone-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-400 placeholder:text-stone-400 transition-all" />
+              {searchQuery && (
+                <button onClick={() => { setSearchQuery(""); setShowResults(false); }} className="absolute right-3 top-3 text-stone-400 hover:text-stone-600">
+                  <X className="w-4 h-4" />
+                </button>
               )}
+              <AnimatePresence>
+                {showResults && (
+                  <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                    className="absolute top-full mt-2 left-0 right-0 bg-white rounded-2xl shadow-xl border border-stone-100 z-50 overflow-hidden max-h-72 overflow-y-auto">
+                    {searching ? <div className="p-4 text-center text-stone-400 text-sm">Searching...</div>
+                      : searchResults.length === 0 ? <div className="p-4 text-center text-stone-400 text-sm">No results for "{searchQuery}"</div>
+                      : searchResults.map(item => (
+                        <Link key={item.id} href={`/listing/${item.id}`} onClick={() => { setShowResults(false); setSearchQuery(""); }}>
+                          <div className="flex items-center gap-3 p-3 hover:bg-stone-50 transition border-b border-stone-50 last:border-0 cursor-pointer">
+                            <div className="w-10 h-10 rounded-xl overflow-hidden flex-shrink-0 bg-stone-50">
+                              <SafeImage src={item.image?.startsWith("http") ? item.image : null} alt={item.title} />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-stone-900 text-sm truncate">{item.title}</p>
+                              <p className="text-xs text-stone-400">@{item.vendor?.username || item.vendor}</p>
+                            </div>
+                            <p className="font-bold text-sm flex-shrink-0 text-transparent bg-clip-text" style={{ backgroundImage: GRAD }}>₦{Number(item.price).toLocaleString()}</p>
+                          </div>
+                        </Link>
+                      ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
 
-            {/* Category filter chips */}
-            <div className="flex gap-2 px-4 pb-3 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
-              {filterTabs.map(tab => (
-                <button key={tab.slug} onClick={() => handleFilter(tab.slug)}
-                  className={`flex-shrink-0 px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${
-                    activeFilter === tab.slug ? "text-white shadow-sm" : "bg-stone-100 text-stone-500 hover:bg-stone-200"
-                  }`}
-                  style={activeFilter === tab.slug ? { background: GRAD } : {}}>
-                  {tab.title}
+            {/* Right actions */}
+            <div className="flex items-center gap-4 flex-shrink-0">
+              {isLoggedIn && user ? (
+                <>
+                  <Link href="/wishlist" className="hidden lg:flex flex-col items-center gap-0.5 text-stone-500 hover:text-teal-600 transition cursor-pointer">
+                    <Heart className="w-5 h-5" />
+                    <span className="text-[10px] font-medium">Wishlist</span>
+                  </Link>
+                  <Link href="/cart" className="hidden lg:flex flex-col items-center gap-0.5 text-stone-500 hover:text-teal-600 transition cursor-pointer relative">
+                    <div className="relative">
+                      <ShoppingCart className="w-5 h-5" />
+                      {cart.length > 0 && (
+                        <span className="absolute -top-1.5 -right-1.5 w-4 h-4 text-[9px] font-bold text-white rounded-full flex items-center justify-center" style={{ background: GRAD }}>
+                          {cart.length}
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-[10px] font-medium">Cart</span>
+                  </Link>
+                  <Link href="/account/address" className="flex items-center gap-1.5 text-sm text-stone-600 hover:text-teal-600 transition cursor-pointer">
+                    <User className="w-4 h-4 text-stone-400" />
+                    <span>Hi, <span className="font-semibold text-stone-900">{(user as any).username}</span></span>
+                    <ChevronDown className="w-3.5 h-3.5 text-stone-400" />
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <Link href="/auth" className="hidden lg:flex items-center gap-1.5 text-sm text-stone-600 hover:text-teal-600 font-medium transition">
+                    <ShoppingCart className="w-4 h-4" /> Sell on StudEx
+                  </Link>
+                  <Link href="/auth">
+                    <motion.button whileTap={{ scale: 0.97 }}
+                      className="px-4 py-2 text-white font-semibold rounded-xl text-sm shadow-sm" style={{ background: GRAD }}>
+                      Login
+                    </motion.button>
+                  </Link>
+                </>
+              )}
+            </div>
+          </div>
+        </header>
+
+        <div className="max-w-7xl mx-auto px-4 pt-5 pb-32">
+
+          {/* ── HERO ── */}
+          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+            className="relative rounded-2xl overflow-hidden"
+            style={{ background: HERO_GRAD }}>
+
+            {/* Blobs */}
+            <div className="absolute top-1/2 left-[45%] -translate-y-1/2 w-80 h-80 rounded-full pointer-events-none"
+              style={{ background: "radial-gradient(circle,rgba(165,180,252,0.35) 0%,transparent 70%)" }} />
+            <div className="absolute bottom-0 left-[20%] w-56 h-56 rounded-full pointer-events-none"
+              style={{ background: "radial-gradient(circle,rgba(103,232,249,0.25) 0%,transparent 70%)" }} />
+
+            <div className="relative z-10 px-4 py-10 sm:px-8 sm:py-10 lg:px-10 lg:py-12">
+              {/* Always side-by-side — scaled down on mobile */}
+              <div className="flex items-center gap-3 sm:gap-6">
+
+                {/* Text */}
+                <div className="flex-1 min-w-0">
+                  {vendorOfMonth ? (
+                    <>
+                      <div className="flex items-center gap-1 bg-amber-400 w-fit px-2 py-0.5 sm:px-3 sm:py-1 rounded-full mb-2 sm:mb-3">
+                        <Trophy className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-amber-900" />
+                        <span className="text-amber-900 text-[10px] sm:text-xs font-bold">Vendor of the Month · {vendorOfMonth.month}</span>
+                      </div>
+                      <h1 className="text-lg sm:text-3xl lg:text-5xl font-black text-white leading-[1.1] mb-1.5 sm:mb-3"
+                        style={{ fontFamily: "var(--font-jakarta),'Plus Jakarta Sans',sans-serif" }}>
+                        {vendorOfMonth.business_name}
+                      </h1>
+                      <p className="text-white/75 text-[11px] sm:text-sm mb-3 sm:mb-4 line-clamp-2 sm:line-clamp-none">
+                        {vendorOfMonth.total_orders} orders last month{vendorOfMonth.rating > 0 && ` · ⭐ ${vendorOfMonth.rating.toFixed(1)}`}
+                      </p>
+                      <Link href={`/vendor/${vendorOfMonth.username}`}>
+                        <motion.button whileTap={{ scale: 0.97 }}
+                          className="bg-white text-stone-900 font-bold px-3 py-1.5 sm:px-6 sm:py-2.5 rounded-full text-[11px] sm:text-sm inline-flex items-center gap-1.5 sm:gap-2 shadow-lg">
+                          Shop Now <ArrowRight className="w-3 h-3 sm:w-4 sm:h-4" />
+                        </motion.button>
+                      </Link>
+                    </>
+                  ) : (
+                    <>
+                      <h1 className="text-xl sm:text-3xl lg:text-5xl font-black text-white leading-[1.1] mb-1.5 sm:mb-3"
+                        style={{ fontFamily: "var(--font-jakarta),'Plus Jakarta Sans',sans-serif" }}>
+                        Shop Smart.<br className="sm:hidden" /> Live Campus.
+                      </h1>
+                      <p className="text-white/80 text-[11px] sm:text-sm lg:text-base mb-3 sm:mb-4 leading-relaxed line-clamp-2 sm:line-clamp-none">
+                        Explore hundreds of services from verified vendors on your campus, every day.
+                      </p>
+                      <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                        <Link href="/categories">
+                          <motion.button whileTap={{ scale: 0.97 }}
+                            className="bg-white text-stone-900 font-bold px-3 py-1.5 sm:px-6 sm:py-2.5 rounded-full text-[11px] sm:text-sm inline-flex items-center gap-1 sm:gap-2 shadow-lg">
+                            Shop Now <ArrowRight className="w-3 h-3 sm:w-4 sm:h-4" />
+                          </motion.button>
+                        </Link>
+                        <button onClick={() => setActiveTab("vendors")}
+                          className="bg-white/20 border border-white/30 text-white font-semibold px-3 py-1.5 sm:px-6 sm:py-2.5 rounded-full text-[11px] sm:text-sm inline-flex items-center gap-1 sm:gap-1.5 backdrop-blur-sm hover:bg-white/30 transition">
+                          View Vendors
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {/* Image — always visible, smaller on mobile */}
+                <div className="w-28 h-36 sm:w-44 sm:h-56 lg:w-56 lg:h-72 rounded-xl sm:rounded-2xl overflow-hidden shadow-2xl border-2 border-white/20 flex-shrink-0">
+                  <img
+                    src="https://plus.unsplash.com/premium_photo-1681487865280-c2b836dd83e8?fm=jpg&q=80&w=900&auto=format&fit=crop"
+                    alt="Shop on StudEx"
+                    className="w-full h-full object-cover object-top"
+                  />
+                </div>
+              </div>
+            </div>
+          </motion.div>
+
+          {/* ── CATEGORY TABS ── */}
+          <div className="mt-4 flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
+            {[{ slug: "All", title: "All Products" }, ...categories.map(c => ({ slug: c.slug, title: c.title }))].map(tab => (
+              <button key={tab.slug} onClick={() => { setActiveTab("listings"); handleFilter(tab.slug); }}
+                className={`flex-shrink-0 px-4 py-1.5 rounded-full text-xs font-semibold transition-all border ${activeFilter === tab.slug && activeTab === "listings" ? "text-white shadow-sm border-transparent" : "bg-white text-stone-500 border-stone-200 hover:border-stone-300"}`}
+                style={activeFilter === tab.slug && activeTab === "listings" ? { background: GRAD } : {}}>
+                {tab.title}
+              </button>
+            ))}
+          </div>
+          {mounted && (!isLoggedIn || !(user as any)?.school) && (
+            <div className="flex items-center gap-2 mt-3">
+              <span className="text-[11px] text-stone-400 font-medium">Campus:</span>
+              {(["pau", "futo"] as const).map(c => (
+                <button key={c} onClick={() => switchCampus(c)}
+                  className={`px-3 py-1 rounded-full text-xs font-bold uppercase transition ${currentCampus === c ? "text-white" : "bg-white text-stone-500 border border-stone-200"}`}
+                  style={currentCampus === c ? { background: GRAD } : {}}>
+                  {c}
                 </button>
               ))}
             </div>
+          )}
 
-            {/* Campus toggle — only shown when user has no campus (admin / guest) */}
-            {mounted && (!isLoggedIn || !(user as any)?.school) && (
-              <div className="flex items-center gap-2 px-4 pb-3">
-                <span className="text-[11px] text-stone-400 font-medium">Campus:</span>
-                {(['pau', 'futo'] as const).map(c => (
-                  <button
-                    key={c}
-                    onClick={() => switchCampus(c)}
-                    className={`px-3 py-1 rounded-full text-xs font-bold transition-all uppercase tracking-wide ${
-                      currentCampus === c ? 'text-white shadow-sm' : 'bg-stone-100 text-stone-500 hover:bg-stone-200'
-                    }`}
-                    style={currentCampus === c ? { background: GRAD } : {}}>
-                    {c}
-                  </button>
-                ))}
-              </div>
-            )}
+          {/* ── TRUST BAR ── */}
+          <div className="mt-4 bg-white border border-stone-200 rounded-2xl overflow-hidden shadow-sm">
+            <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-y lg:divide-y-0 divide-stone-100">
+              {TRUST_ITEMS.map(({ icon: Icon, title, desc }) => (
+                <div key={title} className="flex items-center gap-3 px-5 py-4">
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 bg-teal-50 border border-teal-100">
+                    <Icon className="w-5 h-5 text-teal-600" />
+                  </div>
+                  <div>
+                    <p className="font-bold text-stone-900 text-sm">{title}</p>
+                    <p className="text-stone-400 text-xs mt-0.5 leading-snug">{desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
 
-        <div className="px-4 pt-6 pb-32 max-w-6xl mx-auto">
-          <div className="lg:grid lg:grid-cols-[1fr_300px] lg:gap-10 lg:items-start">
-
-            {/* ── LEFT / MAIN COLUMN ── */}
-            <div className="space-y-8">
-
-              {/* ── GREETING ── */}
-              <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}>
-                {isLoggedIn && user ? (
-                  <>
-                    <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-bold">Welcome back</p>
-                    <h1 className="text-3xl font-black italic tracking-tighter uppercase text-stone-900 mt-1"
-                      style={{ fontFamily: "var(--font-jakarta), 'Plus Jakarta Sans', sans-serif" }}>
-                      Hey, {user.username || "there"} 👋
-                    </h1>
-                    <p className="text-stone-400 text-sm mt-1">Here's what's available on campus today.</p>
-                  </>
-                ) : (
-                  <>
-                    <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-bold">Campus Marketplace</p>
-                    <h1 className="text-3xl font-black italic tracking-tighter uppercase text-stone-900 mt-1"
-                      style={{ fontFamily: "var(--font-jakarta), 'Plus Jakarta Sans', sans-serif" }}>
-                      Discover Services
-                    </h1>
-                    <p className="text-stone-400 text-sm mt-1">Browse verified vendors on campus.</p>
-                  </>
-                )}
-              </motion.div>
-
-              {/* ── HERO BANNER ── */}
-              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-                {vendorOfMonth ? (
-                  /* Vendor of the Month hero */
-                  <Link href={`/vendor/${vendorOfMonth.username}`}>
-                    <motion.div whileHover={{ y: -3 }} whileTap={{ scale: 0.98 }}
-                      className="relative rounded-2xl overflow-hidden h-44 cursor-pointer shadow-md">
-                      {/* Background image or gradient */}
-                      {vendorOfMonth.profile_picture ? (
-                        <img
-                          src={vendorOfMonth.profile_picture}
-                          alt={vendorOfMonth.business_name}
-                          className="absolute inset-0 w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="absolute inset-0" style={{ background: GRAD }} />
-                      )}
-                      {/* Dark overlay */}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-black/10" />
-                      {/* Trophy badge */}
-                      <div className="absolute top-3 left-3 flex items-center gap-1.5 bg-amber-400 text-amber-900 px-2.5 py-1 rounded-full text-[10px] font-bold shadow">
-                        <Trophy className="w-3 h-3" />
-                        Vendor of the Month · {vendorOfMonth.month}
-                      </div>
-                      {/* Content */}
-                      <div className="absolute bottom-0 left-0 right-0 px-4 pb-4 flex items-end justify-between">
-                        <div>
-                          <p className="text-white font-black text-xl leading-tight">{vendorOfMonth.business_name}</p>
-                          <div className="flex items-center gap-1.5 mt-1">
-                            {vendorOfMonth.rating > 0 && (
-                              <div className="flex items-center gap-0.5">
-                                <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
-                                <span className="text-white/80 text-xs font-medium">{vendorOfMonth.rating.toFixed(1)}</span>
-                              </div>
-                            )}
-                            <span className="text-white/60 text-xs">·</span>
-                            <span className="text-white/80 text-xs">{vendorOfMonth.total_orders} orders last month</span>
-                          </div>
-                        </div>
-                        <div className="bg-white/20 backdrop-blur-sm border border-white/30 px-3 py-1.5 rounded-full flex items-center gap-1 flex-shrink-0">
-                          <span className="text-white text-xs font-semibold">Shop now</span>
-                          <ChevronRight className="w-3 h-3 text-white" />
-                        </div>
-                      </div>
-                    </motion.div>
-                  </Link>
-                ) : (
-                  /* Fallback hero when no vendor of month yet */
-                  <Link href="/categories">
-                    <motion.div whileHover={{ y: -3 }} whileTap={{ scale: 0.98 }}
-                      className="relative rounded-2xl overflow-hidden h-36 cursor-pointer shadow-md bg-gradient-to-br from-teal-500 to-purple-600">
-                      <div className="absolute top-0 right-0 w-48 h-48 rounded-full bg-white/10 blur-3xl pointer-events-none" />
-                      <div className="absolute bottom-0 left-0 w-40 h-40 rounded-full bg-white/10 blur-3xl pointer-events-none" />
-                      <div className="relative z-10 h-full flex flex-col justify-center px-6">
-                        <p className="text-white/80 text-xs tracking-[0.25em] uppercase font-semibold mb-1">Campus Marketplace</p>
-                        <h2 className="text-xl font-bold text-white" style={SERIF}>
-                          Every service,{" "}
-                          <span className="italic" style={{
-                            background: "linear-gradient(135deg, #2dd4bf 0%, #a78bfa 100%)",
-                            WebkitBackgroundClip: "text",
-                            WebkitTextFillColor: "transparent",
-                            backgroundClip: "text",
-                          }}>one tap away.</span>
-                        </h2>
-                        <p className="text-white/70 text-xs mt-2 flex items-center gap-1">
-                          Browse all categories <ChevronRight className="w-3 h-3" />
-                        </p>
-                      </div>
-                    </motion.div>
-                  </Link>
-                )}
-              </motion.div>
-
-              {/* ── VENDORS ROW — mobile only ── */}
-              <div className="lg:hidden">
-                <Suspense fallback={<div className="h-20 bg-stone-100 rounded-2xl animate-pulse" />}>
-                  {vendors.length > 0 && (
-                    <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
-                      <div className="flex items-center justify-between mb-4">
-                        <div>
-                          <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-bold">On Campus</p>
-                          <h2 className="text-2xl font-black italic tracking-tighter uppercase text-stone-900 mt-0.5"
-                            style={{ fontFamily: "var(--font-jakarta), 'Plus Jakarta Sans', sans-serif" }}>
-                            Vendors
-                          </h2>
-                        </div>
-                      </div>
-
-                      <div className="flex gap-4 overflow-x-auto pb-2" style={{ scrollbarWidth: "none" }}>
-                        {(showAllVendors ? vendors : vendors.slice(0, VENDOR_PREVIEW_COUNT)).map((vendor, i) => (
-                          <motion.div
-                            key={vendor.id}
-                            initial={{ opacity: 0, scale: 0.9 }}
-                            whileInView={{ opacity: 1, scale: 1 }}
-                            viewport={{ once: true }}
-                            transition={{ delay: i * 0.06 }}
-                            className="flex-shrink-0 flex flex-col items-center gap-2 w-20">
-                            <Link href={`/vendor/${vendor.username}`}>
-                              <motion.div whileTap={{ scale: 0.95 }} className="relative cursor-pointer">
-                                <div style={{
-                                  borderRadius: '50%',
-                                  padding: '3px',
-                                  background: 'linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                }}>
-                                  <div style={{
-                                    borderRadius: '50%',
-                                    padding: '2px',
-                                    background: '#FAFAF9',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                  }}>
-                                    <VendorAvatar src={vendor.username === user?.username && user?.profile_image ? user.profile_image : vendor.profile_picture} name={vendor.business_name || vendor.username} />
-                                  </div>
-                                </div>
-                                {vendor.is_online && (
-                                  <div className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-green-400 border-2 border-white" />
-                                )}
-                                {vendor.vendor_badge && vendor.vendor_badge !== "none" && (
-                                  <div className={`absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full border-2 border-white flex items-center justify-center text-[8px] font-bold
-                                    ${vendor.vendor_badge === "top" ? "bg-amber-400" : vendor.vendor_badge === "trusted" ? "bg-teal-500" : "bg-purple-500"}`}>
-                                    {vendor.vendor_badge === "top" ? "⭐" : vendor.vendor_badge === "trusted" ? "✓" : "↑"}
-                                  </div>
-                                )}
-                              </motion.div>
-                            </Link>
-                            <p className="text-xs text-stone-700 font-medium text-center leading-tight line-clamp-2 w-full">
-                              {vendor.business_name || vendor.username}
-                            </p>
-                            {vendor.total_reviews > 0 && (
-                              <div className="flex items-center gap-0.5">
-                                <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
-                                <span className="text-xs text-stone-400">{vendor.rating}</span>
-                              </div>
-                            )}
-                          </motion.div>
-                        ))}
-                        {!showAllVendors && vendors.length > VENDOR_PREVIEW_COUNT && (
-                          <motion.div
-                            initial={{ opacity: 0, scale: 0.9 }}
-                            whileInView={{ opacity: 1, scale: 1 }}
-                            viewport={{ once: true }}
-                            className="flex-shrink-0 flex flex-col items-center gap-2 w-20">
-                            <motion.button
-                              whileTap={{ scale: 0.95 }}
-                              onClick={() => setShowAllVendors(true)}
-                              className="w-[70px] h-[70px] rounded-full border-2 border-dashed border-teal-300 flex flex-col items-center justify-center gap-1 bg-teal-50 hover:bg-teal-100 transition">
-                              <Plus className="w-5 h-5 text-teal-600" />
-                              <span className="text-[9px] font-bold text-teal-600 leading-none">{vendors.length - VENDOR_PREVIEW_COUNT} more</span>
-                            </motion.button>
-                            <p className="text-xs text-teal-600 font-semibold text-center leading-tight">View More</p>
-                          </motion.div>
-                        )}
-                      </div>
-                    </motion.div>
-                  )}
-                </Suspense>
+          {/* ── FEATURED SECTION ── */}
+          <div className="mt-8" ref={featuredRef}>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
+              <div>
+                <h2 className="text-xl font-bold text-stone-900">
+                  {activeTab === "listings"
+                    ? activeFilter === "All" ? "Featured Services" : categories.find(c => c.slug === activeFilter)?.title || activeFilter
+                    : "Campus Vendors"}
+                </h2>
+                <p className="text-stone-400 text-sm mt-0.5">
+                  {activeTab === "listings" ? "Selected by our team for you." : "Verified campus vendors."}
+                </p>
               </div>
+              <div className="flex items-center gap-3">
+                {/* Tab switcher */}
+                <div className="flex bg-stone-100 rounded-full p-1">
+                  {(["listings", "vendors"] as const).map(tab => (
+                    <button key={tab} onClick={() => setActiveTab(tab)}
+                      className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all capitalize ${activeTab === tab ? "bg-white text-stone-900 shadow-sm" : "text-stone-500"}`}>
+                      {tab === "listings" ? "Listings" : "Vendors"}
+                    </button>
+                  ))}
+                </div>
+                <button onClick={() => handleFilter("All")}
+                  className="text-teal-600 text-sm font-semibold flex items-center gap-1 hover:text-teal-700 transition">
+                  View All <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
 
-              {/* ── LISTINGS ── */}
-              <div ref={listingsSectionRef}>
+            {/* Listings */}
+            {activeTab === "listings" && (
+              <>
                 {mounted && !campusReady ? (
-                  <ListingSkeletons />
+                  <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                    {[0,1,2,3,4].map(i => (
+                      <div key={i} className="bg-white rounded-xl border border-stone-100 overflow-hidden animate-pulse">
+                        <div className="aspect-square bg-stone-100" />
+                        <div className="p-3 space-y-2">
+                          <div className="h-3 bg-stone-100 rounded w-3/4" />
+                          <div className="h-2.5 bg-stone-100 rounded w-1/2" />
+                          <div className="h-4 bg-stone-100 rounded w-1/3" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 ) : activeFilter === "All" ? (
-                  // ── All categories feed ──
                   allListings.length === 0 ? (
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                      className="bg-white rounded-2xl p-12 text-center border border-stone-100 shadow-sm">
+                    <div className="bg-white rounded-2xl p-16 text-center border border-stone-100 shadow-sm">
                       <Sparkles className="w-12 h-12 text-stone-200 mx-auto mb-3" />
-                      <h3 className="text-lg font-bold text-stone-400" style={SERIF}>No listings yet</h3>
+                      <h3 className="text-lg font-bold text-stone-400">No listings yet</h3>
                       <p className="text-stone-400 text-sm mt-1">Check back soon!</p>
-                    </motion.div>
+                    </div>
                   ) : (
                     <div className="space-y-10">
                       {allSections.map(section => (
-                        <motion.div
-                          key={section.slug}
-                          id={`section-${section.slug}`}
-                          initial={{ opacity: 0, y: 20 }}
-                          whileInView={{ opacity: 1, y: 0 }}
-                          viewport={{ once: true, margin: "-60px" }}>
+                        <div key={section.slug}>
                           <div className="flex items-center justify-between mb-4">
                             <div>
-                              <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-bold">
-                                {section.items.length} listing{section.items.length !== 1 ? "s" : ""}
-                              </p>
-                              <h2 className="text-2xl font-black italic tracking-tighter uppercase text-stone-900 mt-0.5"
-                                style={{ fontFamily: "var(--font-jakarta), 'Plus Jakarta Sans', sans-serif" }}>
-                                {section.title}
-                              </h2>
+                              <p className="text-teal-600 text-xs tracking-widest uppercase font-bold">{section.items.length} listing{section.items.length !== 1 ? "s" : ""}</p>
+                              <h3 className="text-lg font-bold text-stone-900 mt-0.5">{section.title}</h3>
                             </div>
                             {section.slug !== "__other__" && (
-                              <button
-                                onClick={() => handleFilter(section.slug)}
-                                className="flex items-center gap-1 text-stone-400 text-sm font-medium hover:text-teal-600 transition">
-                                See all <ChevronRight className="w-4 h-4" />
+                              <button onClick={() => handleFilter(section.slug)} className="text-teal-600 text-sm font-semibold flex items-center gap-1">
+                                View All <ChevronRight className="w-4 h-4" />
                               </button>
                             )}
                           </div>
-                          <div className="grid grid-cols-2 gap-3 lg:gap-4">
-                            {section.items.map((listing, i) => renderListingCard(listing, i))}
+                          <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                            {section.items.map((l, i) => renderListingCard(l, i))}
                           </div>
-                        </motion.div>
+                        </div>
                       ))}
                     </div>
                   )
                 ) : (
-                  // ── Single category view ──
-                  <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-                    <div className="flex items-center justify-between mb-4">
-                      <div>
-                        <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-bold">
-                          {filteredListings.length} listing{filteredListings.length !== 1 ? "s" : ""}
-                        </p>
-                        <h2 className="text-2xl font-black italic tracking-tighter uppercase text-stone-900 mt-0.5"
-                          style={{ fontFamily: "var(--font-jakarta), 'Plus Jakarta Sans', sans-serif" }}>
-                          {categories.find(c => c.slug === activeFilter)?.title || activeFilter}
-                        </h2>
-                      </div>
-                      <button
-                        onClick={() => handleFilter("All")}
-                        className="flex items-center gap-1 text-stone-400 text-sm font-medium hover:text-teal-600 transition">
-                        All categories <ChevronRight className="w-4 h-4" />
-                      </button>
-                    </div>
-
+                  <>
                     {filteredListings.length === 0 ? (
-                      <div className="bg-white rounded-2xl p-12 text-center border border-stone-100 shadow-sm">
+                      <div className="bg-white rounded-2xl p-16 text-center border border-stone-100 shadow-sm">
                         <Sparkles className="w-12 h-12 text-stone-200 mx-auto mb-3" />
-                        <h3 className="text-lg font-bold text-stone-400" style={SERIF}>Nothing here yet</h3>
+                        <h3 className="text-lg font-bold text-stone-400">Nothing here yet</h3>
                         <p className="text-stone-400 text-sm mt-1">No listings in this category.</p>
                       </div>
                     ) : (
-                      <div className="grid grid-cols-2 gap-3 lg:gap-4">
-                        {filteredListings.map((listing, i) => renderListingCard(listing, i))}
+                      <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                        {filteredListings.map((l, i) => renderListingCard(l, i))}
                       </div>
                     )}
-                  </motion.div>
+                  </>
                 )}
-              </div>
+              </>
+            )}
 
-              {/* ── BOTTOM CTA (logged out, mobile only) ── */}
-              {!isLoggedIn && (
-                <div className="lg:hidden">
-                  <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
-                    className="bg-white border border-stone-200 rounded-2xl p-6 text-center shadow-sm relative overflow-hidden">
-                    <div className="relative z-10">
-                      <Shield className="w-8 h-8 mx-auto mb-3 text-teal-600" />
-                      <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-bold mb-1">Safe & Secure</p>
-                      <h3 className="text-2xl font-black italic tracking-tighter uppercase text-stone-900 mb-1"
-                        style={{ fontFamily: "var(--font-jakarta), 'Plus Jakarta Sans', sans-serif" }}>
-                        Ready to book?
-                      </h3>
-                      <p className="text-stone-400 text-sm mb-5">Create a free account to book any service.</p>
-                      <Link href="/auth">
-                        <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
-                          className="px-8 py-3 text-white font-semibold rounded-full text-sm shadow-lg shadow-teal-200/60 inline-flex items-center gap-2"
-                          style={{ background: GRAD }}>
-                          Create Account <ArrowRight className="w-4 h-4" />
-                        </motion.button>
-                      </Link>
-                    </div>
-                  </motion.div>
-                </div>
-              )}
-
-            </div>{/* end left column */}
-
-            {/* ── RIGHT SIDEBAR (desktop only) ── */}
-            <div className="hidden lg:flex flex-col gap-6 sticky" style={{ top: "130px" }}>
-
-              {/* Vendors vertical list */}
-              {vendors.length > 0 && (
-                <div className="bg-white rounded-2xl border border-stone-100 shadow-sm p-5" style={{ marginTop: "3rem" }}>
-                  <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-bold mb-1">On Campus</p>
-                  <h2 className="text-xl font-black italic tracking-tighter uppercase text-stone-900 mb-4"
-                    style={{ fontFamily: "var(--font-jakarta), 'Plus Jakarta Sans', sans-serif" }}>
-                    Vendors
-                  </h2>
-                  <div
-                    className="space-y-3 overflow-y-auto pr-1"
-                    style={{
-                      maxHeight: showAllVendors ? "none" : "420px",
-                      scrollbarWidth: "thin",
-                      scrollbarColor: "#d1d5db transparent",
-                    }}>
-                    {(showAllVendors ? vendors : vendors.slice(0, VENDOR_PREVIEW_COUNT)).map(vendor => (
-                      <Link key={vendor.id} href={`/vendor/${vendor.username}`}>
-                        <div className="flex items-center gap-3 hover:bg-stone-50 rounded-xl p-2 transition cursor-pointer">
-                          <div className="relative flex-shrink-0">
-                            <div style={{ borderRadius: "50%", padding: "3px", background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                              <div style={{ borderRadius: "50%", padding: "2px", background: "#FAFAF9", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                                <VendorAvatar src={vendor.username === user?.username && user?.profile_image ? user.profile_image : vendor.profile_picture} name={vendor.business_name || vendor.username} />
-                              </div>
-                            </div>
-                            {vendor.is_online && (
-                              <div className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-green-400 border-2 border-white" />
-                            )}
-                            {vendor.vendor_badge && vendor.vendor_badge !== "none" && (
-                              <div className={`absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full border-2 border-white flex items-center justify-center text-[8px] font-bold
-                                ${vendor.vendor_badge === "top" ? "bg-amber-400" : vendor.vendor_badge === "trusted" ? "bg-teal-500" : "bg-purple-500"}`}>
-                                {vendor.vendor_badge === "top" ? "⭐" : vendor.vendor_badge === "trusted" ? "✓" : "↑"}
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-semibold text-stone-900 text-sm truncate">{vendor.business_name || vendor.username}</p>
-                            {vendor.total_reviews > 0 && (
-                              <div className="flex items-center gap-0.5 mt-0.5">
-                                <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
-                                <span className="text-xs text-stone-400">{vendor.rating} ({vendor.total_reviews})</span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </Link>
-                    ))}
+            {/* Vendors */}
+            {activeTab === "vendors" && (
+              <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
+                {vendors.length === 0 ? (
+                  <div className="bg-white rounded-2xl p-16 text-center border border-stone-100 shadow-sm">
+                    <Sparkles className="w-12 h-12 text-stone-200 mx-auto mb-3" />
+                    <h3 className="text-lg font-bold text-stone-400">No vendors yet</h3>
                   </div>
-                  {!showAllVendors && vendors.length > VENDOR_PREVIEW_COUNT && (
-                    <button
-                      onClick={() => setShowAllVendors(true)}
-                      className="w-full mt-3 py-2 text-xs font-semibold text-teal-600 border border-teal-200 rounded-xl hover:bg-teal-50 transition flex items-center justify-center gap-1">
-                      View More <ChevronRight className="w-3.5 h-3.5" />
-                    </button>
-                  )}
+                ) : (
+                  <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                    {vendors.map((v, i) => renderVendorCard(v, i))}
+                  </div>
+                )}
+              </motion.div>
+            )}
+          </div>
+
+          {/* ── CTA BANNER ── */}
+          <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
+            className="mt-10 rounded-2xl overflow-hidden" style={{ background: HERO_GRAD }}>
+            <div className="px-6 lg:px-10 py-8 lg:py-10 flex flex-col sm:flex-row items-center justify-between gap-5">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0">
+                  <Tag className="w-6 h-6 text-white" />
                 </div>
-              )}
-
-              {/* CTA — desktop */}
-              {!isLoggedIn && (
-                <div className="bg-white border border-stone-200 rounded-2xl p-6 text-center shadow-sm">
-                  <Shield className="w-8 h-8 mx-auto mb-3 text-teal-600" />
-                  <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-bold mb-1">Safe & Secure</p>
-                  <h3 className="text-xl font-black italic tracking-tighter uppercase text-stone-900 mb-1"
-                    style={{ fontFamily: "var(--font-jakarta), 'Plus Jakarta Sans', sans-serif" }}>
-                    Ready to book?
-                  </h3>
-                  <p className="text-stone-400 text-sm mb-4">Create a free account to book any service.</p>
-                  <Link href="/auth">
-                    <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
-                      className="w-full py-3 text-white font-semibold rounded-full text-sm shadow-lg shadow-teal-200/60 inline-flex items-center justify-center gap-2"
-                      style={{ background: GRAD }}>
-                      Create Account <ArrowRight className="w-4 h-4" />
-                    </motion.button>
-                  </Link>
+                <div>
+                  <p className="text-white font-black text-xl">{isLoggedIn ? "Keep Exploring" : "Become a Vendor"}</p>
+                  <p className="text-white/70 text-sm mt-0.5">
+                    {isLoggedIn ? "Discover hundreds of campus services." : "Join our marketplace and start selling to students on campus."}
+                  </p>
                 </div>
-              )}
+              </div>
+              <Link href={isLoggedIn ? "/categories" : "/auth"} className="flex-shrink-0">
+                <motion.button whileTap={{ scale: 0.97 }}
+                  className="bg-white text-stone-900 font-bold px-6 py-3 rounded-full text-sm inline-flex items-center gap-2 shadow-md">
+                  {isLoggedIn ? "Shop Now" : "Start Selling"} <ArrowRight className="w-4 h-4" />
+                </motion.button>
+              </Link>
+            </div>
+          </motion.div>
 
-            </div>{/* end sidebar */}
-
-          </div>{/* end grid */}
         </div>
       </div>
     </>

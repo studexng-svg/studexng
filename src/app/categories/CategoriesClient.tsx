@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { ChevronLeft, Sparkles } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { GRAD, GRAD_TEXT, SERIF } from "@/lib/tokens";
+import TopNav from "@/components/layout/TopNav";
 
 interface Category {
   id: number;
@@ -13,29 +13,10 @@ interface Category {
 }
 
 export default function CategoriesClient({ categories }: { categories: Category[] }) {
-  const router = useRouter();
-
   return (
-    <div className="min-h-screen bg-[#FAFAF9]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+    <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
 
-      {/* ── STICKY HEADER ── */}
-      <div className="sticky top-0 bg-white/80 backdrop-blur-md z-40 border-b border-stone-100 shadow-sm">
-        <div className="flex items-center justify-between px-4 py-3 max-w-4xl mx-auto">
-          <button
-            onClick={() => router.push("/home")}
-            className="p-2.5 bg-white border border-stone-200 hover:border-stone-300 rounded-full shadow-sm transition-all active:scale-95">
-            <ChevronLeft className="w-5 h-5 text-stone-600" />
-          </button>
-
-          <div className="text-center">
-            <h1 className="text-base font-bold text-stone-900" style={SERIF}>
-              Categories
-            </h1>
-          </div>
-
-          <div className="w-10" />
-        </div>
-      </div>
+      <TopNav showBack backHref="/home" activeNav="services" />
 
       <div className="px-4 pt-6 pb-28 max-w-4xl mx-auto space-y-6">
 

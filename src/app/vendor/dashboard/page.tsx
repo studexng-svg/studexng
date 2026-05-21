@@ -59,20 +59,18 @@ export default function VendorDashboard() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#FAFAF9] flex flex-col" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+    <div className="min-h-screen bg-[#F5F5F5] flex flex-col" style={{ fontFamily: "'DM Sans', sans-serif" }}>
 
       {/* Header */}
-      <div className="sticky top-0 bg-white/80 backdrop-blur-md z-40 border-b border-stone-100 shadow-sm flex-shrink-0">
+      <div className="sticky top-0 bg-white z-40 border-b border-stone-100 shadow-sm flex-shrink-0">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button onClick={() => router.back()}
-              className="p-2.5 bg-white border border-stone-200 rounded-full shadow-sm active:scale-95 transition-all">
+              className="p-2 bg-stone-100 hover:bg-stone-200 rounded-full transition-all active:scale-95">
               <ArrowLeft className="w-4 h-4 text-stone-600" />
             </button>
             <div>
-              <h1 className="text-base font-bold text-stone-900" style={SERIF}>
-                Vendor Hub
-              </h1>
+              <h1 className="text-base font-bold text-stone-900">Vendor Hub</h1>
               <div className="flex items-center gap-1.5 flex-wrap">
                 <p className="text-stone-400 text-xs">{user?.username}</p>
                 {user?.profile?.vendor_badge && user.profile.vendor_badge !== "none" && (
@@ -91,16 +89,9 @@ export default function VendorDashboard() {
             </div>
           </div>
           {user?.profile_image ? (
-            <img
-              src={user.profile_image}
-              alt={user.username}
-              className="w-9 h-9 rounded-full object-cover border border-stone-200 shadow-sm"
-            />
+            <img src={user.profile_image} alt={user.username} className="w-9 h-9 rounded-full object-cover border border-stone-200 shadow-sm" />
           ) : (
-            <div
-              className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-white text-sm"
-              style={{ background: GRAD }}
-            >
+            <div className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-white text-sm" style={{ background: GRAD }}>
               {(user?.username?.[0] || "V").toUpperCase()}
             </div>
           )}

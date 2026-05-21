@@ -95,7 +95,7 @@ export default function AdminUserDetail() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#FFF8F0] flex items-center justify-center">
+      <div className="min-h-screen bg-[#F5F5F5] flex items-center justify-center">
         <div className="w-8 h-8 border-4 border-stone-200 border-t-teal-500 rounded-full animate-spin" />
       </div>
     );
@@ -103,7 +103,7 @@ export default function AdminUserDetail() {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-[#FFF8F0] flex flex-col items-center justify-center px-6 gap-4">
+      <div className="min-h-screen bg-[#F5F5F5] flex flex-col items-center justify-center px-6 gap-4">
         <Users className="w-12 h-12 text-stone-300" />
         <p className="text-stone-500 font-medium">User not found</p>
         <button onClick={() => router.push("/admin/users")}
@@ -119,7 +119,7 @@ export default function AdminUserDetail() {
   const initials = (user.business_name || user.username || "?").slice(0, 2).toUpperCase();
 
   return (
-    <div className="min-h-screen bg-[#FFF8F0]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+    <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       <AdminTopBar title="User Detail" back="/admin/users" />
 
       <div className="px-4 pt-5 pb-28 max-w-2xl mx-auto space-y-4">

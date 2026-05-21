@@ -28,7 +28,12 @@
       "Bash(xargs wc *)",
       "Bash(xargs grep -l \"chat\\\\|message\")",
       "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\HomePC\\\\Documents\\\\studexng\" -Recurse -Directory | Select-Object -First 30 | ForEach-Object { $_.FullName })",
-      "Bash(Get-ChildItem *)"
+      "Bash(Get-ChildItem *)",
+      "Bash(Select-Object Name)",
+      "Bash(git stash *)",
+      "Bash(git checkout *)",
+      "Bash(git merge *)",
+      "Bash(git push *)"
     ]
   }
 }

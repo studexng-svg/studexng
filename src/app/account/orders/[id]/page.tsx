@@ -2,12 +2,13 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import {
-  Package, CheckCircle, Clock, AlertCircle, ChevronLeft, MessageCircle, XCircle,
+  Package, CheckCircle, Clock, AlertCircle, MessageCircle, XCircle,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAuth, fetchWithAuth } from "@/lib/authStore";
 import { GRAD, SERIF } from "@/lib/tokens";
 import ReviewForm from "@/components/ReviewForm";
+import TopNav from "@/components/layout/TopNav";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -110,13 +111,13 @@ export default function OrderDetailPage() {
   }[s] || s);
 
   if (!isHydrated || loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-[#FAFAF9]">
+    <div className="min-h-screen flex items-center justify-center bg-[#F5F5F5]">
       <div className="animate-spin"><Clock className="w-10 h-10 text-teal-600" /></div>
     </div>
   );
 
   if (error === "not_found" || !order) return (
-    <div className="min-h-screen bg-[#FAFAF9] flex items-center justify-center p-6">
+    <div className="min-h-screen bg-[#F5F5F5] flex items-center justify-center p-6">
       <div className="text-center bg-white rounded-2xl p-8 shadow-sm border border-stone-200">
         <AlertCircle className="w-14 h-14 text-red-500 mx-auto mb-3" />
         <h2 className="text-xl font-bold text-stone-800 mb-2">Order Not Found</h2>
@@ -134,26 +135,15 @@ export default function OrderDetailPage() {
   const isCancelled = order.status === "cancelled" || order.current_status === "cancelled";
 
   return (
-    <div className="min-h-screen bg-[#FAFAF9]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-      {/* HEADER */}
-      <div className="sticky top-0 bg-white/80 backdrop-blur-md z-40 border-b border-stone-100 shadow-sm">
-        <div className="flex items-center justify-between px-4 py-3 max-w-4xl mx-auto">
-          <Link href="/account/orders">
-            <button className="p-2.5 bg-white border border-stone-200 rounded-full shadow-sm active:scale-95 transition-all">
-              <ChevronLeft className="w-5 h-5 text-stone-600" />
-            </button>
-          </Link>
-          <h1 className="text-base font-bold text-stone-900" style={SERIF}>Order Details</h1>
-          <button
-            onClick={handleOpenChat}
-            className="p-2.5 bg-white border border-stone-200 rounded-full shadow-sm active:scale-95 transition-all"
-          >
-            <MessageCircle className="w-5 h-5 text-teal-600" />
-          </button>
-        </div>
-      </div>
+    <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+      <TopNav showBack backHref="/account/orders" />
 
       <div className="px-4 pt-6 pb-24 space-y-4 max-w-4xl mx-auto">
+        <div className="flex justify-end">
+          <button onClick={handleOpenChat} className="flex items-center gap-1.5 px-4 py-2 bg-white border border-stone-200 rounded-full shadow-sm text-sm font-semibold text-teal-600 hover:border-teal-300 transition">
+            <MessageCircle className="w-4 h-4" /> Chat Vendor
+          </button>
+        </div>
 
         {/* LOYALTY REWARD BANNER */}
         {loyaltyReward && (

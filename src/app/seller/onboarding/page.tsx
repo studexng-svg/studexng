@@ -1,6 +1,7 @@
 "use client";
 
-import { Store, ChevronLeft, CheckCircle, X, Shield, ArrowRight, CreditCard, FlipHorizontal, FileText, IdCard } from "lucide-react";
+import { Store, CheckCircle, X, Shield, ArrowRight, CreditCard, FlipHorizontal, FileText, IdCard } from "lucide-react";
+import TopNav from "@/components/layout/TopNav";
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -107,22 +108,8 @@ export default function SellerOnboarding() {
   };
 
   return (
-    <div className="min-h-screen bg-[#FAFAF9]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-      {/* HEADER */}
-      <div className="sticky top-0 bg-white/80 backdrop-blur-md z-40 border-b border-stone-100 shadow-sm">
-        <div className="flex items-center justify-between px-4 py-3">
-          <button
-            onClick={() => router.back()}
-            className="p-2.5 bg-white border border-stone-200 rounded-full shadow-sm active:scale-95 transition-all"
-          >
-            <ChevronLeft className="w-5 h-5 text-stone-600" />
-          </button>
-          <h1 className="text-base font-bold text-stone-900" style={SERIF}>
-            Become a Seller
-          </h1>
-          <div className="w-10" />
-        </div>
-      </div>
+    <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+      <TopNav showBack />
 
       <div className="px-4 pt-8 pb-32 max-w-lg mx-auto">
         {/* PROGRESS STEPS */}

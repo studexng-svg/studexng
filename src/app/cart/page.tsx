@@ -1,7 +1,8 @@
 // src/app/cart/page.tsx
 "use client";
 
-import { Plus, Minus, Trash2, ShoppingBag, ArrowRight, Sparkles, AlertCircle, ChevronLeft, Clock } from "lucide-react";
+import { Plus, Minus, Trash2, ShoppingBag, ArrowRight, Sparkles, AlertCircle, Clock } from "lucide-react";
+import TopNav from "@/components/layout/TopNav";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -109,7 +110,7 @@ export default function CartPage() {
   // ── EMPTY STATE ──────────────────────────────────────────────────────────
   if (cart.length === 0) {
     return (
-      <div className="min-h-screen bg-[#FAFAF9] flex flex-col items-center justify-center px-6 pb-28" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+      <div className="min-h-screen bg-[#F5F5F5] flex flex-col items-center justify-center px-6 pb-28" style={{ fontFamily: "'DM Sans', sans-serif" }}>
         <div className="text-center animate-fadeUp">
           <div className="w-24 h-24 mx-auto mb-6 rounded-2xl flex items-center justify-center"
             style={{ background: GRAD }}>
@@ -133,33 +134,24 @@ export default function CartPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#FAFAF9]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+    <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
 
-      {/* ── STICKY HEADER ── */}
-      <div className="sticky top-0 bg-white/80 backdrop-blur-md z-40 border-b border-stone-100 shadow-sm">
-        <div className="flex items-center justify-between px-4 py-3 max-w-2xl mx-auto">
-          <button onClick={handleBack}
-            className="p-2.5 bg-white border border-stone-200 hover:border-stone-300 rounded-full shadow-sm transition-all active:scale-95">
-            <ChevronLeft className="w-5 h-5 text-stone-600" />
-          </button>
-          <h1 className="text-base font-bold text-stone-900" style={SERIF}>
-            Cart ({cart.length})
-          </h1>
-          <button onClick={clearCart}
-            className="text-red-400 hover:text-red-600 font-medium text-sm transition-colors">
-            Clear All
-          </button>
-        </div>
-      </div>
+      <TopNav showBack activeNav="services" />
 
       <div className="px-4 pt-6 pb-28 space-y-4 max-w-2xl mx-auto">
 
         {/* ── SECTION HEADER ── */}
-        <div className="animate-fadeUp">
-          <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold">Your Order</p>
-          <h2 className="text-xl font-bold text-stone-900 mt-0.5" style={SERIF}>
-            Review your cart
-          </h2>
+        <div className="flex items-center justify-between animate-fadeUp">
+          <div>
+            <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold">Your Order</p>
+            <h2 className="text-xl font-bold text-stone-900 mt-0.5" style={SERIF}>
+              Cart ({cart.length})
+            </h2>
+          </div>
+          <button onClick={clearCart}
+            className="text-red-400 hover:text-red-600 font-medium text-sm transition-colors">
+            Clear All
+          </button>
         </div>
 
         {/* ── UNAVAILABILITY WARNING ── */}

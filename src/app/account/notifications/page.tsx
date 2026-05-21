@@ -4,7 +4,8 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { Bell, ChevronLeft, CheckCheck, X, ExternalLink } from "lucide-react";
+import { Bell, CheckCheck, X, ExternalLink } from "lucide-react";
+import TopNav from "@/components/layout/TopNav";
 import { useAuth, fetchWithAuth } from "@/lib/authStore";
 import { GRAD, SERIF } from "@/lib/tokens";
 
@@ -111,7 +112,7 @@ export default function NotificationsPage() {
 
   if (!isHydrated || loading) {
     return (
-      <div className="min-h-screen bg-[#FAFAF9] flex items-center justify-center">
+      <div className="min-h-screen bg-[#F5F5F5] flex items-center justify-center">
         <div className="w-10 h-10 border-4 border-stone-200 border-t-teal-500 rounded-full animate-spin" />
       </div>
     );
@@ -165,36 +166,20 @@ export default function NotificationsPage() {
         )}
       </AnimatePresence>
 
-      <div className="min-h-screen bg-[#FAFAF9]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-
-        {/* ── HEADER ── */}
-        <div className="sticky top-0 bg-white/80 backdrop-blur-md z-40 border-b border-stone-100 shadow-sm">
-          <div className="max-w-2xl mx-auto flex items-center gap-3 px-4 py-3">
-            <Link href="/account">
-              <button className="w-9 h-9 rounded-full bg-stone-100 hover:bg-stone-200 flex items-center justify-center transition">
-                <ChevronLeft className="w-5 h-5 text-stone-600" />
-              </button>
-            </Link>
-            <div className="flex-1">
-              <h1 className="text-base font-black italic tracking-tight uppercase text-stone-900"
-                style={{ fontFamily: "var(--font-jakarta), 'Plus Jakarta Sans', sans-serif" }}>
-                Notifications
-              </h1>
-              {unreadCount > 0 && (
-                <p className="text-xs text-teal-600 font-medium">{unreadCount} unread</p>
-              )}
-            </div>
-            {unreadCount > 0 && (
-              <button
-                onClick={markAllRead}
-                className="flex items-center gap-1.5 text-xs font-semibold text-teal-600 hover:text-teal-700 bg-teal-50 hover:bg-teal-100 px-3 py-1.5 rounded-full transition"
-              >
-                <CheckCheck className="w-3.5 h-3.5" />
-                Mark all read
-              </button>
-            )}
+      <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+        <TopNav showBack backHref="/account" />
+        {unreadCount > 0 && (
+          <div className="max-w-2xl mx-auto px-4 pt-3 flex items-center justify-between">
+            <p className="text-xs text-stone-500 font-medium">{unreadCount} unread</p>
+            <button
+              onClick={markAllRead}
+              className="flex items-center gap-1.5 text-xs font-semibold text-teal-600 hover:text-teal-700 bg-teal-50 hover:bg-teal-100 px-3 py-1.5 rounded-full transition"
+            >
+              <CheckCheck className="w-3.5 h-3.5" />
+              Mark all read
+            </button>
           </div>
-        </div>
+        )}
 
         <div className="max-w-2xl mx-auto px-4 pt-4 pb-32 space-y-2">
 

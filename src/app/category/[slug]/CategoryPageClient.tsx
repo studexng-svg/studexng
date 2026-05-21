@@ -4,9 +4,10 @@ import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  Search, ChevronLeft, Sparkles, Heart, Star, MessageCircle, X,
+  Search, Sparkles, Heart, Star, ShoppingCart, X,
   ChevronRight, ArrowRight, Shield, Clock,
 } from "lucide-react";
+import TopNav from "@/components/layout/TopNav";
 import { useState, useEffect } from "react";
 import { useCartStore } from "@/lib/cartStore";
 import { useAuth, fetchWithAuth } from "@/lib/authStore";
@@ -236,7 +237,7 @@ export default function CategoryPageClient({ slug, initialListings }: Props) {
   });
 
   return (
-    <div className="min-h-screen bg-[#FAFAF9]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+    <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
 
       {/* Toast */}
       {toast && (
@@ -298,45 +299,21 @@ export default function CategoryPageClient({ slug, initialListings }: Props) {
         )}
       </AnimatePresence>
 
-      {/* ── STICKY HEADER ── */}
-      <div className="sticky top-0 bg-white/80 backdrop-blur-md z-40 border-b border-stone-100 shadow-sm">
-        <div className="max-w-6xl mx-auto">
-          <div className="flex items-center gap-3 px-4 py-3">
-            <button
-              onClick={() => router.back()}
-              className="p-2 hover:bg-stone-100 rounded-full transition flex-shrink-0 active:scale-95">
-              <ChevronLeft className="w-5 h-5 text-stone-600" />
-            </button>
+      <TopNav showBack backHref="/categories" activeNav="services" />
 
-            {/* Category title — desktop only */}
-            <span
-              className="hidden lg:block font-black italic tracking-tighter uppercase text-stone-900 text-lg flex-shrink-0"
-              style={{ fontFamily: "var(--font-jakarta), 'Plus Jakarta Sans', sans-serif" }}>
-              {categoryName}
-            </span>
-
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 pointer-events-none" />
-              <input
-                type="text"
-                placeholder={`Search ${categoryName.toLowerCase()}...`}
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                className="w-full pl-9 pr-4 py-2.5 bg-stone-50 border border-stone-200 rounded-full text-sm focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100 transition"
-              />
-            </div>
-
-            {!isLoggedIn && (
-              <Link href="/auth" className="hidden lg:block flex-shrink-0">
-                <motion.button
-                  whileHover={{ scale: 1.03 }}
-                  whileTap={{ scale: 0.97 }}
-                  className="px-4 py-2 text-white font-medium rounded-full text-sm shadow-sm"
-                  style={{ background: GRAD }}>
-                  Login
-                </motion.button>
-              </Link>
-            )}
+      {/* ── SEARCH SUB-BAR ── */}
+      <div className="bg-white border-b border-stone-100">
+        <div className="max-w-6xl mx-auto px-4 py-2.5 flex items-center gap-3">
+          <span className="hidden lg:block font-bold text-stone-900 text-sm flex-shrink-0">{categoryName}</span>
+          <div className="relative flex-1 max-w-xl">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 pointer-events-none" />
+            <input
+              type="text"
+              placeholder={`Search ${categoryName.toLowerCase()}...`}
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 bg-stone-50 border border-stone-200 rounded-full text-sm focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100 transition"
+            />
           </div>
         </div>
       </div>
@@ -392,7 +369,7 @@ export default function CategoryPageClient({ slug, initialListings }: Props) {
                 </Link>
               </motion.div>
             ) : (
-              <div className="space-y-4 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-4">
+              <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4">
                 {sortedListings.map((listing, i) => {
                   const badge = listing.vendor.profile?.vendor_badge;
                   const rating = listing.vendor.profile?.rating;
@@ -406,134 +383,75 @@ export default function CategoryPageClient({ slug, initialListings }: Props) {
                   return (
                     <motion.div
                       key={listing.id}
-                      initial={{ opacity: 0, y: 16 }}
+                      initial={{ opacity: 0, y: 12 }}
                       whileInView={{ opacity: 1, y: 0 }}
                       viewport={{ once: true }}
-                      transition={{ delay: Math.min(i * 0.05, 0.25) }}
-                      className="bg-white rounded-2xl shadow-sm border border-stone-100 overflow-hidden">
+                      transition={{ delay: Math.min(i * 0.04, 0.2) }}
+                      className="bg-white rounded-xl border border-stone-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow group">
 
-                      {/* Clickable image + description → listing detail */}
                       <Link href={`/listing/${listing.id}`} className="block">
-
-                        {/* Image */}
-                        <div
-                          className="relative w-full h-48 overflow-hidden cursor-pointer"
-                          onClick={(e) => {
-                            if (imageUrl) {
-                              e.preventDefault();
-                              setLightboxImage({ src: imageUrl, title: listing.title });
-                            }
-                          }}>
+                        {/* Square image */}
+                        <div className="relative w-full aspect-square overflow-hidden bg-stone-50">
                           <SafeImage src={imageUrl} alt={listing.title} />
 
                           {!listing.is_available && (
                             <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                              <span className="text-white font-bold bg-red-500 px-3 py-1 rounded-full text-xs">
-                                Unavailable
-                              </span>
+                              <span className="text-white font-bold bg-red-500 px-3 py-1 rounded-full text-xs">Unavailable</span>
                             </div>
                           )}
 
                           {badge && badge !== "none" && (
-                            <div className="absolute top-3 left-3">
-                              <span className={`text-[9px] font-semibold px-2 py-0.5 rounded-full backdrop-blur-sm ${BADGE_STYLES[badge]}`}>
-                                {BADGE_LABELS[badge]}
-                              </span>
+                            <div className="absolute top-2.5 left-2.5 z-10 px-2 py-0.5 rounded-md text-[10px] font-bold text-white" style={{ background: GRAD }}>
+                              {BADGE_LABELS[badge]}
                             </div>
                           )}
 
-                          {/* Heart — wishlist */}
                           <motion.button
-                            onClick={(e) => {
+                            onClick={e => {
                               e.preventDefault(); e.stopPropagation();
                               const item = { id: listing.id, title: listing.title, price: listing.price, img: listing.image };
                               if (wishlisted) { removeFromWishlist(listing.id); showToast("Removed from Wishlist"); }
                               else { addToWishlist(item); showToast("Added to Wishlist"); }
                             }}
                             whileTap={{ scale: 0.85 }}
-                            className="absolute top-3 right-3 w-8 h-8 bg-white/90 backdrop-blur-sm rounded-full shadow flex items-center justify-center z-10">
-                            <Heart className={`w-4 h-4 transition-colors ${wishlisted ? "fill-red-500 text-red-500" : "text-stone-400"}`} />
+                            className="absolute top-2.5 right-2.5 z-10 w-7 h-7 bg-white rounded-full shadow-sm flex items-center justify-center">
+                            <Heart className={`w-3.5 h-3.5 ${wishlisted ? "fill-red-500 text-red-500" : "text-stone-400"}`} />
                           </motion.button>
-
-                          {/* Title + vendor overlay */}
-                          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent pt-8 pb-3 px-4">
-                            <p className="text-white font-bold text-base leading-tight line-clamp-1">{listing.title}</p>
-                            <p className="text-white/75 text-xs mt-0.5">
-                              @{listing.vendor.business_name || listing.vendor.username}
-                            </p>
-                          </div>
                         </div>
 
-                        {/* Description */}
-                        <div className="px-4 pt-3 pb-1">
+                        <div className="p-3">
+                          <p className="font-bold text-stone-900 text-sm line-clamp-1">{listing.title}</p>
+                          <p className="text-stone-400 text-xs mt-0.5 truncate">@{listing.vendor.business_name || listing.vendor.username}</p>
+
                           {(totalReviews ?? 0) > 0 && (
-                            <div className="flex items-center gap-1 mb-1.5">
-                              <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                              <span className="text-xs text-stone-500 font-medium">{rating}</span>
+                            <div className="flex items-center gap-0.5 mt-1.5">
+                              <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                              <span className="text-xs text-stone-600 font-medium">{rating}</span>
                               <span className="text-xs text-stone-400">({totalReviews})</span>
                             </div>
                           )}
-                          <p className="text-sm text-stone-500 line-clamp-2 leading-relaxed">
-                            {listing.description || "Tap to view details."}
-                          </p>
-                        </div>
 
+                          <div className="mt-2 space-y-2">
+                            <p className="font-bold text-stone-900 text-sm">₦{Number(listing.price).toLocaleString()}</p>
+                            {isReserved ? (
+                              <span className="text-[10px] text-stone-400 font-semibold flex items-center gap-0.5">
+                                <Clock className="w-3 h-3" /> Reserved
+                              </span>
+                            ) : (
+                              <button
+                                onClick={e => {
+                                  e.preventDefault(); e.stopPropagation();
+                                  if (!isOwnListing) handleAddToCart(listing);
+                                }}
+                                className="w-full py-2 rounded-xl text-white text-xs font-bold flex items-center justify-center gap-1.5 hover:opacity-90 transition-opacity"
+                                style={{ background: "linear-gradient(135deg,#2DD4BF 0%,#0D9488 100%)" }}>
+                                <ShoppingCart className="w-3.5 h-3.5" />
+                                {isOwnListing ? "Manage" : isService ? "Book Now" : "Add to Cart"}
+                              </button>
+                            )}
+                          </div>
+                        </div>
                       </Link>
-
-                      {/* Price + action */}
-                      <div className="px-4 py-3 flex items-center justify-between">
-                        <div>
-                          <p className="text-xs text-stone-400 font-medium">Price</p>
-                          <p className="text-xl font-bold text-stone-900">
-                            ₦{Number(listing.price).toLocaleString()}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {!isOwnListing && (
-                            <motion.button
-                              whileTap={{ scale: 0.95 }}
-                              onClick={() => handleOpenChat(listing)}
-                              className="w-9 h-9 bg-stone-100 text-stone-500 rounded-full flex items-center justify-center hover:bg-teal-50 hover:text-teal-600 transition"
-                              title="Message vendor">
-                              <MessageCircle className="w-4 h-4" />
-                            </motion.button>
-                          )}
-                          {isOwnListing ? (
-                            <Link href="/seller/listings">
-                              <motion.button
-                                whileHover={{ scale: 1.04 }}
-                                whileTap={{ scale: 0.96 }}
-                                className="px-6 py-2.5 text-white rounded-full font-black text-sm shadow-sm uppercase tracking-wide transition-opacity hover:opacity-90"
-                                style={{ background: GRAD }}>
-                                Manage
-                              </motion.button>
-                            </Link>
-                          ) : isReserved ? (
-                            <div className="flex items-center gap-1.5 px-4 py-2.5 bg-stone-100 border border-stone-200 rounded-full text-stone-400 font-semibold text-xs uppercase tracking-wide cursor-not-allowed select-none">
-                              <Clock className="w-3.5 h-3.5" /> Reserved
-                            </div>
-                          ) : listing.is_available && !isService ? (
-                            <motion.button
-                              whileHover={{ scale: 1.04 }}
-                              whileTap={{ scale: 0.96 }}
-                              onClick={() => handleAddToCart(listing)}
-                              className="px-6 py-2.5 text-white rounded-full font-black text-sm shadow-sm uppercase tracking-wide transition-opacity hover:opacity-90"
-                              style={{ background: GRAD }}>
-                              Order
-                            </motion.button>
-                          ) : (
-                            <Link href={`/listing/${listing.id}`}>
-                              <motion.button
-                                whileHover={{ scale: 1.04 }}
-                                whileTap={{ scale: 0.96 }}
-                                className="px-6 py-2.5 text-white rounded-full font-black text-sm shadow-sm uppercase tracking-wide transition-opacity hover:opacity-90"
-                                style={{ background: GRAD }}>
-                                {listing.is_available ? "Book" : "View"}
-                              </motion.button>
-                            </Link>
-                          )}
-                        </div>
-                      </div>
 
                     </motion.div>
                   );

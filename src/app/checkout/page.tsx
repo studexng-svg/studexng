@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import {
-  Package, CreditCard, ChevronLeft, Shield, Lock, Check,
+  Package, CreditCard, Shield, Lock, Check,
   Calendar, MapPin, Clock, Loader, Sparkles, ArrowRight, AlertCircle
 } from "lucide-react";
 import { useCartStore } from "@/lib/cartStore";
@@ -13,6 +13,7 @@ import { useRouter } from "next/navigation";
 import { useAuth, fetchWithAuth } from "@/lib/authStore";
 import Script from "next/script";
 import { GRAD, GRAD_TEXT, SERIF } from "@/lib/tokens";
+import TopNav from "@/components/layout/TopNav";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -189,7 +190,7 @@ export default function CheckoutPage() {
   // ── EMPTY STATE ──────────────────────────────────────────────────────────
   if (!isFoodOrder && !isServiceBooking) {
     return (
-      <div className="min-h-screen bg-[#FAFAF9] flex flex-col items-center justify-center px-6 pb-28"
+      <div className="min-h-screen bg-[#F5F5F5] flex flex-col items-center justify-center px-6 pb-28"
         style={{ fontFamily: "'DM Sans', sans-serif" }}>
         <div className="text-center">
           <div className="w-24 h-24 mx-auto mb-6 rounded-2xl flex items-center justify-center"
@@ -214,27 +215,8 @@ export default function CheckoutPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#FAFAF9]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-
-      {/* ── STICKY HEADER ── */}
-      <div className="sticky top-0 bg-white/80 backdrop-blur-md z-40 border-b border-stone-100 shadow-sm">
-        <div className="flex items-center justify-between px-4 py-3 max-w-2xl mx-auto">
-          <Link href={isServiceBooking ? `/listing/${booking?.providerId}` : "/cart"}>
-            <button className="p-2.5 bg-white border border-stone-200 hover:border-stone-300 rounded-full shadow-sm transition-all active:scale-95">
-              <ChevronLeft className="w-5 h-5 text-stone-600" />
-            </button>
-          </Link>
-          <div className="text-center">
-            <h1 className="text-base font-bold text-stone-900" style={SERIF}>
-              Secure Checkout
-            </h1>
-            <p className="text-xs text-stone-400 flex items-center gap-1 justify-center mt-0.5">
-              <Shield className="w-3 h-3" /> Powered by Paystack
-            </p>
-          </div>
-          <div className="w-10" />
-        </div>
-      </div>
+    <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+      <TopNav showBack />
 
       <div className="px-4 pt-6 pb-28 max-w-2xl mx-auto space-y-4">
 

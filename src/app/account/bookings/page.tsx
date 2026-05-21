@@ -5,10 +5,11 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  ArrowLeft, Calendar, Clock, CheckCircle2, XCircle,
+  Calendar, Clock, CheckCircle2, XCircle,
   CreditCard, AlertCircle, Loader, RefreshCw,
   ChevronRight, Hourglass, Ban,
 } from "lucide-react";
+import TopNav from "@/components/layout/TopNav";
 import { useAuth, fetchWithAuth } from "@/lib/authStore";
 import { GRAD, SERIF, toArray } from "@/lib/tokens";
 
@@ -296,14 +297,14 @@ export default function BuyerBookingsPage() {
 
   if (!isHydrated || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#FAFAF9]">
+      <div className="min-h-screen flex items-center justify-center bg-[#F5F5F5]">
         <Loader className="w-10 h-10 text-teal-600 animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#FAFAF9]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+    <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       {/* TOAST */}
       <AnimatePresence>
         {toast && (
@@ -424,26 +425,7 @@ export default function BuyerBookingsPage() {
         )}
       </AnimatePresence>
 
-      {/* HEADER */}
-      <div className="sticky top-0 bg-white/80 backdrop-blur-md z-40 border-b border-stone-100 shadow-sm">
-        <div className="flex items-center justify-between px-4 py-3 max-w-2xl mx-auto">
-          <button
-            onClick={() => router.back()}
-            className="p-2.5 bg-white border border-stone-200 rounded-full shadow-sm active:scale-95 transition-all"
-          >
-            <ArrowLeft className="w-5 h-5 text-stone-600" />
-          </button>
-          <h1 className="text-base font-bold text-stone-900" style={SERIF}>
-            My Bookings
-          </h1>
-          <button
-            onClick={loadBookings}
-            className="p-2.5 bg-white border border-stone-200 rounded-full shadow-sm active:scale-95 transition-all"
-          >
-            <RefreshCw className="w-4 h-4 text-stone-500" />
-          </button>
-        </div>
-      </div>
+      <TopNav showBack backHref="/account" />
 
       <div className="max-w-2xl mx-auto px-4 pt-5 pb-44 space-y-4">
         {/* FILTER TABS */}

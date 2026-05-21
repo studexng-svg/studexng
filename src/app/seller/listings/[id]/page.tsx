@@ -3,7 +3,8 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ChevronLeft, Package, Tag, FileText, Calendar, Eye, TrendingUp, Edit3, ArrowLeft, AlertCircle } from "lucide-react";
+import { Package, Tag, FileText, Calendar, Eye, TrendingUp, Edit3, AlertCircle } from "lucide-react";
+import TopNav from "@/components/layout/TopNav";
 import Link from "next/link";
 import { fetchWithAuth, useAuth } from "@/lib/authStore";
 import { GRAD, SERIF } from "@/lib/tokens";
@@ -63,7 +64,7 @@ export default function SellerProductDetails() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#FAFAF9]">
+      <div className="min-h-screen flex items-center justify-center bg-[#F5F5F5]">
         <div className="animate-spin">
           <Package className="w-10 h-10 text-teal-600" />
         </div>
@@ -73,7 +74,7 @@ export default function SellerProductDetails() {
 
   if (error || !product) {
     return (
-      <div className="min-h-screen bg-[#FAFAF9] flex flex-col items-center justify-center p-6 text-center" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+      <div className="min-h-screen bg-[#F5F5F5] flex flex-col items-center justify-center p-6 text-center" style={{ fontFamily: "'DM Sans', sans-serif" }}>
         <AlertCircle className="w-14 h-14 text-red-400 mx-auto mb-4" />
         <h2 className="text-lg font-bold text-stone-800 mb-2" style={SERIF}>
           Product Not Found
@@ -93,19 +94,8 @@ export default function SellerProductDetails() {
   }
 
   return (
-    <div className="min-h-screen bg-[#FAFAF9]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-      {/* HEADER */}
-      <div className="sticky top-0 bg-white/80 backdrop-blur-md z-40 border-b border-stone-100 shadow-sm">
-        <div className="flex items-center justify-between px-4 py-3 max-w-2xl mx-auto">
-          <button onClick={() => router.back()} className="p-2.5 bg-white border border-stone-200 rounded-full shadow-sm active:scale-95 transition-all">
-            <ChevronLeft className="w-5 h-5 text-stone-600" />
-          </button>
-          <h1 className="text-base font-bold text-stone-900" style={SERIF}>
-            Listing Details
-          </h1>
-          <div className="w-10" />
-        </div>
-      </div>
+    <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+      <TopNav showBack backHref="/seller/listings" />
 
       <div className="px-4 pt-6 pb-32 space-y-5 max-w-2xl mx-auto">
         {/* IMAGE */}
