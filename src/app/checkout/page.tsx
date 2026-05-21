@@ -143,8 +143,9 @@ export default function CheckoutPage() {
         method: "POST",
         body: JSON.stringify({
           listing_id: listingId,
-          // Pass the full cart total so the discount base is correct for multi-item orders
-          ...(isFoodOrder && cart.length > 1 ? { cart_amount: foodTotal } : {}),
+          // Always pass cart_amount for food orders — covers both multi-item carts
+          // and single items with quantity > 1 (where listing.price ≠ cart total).
+          ...(isFoodOrder ? { cart_amount: foodTotal } : {}),
         }),
       });
       const initData = await initRes.json();
