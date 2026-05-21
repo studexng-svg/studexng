@@ -462,53 +462,53 @@ export default function HomePageClient({ initialVendors, initialListings, initia
             <div className="absolute bottom-0 left-[20%] w-56 h-56 rounded-full pointer-events-none"
               style={{ background: "radial-gradient(circle,rgba(103,232,249,0.25) 0%,transparent 70%)" }} />
 
-            <div className="relative z-10 px-5 py-7 sm:px-8 sm:py-10 lg:px-10 lg:py-12">
-              {/* Stack on mobile, side-by-side on sm+ */}
-              <div className="flex flex-col sm:flex-row sm:items-center sm:gap-6">
+            <div className="relative z-10 px-4 py-5 sm:px-8 sm:py-10 lg:px-10 lg:py-12">
+              {/* Always side-by-side — scaled down on mobile */}
+              <div className="flex items-center gap-3 sm:gap-6">
 
                 {/* Text */}
-                <div className="sm:flex-1">
+                <div className="flex-1 min-w-0">
                   {vendorOfMonth ? (
                     <>
-                      <div className="flex items-center gap-1.5 bg-amber-400 w-fit px-3 py-1 rounded-full mb-3">
-                        <Trophy className="w-3 h-3 text-amber-900" />
-                        <span className="text-amber-900 text-xs font-bold">Vendor of the Month · {vendorOfMonth.month}</span>
+                      <div className="flex items-center gap-1 bg-amber-400 w-fit px-2 py-0.5 sm:px-3 sm:py-1 rounded-full mb-2 sm:mb-3">
+                        <Trophy className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-amber-900" />
+                        <span className="text-amber-900 text-[10px] sm:text-xs font-bold">Vendor of the Month · {vendorOfMonth.month}</span>
                       </div>
-                      <h1 className="text-2xl sm:text-3xl lg:text-5xl font-black text-white leading-[1.1] mb-2 sm:mb-3"
+                      <h1 className="text-lg sm:text-3xl lg:text-5xl font-black text-white leading-[1.1] mb-1.5 sm:mb-3"
                         style={{ fontFamily: "var(--font-jakarta),'Plus Jakarta Sans',sans-serif" }}>
                         {vendorOfMonth.business_name}
                       </h1>
-                      <p className="text-white/75 text-sm mb-4">
+                      <p className="text-white/75 text-[11px] sm:text-sm mb-3 sm:mb-4 line-clamp-2 sm:line-clamp-none">
                         {vendorOfMonth.total_orders} orders last month{vendorOfMonth.rating > 0 && ` · ⭐ ${vendorOfMonth.rating.toFixed(1)}`}
                       </p>
                       <Link href={`/vendor/${vendorOfMonth.username}`}>
                         <motion.button whileTap={{ scale: 0.97 }}
-                          className="bg-white text-stone-900 font-bold px-5 py-2 sm:px-6 sm:py-2.5 rounded-full text-sm inline-flex items-center gap-2 shadow-lg">
-                          Shop Now <ArrowRight className="w-4 h-4" />
+                          className="bg-white text-stone-900 font-bold px-3 py-1.5 sm:px-6 sm:py-2.5 rounded-full text-[11px] sm:text-sm inline-flex items-center gap-1.5 sm:gap-2 shadow-lg">
+                          Shop Now <ArrowRight className="w-3 h-3 sm:w-4 sm:h-4" />
                         </motion.button>
                       </Link>
                     </>
                   ) : (
                     <>
-                      <div className="bg-white/20 border border-white/30 backdrop-blur-sm w-fit px-3 py-1 rounded-full mb-3">
-                        <span className="text-white text-xs font-semibold">New Collection 2024</span>
+                      <div className="bg-white/20 border border-white/30 backdrop-blur-sm w-fit px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full mb-2 sm:mb-3">
+                        <span className="text-white text-[10px] sm:text-xs font-semibold">New Collection 2024</span>
                       </div>
-                      <h1 className="text-2xl sm:text-3xl lg:text-5xl font-black text-white leading-[1.1] mb-2 sm:mb-3"
+                      <h1 className="text-xl sm:text-3xl lg:text-5xl font-black text-white leading-[1.1] mb-1.5 sm:mb-3"
                         style={{ fontFamily: "var(--font-jakarta),'Plus Jakarta Sans',sans-serif" }}>
-                        Shop Smart. Live Campus.
+                        Shop Smart.<br className="sm:hidden" /> Live Campus.
                       </h1>
-                      <p className="text-white/80 text-sm lg:text-base mb-4 leading-relaxed max-w-sm">
+                      <p className="text-white/80 text-[11px] sm:text-sm lg:text-base mb-3 sm:mb-4 leading-relaxed line-clamp-2 sm:line-clamp-none">
                         Explore hundreds of services from verified vendors on your campus, every day.
                       </p>
-                      <div className="flex items-center gap-2 flex-wrap">
+                      <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
                         <Link href="/categories">
                           <motion.button whileTap={{ scale: 0.97 }}
-                            className="bg-white text-stone-900 font-bold px-5 py-2 sm:px-6 sm:py-2.5 rounded-full text-sm inline-flex items-center gap-2 shadow-lg">
-                            Shop Now <ArrowRight className="w-4 h-4" />
+                            className="bg-white text-stone-900 font-bold px-3 py-1.5 sm:px-6 sm:py-2.5 rounded-full text-[11px] sm:text-sm inline-flex items-center gap-1 sm:gap-2 shadow-lg">
+                            Shop Now <ArrowRight className="w-3 h-3 sm:w-4 sm:h-4" />
                           </motion.button>
                         </Link>
                         <button onClick={() => setActiveTab("vendors")}
-                          className="bg-white/20 border border-white/30 text-white font-semibold px-5 py-2 sm:px-6 sm:py-2.5 rounded-full text-sm inline-flex items-center gap-1.5 backdrop-blur-sm hover:bg-white/30 transition">
+                          className="bg-white/20 border border-white/30 text-white font-semibold px-3 py-1.5 sm:px-6 sm:py-2.5 rounded-full text-[11px] sm:text-sm inline-flex items-center gap-1 sm:gap-1.5 backdrop-blur-sm hover:bg-white/30 transition">
                           View Vendors
                         </button>
                       </div>
@@ -516,23 +516,14 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                   )}
                 </div>
 
-                {/* Image — beside text on sm+, hidden here (shown below on mobile) */}
-                <div className="hidden sm:block sm:w-44 sm:h-56 lg:w-56 lg:h-72 rounded-2xl overflow-hidden shadow-2xl border-2 border-white/20 flex-shrink-0">
+                {/* Image — always visible, smaller on mobile */}
+                <div className="w-28 h-36 sm:w-44 sm:h-56 lg:w-56 lg:h-72 rounded-xl sm:rounded-2xl overflow-hidden shadow-2xl border-2 border-white/20 flex-shrink-0">
                   <img
                     src="https://plus.unsplash.com/premium_photo-1681487865280-c2b836dd83e8?fm=jpg&q=80&w=900&auto=format&fit=crop"
                     alt="Shop on StudEx"
                     className="w-full h-full object-cover object-top"
                   />
                 </div>
-              </div>
-
-              {/* Mobile-only: full-width image below text */}
-              <div className="mt-4 sm:hidden h-44 rounded-xl overflow-hidden shadow-xl border border-white/20">
-                <img
-                  src="https://plus.unsplash.com/premium_photo-1681487865280-c2b836dd83e8?fm=jpg&q=80&w=900&auto=format&fit=crop"
-                  alt="Shop on StudEx"
-                  className="w-full h-full object-cover object-center"
-                />
               </div>
             </div>
           </motion.div>
