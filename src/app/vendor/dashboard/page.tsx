@@ -508,7 +508,7 @@ function BookingsTab() {
                     ₦{Number(booking.listing_price || 0).toLocaleString()}
                   </p>
                   <p className="text-stone-400 text-xs mt-0.5">
-                    Your full listing price (₦215.56 service fee charged to buyer)
+                    Your full listing price (2% service fee charged to buyer)
                   </p>
                 </div>
               </div>
@@ -587,10 +587,10 @@ function EarningsTab() {
     },
     {
       label: "Service Fee",
-      value: "₦215.56",
+      value: "2%",
       color: "text-stone-600",
       bg: "bg-stone-50 border-stone-100",
-      note: "Flat fee per transaction",
+      note: "Min ₦50 · Max ₦1,500 per transaction",
     },
   ];
 
@@ -619,7 +619,7 @@ function EarningsTab() {
           </div>
           <div className="flex items-start gap-3 bg-stone-50 border border-stone-100 rounded-xl p-3">
             <span className="text-teal-600 font-bold text-base leading-none">2</span>
-            <p>StudEx collects a flat <span className="text-stone-800 font-semibold">₦215.56 service fee</span> from the buyer — your listing price is transferred to your bank in full.</p>
+            <p>StudEx collects a <span className="text-stone-800 font-semibold">2% service fee</span> (min ₦50, max ₦1,500) from the buyer — your listing price is transferred to your bank in full.</p>
           </div>
           <div className="flex items-start gap-3 bg-stone-50 border border-stone-100 rounded-xl p-3">
             <span className="text-teal-600 font-bold text-base leading-none">3</span>

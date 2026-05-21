@@ -11,10 +11,9 @@ import {
 } from "lucide-react";
 import TopNav from "@/components/layout/TopNav";
 import { useAuth, fetchWithAuth } from "@/lib/authStore";
-import { GRAD, SERIF, toArray } from "@/lib/tokens";
+import { GRAD, SERIF, toArray, calcServiceFee } from "@/lib/tokens";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
-const SERVICE_FEE = 215.56;
 
 interface Booking {
   id: number;
@@ -234,7 +233,8 @@ export default function BuyerBookingsPage() {
   const listingPrice = activeBooking ? parseFloat(activeBooking.listing_price) : 0;
   const creditsToApply = useCredits ? Math.min(loyaltyBalance, listingPrice) : 0;
   const amountAfterCredits = Math.max(listingPrice - creditsToApply, 0);
-  const totalWithFee = amountAfterCredits + SERVICE_FEE;
+  const serviceFee = calcServiceFee(amountAfterCredits);
+  const totalWithFee = amountAfterCredits + serviceFee;
 
   const proceedToPaystack = () => {
     if (!activeBooking) return;
@@ -261,10 +261,9 @@ export default function BuyerBookingsPage() {
       amount: totalWithFee * 100,
       currency: "NGN",
       ref: txRef,
-      // StudEx service fee: ₦215.56 flat (21556 kobo) — vendor receives listing price via Transfer API
       ...(subaccountCode && subaccountCode.startsWith("ACCT_") ? {
         subaccount: subaccountCode,
-        transaction_charge: 20556,
+        transaction_charge: Math.round(calcServiceFee(totalWithFee) * 100),
         bearer: "account",
       } : {}),
       metadata: {
@@ -360,11 +359,11 @@ export default function BuyerBookingsPage() {
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-stone-500">Service Fee</span>
-                  <span className="font-medium text-teal-600">₦{SERVICE_FEE.toLocaleString()}</span>
+                  <span className="font-medium text-teal-600">₦{serviceFee.toLocaleString()}</span>
                 </div>
                 <div className="border-t border-stone-200 pt-2 flex justify-between">
                   <span className="font-semibold text-stone-900">Total</span>
-                  <span className="font-bold text-teal-600 text-lg">₦{(Number(activeBooking.listing_price) + SERVICE_FEE).toLocaleString()}</span>
+                  <span className="font-bold text-teal-600 text-lg">₦{totalWithFee.toLocaleString()}</span>
                 </div>
               </div>
 
@@ -508,7 +507,7 @@ export default function BuyerBookingsPage() {
                     <button onClick={() => handlePay(booking.id)}
                       className="flex-1 py-3 text-white rounded-xl font-semibold text-sm flex items-center justify-center gap-2 shadow-md active:scale-95 transition-transform"
                       style={{ background: GRAD }}>
-                      <CreditCard className="w-4 h-4" /> Pay ₦{(Number(booking.listing_price) + SERVICE_FEE).toLocaleString()}
+                      <CreditCard className="w-4 h-4" /> Pay ₦{(Number(booking.listing_price) + calcServiceFee(Number(booking.listing_price))).toLocaleString()}
                     </button>
                   )}
                   {isPending && (

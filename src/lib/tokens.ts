@@ -23,5 +23,10 @@ export const SANS: CSSProperties = {
 export const toArray = (d: any): any[] =>
   Array.isArray(d) ? d : (d?.results ?? []);
 
+/** StudEx service fee: 2% of order, minimum ₦50, capped at ₦1,500 */
+export function calcServiceFee(amount: number): number {
+  return Math.min(Math.max(amount * 0.02, 50), 1500);
+}
+
 export const ACCENT = "#f97316"; // orange-500
 export const ACCENT_DARK = "#ea580c"; // orange-600

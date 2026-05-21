@@ -16,7 +16,7 @@ const faqs = [
     questions: [
       {
         q: "How does payment work on StudEx?",
-        a: "When you pay for a service, your payment is processed securely via Paystack. StudEx charges a flat ₦215.56 service fee and the vendor receives their full listing price directly via Paystack transfer.",
+        a: "When you pay for a service, your payment is processed securely via Paystack. StudEx charges a 2% service fee (minimum ₦50, maximum ₦1,500) and the vendor receives their full listing price directly via Paystack transfer.",
       },
       {
         q: "When is the vendor paid?",

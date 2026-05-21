@@ -12,7 +12,7 @@ import { useBookingStore } from "@/lib/bookingStore";
 import { useRouter } from "next/navigation";
 import { useAuth, fetchWithAuth } from "@/lib/authStore";
 import Script from "next/script";
-import { GRAD, GRAD_TEXT, SERIF } from "@/lib/tokens";
+import { GRAD, GRAD_TEXT, SERIF, calcServiceFee } from "@/lib/tokens";
 import TopNav from "@/components/layout/TopNav";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
@@ -32,7 +32,6 @@ export default function CheckoutPage() {
   const isServiceBooking = !!booking && cart.length === 0;
   const isFoodOrder = cart.length > 0;
 
-  const SERVICE_FEE = 215.56;
   const foodTotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const serviceTotal = booking?.total || 0;
   const baseTotal = isServiceBooking ? serviceTotal : foodTotal;
@@ -47,7 +46,8 @@ export default function CheckoutPage() {
   } | null>(null);
 
   const discountedBase = discount ? discount.finalBase : baseTotal;
-  const finalTotal = discountedBase + SERVICE_FEE;
+  const serviceFee = calcServiceFee(discountedBase);
+  const finalTotal = discountedBase + serviceFee;
 
   useEffect(() => {
     if (!isLoggedIn || !isHydrated || baseTotal <= 0) return;
@@ -310,7 +310,7 @@ export default function CheckoutPage() {
             )}
             <div className="flex justify-between items-center text-sm">
               <span className="text-stone-500">Service fee</span>
-              <span className="text-stone-700 font-medium">₦{SERVICE_FEE.toLocaleString()}</span>
+              <span className="text-stone-700 font-medium">₦{serviceFee.toLocaleString()}</span>
             </div>
             <div className="border-t border-stone-100 pt-3 flex justify-between items-center">
               <span className="font-bold text-stone-900" style={SERIF}>Total</span>
@@ -356,7 +356,7 @@ export default function CheckoutPage() {
             <div>
               <p className="font-semibold text-teal-800 text-sm">Transparent Pricing</p>
               <p className="text-xs text-teal-600 mt-0.5 leading-relaxed">
-                A flat <strong>₦215.56 service fee</strong> is included in your total.
+                A <strong>2% service fee</strong> (min ₦50, max ₦1,500) is included in your total.
                 The vendor receives their full listed price.
                 {discount?.hasDiscount && " Your 5% profile completion bonus has been applied and will be used on this order."}
                 {" "}Refunds are processed back to your original payment method.
