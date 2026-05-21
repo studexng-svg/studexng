@@ -315,9 +315,9 @@ export default function HomePageClient({ initialVendors, initialListings, initia
               <p className="font-bold text-stone-900 text-sm truncate">{vendor.business_name || vendor.username}</p>
               <p className="text-stone-400 text-xs truncate">@{vendor.username}</p>
               <div className="flex items-center justify-between mt-2">
-                {vendor.total_reviews > 0
-                  ? <div className="flex items-center gap-0.5"><Star className="w-3 h-3 fill-amber-400 text-amber-400" /><span className="text-xs text-stone-600 font-medium">{vendor.rating}</span><span className="text-xs text-stone-400">({vendor.total_reviews})</span></div>
-                  : <span className="text-xs text-stone-400">New vendor</span>}
+                {vendor.total_reviews > 0 && (
+                  <div className="flex items-center gap-0.5"><Star className="w-3 h-3 fill-amber-400 text-amber-400" /><span className="text-xs text-stone-600 font-medium">{vendor.rating}</span><span className="text-xs text-stone-400">({vendor.total_reviews})</span></div>
+                )}
                 <span className="text-xs text-stone-400">{vendor.total_listings} listings</span>
               </div>
             </div>
