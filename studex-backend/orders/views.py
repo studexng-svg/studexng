@@ -90,6 +90,7 @@ class OrderViewSet(viewsets.ModelViewSet):
             )
 
         order.status = 'seller_completed'
+        order.seller_completed_at = timezone.now()
         order.save()
         _notify(
             recipient=order.buyer,
