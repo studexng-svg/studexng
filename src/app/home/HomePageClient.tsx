@@ -319,8 +319,17 @@ export default function HomePageClient({ initialVendors, initialListings, initia
               )}
             </div>
             <div className="p-3">
-              <p className="font-bold text-stone-900 text-sm truncate">{vendor.business_name || vendor.username}</p>
-              <p className="text-stone-400 text-xs truncate">@{vendor.username}</p>
+              <div className="flex items-start justify-between gap-1">
+                <div className="min-w-0">
+                  <p className="font-bold text-stone-900 text-sm truncate">{vendor.business_name || vendor.username}</p>
+                  <p className="text-stone-400 text-xs truncate">@{vendor.username}</p>
+                </div>
+                {vendor.vendor_badge && vendor.vendor_badge !== "none" && (
+                  <span className={`flex-shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full ${BADGE_STYLES[vendor.vendor_badge]}`}>
+                    {vendor.vendor_badge === "top" ? "🏆" : vendor.vendor_badge === "trusted" ? "✅" : "⭐"} {BADGE_LABELS[vendor.vendor_badge]}
+                  </span>
+                )}
+              </div>
               <div className="flex items-center justify-between mt-2">
                 {vendor.total_reviews > 0 && (
                   <div className="flex items-center gap-0.5"><Star className="w-3 h-3 fill-amber-400 text-amber-400" /><span className="text-xs text-stone-600 font-medium">{vendor.rating}</span><span className="text-xs text-stone-400">({vendor.total_reviews})</span></div>
