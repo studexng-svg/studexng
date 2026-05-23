@@ -288,7 +288,7 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
 
           {/* ── HERO IMAGE ── */}
           <div
-            className={`relative h-64 w-full bg-stone-100 ${listing.image?.startsWith("http") ? "cursor-zoom-in" : ""}`}
+            className={`relative w-full bg-stone-100 ${listing.image?.startsWith("http") ? "cursor-zoom-in" : "h-48"}`}
             onClick={() => listing.image?.startsWith("http") && setImageOpen(true)}
           >
             {listing.image?.startsWith("http") ? (
@@ -297,7 +297,7 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
                 alt={listing.title}
                 loading="lazy"
                 decoding="async"
-                className="w-full h-full object-cover"
+                className="w-full max-h-[480px] object-contain"
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
@@ -305,7 +305,7 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
               </div>
             )}
             {/* Gradient overlay */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
+            <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-black/30 to-transparent pointer-events-none" />
 
             {/* Zoom hint */}
             {listing.image?.startsWith("http") && listing.is_available && (
