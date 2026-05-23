@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import {
-  Package, CheckCircle, Clock, AlertCircle, MessageCircle, XCircle,
+  Package, CheckCircle, Clock, AlertCircle, MessageCircle, XCircle, MapPin,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAuth, fetchWithAuth } from "@/lib/authStore";
@@ -21,6 +21,7 @@ interface Order {
   created_at: string;
   status: "pending" | "paid" | "seller_completed" | "completed" | "disputed" | "cancelled";
   current_status: string;
+  delivery_location?: string;
 }
 
 export default function OrderDetailPage() {
@@ -225,6 +226,15 @@ export default function OrderDetailPage() {
               <span className="text-sm text-stone-400">Vendor</span>
               <span className="font-semibold text-stone-800 text-sm">{order.listing?.vendor?.username}</span>
             </div>
+            {order.delivery_location && (
+              <div className="flex items-start gap-2 py-2 border-b border-stone-50">
+                <MapPin className="w-4 h-4 text-teal-500 mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-xs text-stone-400 mb-0.5">Delivery Location</p>
+                  <p className="font-semibold text-stone-800 text-sm">{order.delivery_location}</p>
+                </div>
+              </div>
+            )}
             <div className="flex justify-between pt-2">
               <span className="font-semibold text-stone-700">Total</span>
               <span className="font-bold text-2xl text-teal-700">
