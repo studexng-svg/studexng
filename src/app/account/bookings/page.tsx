@@ -231,16 +231,18 @@ export default function BuyerBookingsPage() {
 
   const activeBooking = bookings.find(b => b.id === payingId);
   const listingPrice = activeBooking ? parseFloat(activeBooking.listing_price) : 0;
-  const creditsToApply = useCredits ? Math.min(loyaltyBalance, listingPrice) : 0;
-  const amountAfterCredits = Math.max(listingPrice - creditsToApply, 0);
-  const serviceFee = calcServiceFee(amountAfterCredits);
-  const totalWithFee = amountAfterCredits + serviceFee;
+  const fullCheckoutAmount = listingPrice + calcServiceFee(listingPrice);
+  const creditsToApply = useCredits ? Math.min(loyaltyBalance, fullCheckoutAmount) : 0;
+  const isFullyCoveredByCredits = useCredits && creditsToApply >= fullCheckoutAmount && fullCheckoutAmount > 0;
+  const amountAfterCredits = isFullyCoveredByCredits ? 0 : Math.max(listingPrice - creditsToApply, 0);
+  const serviceFee = isFullyCoveredByCredits ? 0 : calcServiceFee(amountAfterCredits);
+  const totalWithFee = isFullyCoveredByCredits ? 0 : amountAfterCredits + serviceFee;
 
   const proceedToPaystack = async () => {
     if (!activeBooking) return;
 
     // Full credits coverage — skip Paystack, StudEx pays vendor directly
-    if (useCredits && creditsToApply >= listingPrice) {
+    if (isFullyCoveredByCredits) {
       setPayingId(null);
       setVerifying(true);
       try {
@@ -251,7 +253,7 @@ export default function BuyerBookingsPage() {
         const data = await res.json();
         if (res.ok && data.order_id) {
           setVerifying(false);
-          setLoyaltyBalance(prev => Math.max(0, prev - listingPrice));
+          setLoyaltyBalance(prev => Math.max(0, prev - creditsToApply));
           showToast("Order placed with loyalty credits!");
           await loadBookings();
           setTimeout(() => router.push(`/account/orders/${data.order_id}`), 1200);

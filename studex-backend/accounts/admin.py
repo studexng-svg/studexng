@@ -30,16 +30,16 @@ class UserAdmin(BaseUserAdmin):
             return []
         return [ProfileInline]
 
-    list_display = ['username', 'email', 'school', 'user_type', 'business_name', 'hostel', 'wallet_balance', 'is_verified_vendor', 'is_staff', 'is_active', 'created_at']
+    list_display = ['username', 'email', 'school', 'user_type', 'verification_type', 'matric_number', 'nin_display', 'business_name', 'hostel', 'wallet_balance', 'is_verified_vendor', 'is_staff', 'is_active', 'created_at']
     list_filter = ['school', 'user_type', 'is_verified_vendor', 'is_staff', 'is_active', 'hostel']
     search_fields = ['username', 'email', 'phone', 'business_name', 'matric_number', 'school']
-    readonly_fields = ['wallet_balance', 'created_at', 'updated_at']
+    readonly_fields = ['wallet_balance', 'created_at', 'updated_at', 'nin_display']
 
     fieldsets = (
         (None, {'fields': ('username', 'password')}),
         ('Personal Info', {'fields': ('first_name', 'last_name', 'email', 'phone', 'bio', 'profile_image')}),
         ('StudEx Role', {'fields': ('user_type',)}),
-        ('Student Info', {'fields': ('school', 'matric_number', 'hostel')}),
+        ('Student Info', {'fields': ('school', 'verification_type', 'matric_number', 'nin_display', 'hostel')}),
         ('Vendor Info', {'fields': ('business_name', 'is_verified_vendor')}),
         ('Wallet', {'fields': ('wallet_balance',)}),
         ('Permissions', {'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions')}),
@@ -52,6 +52,14 @@ class UserAdmin(BaseUserAdmin):
 
     ordering = ['-created_at']
     actions = ['approve_vendors', 'unverify_vendors', 'export_to_csv', 'send_custom_notification']
+
+    def nin_display(self, obj):
+        from accounts.fields import decrypt_field
+        value = decrypt_field(obj.nin) if obj.nin else None
+        if not value:
+            return format_html('<span style="color:#9ca3af;">—</span>')
+        return format_html('<code style="background:#f3f4f6;padding:2px 6px;border-radius:4px;">{}</code>', value)
+    nin_display.short_description = 'NIN'
 
     def changelist_view(self, request, extra_context=None):
         from datetime import timedelta

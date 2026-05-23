@@ -49,11 +49,12 @@ export default function CheckoutPage() {
   const [useCredits, setUseCredits] = useState(false);
 
   const discountedBase = discount ? discount.finalBase : baseTotal;
-  const creditsToApply = useCredits ? Math.min(loyaltyBalance, discountedBase) : 0;
-  const baseAfterCredits = Math.max(discountedBase - creditsToApply, 0);
-  const serviceFee = calcServiceFee(baseAfterCredits);
-  const finalTotal = baseAfterCredits + serviceFee;
-  const isFullyCoveredByCredits = useCredits && creditsToApply >= discountedBase && discountedBase > 0;
+  const fullCheckoutAmount = discountedBase + calcServiceFee(discountedBase);
+  const creditsToApply = useCredits ? Math.min(loyaltyBalance, fullCheckoutAmount) : 0;
+  const isFullyCoveredByCredits = useCredits && creditsToApply >= fullCheckoutAmount && fullCheckoutAmount > 0;
+  const baseAfterCredits = isFullyCoveredByCredits ? 0 : Math.max(discountedBase - creditsToApply, 0);
+  const serviceFee = isFullyCoveredByCredits ? 0 : calcServiceFee(baseAfterCredits);
+  const finalTotal = isFullyCoveredByCredits ? 0 : baseAfterCredits + serviceFee;
 
   useEffect(() => {
     if (!isLoggedIn || !isHydrated || baseTotal <= 0) return;
@@ -393,6 +394,12 @@ export default function CheckoutPage() {
                 <span className="text-amber-600 font-semibold">
                   -₦{creditsToApply.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
+              </div>
+            )}
+            {isFullyCoveredByCredits && (
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-emerald-600 font-medium">Service fee</span>
+                <span className="text-emerald-600 font-semibold">₦0.00 (covered)</span>
               </div>
             )}
 

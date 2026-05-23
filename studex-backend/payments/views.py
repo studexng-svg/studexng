@@ -732,7 +732,8 @@ def pay_with_credits(request):
         order_id=order_id,
     )
 
-    credits_to_deduct = min(loyalty_account.credit_balance, listing_price)
+    total_charge = listing_price + calc_service_fee(listing_price)
+    credits_to_deduct = min(loyalty_account.credit_balance, total_charge)
     loyalty_account.credit_balance -= credits_to_deduct
     loyalty_account.save()
     LoyaltyTransaction.objects.create(
