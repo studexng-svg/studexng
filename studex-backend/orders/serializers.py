@@ -26,7 +26,7 @@ class OrderSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'reference', 'listing', 'listing_id', 'buyer', 'buyer_id',
             'amount', 'status', 'current_status', 'estimated_time',
-            'created_at', 'paid_at',
+            'delivery_location', 'created_at', 'paid_at',
         ]
         read_only_fields = [
             'reference', 'amount', 'status', 'current_status', 'estimated_time',

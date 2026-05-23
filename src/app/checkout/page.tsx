@@ -39,6 +39,7 @@ export default function CheckoutPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [paystackLoaded, setPaystackLoaded] = useState(false);
   const [paymentError, setPaymentError] = useState("");
+  const [deliveryLocation, setDeliveryLocation] = useState("");
   const [discount, setDiscount] = useState<{
     hasDiscount: boolean;
     discountAmount: number;
@@ -112,6 +113,7 @@ export default function CheckoutPage() {
         transaction_id: transactionId,
         items: cart.map(item => ({ listing_id: item.id, quantity: item.quantity })),
         order_type: "product",
+        delivery_location: deliveryLocation.trim(),
       }),
     });
     const data = await res.json();
@@ -129,6 +131,7 @@ export default function CheckoutPage() {
     }
     if (finalTotal <= 0) { setPaymentError("Invalid amount. Please go back and try again."); return; }
     if (!window.PaystackPop) { setPaymentError("Payment system not ready. Please refresh the page."); return; }
+    if (isFoodOrder && !deliveryLocation.trim()) { setPaymentError("Please enter your campus delivery location."); return; }
 
     const listingId = isServiceBooking ? booking?.providerId : cart[0]?.id;
     if (!listingId) {
@@ -283,6 +286,25 @@ export default function CheckoutPage() {
                 </p>
               </motion.div>
             ))}
+          </motion.div>
+        )}
+
+        {/* ── DELIVERY LOCATION (products only) ── */}
+        {isFoodOrder && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 }}
+            className="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm space-y-2">
+            <div className="flex items-center gap-2 mb-1">
+              <MapPin className="w-4 h-4 text-teal-600" />
+              <p className="font-semibold text-stone-900 text-sm">Delivery Location</p>
+            </div>
+            <p className="text-xs text-stone-400">Campus delivery only — specify your hostel, hall, or building.</p>
+            <input
+              type="text"
+              value={deliveryLocation}
+              onChange={e => setDeliveryLocation(e.target.value)}
+              placeholder="e.g. Cedar Hostel, Room 12"
+              className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-teal-400 transition"
+            />
           </motion.div>
         )}
 

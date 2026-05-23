@@ -539,6 +539,7 @@ def verify_payment(request):
         listing_id=actual_listing_id,
         order_type=_normalize_order_type(order_type),
         use_credits=use_credits,
+        delivery_location=request.data.get("delivery_location", ""),
     )
 
     if error:
@@ -901,7 +902,7 @@ def paystack_webhook(request):
 # INTERNAL: create order from Paystack data
 # ─────────────────────────────────────────
 
-def _create_order_from_paystack_data(paystack_data, buyer, listing_id, order_type, use_credits=False):
+def _create_order_from_paystack_data(paystack_data, buyer, listing_id, order_type, use_credits=False, delivery_location=""):
     from services.models import Listing
 
     # Paystack amounts are in kobo — divide by 100 to get naira
@@ -961,6 +962,7 @@ def _create_order_from_paystack_data(paystack_data, buyer, listing_id, order_typ
                 reference=ref_key,
                 status="paid",
                 paid_at=timezone.now(),
+                delivery_location=delivery_location or "",
             )
             order_id = order.id
 

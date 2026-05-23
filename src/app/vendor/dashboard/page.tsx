@@ -10,7 +10,7 @@ import {
   MessageCircle, Calendar, DollarSign, Package, ShoppingBag,
   Send, Check, CheckCheck, X, Plus, Edit2, Trash2,
   TrendingUp, Loader, ToggleLeft, ToggleRight, Image as ImageIcon,
-  Star, ArrowLeft, Link2, Share2,
+  Star, ArrowLeft, Link2, Share2, MapPin,
 } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
@@ -965,6 +965,12 @@ function OrdersTab() {
                   </p>
                 </div>
               </div>
+              {order.delivery_location && (
+                <div className="flex items-start gap-1.5 mb-3 bg-stone-50 rounded-xl px-3 py-2">
+                  <MapPin className="w-3.5 h-3.5 text-teal-500 mt-0.5 shrink-0" />
+                  <p className="text-xs text-stone-600">{order.delivery_location}</p>
+                </div>
+              )}
               {order.status === "paid" && (
                 <button
                   onClick={() => markComplete(order.id)}

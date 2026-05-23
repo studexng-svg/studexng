@@ -1,7 +1,7 @@
 // src/app/admin/orders/[id]/page.tsx
 "use client";
 
-import { Package } from "lucide-react";
+import { Package, Clock } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import AdminTopBar from "@/components/layout/AdminTopBar";
@@ -20,6 +20,27 @@ const STATUS_STYLE: Record<string, string> = {
 };
 
 
+function useElapsed(isoDate: string | null | undefined) {
+  const [elapsed, setElapsed] = useState("");
+  useEffect(() => {
+    if (!isoDate) return;
+    const update = () => {
+      const secs = Math.floor((Date.now() - new Date(isoDate).getTime()) / 1000);
+      if (secs < 60) { setElapsed(`${secs}s ago`); return; }
+      const mins = Math.floor(secs / 60);
+      if (mins < 60) { setElapsed(`${mins}m ago`); return; }
+      const hrs = Math.floor(mins / 60);
+      if (hrs < 24) { setElapsed(`${hrs}h ${mins % 60}m ago`); return; }
+      const days = Math.floor(hrs / 24);
+      setElapsed(`${days}d ${hrs % 24}h ago`);
+    };
+    update();
+    const t = setInterval(update, 30_000);
+    return () => clearInterval(t);
+  }, [isoDate]);
+  return elapsed;
+}
+
 function Row({ label, value }: { label: string; value?: string | number | null }) {
   if (!value && value !== 0) return null;
   return (
@@ -36,6 +57,7 @@ export default function AdminOrderDetail() {
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
+  const sellerCompletedElapsed = useElapsed(order?.seller_completed_at);
 
   useEffect(() => {
     if (!id) return;
@@ -112,11 +134,28 @@ export default function AdminOrderDetail() {
 
             {order.status === "seller_completed" && (
               <>
-                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-2">
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-2 space-y-2">
                   <p className="text-amber-700 text-xs font-medium">
                     Vendor has marked this order complete but the buyer hasn&apos;t confirmed yet.
                     Confirming here will immediately trigger the vendor payout via Transfer API.
                   </p>
+                  {order.seller_completed_at && (
+                    <div className="flex items-center gap-1.5 pt-1 border-t border-amber-200">
+                      <Clock className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                      <p className="text-amber-600 text-xs">
+                        Marked delivered on{" "}
+                        <span className="font-semibold">
+                          {new Date(order.seller_completed_at).toLocaleString("en-NG", {
+                            day: "numeric", month: "short", year: "numeric",
+                            hour: "2-digit", minute: "2-digit",
+                          })}
+                        </span>
+                        {sellerCompletedElapsed && (
+                          <span className="ml-1 text-amber-500">({sellerCompletedElapsed})</span>
+                        )}
+                      </p>
+                    </div>
+                  )}
                 </div>
                 <button onClick={() => updateStatus("completed")} disabled={updating}
                   className="w-full py-3 text-white font-semibold rounded-xl text-sm disabled:opacity-50 transition"

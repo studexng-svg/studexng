@@ -29,6 +29,7 @@ class Order(models.Model):
     seller_completed_at = models.DateTimeField(null=True, blank=True)
     buyer_confirmed_at = models.DateTimeField(null=True, blank=True)
     auto_released = models.BooleanField(default=False)
+    delivery_location = models.CharField(max_length=200, blank=True, default="")
 
     def __str__(self):
         return f"Order {self.reference} - {self.buyer.username}"
