@@ -226,15 +226,15 @@ export default function OrderDetailPage() {
               <span className="text-sm text-stone-400">Vendor</span>
               <span className="font-semibold text-stone-800 text-sm">{order.listing?.vendor?.username}</span>
             </div>
-            {order.delivery_location && (
               <div className="flex items-start gap-2 py-2 border-b border-stone-50">
                 <MapPin className="w-4 h-4 text-teal-500 mt-0.5 shrink-0" />
                 <div>
                   <p className="text-xs text-stone-400 mb-0.5">Delivery Location</p>
-                  <p className="font-semibold text-stone-800 text-sm">{order.delivery_location}</p>
+                  <p className="font-semibold text-stone-800 text-sm">
+                    {order.delivery_location || <span className="text-stone-400 italic font-normal">Not set</span>}
+                  </p>
                 </div>
               </div>
-            )}
             <div className="flex justify-between pt-2">
               <span className="font-semibold text-stone-700">Total</span>
               <span className="font-bold text-2xl text-teal-700">

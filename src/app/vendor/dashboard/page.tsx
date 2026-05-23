@@ -965,12 +965,12 @@ function OrdersTab() {
                   </p>
                 </div>
               </div>
-              {order.delivery_location && (
-                <div className="flex items-start gap-1.5 mb-3 bg-stone-50 rounded-xl px-3 py-2">
-                  <MapPin className="w-3.5 h-3.5 text-teal-500 mt-0.5 shrink-0" />
-                  <p className="text-xs text-stone-600">{order.delivery_location}</p>
-                </div>
-              )}
+              <div className="flex items-start gap-1.5 mb-3 bg-stone-50 rounded-xl px-3 py-2">
+                <MapPin className="w-3.5 h-3.5 text-teal-500 mt-0.5 shrink-0" />
+                <p className="text-xs text-stone-600">
+                  {order.delivery_location || <span className="text-stone-400 italic">No delivery location set</span>}
+                </p>
+              </div>
               {order.status === "paid" && (
                 <button
                   onClick={() => markComplete(order.id)}
