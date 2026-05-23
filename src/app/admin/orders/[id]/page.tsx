@@ -123,8 +123,9 @@ export default function AdminOrderDetail() {
           <Row label="Listing"    value={order.listing?.title} />
           <Row label="Buyer"      value={order.buyer?.username} />
           <Row label="Vendor"     value={order.listing?.vendor?.username} />
-          <Row label="Amount"     value={order.amount ? `₦${Number(order.amount).toLocaleString()}` : undefined} />
-          <Row label="Date"       value={order.created_at ? new Date(order.created_at).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" }) : undefined} />
+          <Row label="Amount"           value={order.amount ? `₦${Number(order.amount).toLocaleString()}` : undefined} />
+          <Row label="Delivery Location" value={order.delivery_location || undefined} />
+          <Row label="Date"             value={order.created_at ? new Date(order.created_at).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" }) : undefined} />
         </div>
 
         {/* Admin Actions */}

@@ -297,12 +297,12 @@ export default function CheckoutPage() {
               <MapPin className="w-4 h-4 text-teal-600" />
               <p className="font-semibold text-stone-900 text-sm">Delivery Location</p>
             </div>
-            <p className="text-xs text-stone-400">Campus delivery only — specify your hostel, hall, or building.</p>
+            <p className="text-xs text-stone-400">Must be within school surroundings. Specify your hostel, hall, or landmark.</p>
             <input
               type="text"
               value={deliveryLocation}
               onChange={e => setDeliveryLocation(e.target.value)}
-              placeholder="e.g. Cedar Hostel, Room 12"
+              placeholder="e.g. Love Garden, FUTO"
               className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-teal-400 transition"
             />
           </motion.div>
