@@ -21,6 +21,29 @@ logger = logging.getLogger(__name__)
 
 PAYSTACK_BASE = "https://api.paystack.co"
 
+
+def _refund_paystack_transaction(reference: str, amount_kobo: int | None = None) -> bool:
+    """Issue a full or partial refund via Paystack Refund API.
+    Returns True if Paystack accepted the refund request, False otherwise.
+    Paystack refunds to the original payment channel automatically.
+    """
+    try:
+        secret_key = (getattr(settings, "PAYSTACK_SECRET_KEY", "") or "").strip()
+        headers = {"Authorization": f"Bearer {secret_key}", "Content-Type": "application/json"}
+        payload = {"transaction": reference}
+        if amount_kobo is not None:
+            payload["amount"] = amount_kobo
+        res = requests.post(f"{PAYSTACK_BASE}/refund", json=payload, headers=headers, timeout=15)
+        data = res.json()
+        if data.get("status"):
+            logger.info(f"Paystack refund initiated for {reference}: {data.get('message')}")
+            return True
+        logger.warning(f"Paystack refund failed for {reference}: {data.get('message')}")
+        return False
+    except Exception as e:
+        logger.error(f"Paystack refund exception for {reference}: {e}")
+        return False
+
 # ─────────────────────────────────────────
 # Dynamic service fee: 8% of the base amount, min ₦50, capped at ₦1,500.
 # The 8% covers both the StudEx platform margin and Paystack's processing fee
@@ -523,14 +546,20 @@ def verify_payment(request):
             f"verify_payment: underpayment on {ref_key} — "
             f"paid {actual_kobo} kobo, min expected {min_kobo} kobo"
         )
-        return Response({"error": "Payment amount is less than the order amount."}, status=400)
+        _refund_paystack_transaction(ref_key, actual_kobo)
+        return Response({
+            "error": "Payment amount is less than the order amount. Your payment has been refunded automatically."
+        }, status=400)
 
     if max_kobo is not None and actual_kobo > max_kobo:
         logger.warning(
             f"verify_payment: overpayment on {ref_key} — "
             f"paid {actual_kobo} kobo, max expected {max_kobo} kobo"
         )
-        return Response({"error": "Payment amount does not match the checkout amount."}, status=400)
+        _refund_paystack_transaction(ref_key, actual_kobo)
+        return Response({
+            "error": "Payment amount does not match the checkout amount. Your payment has been refunded automatically."
+        }, status=400)
     # ─────────────────────────────────────────────────────────────────────────
 
     order_id, error = _create_order_from_paystack_data(
