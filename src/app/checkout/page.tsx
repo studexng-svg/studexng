@@ -146,9 +146,8 @@ export default function CheckoutPage() {
         method: "POST",
         body: JSON.stringify({
           listing_id: listingId,
-          // Always pass cart_amount for food orders — covers both multi-item carts
-          // and single items with quantity > 1 (where listing.price ≠ cart total).
           ...(isFoodOrder ? { cart_amount: foodTotal } : {}),
+          ...(isFoodOrder && deliveryLocation.trim() ? { delivery_location: deliveryLocation.trim() } : {}),
         }),
       });
       const initData = await initRes.json();

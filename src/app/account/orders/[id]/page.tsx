@@ -22,6 +22,8 @@ interface Order {
   status: "pending" | "paid" | "seller_completed" | "completed" | "disputed" | "cancelled";
   current_status: string;
   delivery_location?: string;
+  paid_at?: string | null;
+  created_at: string;
 }
 
 export default function OrderDetailPage() {
@@ -94,6 +96,26 @@ export default function OrderDetailPage() {
     } catch { router.push("/chat"); }
   };
 
+  const useElapsed = (isoDate?: string | null) => {
+    const [elapsed, setElapsed] = useState("");
+    useEffect(() => {
+      if (!isoDate) return;
+      const update = () => {
+        const secs = Math.floor((Date.now() - new Date(isoDate).getTime()) / 1000);
+        if (secs < 60) { setElapsed(`${secs}s ago`); return; }
+        const mins = Math.floor(secs / 60);
+        if (mins < 60) { setElapsed(`${mins}m ago`); return; }
+        const hrs = Math.floor(mins / 60);
+        if (hrs < 24) { setElapsed(`${hrs}h ${mins % 60}m ago`); return; }
+        setElapsed(`${Math.floor(hrs / 24)}d ${hrs % 24}h ago`);
+      };
+      update();
+      const t = setInterval(update, 30_000);
+      return () => clearInterval(t);
+    }, [isoDate]);
+    return elapsed;
+  };
+
   const statusColor = (s: string) => ({
     paid: "bg-amber-100 text-amber-700",
     seller_completed: "bg-blue-100 text-blue-700",
@@ -134,6 +156,7 @@ export default function OrderDetailPage() {
   const canConfirm = order.status === "paid" || order.status === "seller_completed";
   const isCompleted = order.status === "completed";
   const isCancelled = order.status === "cancelled" || order.current_status === "cancelled";
+  const elapsed = useElapsed(order.paid_at || order.created_at);
 
   return (
     <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
@@ -160,7 +183,11 @@ export default function OrderDetailPage() {
               <p className="text-xs text-stone-400 font-medium">Reference</p>
               <p className="font-semibold text-stone-800 text-sm mt-0.5">#{order.reference}</p>
               <p className="text-xs text-stone-400 mt-1">
-                {new Date(order.created_at).toLocaleDateString("en-NG", { day: "numeric", month: "long", year: "numeric" })}
+                {new Date(order.paid_at || order.created_at).toLocaleString("en-NG", {
+                  day: "numeric", month: "short", year: "numeric",
+                  hour: "2-digit", minute: "2-digit",
+                })}
+                {elapsed && <span className="ml-1 text-stone-300">({elapsed})</span>}
               </p>
             </div>
             <div className={`px-3 py-1.5 rounded-full font-semibold text-xs flex items-center gap-1.5 ${statusColor(order.status)}`}>

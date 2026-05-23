@@ -378,6 +378,8 @@ def initialize_payment(request):
         or None
     )
 
+    delivery_location = request.data.get("delivery_location", "")
+
     payload = {
         "email": buyer.email,
         "amount": total_amount_kobo,
@@ -387,6 +389,7 @@ def initialize_payment(request):
             "buyer_id": buyer.id,
             "type": "service",
             "discount_amount": str(discount_amount),
+            "delivery_location": delivery_location,
         },
     }
     if callback_url:
@@ -819,6 +822,7 @@ def paystack_webhook(request):
                 buyer=buyer,
                 listing_id=listing_id,
                 order_type=order_type,
+                delivery_location=meta.get("delivery_location", ""),
             )
             if error:
                 logger.error(f"Webhook order creation failed: {error}")
