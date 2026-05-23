@@ -213,7 +213,7 @@ export default function AuthPage() {
   const matricVal = validateMatric(signupForm.matric_number || "");
   const ninVal = validateNIN(signupForm.nin || "");
   const isFUTO = signupForm.school === "FUTO";
-  const schoolOk = isNonStudent ? true : !!signupForm.school;
+  const schoolOk = !!signupForm.school;
   const step1Valid = usernameVal.ok && usernameAvailable !== false && emailVal.ok &&
     phoneVal.ok && hostelOk && passwordVal.ok && schoolOk &&
     (isNonStudent ? ninVal.ok : isFUTO ? matricVal.ok : true);
@@ -300,8 +300,8 @@ export default function AuthPage() {
           username: signupForm.username, email: signupForm.email, phone: signupForm.phone,
           password: signupForm.password, password2: signupForm.password, user_type: "student",
           hostel: signupForm.hostel || "",
-          school: isNonStudent ? "futo" : signupForm.school,
-          campus: isNonStudent ? "futo" : signupForm.school.toLowerCase(),
+          school: signupForm.school,
+          campus: signupForm.school.toLowerCase(),
           ...(signupForm.matric_number ? { matric_number: signupForm.matric_number } : {}),
           ...(signupForm.nin ? { nin: signupForm.nin } : {}),
         });
@@ -561,8 +561,8 @@ export default function AuthPage() {
                           type="button"
                           onClick={() => {
                             setSignupCategory("non_student");
-                            setSignupForm(prev => ({ ...prev, matric_number: "", school: "", hostel: "" }));
-                            setTouched(prev => ({ ...prev, school: false, hostel: false }));
+                            setSignupForm(prev => ({ ...prev, matric_number: "", hostel: "" }));
+                            setTouched(prev => ({ ...prev, hostel: false }));
                           }}
                           className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-semibold transition-all ${
                             isNonStudent ? "bg-white text-teal-700 shadow-sm border border-stone-100" : "text-stone-400 hover:text-stone-600"
@@ -574,11 +574,10 @@ export default function AuthPage() {
                       </div>
                     </div>
 
-                    {/* SCHOOL — students only */}
-                    {!isNonStudent && (
+                    {/* SCHOOL — all users */}
                     <div>
                       <label className="text-sm font-medium text-stone-700 flex items-center gap-1.5 mb-1.5">
-                        <GraduationCap className="w-4 h-4" /> School / University
+                        <GraduationCap className="w-4 h-4" /> {isNonStudent ? "School / Former University" : "School / University"}
                       </label>
                       <select
                         value={signupForm.school}
@@ -594,7 +593,6 @@ export default function AuthPage() {
                       </select>
                       {touched.school && !schoolOk && <FieldFeedback ok={false} msg="Please select your school" />}
                     </div>
-                    )}
 
                     {/* USERNAME */}
                     <div>
