@@ -337,13 +337,27 @@ export default function CheckoutPage() {
               <p className="font-semibold text-stone-900 text-sm">Delivery Location</p>
             </div>
             <p className="text-xs text-stone-400">Must be within school surroundings. Specify your hostel, hall, or landmark.</p>
-            <input
-              type="text"
-              value={deliveryLocation}
-              onChange={e => setDeliveryLocation(e.target.value)}
-              placeholder="e.g. Love Garden"
-              className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-teal-400 transition"
-            />
+            {user?.school?.toLowerCase() === "futo" ? (
+              <select
+                value={deliveryLocation}
+                onChange={e => setDeliveryLocation(e.target.value)}
+                className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-teal-400 transition appearance-none"
+              >
+                <option value="">Select delivery location</option>
+                <option>Love Garden</option>
+                <option>Tetfund</option>
+                <option>SEET Roundabout</option>
+                <option>ICT</option>
+              </select>
+            ) : (
+              <input
+                type="text"
+                value={deliveryLocation}
+                onChange={e => setDeliveryLocation(e.target.value)}
+                placeholder="e.g. Love Garden"
+                className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-teal-400 transition"
+              />
+            )}
           </motion.div>
         )}
 
