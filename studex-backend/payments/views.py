@@ -716,14 +716,18 @@ def pay_with_credits(request):
     except Exception as e:
         logger.warning(f"pay_with_credits: booking update failed: {e}")
 
+    service_fee = calc_service_fee(listing_price)
+    total_charge = listing_price + service_fee
+    credits_to_deduct = min(loyalty_account.credit_balance, total_charge)
+
     txn = PaymentTransaction.objects.create(
         buyer=buyer,
         seller=seller,
         reference=reference,
         amount=Decimal("0"),
         seller_amount=listing_price,
-        platform_amount=Decimal("0"),
-        service_charge=Decimal("0"),
+        platform_amount=service_fee,
+        service_charge=service_fee,
         status="success",
         order_type="service",
         buyer_email=buyer.email,
@@ -731,9 +735,6 @@ def pay_with_credits(request):
         paystack_response={"credits_only": True},
         order_id=order_id,
     )
-
-    total_charge = listing_price + calc_service_fee(listing_price)
-    credits_to_deduct = min(loyalty_account.credit_balance, total_charge)
     loyalty_account.credit_balance -= credits_to_deduct
     loyalty_account.save()
     LoyaltyTransaction.objects.create(

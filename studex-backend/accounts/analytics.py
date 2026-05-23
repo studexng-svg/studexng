@@ -175,7 +175,7 @@ class AdminAnalytics:
                 platform_fees=Sum('platform_amount'),
             )
 
-            if totals.get('transaction_volume'):
+            if totals.get('transaction_volume') is not None:
                 # PaymentTransaction records exist — use them directly
                 totals_30d = successful.filter(created_at__gte=thirty_days_ago).aggregate(
                     transaction_volume_30d=Sum('amount'),
