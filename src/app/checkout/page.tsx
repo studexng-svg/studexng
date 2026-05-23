@@ -189,7 +189,7 @@ export default function CheckoutPage() {
       setPaymentError(err.message || "Payment failed. Please try again.");
       setIsProcessing(false);
     }
-  }, [finalTotal, foodTotal, user, isFoodOrder, isServiceBooking, booking, cart, paystackLoaded]);
+  }, [finalTotal, foodTotal, user, isFoodOrder, isServiceBooking, booking, cart, paystackLoaded, deliveryLocation]);
 
   // ── EMPTY STATE ──────────────────────────────────────────────────────────
   if (!isFoodOrder && !isServiceBooking) {
