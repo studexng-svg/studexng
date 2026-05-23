@@ -891,6 +891,8 @@ function ListingsTab() {
 function OrdersTab() {
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [marking, setMarking] = useState<number | null>(null);
+  const [error, setError] = useState<string>("");
 
   useEffect(() => {
     const load = async () => {
@@ -903,6 +905,23 @@ function OrdersTab() {
     load();
   }, []);
 
+  const markComplete = async (orderId: number) => {
+    setMarking(orderId); setError("");
+    try {
+      const res = await fetchWithAuth(`${API_URL}/api/orders/orders/${orderId}/mark-complete/`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.detail || data.error || "Could not mark complete.");
+        return;
+      }
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: "seller_completed" } : o));
+    } catch {
+      setError("Network error. Please try again.");
+    } finally {
+      setMarking(null);
+    }
+  };
+
   if (loading) return <LoadingSpinner />;
 
   return (
@@ -912,36 +931,55 @@ function OrdersTab() {
         <h2 className="font-black text-stone-900 text-xl tracking-tight" style={{ fontFamily: "var(--font-jakarta), 'Plus Jakarta Sans', sans-serif" }}>Orders</h2>
         <p className="text-stone-400 text-xs mt-0.5">{orders.length} total</p>
       </div>
+      {error && (
+        <div className="mb-3 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-600 font-medium">
+          {error}
+        </div>
+      )}
       {orders.length === 0 ? (
         <EmptyState icon={ShoppingBag} message="No orders yet" />
       ) : (
         <div className="space-y-3">
           {orders.map(order => (
             <div key={order.id} className="bg-white border border-stone-200 rounded-2xl p-4 shadow-sm">
-                <div className="flex items-center justify-between mb-3">
-                  <div>
-                    <p className="font-semibold text-stone-900 text-sm">{order.listing?.title}</p>
-                    <p className="text-xs text-stone-400">#{order.reference}</p>
-                  </div>
-                  <StatusBadge status={order.status} />
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <p className="font-semibold text-stone-900 text-sm">{order.listing?.title}</p>
+                  <p className="text-xs text-stone-400">#{order.reference}</p>
                 </div>
-                <div className="flex items-center justify-between text-sm">
-                  <div>
-                    <p className="text-xs text-stone-400">Buyer</p>
-                    <p className="font-semibold text-stone-800">{order.buyer}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs text-stone-400">Order total</p>
-                    <p className="font-semibold text-stone-800">₦{Number(order.amount).toLocaleString()}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs text-stone-400">Your payout</p>
-                    <p className="font-bold text-teal-600">
-                      ₦{Number(order.listing?.price ?? order.amount).toLocaleString()}
-                    </p>
-                  </div>
+                <StatusBadge status={order.status} />
+              </div>
+              <div className="flex items-center justify-between text-sm mb-3">
+                <div>
+                  <p className="text-xs text-stone-400">Buyer</p>
+                  <p className="font-semibold text-stone-800">{order.buyer}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-stone-400">Order total</p>
+                  <p className="font-semibold text-stone-800">₦{Number(order.amount).toLocaleString()}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-stone-400">Your payout</p>
+                  <p className="font-bold text-teal-600">
+                    ₦{Number(order.listing?.price ?? order.amount).toLocaleString()}
+                  </p>
                 </div>
               </div>
+              {order.status === "paid" && (
+                <button
+                  onClick={() => markComplete(order.id)}
+                  disabled={marking === order.id}
+                  className="w-full py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-50 transition-all active:scale-[0.98]"
+                  style={{ background: GRAD }}>
+                  {marking === order.id ? "Marking…" : "Mark as Delivered"}
+                </button>
+              )}
+              {order.status === "seller_completed" && (
+                <div className="w-full py-2.5 rounded-xl text-sm font-semibold text-center bg-teal-50 text-teal-700 border border-teal-100">
+                  Waiting for buyer to confirm
+                </div>
+              )}
+            </div>
           ))}
         </div>
       )}
