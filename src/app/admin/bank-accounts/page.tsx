@@ -85,9 +85,6 @@ export default function AdminBankAccountsPage() {
                     {a.paystack_recipient_code && (
                       <p className="text-stone-400 text-xs mt-0.5 font-mono">RCP: {a.paystack_recipient_code}</p>
                     )}
-                    {a.paystack_subaccount_code && (
-                      <p className="text-stone-400 text-xs mt-0.5 font-mono">SUB: {a.paystack_subaccount_code}</p>
-                    )}
                   </div>
                   <div className="flex flex-col items-end gap-2 flex-shrink-0">
                     <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${a.is_active ? "bg-teal-100 text-teal-700" : "bg-red-100 text-red-600"}`}>

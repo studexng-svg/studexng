@@ -205,29 +205,19 @@ class BookingSerializer(serializers.ModelSerializer):
     listing_title = serializers.CharField(source='listing.title', read_only=True)
     listing_price = serializers.DecimalField(source='listing.price', max_digits=10, decimal_places=2, read_only=True)
     vendor_name = serializers.SerializerMethodField()
-    vendor_subaccount_code = serializers.SerializerMethodField()
 
     class Meta:
         model = Booking
         fields = [
             'id', 'buyer_username', 'vendor_username', 'listing', 'listing_title',
-            'listing_price', 'vendor_name', 'vendor_subaccount_code',
+            'listing_price', 'vendor_name',
             'scheduled_date', 'scheduled_time', 'note', 'status', 'created_at',
         ]
-        read_only_fields = ['id', 'buyer_username', 'vendor_username', 'listing_title', 'listing_price', 'vendor_name', 'vendor_subaccount_code', 'status', 'created_at']
+        read_only_fields = ['id', 'buyer_username', 'vendor_username', 'listing_title', 'listing_price', 'vendor_name', 'status', 'created_at']
 
     def get_vendor_name(self, obj):
         vendor = obj.listing.vendor
         return getattr(vendor, 'business_name', None) or vendor.username
-
-    def get_vendor_subaccount_code(self, obj):
-        """Return vendor's Paystack subaccount code so frontend can pass it at payment init."""
-        try:
-            from payments.models import SellerBankAccount
-            bank = SellerBankAccount.objects.filter(user=obj.listing.vendor).first()
-            return bank.paystack_subaccount_code if bank else None
-        except Exception:
-            return None
 
     def validate_scheduled_date(self, value):
         from datetime import date

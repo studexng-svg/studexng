@@ -155,13 +155,11 @@ def seller_bank_account(request):
                 "bank_name": account.bank_name,
                 "account_number": "••••••" + account.account_number[-4:],
                 "account_name": account.account_name,
-                "paystack_subaccount_code": account.paystack_subaccount_code,
                 "paystack_recipient_code": account.paystack_recipient_code,
-                "subaccount_ready": bool(account.paystack_subaccount_code),
                 "recipient_ready": bool(account.paystack_recipient_code),
             })
         except SellerBankAccount.DoesNotExist:
-            return Response({"subaccount_ready": False}, status=200)
+            return Response({"recipient_ready": False}, status=200)
 
     bank_code = request.data.get("bank_code")
     account_number = str(request.data.get("account_number", ""))
@@ -411,44 +409,6 @@ def initialize_payment(request):
     })
 
 
-# ─────────────────────────────────────────
-# RETRY SUBACCOUNT
-# ─────────────────────────────────────────
-
-@api_view(["POST"])
-@permission_classes([IsAuthenticated])
-def retry_subaccount(request):
-    """
-    POST /api/payments/retry-subaccount/
-    Re-creates or force-updates the vendor's Paystack subaccount.
-    """
-    try:
-        account = SellerBankAccount.objects.get(user=request.user)
-    except SellerBankAccount.DoesNotExist:
-        return Response({"error": "No bank account saved yet."}, status=404)
-
-    subaccount_code, error_detail = _create_or_update_paystack_subaccount(
-        request.user,
-        account.bank_code,
-        account.account_number,
-        account.account_name,
-        force_update=True,
-    )
-
-    if not subaccount_code:
-        return Response({
-            "error": f"Subaccount update failed: {error_detail}",
-            "subaccount_ready": False,
-        }, status=400)
-
-    account.paystack_subaccount_code = subaccount_code
-    account.save(update_fields=["paystack_subaccount_code"])
-
-    return Response({
-        "message": "Paystack subaccount updated. Vendor now receives full listing price.",
-        "paystack_subaccount_code": subaccount_code,
-        "subaccount_ready": True,
-    })
 
 
 # ─────────────────────────────────────────
@@ -1196,82 +1156,6 @@ def _transfer_to_vendor(txn, listing_title):
         logger.error(f"Transfer exception for order {txn.order_id}: {e}", exc_info=True)
 
 
-def _create_or_update_paystack_subaccount(user, bank_code, account_number, account_name, force_update=False):
-    """
-    Creates or updates a Paystack subaccount for the vendor.
-
-    Paystack subaccount split config (set at payment time via PaystackPop.setup):
-      subaccount = ACCT_xxx  (the subaccount code returned here)
-      transaction_charge = dynamic (8% of base, min ₦50, max ₦1,500) → goes to StudEx
-      bearer = "account"    → StudEx bears Paystack's processing fee
-
-    Returns (subaccount_code, error_message).
-    """
-    try:
-        secret_key = (getattr(settings, "PAYSTACK_SECRET_KEY", "") or "").strip()
-        if not secret_key:
-            msg = "PAYSTACK_SECRET_KEY is not configured."
-            logger.error(msg)
-            return None, msg
-
-        headers = {"Authorization": f"Bearer {secret_key}", "Content-Type": "application/json"}
-
-        existing = SellerBankAccount.objects.filter(user=user).first()
-
-        payload = {
-            "business_name": getattr(user, "business_name", None) or user.username,
-            "settlement_bank": str(bank_code),
-            "account_number": str(account_number),
-            "percentage_charge": 0,  # Split is handled at transaction time, not subaccount level
-        }
-
-        logger.info(f"Paystack subaccount for {user.username}: bank={bank_code}, acct={account_number[-4:]}****")
-
-        if existing and existing.paystack_subaccount_code and not force_update:
-            # Update the existing subaccount
-            res = requests.put(
-                f"{PAYSTACK_BASE}/subaccount/{existing.paystack_subaccount_code}",
-                headers=headers,
-                json=payload,
-                timeout=15,
-            )
-            action = "update"
-        else:
-            # Create new subaccount
-            res = requests.post(
-                f"{PAYSTACK_BASE}/subaccount",
-                headers=headers,
-                json=payload,
-                timeout=15,
-            )
-            action = "create"
-
-        logger.info(f"Paystack subaccount {action} → {res.status_code}: {res.text[:300]}")
-
-        if res.status_code in [200, 201]:
-            data = res.json().get("data", {})
-            sub_code = data.get("subaccount_code") or data.get("id")
-            if sub_code:
-                logger.info(f"Paystack subaccount {action}d: {sub_code}")
-                return str(sub_code), None
-            else:
-                msg = f"Paystack returned success but no subaccount_code: {data}"
-                logger.error(msg)
-                return None, msg
-        else:
-            try:
-                error_body = res.json()
-            except Exception:
-                error_body = res.text
-            msg = f"Paystack {action} failed ({res.status_code}): {error_body}"
-            logger.error(msg)
-            return None, str(msg)[:300]
-
-    except requests.exceptions.Timeout:
-        return None, "Paystack API timed out."
-    except Exception as e:
-        logger.error(f"Subaccount exception: {e}", exc_info=True)
-        return None, str(e)
 
 
 def _get_seller_from_listing(listing_id):

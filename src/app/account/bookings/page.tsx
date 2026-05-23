@@ -21,7 +21,6 @@ interface Booking {
   listing_title: string;
   listing_price: string;
   vendor_name: string;
-  vendor_subaccount_code: string | null;
   buyer_username: string;
   scheduled_date: string;
   scheduled_time: string;
@@ -249,7 +248,6 @@ export default function BuyerBookingsPage() {
       return;
     }
 
-    const subaccountCode = (activeBookingRef.current || activeBooking).vendor_subaccount_code?.trim();
     const txRef = referenceRef.current;
 
     setPayingId(null); // Close modal before opening Paystack
@@ -261,11 +259,6 @@ export default function BuyerBookingsPage() {
       amount: totalWithFee * 100,
       currency: "NGN",
       ref: txRef,
-      ...(subaccountCode && subaccountCode.startsWith("ACCT_") ? {
-        subaccount: subaccountCode,
-        transaction_charge: Math.round(calcServiceFee(totalWithFee) * 100),
-        bearer: "account",
-      } : {}),
       metadata: {
         custom_fields: [],
         listing_id: (activeBookingRef.current || activeBooking).listing,
