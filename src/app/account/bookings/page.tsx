@@ -211,6 +211,7 @@ export default function BuyerBookingsPage() {
           listing_id: booking.listing,
           order_type: "service",
           use_credits: useCredits,
+          credits_applied: useCredits ? creditsToApply : 0,
         }),
       });
       const data = await res.json();
@@ -235,8 +236,35 @@ export default function BuyerBookingsPage() {
   const serviceFee = calcServiceFee(amountAfterCredits);
   const totalWithFee = amountAfterCredits + serviceFee;
 
-  const proceedToPaystack = () => {
+  const proceedToPaystack = async () => {
     if (!activeBooking) return;
+
+    // Full credits coverage — skip Paystack, StudEx pays vendor directly
+    if (useCredits && creditsToApply >= listingPrice) {
+      setPayingId(null);
+      setVerifying(true);
+      try {
+        const res = await fetchWithAuth(`${API_URL}/api/payments/pay-with-credits/`, {
+          method: "POST",
+          body: JSON.stringify({ listing_id: activeBooking.listing }),
+        });
+        const data = await res.json();
+        if (res.ok && data.order_id) {
+          setVerifying(false);
+          setLoyaltyBalance(prev => Math.max(0, prev - listingPrice));
+          showToast("Order placed with loyalty credits!");
+          await loadBookings();
+          setTimeout(() => router.push(`/account/orders/${data.order_id}`), 1200);
+        } else {
+          setVerifying(false);
+          showToast(data.error || "Payment failed. Try again.", false);
+        }
+      } catch {
+        setVerifying(false);
+        showToast("Payment failed. Try again.", false);
+      }
+      return;
+    }
 
     const PaystackPop = (window as any).PaystackPop;
     if (!PaystackPop) {
@@ -263,6 +291,7 @@ export default function BuyerBookingsPage() {
         custom_fields: [],
         listing_id: (activeBookingRef.current || activeBooking).listing,
         type: "booking_payment",
+        ...(useCredits && creditsToApply > 0 ? { credits_applied: creditsToApply } : {}),
       },
       callback: (response: any) => {
         if (response.status === "success") {

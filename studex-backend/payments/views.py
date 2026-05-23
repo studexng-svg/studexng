@@ -44,6 +44,46 @@ def _refund_paystack_transaction(reference: str, amount_kobo: int | None = None)
         logger.error(f"Paystack refund exception for {reference}: {e}")
         return False
 
+
+def _deduct_loyalty_credits_idempotent(buyer, order_id, credits_applied: Decimal):
+    """
+    Deduct loyalty credits for an order. Idempotent — checks existing LoyaltyTransactions
+    to prevent double-deduction in webhook + verify_payment race conditions.
+    """
+    if not buyer or not order_id or credits_applied <= 0:
+        return
+    try:
+        from loyalty.models import LoyaltyAccount, LoyaltyTransaction
+        from orders.models import Order as OrderModel
+        loyalty_account = LoyaltyAccount.objects.filter(user=buyer).first()
+        if not loyalty_account:
+            return
+        already_deducted = LoyaltyTransaction.objects.filter(
+            account=loyalty_account, type="redeemed", order_id=order_id
+        ).exists()
+        if already_deducted:
+            return
+        to_deduct = min(loyalty_account.credit_balance, credits_applied)
+        if to_deduct <= 0:
+            return
+        loyalty_account.credit_balance -= to_deduct
+        loyalty_account.save()
+        order_obj = None
+        try:
+            order_obj = OrderModel.objects.get(id=order_id)
+        except Exception:
+            pass
+        LoyaltyTransaction.objects.create(
+            account=loyalty_account,
+            type="redeemed",
+            amount=to_deduct,
+            description=f"Credits discount on order #{order_id}",
+            order=order_obj,
+        )
+        logger.info(f"Loyalty credits deducted: ₦{to_deduct} for order {order_id} by {buyer.username}")
+    except Exception as e:
+        logger.warning(f"_deduct_loyalty_credits_idempotent failed: {e}")
+
 # ─────────────────────────────────────────
 # Dynamic service fee: 8% of the base amount, min ₦50, capped at ₦1,500.
 # The 8% covers both the StudEx platform margin and Paystack's processing fee
@@ -450,6 +490,7 @@ def verify_payment(request):
     listing_id = request.data.get("listing_id")
     items = request.data.get("items", [])
     use_credits = request.data.get("use_credits", False)
+    credits_applied = Decimal(str(request.data.get("credits_applied", "0") or "0"))
 
     if not reference and not transaction_id:
         return Response({"error": "Payment reference is required."}, status=400)
@@ -527,13 +568,14 @@ def verify_payment(request):
 
     if min_kobo is None and actual_listing_id:
         # Cache miss (server restart / TTL expired) — recalculate from listing price.
-        # Assume max discount applied so a legitimately discounted payment isn't rejected.
+        # Assume max discount applied (5% profile bonus + any loyalty credits) so
+        # a legitimately discounted payment isn't rejected.
         try:
             from services.models import Listing
             _listing = Listing.objects.get(id=actual_listing_id)
             _base = Decimal(str(_listing.price))
             _max_discount = (_base * Decimal("0.05")).quantize(Decimal("0.01"))
-            _discounted = _base - _max_discount
+            _discounted = max(_base - _max_discount - credits_applied, Decimal("0"))
             _net = _discounted + calc_service_fee(_discounted)
             _rate = Decimal("0.015")
             _flat = Decimal("100") if _net >= Decimal("2500") else Decimal("0")
@@ -570,7 +612,7 @@ def verify_payment(request):
         buyer=request.user,
         listing_id=actual_listing_id,
         order_type=_normalize_order_type(order_type),
-        use_credits=use_credits,
+        credits_applied=credits_applied,
         delivery_location=request.data.get("delivery_location", ""),
     )
 
@@ -595,6 +637,127 @@ def verify_payment(request):
     # Payout is deferred to buyer confirmation (orders/views.py:confirm) to protect buyers.
     # Transferring before delivery confirmation leaves no recourse if the vendor doesn't deliver.
     return Response({"order_id": order_id, "message": "Payment verified. Order created."})
+
+
+# ─────────────────────────────────────────
+# PAY WITH LOYALTY CREDITS (full coverage)
+# ─────────────────────────────────────────
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def pay_with_credits(request):
+    """
+    POST /api/payments/pay-with-credits/
+    Used when loyalty credits fully cover the listing price.
+    Bypasses Paystack entirely — StudEx pays vendor from their Paystack balance
+    via Transfer API. Buyer pays ₦0.
+    """
+    listing_id = request.data.get("listing_id")
+    if not listing_id:
+        return Response({"error": "listing_id is required."}, status=400)
+
+    try:
+        from services.models import Listing
+        listing = Listing.objects.select_related("vendor").get(id=listing_id)
+    except Exception:
+        return Response({"error": "Listing not found."}, status=404)
+
+    buyer = request.user
+    listing_price = Decimal(str(listing.price))
+
+    try:
+        from loyalty.models import LoyaltyAccount, LoyaltyTransaction
+        loyalty_account = LoyaltyAccount.objects.filter(user=buyer).first()
+        if not loyalty_account or loyalty_account.credit_balance < listing_price:
+            return Response({"error": "Insufficient loyalty credits for this order."}, status=400)
+    except Exception as e:
+        logger.error(f"pay_with_credits: loyalty check failed: {e}")
+        return Response({"error": "Could not verify loyalty balance."}, status=500)
+
+    seller = _get_seller_from_listing(listing_id)
+    reference = f"CREDITS-{uuid.uuid4().hex[:16].upper()}"
+
+    try:
+        order = Order.objects.create(
+            buyer=buyer,
+            listing=listing,
+            amount=listing_price,
+            reference=reference,
+            status="paid",
+            paid_at=timezone.now(),
+        )
+        order_id = order.id
+    except Exception as e:
+        logger.error(f"pay_with_credits: order creation failed: {e}", exc_info=True)
+        return Response({"error": f"Order creation failed: {e}"}, status=500)
+
+    try:
+        listing.reduce_stock(1)
+    except Exception as e:
+        logger.warning(f"pay_with_credits: reduce_stock failed: {e}")
+
+    try:
+        from orders.models import Booking
+        Booking.objects.filter(buyer=buyer, listing=listing, status="confirmed").update(status="paid")
+    except Exception as e:
+        logger.warning(f"pay_with_credits: booking update failed: {e}")
+
+    txn = PaymentTransaction.objects.create(
+        buyer=buyer,
+        seller=seller,
+        reference=reference,
+        amount=Decimal("0"),
+        seller_amount=listing_price,
+        platform_amount=Decimal("0"),
+        service_charge=Decimal("0"),
+        status="success",
+        order_type="service",
+        buyer_email=buyer.email,
+        buyer_name=buyer.get_full_name() or buyer.username,
+        paystack_response={"credits_only": True},
+        order_id=order_id,
+    )
+
+    credits_to_deduct = min(loyalty_account.credit_balance, listing_price)
+    loyalty_account.credit_balance -= credits_to_deduct
+    loyalty_account.save()
+    LoyaltyTransaction.objects.create(
+        account=loyalty_account,
+        type="redeemed",
+        amount=credits_to_deduct,
+        description=f"Full credits payment for order #{order_id}",
+        order=order,
+    )
+    logger.info(f"pay_with_credits: ₦{credits_to_deduct} deducted for order {order_id} by {buyer.username}")
+
+    _transfer_to_vendor(txn, listing.title)
+
+    try:
+        from accounts.utils import send_notification
+        send_notification(
+            recipient=listing.vendor,
+            notification_type='new_order',
+            title=f'New Order — {listing.title}',
+            message=(
+                f'{buyer.username} paid with loyalty credits for "{listing.title}". '
+                f'Your payout of ₦{listing_price:,.0f} will be released once they confirm delivery.'
+            ),
+            action_url='/vendor/dashboard',
+        )
+        send_notification(
+            recipient=buyer,
+            notification_type='order_placed',
+            title=f'Order Confirmed — {listing.title}',
+            message=(
+                f'Your loyalty credits covered the full cost of "{listing.title}". '
+                f'The vendor has been notified and will begin your order shortly.'
+            ),
+            action_url='/account/orders',
+        )
+    except Exception as ne:
+        logger.warning(f"pay_with_credits: notification failed: {ne}")
+
+    return Response({"order_id": order_id, "message": "Order placed using loyalty credits."})
 
 
 # ─────────────────────────────────────────
@@ -822,6 +985,7 @@ def paystack_webhook(request):
                 buyer=buyer,
                 listing_id=listing_id,
                 order_type=order_type,
+                credits_applied=Decimal(str(meta.get("credits_applied", "0") or "0")),
                 delivery_location=meta.get("delivery_location", ""),
             )
             if error:
@@ -935,7 +1099,7 @@ def paystack_webhook(request):
 # INTERNAL: create order from Paystack data
 # ─────────────────────────────────────────
 
-def _create_order_from_paystack_data(paystack_data, buyer, listing_id, order_type, use_credits=False, delivery_location=""):
+def _create_order_from_paystack_data(paystack_data, buyer, listing_id, order_type, credits_applied=Decimal("0"), delivery_location=""):
     from services.models import Listing
 
     # Paystack amounts are in kobo — divide by 100 to get naira
@@ -982,12 +1146,12 @@ def _create_order_from_paystack_data(paystack_data, buyer, listing_id, order_typ
     )
 
     if not created and txn.order_id:
-        # Webhook created the order before verify_payment ran — patch delivery_location
-        # which the webhook couldn't know (it's not in Paystack metadata).
         if delivery_location:
             Order.objects.filter(id=txn.order_id, delivery_location="").update(
                 delivery_location=delivery_location
             )
+        # Credits deduction is idempotent — safe to call even if webhook already ran
+        _deduct_loyalty_credits_idempotent(buyer, txn.order_id, credits_applied)
         return txn.order_id, None
 
     order_id = None
@@ -1053,21 +1217,7 @@ def _create_order_from_paystack_data(paystack_data, buyer, listing_id, order_typ
     txn.status = "success"
     txn.save()
 
-    if use_credits and buyer:
-        try:
-            from loyalty.models import LoyaltyAccount, LoyaltyTransaction
-            loyalty_account = LoyaltyAccount.objects.filter(user=buyer).first()
-            if loyalty_account and loyalty_account.credit_balance > 0:
-                credits_used = min(loyalty_account.credit_balance, amount_paid)
-                loyalty_account.credit_balance -= credits_used
-                loyalty_account.save()
-                LoyaltyTransaction.objects.create(
-                    account=loyalty_account, type="redeemed",
-                    amount=credits_used,
-                    description=f"Credits used on order #{order_id}",
-                )
-        except Exception as e:
-            logger.warning(f"Loyalty deduction failed: {e}")
+    _deduct_loyalty_credits_idempotent(buyer, order_id, credits_applied)
 
     return order_id, None
 
