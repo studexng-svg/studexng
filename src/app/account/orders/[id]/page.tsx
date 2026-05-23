@@ -204,7 +204,7 @@ export default function OrderDetailPage() {
               <div>
                 <p className="font-semibold text-emerald-900 text-sm">Order Completed ✓</p>
                 <p className="text-xs text-emerald-700 mt-1">
-                  Paystack will transfer the vendor's share within 1–2 business days.
+                  The vendor will receive their payment shortly.
                 </p>
               </div>
             </div>
