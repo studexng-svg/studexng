@@ -282,13 +282,26 @@ PAYSTACK_SKIP_IP_CHECK = config('PAYSTACK_SKIP_IP_CHECK', default='false')
 
 # =======================================
 # CACHE
+# Use Redis if REDIS_URL is set, otherwise in-process memory cache.
+# DatabaseCache was replaced because every cache.get/set became a DB
+# round-trip, adding ~100-200ms overhead to every request via middleware.
 # =======================================
-CACHES = {
-    'default': {
-        'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
-        'LOCATION': 'studex_cache_table',
+_REDIS_URL = config('REDIS_URL', default='')
+
+if _REDIS_URL:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+            'LOCATION': _REDIS_URL,
+        }
     }
-}
+else:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+            'LOCATION': 'studex-cache',
+        }
+    }
 
 # Fernet key for NIN and other PII field encryption.
 # Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
@@ -309,6 +322,10 @@ APSCHEDULER_RUN_NOW_TIMEOUT = 25
 # SECURITY HEADERS (production only)
 # =======================================
 if not DEBUG:
+    # Render (and most PaaS) terminate TLS at their proxy and forward plain
+    # HTTP to the app. Without this header, Django sees every request as HTTP
+    # and SECURE_SSL_REDIRECT causes an infinite redirect loop.
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
     SECURE_SSL_REDIRECT = True
     SECURE_HSTS_SECONDS = 31536000
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
