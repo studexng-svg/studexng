@@ -1,4 +1,5 @@
 # accounts/admin.py
+from django import forms
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.admin import helpers
@@ -10,6 +11,20 @@ from django.db.models import Count, Avg, Sum, Q
 import csv
 from .models import User, Profile, SellerApplication
 from .utils import send_notification
+
+SCHOOL_CHOICES = [
+    ('', '— Not set —'),
+    ('pau', 'Pan-Atlantic University (PAU)'),
+    ('futo', 'Federal University of Technology Owerri (FUTO)'),
+]
+
+class UserChangeForm(forms.ModelForm):
+    school = forms.ChoiceField(choices=SCHOOL_CHOICES, required=False,
+        widget=forms.Select(attrs={'style': 'max-width:360px'}))
+
+    class Meta:
+        model = User
+        fields = '__all__'
 
 
 class ProfileInline(admin.StackedInline):
@@ -23,6 +38,7 @@ class ProfileInline(admin.StackedInline):
 
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
+    form = UserChangeForm
     inlines = [ProfileInline]
 
     def get_inlines(self, request, obj):
