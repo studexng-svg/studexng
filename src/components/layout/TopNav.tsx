@@ -50,9 +50,9 @@ export default function TopNav({ showBack = false, backHref, activeNav }: TopNav
           </Link>
           <Link href="/categories"
             className={`text-sm pb-0.5 transition ${activeNav === "services" ? "font-semibold text-teal-600 border-b-2 border-teal-500" : "font-medium text-stone-500 hover:text-stone-700"}`}>
-            Services
+            Explore
           </Link>
-          <Link href="/home"
+          <Link href="/home#vendors"
             className={`text-sm pb-0.5 transition ${activeNav === "vendors" ? "font-semibold text-teal-600 border-b-2 border-teal-500" : "font-medium text-stone-500 hover:text-stone-700"}`}>
             Vendors
           </Link>

@@ -123,6 +123,10 @@ export default function HomePageClient({ initialVendors, initialListings, initia
     setMounted(true);
     const c = document.cookie.split(";").find(s => s.trim().startsWith("studex_campus="))?.split("=")?.[1]?.toLowerCase();
     if (c === "pau" || c === "futo") setCurrentCampus(c);
+    if (window.location.hash === "#vendors") {
+      setActiveTab("vendors");
+      setTimeout(() => featuredRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 200);
+    }
   }, []);
 
   const switchCampus = async (campus: "pau" | "futo") => {
