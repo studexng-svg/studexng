@@ -1,6 +1,7 @@
 # accounts/admin_urls.py
 from django.urls import path
 from accounts.admin_views import (
+    AdminRewardsOverviewView,
     AdminDashboardView,
     AdminAnalyticsTimeSeriesView,
     AdminVendorOfMonthView,
@@ -46,6 +47,7 @@ app_name = 'admin_api'
 urlpatterns = [
     # Dashboard
     path('dashboard/', AdminDashboardView.as_view(), name='dashboard'),
+    path('rewards-overview/', AdminRewardsOverviewView.as_view(), name='rewards-overview'),
     path('analytics/timeseries/', AdminAnalyticsTimeSeriesView.as_view(), name='analytics-timeseries'),
     path('vendor-of-month/', AdminVendorOfMonthView.as_view(), name='vendor-of-month'),
     path('activity/', AdminActivityView.as_view(), name='activity'),

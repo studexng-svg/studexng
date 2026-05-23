@@ -744,7 +744,8 @@ def pay_with_credits(request):
     )
     logger.info(f"pay_with_credits: ₦{credits_to_deduct} deducted for order {order_id} by {buyer.username}")
 
-    _transfer_to_vendor(txn, listing.title)
+    # Vendor payout is deferred to buyer confirmation (same escrow flow as Paystack orders).
+    # _transfer_to_vendor is NOT called here — it runs in orders/views.py:confirm().
 
     try:
         from accounts.utils import send_notification

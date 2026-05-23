@@ -2620,3 +2620,82 @@ class AdminTestEmailView(APIView):
             'resend': resend_result,
             'brevo': brevo_result,
         }, status=200 if overall else 207)
+
+
+# ============================================
+# REWARDS OVERVIEW
+# ============================================
+
+class AdminRewardsOverviewView(APIView):
+    """GET /api/admin/rewards-overview/ — loyalty credits and 5% discount usage."""
+    permission_classes = [IsAdminUser]
+
+    def get(self, request):
+        from loyalty.models import LoyaltyAccount, LoyaltyTransaction
+        from django.db.models import Sum
+
+        MILESTONE = 10
+
+        # Aggregate stats
+        total_credits_issued = LoyaltyTransaction.objects.filter(
+            type='earned'
+        ).aggregate(total=Sum('amount'))['total'] or 0
+
+        total_credits_redeemed = LoyaltyTransaction.objects.filter(
+            type='redeemed'
+        ).aggregate(total=Sum('amount'))['total'] or 0
+
+        discount_users_count = Profile.objects.filter(profile_bonus_used=True).count()
+        users_with_credits = LoyaltyAccount.objects.filter(credit_balance__gt=0).count()
+
+        # Per-user loyalty data (all users who have a loyalty account)
+        accounts = LoyaltyAccount.objects.select_related('user', 'user__profile').order_by('-credit_balance')
+        loyalty_users = []
+        for acc in accounts:
+            completed = acc.total_completed_orders
+            orders_until_next = MILESTONE - (completed % MILESTONE)
+            if orders_until_next == MILESTONE and completed == 0:
+                orders_until_next = MILESTONE
+            try:
+                bonus_used = acc.user.profile.profile_bonus_used
+                bonus_eligible = acc.user.profile.profile_bonus_eligible
+            except Exception:
+                bonus_used = False
+                bonus_eligible = False
+            loyalty_users.append({
+                'username': acc.user.username,
+                'credit_balance': float(acc.credit_balance),
+                'total_completed_orders': completed,
+                'orders_until_next_reward': orders_until_next,
+                'progress_pct': round((completed % MILESTONE) / MILESTONE * 100),
+                'discount_eligible': bonus_eligible,
+                'discount_used': bonus_used,
+            })
+
+        # Users who used the 5% profile bonus but have no loyalty account yet
+        bonus_used_ids = set(
+            Profile.objects.filter(profile_bonus_used=True).values_list('user_id', flat=True)
+        )
+        loyalty_user_ids = set(LoyaltyAccount.objects.values_list('user_id', flat=True))
+        bonus_only_ids = bonus_used_ids - loyalty_user_ids
+        for user in User.objects.filter(id__in=bonus_only_ids).select_related('profile'):
+            loyalty_users.append({
+                'username': user.username,
+                'credit_balance': 0,
+                'total_completed_orders': 0,
+                'orders_until_next_reward': MILESTONE,
+                'progress_pct': 0,
+                'discount_eligible': getattr(user.profile, 'profile_bonus_eligible', False),
+                'discount_used': True,
+            })
+
+        return Response({
+            'summary': {
+                'total_credits_issued': float(total_credits_issued),
+                'total_credits_redeemed': float(total_credits_redeemed),
+                'credits_outstanding': float(total_credits_issued) - float(total_credits_redeemed),
+                'users_with_credit_balance': users_with_credits,
+                'discount_users_count': discount_users_count,
+            },
+            'users': loyalty_users,
+        })

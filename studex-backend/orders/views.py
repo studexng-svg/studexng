@@ -266,6 +266,7 @@ class OrderViewSet(viewsets.ModelViewSet):
         try:
             vendor = order.listing.vendor
             vp = vendor.profile
+            old_badge = vp.vendor_badge or 'none'
             vp.on_platform_sales = (vp.on_platform_sales or 0) + 1
             sales = vp.on_platform_sales
             if sales >= 50: vp.vendor_badge = 'top'
@@ -282,6 +283,21 @@ class OrderViewSet(viewsets.ModelViewSet):
             ) if finalized_count > 0 else 0
 
             vp.save(update_fields=['on_platform_sales', 'vendor_badge', 'completion_rate'])
+
+            if vp.vendor_badge != old_badge and vp.vendor_badge != 'none':
+                badge_labels = {
+                    'rising': ('🌟 Rising Vendor', 'You just earned the Rising Vendor badge — 10 completed sales!'),
+                    'trusted': ('⭐ Trusted Vendor', 'Amazing! You just earned the Trusted Vendor badge — 30 completed sales!'),
+                    'top': ('👑 Top Vendor', 'Outstanding! You just earned the Top Vendor badge — 50 completed sales!'),
+                }
+                title, msg = badge_labels.get(vp.vendor_badge, (f'Badge Upgrade: {vp.vendor_badge}', ''))
+                _notify(
+                    recipient=vendor,
+                    notification_type='badge_upgrade',
+                    title=title,
+                    message=f'{msg} Keep delivering great service to maintain your badge.',
+                    action_url='/vendor/dashboard',
+                )
         except Exception as e:
             logger.warning(f"Vendor badge/completion update skipped: {e}")
 

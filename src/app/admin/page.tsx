@@ -92,6 +92,7 @@ const QUICK_LINKS = [
   { label: "Messages",           href: "/admin/messages",         icon: Send,         desc: "Send notifications to users" },
   { label: "AI Assistant",      href: "/admin/ai",               icon: Bot,          desc: "Chat with AI, get reports & take actions" },
   { label: "Vendor of Month",  href: "/admin/vendor-of-month",  icon: TrendingUp,   desc: "See, pick or override the monthly winner" },
+  { label: "Rewards",          href: "/admin/rewards",          icon: Star,         desc: "Loyalty credits and 5% discount usage" },
 ];
 
 function LiveActivity() {
