@@ -97,6 +97,24 @@ class DisputeSerializer(serializers.ModelSerializer):
         order = validated_data['order']
         user = self.context['request'].user
 
+        # Validate order is in a disputable state
+        if order.status == 'pending':
+            raise serializers.ValidationError("Cannot dispute an order that has not been paid yet.")
+        if order.status == 'cancelled':
+            raise serializers.ValidationError("Cannot dispute a cancelled order.")
+        if order.status == 'disputed':
+            raise serializers.ValidationError("A dispute has already been filed for this order.")
+
+        # Buyers have 7 days after confirming receipt to raise a post-completion dispute.
+        # Prevents abuse months after a transaction closed.
+        if order.status == 'completed' and order.buyer_confirmed_at:
+            from django.utils import timezone as _tz
+            from datetime import timedelta
+            if _tz.now() - order.buyer_confirmed_at > timedelta(days=7):
+                raise serializers.ValidationError(
+                    "Disputes must be filed within 7 days of order completion."
+                )
+
         if user == order.buyer:
             validated_data['filed_by'] = 'customer'
         elif user == order.listing.vendor:

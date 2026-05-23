@@ -4,7 +4,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth, fetchWithAuth } from "@/lib/authStore";
-import { GRAD, SERIF, toArray } from "@/lib/tokens";
+import { GRAD, GRAD_DARK, SERIF, toArray } from "@/lib/tokens";
 import Link from "next/link";
 import {
   MessageCircle, Calendar, DollarSign, Package, ShoppingBag,
@@ -61,40 +61,41 @@ export default function VendorDashboard() {
   return (
     <div className="min-h-screen bg-[#F5F5F5] flex flex-col" style={{ fontFamily: "'DM Sans', sans-serif" }}>
 
-      {/* Header */}
-      <div className="sticky top-0 bg-white z-40 border-b border-stone-100 shadow-sm flex-shrink-0">
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+      {/* Header — dark gradient matches site hero */}
+      <div className="sticky top-0 z-40 flex-shrink-0 relative overflow-hidden" style={{ background: GRAD_DARK }}>
+        <div className="absolute inset-0" style={{ background: "linear-gradient(135deg, rgba(13,148,136,0.28) 0%, rgba(124,58,237,0.45) 100%)" }} />
+        <div className="relative z-10 max-w-5xl mx-auto px-4 py-3.5 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button onClick={() => router.back()}
-              className="p-2 bg-stone-100 hover:bg-stone-200 rounded-full transition-all active:scale-95">
-              <ArrowLeft className="w-4 h-4 text-stone-600" />
+              className="p-2 rounded-full transition-all active:scale-95 flex-shrink-0"
+              style={{ background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.22)" }}>
+              <ArrowLeft className="w-4 h-4 text-white" />
             </button>
             <div>
-              <h1 className="text-base font-bold text-stone-900">Vendor Hub</h1>
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <p className="text-stone-400 text-xs">{user?.username}</p>
-                {user?.profile?.vendor_badge && user.profile.vendor_badge !== "none" && (
-                  <span className={`inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${
-                    user.profile.vendor_badge === "top"
-                      ? "bg-amber-50 text-amber-700 border-amber-200"
-                      : user.profile.vendor_badge === "trusted"
-                      ? "bg-blue-50 text-blue-700 border-blue-200"
-                      : "bg-purple-50 text-purple-700 border-purple-200"
-                  }`}>
-                    {user.profile.vendor_badge === "top" ? "🏆" : user.profile.vendor_badge === "trusted" ? "✅" : "⭐"}
-                    {" "}{user.profile.vendor_badge === "top" ? "Top Vendor" : user.profile.vendor_badge === "trusted" ? "Trusted Vendor" : "Rising Vendor"}
-                  </span>
-                )}
-              </div>
+              <p className="text-white/50 text-[10px] tracking-[0.25em] uppercase font-bold leading-none mb-0.5">Vendor Hub</p>
+              <h1 className="text-white font-black text-base tracking-tight leading-none">
+                {user?.username || "Dashboard"}
+              </h1>
             </div>
           </div>
-          {user?.profile_image ? (
-            <img src={user.profile_image} alt={user.username} className="w-9 h-9 rounded-full object-cover border border-stone-200 shadow-sm" />
-          ) : (
-            <div className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-white text-sm" style={{ background: GRAD }}>
-              {(user?.username?.[0] || "V").toUpperCase()}
-            </div>
-          )}
+          <div className="flex items-center gap-2">
+            {user?.profile?.vendor_badge && user.profile.vendor_badge !== "none" && (
+              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full"
+                style={{ background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.25)", color: "white" }}>
+                {user.profile.vendor_badge === "top" ? "🏆 Top" : user.profile.vendor_badge === "trusted" ? "✅ Trusted" : "⭐ Rising"}
+              </span>
+            )}
+            {user?.profile_image ? (
+              <img src={user.profile_image} alt={user.username}
+                className="w-9 h-9 rounded-full object-cover flex-shrink-0"
+                style={{ border: "2px solid rgba(255,255,255,0.35)" }} />
+            ) : (
+              <div className="w-9 h-9 rounded-full flex items-center justify-center font-black text-white text-sm flex-shrink-0"
+                style={{ background: "rgba(255,255,255,0.18)", border: "2px solid rgba(255,255,255,0.3)" }}>
+                {(user?.username?.[0] || "V").toUpperCase()}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -345,8 +346,9 @@ function MessagesTab() {
       {/* Conversations list */}
       <div className="w-full lg:w-60 lg:flex-shrink-0 bg-white border border-stone-200 rounded-2xl overflow-hidden shadow-sm">
         <div className="px-4 py-3 border-b border-stone-100">
-          <h2 className="font-semibold text-stone-800 text-sm">Conversations</h2>
-          <p className="text-xs text-stone-400">{conversations.length} chats</p>
+          <p className="text-teal-600 text-[10px] tracking-[0.25em] uppercase font-bold mb-0.5">Messages</p>
+          <h2 className="font-black text-stone-900 text-base tracking-tight" style={{ fontFamily: "var(--font-jakarta), 'Plus Jakarta Sans', sans-serif" }}>Conversations</h2>
+          <p className="text-xs text-stone-400 mt-0.5">{conversations.length} chats</p>
         </div>
         {conversations.length === 0 ? (
           <div className="p-6 text-center text-stone-400 text-sm">No messages yet</div>
@@ -453,6 +455,10 @@ function BookingsTab() {
 
   return (
     <div className="pb-4">
+      <div className="mb-4">
+        <p className="text-teal-600 text-[10px] tracking-[0.25em] uppercase font-bold mb-0.5">Manage</p>
+        <h2 className="font-black text-stone-900 text-xl tracking-tight" style={{ fontFamily: "var(--font-jakarta), 'Plus Jakarta Sans', sans-serif" }}>Bookings</h2>
+      </div>
       <div className="flex gap-2 mb-5">
         {(["pending", "confirmed", "all"] as const).map(f => (
           <button key={f} onClick={() => setFilter(f)}
@@ -597,6 +603,11 @@ function EarningsTab() {
   return (
     <div className="space-y-5 pb-4">
 
+      <div>
+        <p className="text-teal-600 text-[10px] tracking-[0.25em] uppercase font-bold mb-0.5">Overview</p>
+        <h2 className="font-black text-stone-900 text-xl tracking-tight" style={{ fontFamily: "var(--font-jakarta), 'Plus Jakarta Sans', sans-serif" }}>Your Earnings</h2>
+      </div>
+
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {stats.map(stat => (
           <div key={stat.label} className={`bg-white border rounded-2xl p-5 shadow-sm ${stat.bg}`}>
@@ -608,10 +619,10 @@ function EarningsTab() {
       </div>
 
       <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm">
-        <h3 className="font-semibold text-stone-800 mb-3 flex items-center gap-2 text-sm">
-          <TrendingUp className="w-4 h-4 text-teal-600" />
-          How Payouts Work
-        </h3>
+        <div className="mb-4">
+          <p className="text-teal-600 text-[10px] tracking-[0.25em] uppercase font-bold mb-0.5">Payouts</p>
+          <h3 className="font-black text-stone-900 text-base tracking-tight" style={{ fontFamily: "var(--font-jakarta), 'Plus Jakarta Sans', sans-serif" }}>How You Get Paid</h3>
+        </div>
         <div className="space-y-2 text-sm text-stone-500 leading-relaxed">
           <div className="flex items-start gap-3 bg-stone-50 border border-stone-100 rounded-xl p-3">
             <span className="text-teal-600 font-bold text-base leading-none">1</span>
@@ -629,8 +640,9 @@ function EarningsTab() {
       </div>
 
       <div className="bg-white border border-stone-200 rounded-2xl overflow-hidden shadow-sm">
-        <div className="px-5 py-3 border-b border-stone-100">
-          <h3 className="font-semibold text-stone-800 text-sm">Transaction History</h3>
+        <div className="px-5 py-4 border-b border-stone-100">
+          <p className="text-teal-600 text-[10px] tracking-[0.25em] uppercase font-bold mb-0.5">History</p>
+          <h3 className="font-black text-stone-900 text-base tracking-tight" style={{ fontFamily: "var(--font-jakarta), 'Plus Jakarta Sans', sans-serif" }}>Transactions</h3>
         </div>
         {transactions.length === 0 ? (
           <div className="p-8 text-center text-stone-400 text-sm">No transactions yet</div>
@@ -756,10 +768,11 @@ function ListingsTab() {
         </div>
       )}
 
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-5">
         <div>
-          <h2 className="font-bold text-stone-900 text-base">My Listings</h2>
-          <p className="text-stone-400 text-xs">{listings.length} services</p>
+          <p className="text-teal-600 text-[10px] tracking-[0.25em] uppercase font-bold mb-0.5">Manage</p>
+          <h2 className="font-black text-stone-900 text-xl tracking-tight" style={{ fontFamily: "var(--font-jakarta), 'Plus Jakarta Sans', sans-serif" }}>My Listings</h2>
+          <p className="text-stone-400 text-xs mt-0.5">{listings.length} {listings.length === 1 ? "service" : "services"}</p>
         </div>
         <button onClick={() => { resetForm(); setShowForm(true); }}
           className="flex items-center gap-1.5 px-4 py-2 text-white rounded-full font-semibold text-sm transition active:scale-95"
@@ -892,17 +905,17 @@ function OrdersTab() {
 
   return (
     <div className="pb-4">
-      <div className="mb-4">
-        <h2 className="font-bold text-stone-900 text-base">Orders</h2>
-        <p className="text-stone-400 text-xs">{orders.length} total</p>
+      <div className="mb-5">
+        <p className="text-teal-600 text-[10px] tracking-[0.25em] uppercase font-bold mb-0.5">Track</p>
+        <h2 className="font-black text-stone-900 text-xl tracking-tight" style={{ fontFamily: "var(--font-jakarta), 'Plus Jakarta Sans', sans-serif" }}>Orders</h2>
+        <p className="text-stone-400 text-xs mt-0.5">{orders.length} total</p>
       </div>
       {orders.length === 0 ? (
         <EmptyState icon={ShoppingBag} message="No orders yet" />
       ) : (
         <div className="space-y-3">
           {orders.map(order => (
-            <Link key={order.id} href={`/seller/orders/${order.id}`}>
-              <div className="bg-white border border-stone-200 rounded-2xl p-4 shadow-sm hover:border-teal-300 hover:shadow-md transition-all active:scale-[0.99] cursor-pointer">
+            <div key={order.id} className="bg-white border border-stone-200 rounded-2xl p-4 shadow-sm">
                 <div className="flex items-center justify-between mb-3">
                   <div>
                     <p className="font-semibold text-stone-900 text-sm">{order.listing?.title}</p>
@@ -927,7 +940,7 @@ function OrdersTab() {
                   </div>
                 </div>
               </div>
-            </Link>
+            </div>
           ))}
         </div>
       )}
@@ -957,6 +970,10 @@ function ReviewsTab() {
 
   return (
     <div className="pb-4 space-y-3">
+      <div className="mb-1">
+        <p className="text-teal-600 text-[10px] tracking-[0.25em] uppercase font-bold mb-0.5">Feedback</p>
+        <h2 className="font-black text-stone-900 text-xl tracking-tight" style={{ fontFamily: "var(--font-jakarta), 'Plus Jakarta Sans', sans-serif" }}>Reviews</h2>
+      </div>
       {reviews.length > 0 && (
         <div className="bg-white border border-amber-100 rounded-2xl p-4 shadow-sm flex items-center gap-4">
           <div className="text-center">
@@ -1020,9 +1037,15 @@ function StatusBadge({ status }: { status: string }) {
 
 function EmptyState({ icon: Icon, message }: { icon: any; message: string }) {
   return (
-    <div className="flex flex-col items-center justify-center py-16 text-stone-300">
-      <Icon className="w-10 h-10 mb-3 opacity-50" />
-      <p className="font-medium text-stone-400 text-sm">{message}</p>
+    <div className="flex flex-col items-center justify-center py-16">
+      <div className="w-16 h-16 rounded-2xl mb-5 flex items-center justify-center"
+        style={{ background: "rgba(13,148,136,0.07)", border: "1px solid rgba(13,148,136,0.14)" }}>
+        <Icon className="w-7 h-7 text-teal-400 opacity-70" />
+      </div>
+      <p className="font-black text-stone-300 text-lg tracking-tight text-center"
+        style={{ fontFamily: "var(--font-jakarta), 'Plus Jakarta Sans', sans-serif" }}>
+        {message}
+      </p>
     </div>
   );
 }

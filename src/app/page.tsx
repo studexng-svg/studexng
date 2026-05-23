@@ -287,11 +287,6 @@ export default function LandingPage() {
 
               {/* ── Left: badge + headline + subheadline ── */}
               <div>
-                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-white text-xs font-bold tracking-widest uppercase mb-6">
-                  <span className="w-2 h-2 rounded-full bg-teal-400 animate-pulse" />
-                  Now Live
-                </div>
-
                 <h1 className="text-5xl md:text-7xl lg:text-5xl xl:text-6xl font-black leading-[0.95] tracking-tighter italic uppercase mb-6"
                   style={{ fontFamily: "var(--font-jakarta), 'Plus Jakarta Sans', sans-serif" }}>
                   THE CAMPUS<br />

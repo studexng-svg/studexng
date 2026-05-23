@@ -8,11 +8,49 @@ from datetime import timedelta
 from .models import Conversation, Message
 from .serializers import ConversationSerializer, MessageSerializer
 import logging
+import re
 
 logger = logging.getLogger(__name__)
 
-# "Delete for everyone" is only allowed within this time window (like WhatsApp ~60hrs)
-DELETE_FOR_EVERYONE_LIMIT_HOURS = 60
+# "Delete for everyone" is only allowed within this short window.
+# Kept tight so bad actors cannot delete scam evidence before a buyer files a dispute.
+DELETE_FOR_EVERYONE_LIMIT_MINUTES = 10
+
+# ─── Off-platform payment detection ─────────────────────────────────────────
+_NG_PHONE_RE = re.compile(
+    r'(?<!\d)(?:0[789][01]\d{8}|\+?234[789][01]\d{8})(?!\d)'
+)
+_OFFPLATFORM_RE = re.compile(
+    r'\b(?:'
+    r'pay\s+me\s+(?:directly|outside|off[\s-]*platform)|'
+    r'send\s+(?:the\s+)?money\s+(?:to\s+my|directly)|'
+    r'transfer\s+(?:to\s+my\s+(?:account|number)|directly)|'
+    r'my\s+account\s+number\s+is|'
+    r'my\s+(?:opay|palmpay|kuda|moniepoint)\s+(?:number|account)|'
+    r'pay\s+(?:via|through|using)\s+(?:opay|palmpay|kuda|moniepoint|bank\s+transfer|whatsapp)|'
+    r'bypass\s+(?:studex|the\s+platform|platform)|'
+    r'outside\s+(?:studex|the\s+platform|platform)'
+    r')\b',
+    re.IGNORECASE,
+)
+
+
+def _has_suspicious_content(content: str):
+    """
+    Returns a user-facing error string if content looks like off-platform payment
+    solicitation; otherwise returns None.
+    """
+    if _NG_PHONE_RE.search(content):
+        return (
+            "Phone numbers are not allowed in chat — all payments must go through "
+            "StudEx to keep your transaction protected."
+        )
+    if _OFFPLATFORM_RE.search(content):
+        return (
+            "Off-platform payment requests are not allowed. Use the StudEx checkout "
+            "to stay protected and eligible for dispute resolution."
+        )
+    return None
 
 
 class ConversationViewSet(viewsets.ModelViewSet):
@@ -94,6 +132,11 @@ class ConversationViewSet(viewsets.ModelViewSet):
 
         if not content and not image:
             return Response({'error': 'Message content or image is required'}, status=400)
+
+        if content:
+            warning = _has_suspicious_content(content)
+            if warning:
+                return Response({'error': warning}, status=400)
 
         message_type = 'image' if image else request.data.get('message_type', 'text')
         image_url = ''
@@ -217,11 +260,27 @@ class MessageViewSet(viewsets.ReadOnlyModelViewSet):
                 status=status.HTTP_403_FORBIDDEN
             )
 
+        # Block deletion on conversations that have a paid order — preserves dispute evidence
+        conv = message.conversation
+        try:
+            from orders.models import Order as _Order
+            if _Order.objects.filter(
+                buyer=conv.buyer,
+                listing=conv.listing,
+                status__in=['paid', 'seller_completed', 'completed', 'disputed'],
+            ).exists():
+                return Response(
+                    {'error': 'Messages cannot be deleted on orders that have been paid.'},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+        except Exception:
+            pass
+
         # Check time limit
-        time_limit = timezone.now() - timedelta(hours=DELETE_FOR_EVERYONE_LIMIT_HOURS)
+        time_limit = timezone.now() - timedelta(minutes=DELETE_FOR_EVERYONE_LIMIT_MINUTES)
         if message.created_at < time_limit:
             return Response(
-                {'error': f'You can only delete messages sent within the last {DELETE_FOR_EVERYONE_LIMIT_HOURS} hours'},
+                {'error': f'You can only delete messages sent within the last {DELETE_FOR_EVERYONE_LIMIT_MINUTES} minutes'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 

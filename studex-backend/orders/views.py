@@ -76,6 +76,19 @@ class OrderViewSet(viewsets.ModelViewSet):
             return Response({"detail": "You are not the vendor for this order."}, status=403)
         if order.status not in ['paid']:
             return Response({"detail": f"Cannot mark an order with status '{order.status}' as complete."}, status=400)
+
+        # Minimum 15 minutes must elapse after payment before vendor can claim completion.
+        # Prevents marking complete before any service/delivery is even possible.
+        from datetime import timedelta
+        paid_time = order.paid_at or order.created_at
+        elapsed = timezone.now() - paid_time
+        if elapsed < timedelta(minutes=15):
+            mins_left = max(1, int((timedelta(minutes=15) - elapsed).total_seconds() / 60) + 1)
+            return Response(
+                {"detail": f"Please wait {mins_left} more minute(s) before marking this order as complete."},
+                status=400,
+            )
+
         order.status = 'seller_completed'
         order.save()
         _notify(
@@ -198,13 +211,27 @@ class OrderViewSet(viewsets.ModelViewSet):
         order.buyer_confirmed_at = timezone.now()
         order.save()
 
+        # Trigger vendor payout now that the buyer has confirmed delivery.
+        # Deferring to this point (rather than on payment) protects buyers from vendors
+        # who take payment but never deliver.
+        try:
+            from payments.models import PaymentTransaction
+            from payments.views import _transfer_to_vendor
+            txn = PaymentTransaction.objects.filter(
+                reference=order.reference, status="success"
+            ).first()
+            if txn and not txn.transfer_reference:
+                _transfer_to_vendor(txn, order.listing.title)
+        except Exception as pe:
+            logger.warning(f"Payout trigger failed for order {order.id}: {pe}")
+
         _notify(
             recipient=order.listing.vendor,
             notification_type='order_confirmed',
             title=f'✅ Order Confirmed — {order.listing.title}',
             message=(
                 f'{request.user.username} has confirmed the order for '
-                f'"{order.listing.title}". Paystack will transfer your share within 1-2 business days.'
+                f'"{order.listing.title}". Your payout is being processed now.'
             ),
             action_url='/vendor/dashboard',
         )
@@ -372,6 +399,44 @@ class BookingViewSet(viewsets.ModelViewSet):
             )
 
         return Response({'detail': 'Booking cancelled.', 'status': 'cancelled'})
+
+    @action(detail=True, methods=['get'], url_path='checkout-config')
+    def checkout_config(self, request, pk=None):
+        """
+        Returns Paystack checkout parameters for a confirmed booking.
+        Only callable when booking.status == 'confirmed' and by the buyer.
+        Feeds directly into the standard initialize_payment flow.
+        """
+        booking = self.get_object()
+
+        if booking.buyer != request.user:
+            return Response({'detail': 'Only the buyer can pay for a booking.'}, status=403)
+
+        if booking.status != 'confirmed':
+            return Response(
+                {'detail': f'This booking cannot be paid — current status: {booking.status}.'},
+                status=400,
+            )
+
+        from payments.views import calc_service_fee
+        from decimal import Decimal
+        amount = Decimal(str(booking.listing.price))
+        service_fee = calc_service_fee(amount)
+        checkout_amount = amount + service_fee
+
+        return Response({
+            'booking_id': booking.id,
+            'listing_id': booking.listing.id,
+            'listing_title': booking.listing.title,
+            'listing_price': float(amount),
+            'service_fee': float(service_fee),
+            'checkout_amount': float(checkout_amount),
+            'checkout_amount_kobo': int(checkout_amount * 100),
+            'currency': 'NGN',
+            'vendor_username': booking.listing.vendor.username,
+            'scheduled_date': str(booking.scheduled_date),
+            'scheduled_time': booking.scheduled_time,
+        })
 
     @action(detail=False, methods=['get'], url_path='vendor-paid')
     def vendor_paid_bookings(self, request):

@@ -13,6 +13,7 @@ from django.http import HttpResponse
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
+from django.utils import timezone
 from orders.models import Order
 from .models import SellerBankAccount, PaymentTransaction
 
@@ -291,9 +292,29 @@ def initialize_payment(request):
     buyer = request.user
     # cart_amount lets the frontend pass the true multi-item cart total so the
     # discount base is correct; fall back to the single listing price otherwise.
-    cart_amount = request.data.get("cart_amount")
+    # Compute cart total server-side — never trust client-supplied totals.
+    # Validates against CartItem records to prevent underpayment via tampered cart_amount.
+    cart_amount_raw = request.data.get("cart_amount")
     try:
-        amount = Decimal(str(cart_amount)) if cart_amount else Decimal(str(listing.price))
+        if cart_amount_raw:
+            from cart.models import CartItem
+            cart_items = CartItem.objects.filter(user=buyer).select_related('listing')
+            if cart_items.exists():
+                server_total = sum(
+                    Decimal(str(item.listing.price)) * item.quantity
+                    for item in cart_items
+                )
+                client_amount = Decimal(str(cart_amount_raw))
+                if abs(client_amount - server_total) > Decimal("0.01"):
+                    return Response(
+                        {"error": "Cart total does not match. Please refresh your cart and try again."},
+                        status=400,
+                    )
+                amount = server_total
+            else:
+                amount = Decimal(str(listing.price))
+        else:
+            amount = Decimal(str(listing.price))
     except Exception:
         amount = Decimal(str(listing.price))
 
@@ -578,22 +599,8 @@ def verify_payment(request):
     except Exception:
         pass
 
-    # Trigger vendor payout immediately from here — don't rely solely on the webhook.
-    # The transfer is idempotent (PAYOUT-{reference} key), so if the webhook also fires
-    # later, Paystack deduplicates and no double-payment occurs.
-    try:
-        txn = PaymentTransaction.objects.get(reference=ref_key, status="success")
-        if not txn.transfer_reference:
-            listing_title = ""
-            try:
-                from services.models import Listing
-                listing_title = Listing.objects.get(id=actual_listing_id).title
-            except Exception:
-                pass
-            _transfer_to_vendor(txn, listing_title)
-    except Exception as te:
-        logger.error(f"verify_payment: post-order transfer failed for {ref_key}: {te}", exc_info=True)
-
+    # Payout is deferred to buyer confirmation (orders/views.py:confirm) to protect buyers.
+    # Transferring before delivery confirmation leaves no recourse if the vendor doesn't deliver.
     return Response({"order_id": order_id, "message": "Payment verified. Order created."})
 
 
@@ -800,22 +807,8 @@ def paystack_webhook(request):
         reference = data.get("reference", "")
 
         if PaymentTransaction.objects.filter(reference=reference, status="success").exists():
-            existing = PaymentTransaction.objects.get(reference=reference, status="success")
-            if existing.order_id:
-                if not existing.transfer_reference:
-                    # Order was created by verify_payment before this webhook arrived.
-                    # Transfer hasn't been sent yet — do it now.
-                    try:
-                        listing_title = ""
-                        try:
-                            order = Order.objects.select_related("listing").get(id=existing.order_id)
-                            listing_title = order.listing.title
-                        except Exception:
-                            pass
-                        _transfer_to_vendor(existing, listing_title)
-                    except Exception as te:
-                        logger.error(f"Transfer to vendor failed for {reference}: {te}", exc_info=True)
-                return HttpResponse(status=200)
+            # Already processed — payout will be triggered when buyer confirms delivery.
+            return HttpResponse(status=200)
 
         customer_email = data.get("customer", {}).get("email", "")
         meta = data.get("metadata", {}) or {}
@@ -851,17 +844,6 @@ def paystack_webhook(request):
                             buyer_profile.save(update_fields=["profile_bonus_used"])
                 except Exception:
                     pass
-                try:
-                    txn = PaymentTransaction.objects.get(reference=reference)
-                    listing_title = ""
-                    try:
-                        from services.models import Listing
-                        listing_title = Listing.objects.get(id=listing_id).title
-                    except Exception:
-                        pass
-                    _transfer_to_vendor(txn, listing_title)
-                except Exception as te:
-                    logger.error(f"Transfer to vendor failed for {reference}: {te}", exc_info=True)
         else:
             # Paystack amount is in kobo — convert to naira
             amount = Decimal(str(data.get("amount", 0))) / 100
@@ -1018,6 +1000,7 @@ def _create_order_from_paystack_data(paystack_data, buyer, listing_id, order_typ
                 amount=amount_paid,
                 reference=ref_key,
                 status="paid",
+                paid_at=timezone.now(),
             )
             order_id = order.id
 
@@ -1043,7 +1026,7 @@ def _create_order_from_paystack_data(paystack_data, buyer, listing_id, order_typ
                     title=f'New Order — {listing.title}',
                     message=(
                         f'{buyer.username} just paid for "{listing.title}". '
-                        f'Your payout of ₦{vendor_amount:,.0f} will be transferred to your bank shortly.'
+                        f'Your payout of ₦{vendor_amount:,.0f} will be released once the buyer confirms delivery.'
                     ),
                     action_url='/vendor/dashboard',
                 )
