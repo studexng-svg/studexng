@@ -940,7 +940,6 @@ function OrdersTab() {
                   </div>
                 </div>
               </div>
-            </div>
           ))}
         </div>
       )}
