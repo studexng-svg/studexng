@@ -78,26 +78,17 @@ function CanvasCrop({
     if (!img || !canvasRef.current) return;
     const ctx = canvasRef.current.getContext("2d")!;
     ctx.clearRect(0, 0, SIZE, SIZE);
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(SIZE / 2, SIZE / 2, SIZE / 2, 0, Math.PI * 2);
-    ctx.clip();
+    // Dimmed background
     ctx.drawImage(img, offset.x, offset.y, img.width * scale, img.height * scale);
-    ctx.restore();
-    ctx.fillStyle = "rgba(0,0,0,0.5)";
+    ctx.fillStyle = "rgba(0,0,0,0.45)";
     ctx.fillRect(0, 0, SIZE, SIZE);
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(SIZE / 2, SIZE / 2, SIZE / 2, 0, Math.PI * 2);
-    ctx.clip();
+    // Clear the square crop area so it shows the image clearly
     ctx.clearRect(0, 0, SIZE, SIZE);
     ctx.drawImage(img, offset.x, offset.y, img.width * scale, img.height * scale);
-    ctx.restore();
+    // Square border
     ctx.strokeStyle = "rgba(255,255,255,0.8)";
     ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(SIZE / 2, SIZE / 2, SIZE / 2 - 1, 0, Math.PI * 2);
-    ctx.stroke();
+    ctx.strokeRect(1, 1, SIZE - 2, SIZE - 2);
   }, [img, offset, scale]);
 
   const onMouseDown = (e: React.MouseEvent) => { setDragging(true); dragStart.current = { x: e.clientX, y: e.clientY, ox: offset.x, oy: offset.y }; };
@@ -113,14 +104,13 @@ function CanvasCrop({
     out.width = 400; out.height = 400;
     const ctx = out.getContext("2d")!;
     const ratio = 400 / SIZE;
-    ctx.beginPath(); ctx.arc(200, 200, 200, 0, Math.PI * 2); ctx.clip();
     ctx.drawImage(img, offset.x * ratio, offset.y * ratio, img.width * scale * ratio, img.height * scale * ratio);
     out.toBlob(b => { if (b) onCrop(b); }, "image/jpeg", 0.92);
   };
 
   return (
     <div className="flex flex-col items-center gap-4">
-      <div className="relative cursor-move rounded-full overflow-hidden" style={{ width: SIZE, height: SIZE }}
+      <div className="relative cursor-move rounded-2xl overflow-hidden" style={{ width: SIZE, height: SIZE }}
         onMouseDown={onMouseDown} onMouseMove={onMouseMove} onMouseUp={onMouseUp} onMouseLeave={onMouseUp}
         onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}>
         <canvas ref={canvasRef} width={SIZE} height={SIZE} />
@@ -390,7 +380,7 @@ export default function AccountPage() {
             onClick={() => setViewModalOpen(false)}>
             <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
               className="w-full max-w-xs" onClick={e => e.stopPropagation()}>
-              <div className="w-64 h-64 mx-auto rounded-full overflow-hidden shadow-2xl ring-4 ring-white/20">
+              <div className="w-64 h-64 mx-auto rounded-2xl overflow-hidden shadow-2xl ring-4 ring-white/20">
                 {profilePic ? <img src={profilePic} alt="Profile" className="w-full h-full object-cover block" /> : (
                   <div className="w-full h-full flex items-center justify-center text-white text-6xl font-bold" style={{ background: GRAD }}>{initials}</div>
                 )}
