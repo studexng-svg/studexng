@@ -387,13 +387,25 @@ def initialize_payment(request):
     except Exception:
         pass
 
-    final_amount = amount - discount_amount
+    # Loyalty credits — computed server-side from real balance (never trust client-supplied amount)
+    credits_applied = Decimal("0")
+    if request.data.get("use_credits", False):
+        try:
+            from loyalty.models import LoyaltyAccount
+            loyalty_account = LoyaltyAccount.objects.filter(user=buyer).first()
+            if loyalty_account and loyalty_account.credit_balance > 0:
+                base_after_bonus = amount - discount_amount
+                credits_applied = min(loyalty_account.credit_balance, base_after_bonus).quantize(Decimal("0.01"))
+        except Exception as e:
+            logger.warning(f"initialize_payment: loyalty balance check failed: {e}")
+
+    final_amount = max(amount - discount_amount - credits_applied, Decimal("0"))
     checkout_amount = final_amount + calc_service_fee(final_amount)
     total_amount_kobo = int(checkout_amount * 100)
 
     if total_amount_kobo < 10000:  # Paystack minimum is ₦100 (10000 kobo)
         logger.error(f"Amount too low: {total_amount_kobo} kobo for listing {listing_id}")
-        return Response({"error": "Amount is below the minimum transaction value."}, status=400)
+        return Response({"error": "Amount is below the minimum transaction value. Please use credits-only payment."}, status=400)
 
     reference = f"STX-{uuid.uuid4().hex[:16].upper()}"
 
@@ -430,6 +442,7 @@ def initialize_payment(request):
             "type": "service",
             "discount_amount": str(discount_amount),
             "delivery_location": delivery_location,
+            "credits_applied": str(credits_applied),
         },
     }
     if callback_url:
@@ -472,6 +485,7 @@ def initialize_payment(request):
         "access_code": data.get("access_code"),
         "reference": data.get("reference", reference),
         "amount_kobo": total_amount_kobo,
+        "credits_applied": float(credits_applied),
     })
 
 

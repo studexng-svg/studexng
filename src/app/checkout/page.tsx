@@ -45,10 +45,15 @@ export default function CheckoutPage() {
     discountAmount: number;
     finalBase: number;
   } | null>(null);
+  const [loyaltyBalance, setLoyaltyBalance] = useState(0);
+  const [useCredits, setUseCredits] = useState(false);
 
   const discountedBase = discount ? discount.finalBase : baseTotal;
-  const serviceFee = calcServiceFee(discountedBase);
-  const finalTotal = discountedBase + serviceFee;
+  const creditsToApply = useCredits ? Math.min(loyaltyBalance, discountedBase) : 0;
+  const baseAfterCredits = Math.max(discountedBase - creditsToApply, 0);
+  const serviceFee = calcServiceFee(baseAfterCredits);
+  const finalTotal = baseAfterCredits + serviceFee;
+  const isFullyCoveredByCredits = useCredits && creditsToApply >= discountedBase && discountedBase > 0;
 
   useEffect(() => {
     if (!isLoggedIn || !isHydrated || baseTotal <= 0) return;
@@ -68,6 +73,14 @@ export default function CheckoutPage() {
       })
       .catch(() => {});
   }, [isLoggedIn, isHydrated, baseTotal]);
+
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    fetchWithAuth(`${API_URL}/api/loyalty/status/`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) setLoyaltyBalance(parseFloat(d.credit_balance) || 0); })
+      .catch(() => {});
+  }, [isLoggedIn]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -91,7 +104,7 @@ export default function CheckoutPage() {
     };
   }, []);
 
-  const createOrder = async (txRef: string, transactionId: string) => {
+  const createOrder = async (txRef: string, transactionId: string, appliedCredits = 0) => {
     if (isServiceBooking && booking) {
       const res = await fetchWithAuth(`${API_URL}/api/payments/verify/`, {
         method: "POST",
@@ -100,6 +113,8 @@ export default function CheckoutPage() {
           transaction_id: transactionId,
           listing_id: booking.providerId,
           order_type: "service",
+          use_credits: appliedCredits > 0,
+          credits_applied: appliedCredits,
         }),
       });
       const data = await res.json();
@@ -114,6 +129,8 @@ export default function CheckoutPage() {
         items: cart.map(item => ({ listing_id: item.id, quantity: item.quantity })),
         order_type: "product",
         delivery_location: deliveryLocation.trim(),
+        use_credits: appliedCredits > 0,
+        credits_applied: appliedCredits,
       }),
     });
     const data = await res.json();
@@ -129,8 +146,8 @@ export default function CheckoutPage() {
       setPaymentError("Payment key not configured. Please contact support.");
       return;
     }
-    if (finalTotal <= 0) { setPaymentError("Invalid amount. Please go back and try again."); return; }
-    if (!window.PaystackPop) { setPaymentError("Payment system not ready. Please refresh the page."); return; }
+    if (!isFullyCoveredByCredits && finalTotal <= 0) { setPaymentError("Invalid amount. Please go back and try again."); return; }
+    if (!isFullyCoveredByCredits && !window.PaystackPop) { setPaymentError("Payment system not ready. Please refresh the page."); return; }
     if (isFoodOrder && !deliveryLocation.trim()) { setPaymentError("Please enter your campus delivery location."); return; }
 
     const listingId = isServiceBooking ? booking?.providerId : cart[0]?.id;
@@ -141,6 +158,25 @@ export default function CheckoutPage() {
 
     setIsProcessing(true);
 
+    // Full credits coverage — skip Paystack, StudEx pays vendor directly
+    if (isFullyCoveredByCredits) {
+      try {
+        const res = await fetchWithAuth(`${API_URL}/api/payments/pay-with-credits/`, {
+          method: "POST",
+          body: JSON.stringify({ listing_id: listingId }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Payment failed");
+        if (isFoodOrder) clearCart();
+        if (isServiceBooking) clearBooking();
+        router.push(`/order-confirmation/${data.order_id}`);
+      } catch (err: any) {
+        setPaymentError(err.message || "Payment failed. Please try again.");
+        setIsProcessing(false);
+      }
+      return;
+    }
+
     try {
       const initRes = await fetchWithAuth(`${API_URL}/api/payments/initialize/`, {
         method: "POST",
@@ -148,13 +184,16 @@ export default function CheckoutPage() {
           listing_id: listingId,
           ...(isFoodOrder ? { cart_amount: foodTotal } : {}),
           ...(isFoodOrder && deliveryLocation.trim() ? { delivery_location: deliveryLocation.trim() } : {}),
+          ...(useCredits && creditsToApply > 0 ? { use_credits: true } : {}),
         }),
       });
       const initData = await initRes.json();
       if (!initRes.ok) throw new Error(initData.error || "Failed to initialize payment");
 
-      const { access_code, reference, amount_kobo } = initData;
+      const { access_code, reference, amount_kobo, credits_applied: serverCredits } = initData;
       if (!access_code) throw new Error("Payment initialization incomplete. Please try again.");
+
+      const appliedCredits = serverCredits ?? 0;
 
       const handler = window.PaystackPop.setup({
         key: paystackKey,
@@ -165,7 +204,7 @@ export default function CheckoutPage() {
         ref: reference,
         callback: function(response: any) {
           if (response.status === "success") {
-            createOrder(response.reference, response.reference)
+            createOrder(response.reference, response.reference, appliedCredits)
               .then(orderId => {
                 if (isFoodOrder) clearCart();
                 if (isServiceBooking) clearBooking();
@@ -188,7 +227,7 @@ export default function CheckoutPage() {
       setPaymentError(err.message || "Payment failed. Please try again.");
       setIsProcessing(false);
     }
-  }, [finalTotal, foodTotal, user, isFoodOrder, isServiceBooking, booking, cart, paystackLoaded, deliveryLocation]);
+  }, [finalTotal, foodTotal, user, isFoodOrder, isServiceBooking, booking, cart, paystackLoaded, deliveryLocation, useCredits, creditsToApply, isFullyCoveredByCredits]);
 
   // ── EMPTY STATE ──────────────────────────────────────────────────────────
   if (!isFoodOrder && !isServiceBooking) {
@@ -330,6 +369,33 @@ export default function CheckoutPage() {
                 </span>
               </div>
             )}
+
+            {/* Loyalty credits toggle */}
+            <div className={`flex items-center justify-between rounded-xl px-3 py-2.5 border transition ${loyaltyBalance > 0 ? (useCredits ? "bg-amber-50 border-amber-300" : "bg-stone-50 border-stone-200 cursor-pointer") : "bg-stone-50 border-stone-100 opacity-50"}`}
+              onClick={() => loyaltyBalance > 0 && setUseCredits(v => !v)}>
+              <div className="flex items-center gap-2">
+                <span className="text-lg">🎁</span>
+                <div>
+                  <p className="text-sm font-semibold text-stone-800 leading-tight">Loyalty Credits</p>
+                  <p className="text-xs text-stone-500">
+                    {loyaltyBalance > 0 ? `₦${loyaltyBalance.toLocaleString()} available` : "No credits yet"}
+                  </p>
+                </div>
+              </div>
+              <div className={`w-11 h-6 rounded-full flex items-center px-1 transition-colors ${loyaltyBalance > 0 && useCredits ? "bg-amber-400" : "bg-stone-300"}`}>
+                <div className={`w-4 h-4 bg-white rounded-full shadow transition-transform ${loyaltyBalance > 0 && useCredits ? "translate-x-5" : "translate-x-0"}`} />
+              </div>
+            </div>
+
+            {useCredits && creditsToApply > 0 && (
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-amber-600 font-medium">🎁 Credits applied</span>
+                <span className="text-amber-600 font-semibold">
+                  -₦{creditsToApply.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+            )}
+
             <div className="flex justify-between items-center text-sm">
               <span className="text-stone-500">Service fee (8%)</span>
               <span className="text-stone-700 font-medium">₦{serviceFee.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
@@ -404,6 +470,8 @@ export default function CheckoutPage() {
               style={{ background: GRAD }}>
               {isProcessing ? (
                 <><Loader className="w-5 h-5 animate-spin" /> Processing...</>
+              ) : isFullyCoveredByCredits ? (
+                <><span className="text-lg">🎁</span> Redeem Credits & Place Order</>
               ) : (
                 <><CreditCard className="w-5 h-5" /> Pay ₦{finalTotal.toLocaleString()} Now</>
               )}
