@@ -38,11 +38,16 @@ interface Order {
   listing: { id: number; title: string; vendor: { id: number; username: string } };
   amount: number;
   created_at: string;
+  paid_at?: string | null;
   status: "pending" | "paid" | "seller_completed" | "completed" | "disputed" | "cancelled";
   current_status: string;
   delivery_location?: string;
-  paid_at?: string | null;
-  created_at: string;
+}
+
+interface LoyaltyStatus {
+  total_completed_orders: number;
+  orders_until_next_reward: number;
+  credit_balance: number;
 }
 
 export default function OrderDetailPage() {
@@ -58,11 +63,21 @@ export default function OrderDetailPage() {
   const [error, setError] = useState("");
   const [canReview, setCanReview] = useState(false);
   const [loyaltyReward, setLoyaltyReward] = useState<string | null>(null);
+  const [loyalty, setLoyalty] = useState<LoyaltyStatus | null>(null);
   const elapsed = useElapsed(order?.paid_at || order?.created_at);
+
+  const fetchLoyalty = async () => {
+    try {
+      const r = await fetchWithAuth(`${API_URL}/api/loyalty/status/`);
+      if (r.ok) setLoyalty(await r.json());
+    } catch {}
+  };
 
   useEffect(() => {
     if (isHydrated && !isLoggedIn) { router.push("/auth"); return; }
     if (!isHydrated || !isLoggedIn) return;
+
+    fetchLoyalty();
 
     const load = async () => {
       try {
@@ -100,6 +115,7 @@ export default function OrderDetailPage() {
         setCanReview(true);
         if (data.loyalty_reward?.awarded) setLoyaltyReward(data.loyalty_reward.message);
         setShowModal(false);
+        fetchLoyalty();
       } else { alert("Failed to confirm. Please try again."); }
     } catch { alert("Network error."); }
     finally { setConfirming(false); }
@@ -271,6 +287,32 @@ export default function OrderDetailPage() {
           </div>
         </div>
 
+        {/* LOYALTY PROGRESS */}
+        {loyalty && (
+          <div className="bg-white rounded-2xl p-4 shadow-sm border border-stone-200 animate-fadeUp">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-semibold text-stone-700">🎁 Loyalty Rewards</p>
+              <p className="text-xs text-teal-600 font-bold">
+                {loyalty.total_completed_orders % 10}/10 orders
+              </p>
+            </div>
+            <div className="w-full bg-stone-100 rounded-full h-2 mb-2">
+              <div
+                className="h-2 rounded-full transition-all duration-500"
+                style={{ width: `${((loyalty.total_completed_orders % 10) / 10) * 100}%`, background: "linear-gradient(90deg,#0d9488,#7c3aed)" }}
+              />
+            </div>
+            <p className="text-xs text-stone-400">
+              {loyalty.orders_until_next_reward === 0
+                ? "You just earned ₦200!"
+                : `${loyalty.orders_until_next_reward} more order${loyalty.orders_until_next_reward === 1 ? "" : "s"} to earn ₦200 credits`}
+              {loyalty.credit_balance > 0 && (
+                <span className="ml-2 text-teal-600 font-semibold">· Balance: ₦{Number(loyalty.credit_balance).toLocaleString()}</span>
+              )}
+            </p>
+          </div>
+        )}
+
         {/* CONFIRM BUTTON */}
         {canConfirm && (
           <div className="space-y-3 animate-fadeUp">
@@ -317,7 +359,13 @@ export default function OrderDetailPage() {
               <p className="text-xs text-stone-400 mt-1">to {order.listing?.vendor?.username}</p>
             </div>
             <p className="text-xs text-center text-amber-600 mb-4">
-              🎁 Complete 10 orders to earn ₦200 loyalty credits!
+              {loyalty
+                ? loyalty.orders_until_next_reward === 1
+                  ? "🎁 This is your last order before earning ₦200 loyalty credits!"
+                  : loyalty.orders_until_next_reward === 0
+                  ? "🎉 You just hit a milestone — ₦200 credits incoming!"
+                  : `🎁 ${loyalty.orders_until_next_reward} more orders to earn ₦200 loyalty credits`
+                : "🎁 Complete 10 orders to earn ₦200 loyalty credits"}
             </p>
             <div className="flex gap-3">
               <button onClick={() => setShowModal(false)} disabled={confirming}
