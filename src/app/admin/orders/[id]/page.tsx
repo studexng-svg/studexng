@@ -106,14 +106,34 @@ export default function AdminOrderDetail() {
         </div>
 
         {/* Admin Actions */}
-        {(order.status === "pending" || order.status === "paid") && (
+        {(order.status === "pending" || order.status === "paid" || order.status === "seller_completed") && (
           <div className="bg-white border border-stone-200 rounded-2xl p-4 shadow-sm space-y-2">
             <p className="text-teal-600 text-xs tracking-[0.2em] uppercase font-semibold mb-3">Admin Actions</p>
-            <button onClick={() => updateStatus("completed")} disabled={updating}
-              className="w-full py-3 text-white font-semibold rounded-xl text-sm disabled:opacity-50 transition"
-              style={{ background: GRAD }}>
-              {updating ? "Updating…" : "Mark as Completed"}
-            </button>
+
+            {order.status === "seller_completed" && (
+              <>
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-2">
+                  <p className="text-amber-700 text-xs font-medium">
+                    Vendor has marked this order complete but the buyer hasn&apos;t confirmed yet.
+                    Confirming here will immediately trigger the vendor payout via Transfer API.
+                  </p>
+                </div>
+                <button onClick={() => updateStatus("completed")} disabled={updating}
+                  className="w-full py-3 text-white font-semibold rounded-xl text-sm disabled:opacity-50 transition"
+                  style={{ background: GRAD }}>
+                  {updating ? "Processing…" : "Confirm Delivery & Release Payment"}
+                </button>
+              </>
+            )}
+
+            {(order.status === "pending" || order.status === "paid") && (
+              <button onClick={() => updateStatus("completed")} disabled={updating}
+                className="w-full py-3 text-white font-semibold rounded-xl text-sm disabled:opacity-50 transition"
+                style={{ background: GRAD }}>
+                {updating ? "Updating…" : "Mark as Completed"}
+              </button>
+            )}
+
             <button onClick={() => updateStatus("cancelled")} disabled={updating}
               className="w-full py-3 bg-red-100 text-red-700 font-semibold rounded-xl text-sm disabled:opacity-50 transition hover:bg-red-200">
               {updating ? "Updating…" : "Cancel Order"}

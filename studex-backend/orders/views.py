@@ -94,10 +94,12 @@ class OrderViewSet(viewsets.ModelViewSet):
         _notify(
             recipient=order.buyer,
             notification_type='order_update',
-            title=f'📦 Order Ready — {order.listing.title}',
+            title=f'📦 Confirm Your Delivery — {order.listing.title}',
             message=(
-                f'{request.user.username} has completed your order for '
-                f'"{order.listing.title}". Please confirm receipt to release payment.'
+                f'Your order for "{order.listing.title}" has been marked delivered by '
+                f'{request.user.username}. Please open your orders and tap '
+                f'"Confirm Delivery" to release payment to the vendor. '
+                f'If you have an issue, you can file a dispute instead.'
             ),
             action_url='/account/orders',
         )

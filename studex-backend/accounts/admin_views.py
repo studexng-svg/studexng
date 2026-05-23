@@ -534,9 +534,45 @@ try:
         def patch(self, request, order_id):
             try:
                 order = Order.objects.get(id=order_id)
-                if 'status' in request.data:
-                    order.status = request.data['status']
+                new_status = request.data.get('status')
+                if new_status:
+                    order.status = new_status
+                    if new_status == 'completed':
+                        from django.utils import timezone as _tz
+                        order.buyer_confirmed_at = _tz.now()
                     order.save()
+
+                    if new_status == 'completed':
+                        # Trigger vendor payout via Transfer API
+                        try:
+                            from payments.models import PaymentTransaction
+                            from payments.views import _transfer_to_vendor
+                            txn = PaymentTransaction.objects.filter(
+                                reference=order.reference, status='success'
+                            ).first()
+                            if txn and not txn.transfer_reference:
+                                _transfer_to_vendor(txn, order.listing.title)
+                        except Exception as pe:
+                            import logging as _log
+                            _log.getLogger(__name__).warning(
+                                f"Admin payout trigger failed for order {order.id}: {pe}"
+                            )
+                        # Notify vendor
+                        try:
+                            from accounts.utils import send_notification
+                            send_notification(
+                                recipient=order.listing.vendor,
+                                notification_type='order_confirmed',
+                                title=f'✅ Order Confirmed — {order.listing.title}',
+                                message=(
+                                    f'An admin has confirmed the order for '
+                                    f'"{order.listing.title}". Your payout is being processed.'
+                                ),
+                                action_url='/vendor/dashboard',
+                            )
+                        except Exception:
+                            pass
+
                 serializer = OrderSerializer(order)
                 return Response(serializer.data, status=status.HTTP_200_OK)
             except Order.DoesNotExist:
