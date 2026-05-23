@@ -12,6 +12,25 @@ import TopNav from "@/components/layout/TopNav";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
+function useElapsed(isoDate?: string | null) {
+  const [elapsed, setElapsed] = useState("");
+  useEffect(() => {
+    if (!isoDate) return;
+    const update = () => {
+      const secs = Math.floor((Date.now() - new Date(isoDate).getTime()) / 1000);
+      if (secs < 60) { setElapsed(`${secs}s ago`); return; }
+      const mins = Math.floor(secs / 60);
+      if (mins < 60) { setElapsed(`${mins}m ago`); return; }
+      const hrs = Math.floor(mins / 60);
+      if (hrs < 24) { setElapsed(`${hrs}h ${mins % 60}m ago`); return; }
+      setElapsed(`${Math.floor(hrs / 24)}d ${hrs % 24}h ago`);
+    };
+    update();
+    const t = setInterval(update, 30_000);
+    return () => clearInterval(t);
+  }, [isoDate]);
+  return elapsed;
+}
 
 interface Order {
   id: number;
@@ -96,25 +115,6 @@ export default function OrderDetailPage() {
     } catch { router.push("/chat"); }
   };
 
-  const useElapsed = (isoDate?: string | null) => {
-    const [elapsed, setElapsed] = useState("");
-    useEffect(() => {
-      if (!isoDate) return;
-      const update = () => {
-        const secs = Math.floor((Date.now() - new Date(isoDate).getTime()) / 1000);
-        if (secs < 60) { setElapsed(`${secs}s ago`); return; }
-        const mins = Math.floor(secs / 60);
-        if (mins < 60) { setElapsed(`${mins}m ago`); return; }
-        const hrs = Math.floor(mins / 60);
-        if (hrs < 24) { setElapsed(`${hrs}h ${mins % 60}m ago`); return; }
-        setElapsed(`${Math.floor(hrs / 24)}d ${hrs % 24}h ago`);
-      };
-      update();
-      const t = setInterval(update, 30_000);
-      return () => clearInterval(t);
-    }, [isoDate]);
-    return elapsed;
-  };
 
   const statusColor = (s: string) => ({
     paid: "bg-amber-100 text-amber-700",
