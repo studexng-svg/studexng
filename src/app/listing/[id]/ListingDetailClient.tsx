@@ -297,7 +297,7 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
                 alt={listing.title}
                 loading="lazy"
                 decoding="async"
-                className="w-full max-h-[480px] object-contain"
+                className="w-full max-h-[260px] object-contain"
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
