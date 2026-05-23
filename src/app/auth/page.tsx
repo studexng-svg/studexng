@@ -300,8 +300,8 @@ export default function AuthPage() {
           username: signupForm.username, email: signupForm.email, phone: signupForm.phone,
           password: signupForm.password, password2: signupForm.password, user_type: "student",
           hostel: signupForm.hostel || "",
-          school: isNonStudent ? "" : signupForm.school,
-          campus: isNonStudent ? "" : signupForm.school.toLowerCase(),
+          school: isNonStudent ? "futo" : signupForm.school,
+          campus: isNonStudent ? "futo" : signupForm.school.toLowerCase(),
           ...(signupForm.matric_number ? { matric_number: signupForm.matric_number } : {}),
           ...(signupForm.nin ? { nin: signupForm.nin } : {}),
         });

@@ -175,12 +175,7 @@ class AdminUserListView(generics.ListAPIView):
         school = self.request.query_params.get('school', None)
         if school:
             school = school.lower()
-            if school == 'pau':
-                queryset = queryset.filter(
-                    Q(school__iexact='pau') | Q(school='') | Q(school__isnull=True)
-                )
-            else:
-                queryset = queryset.filter(school__iexact=school)
+            queryset = queryset.filter(school__iexact=school)
 
         return queryset
 
