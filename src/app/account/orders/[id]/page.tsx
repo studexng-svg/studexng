@@ -58,6 +58,7 @@ export default function OrderDetailPage() {
   const [error, setError] = useState("");
   const [canReview, setCanReview] = useState(false);
   const [loyaltyReward, setLoyaltyReward] = useState<string | null>(null);
+  const elapsed = useElapsed(order?.paid_at || order?.created_at);
 
   useEffect(() => {
     if (isHydrated && !isLoggedIn) { router.push("/auth"); return; }
@@ -156,7 +157,6 @@ export default function OrderDetailPage() {
   const canConfirm = order.status === "paid" || order.status === "seller_completed";
   const isCompleted = order.status === "completed";
   const isCancelled = order.status === "cancelled" || order.current_status === "cancelled";
-  const elapsed = useElapsed(order.paid_at || order.created_at);
 
   return (
     <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
