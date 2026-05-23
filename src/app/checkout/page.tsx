@@ -302,7 +302,7 @@ export default function CheckoutPage() {
               type="text"
               value={deliveryLocation}
               onChange={e => setDeliveryLocation(e.target.value)}
-              placeholder="e.g. Love Garden, FUTO"
+              placeholder="e.g. Love Garden"
               className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-teal-400 transition"
             />
           </motion.div>
