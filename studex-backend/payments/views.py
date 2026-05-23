@@ -978,6 +978,12 @@ def _create_order_from_paystack_data(paystack_data, buyer, listing_id, order_typ
     )
 
     if not created and txn.order_id:
+        # Webhook created the order before verify_payment ran — patch delivery_location
+        # which the webhook couldn't know (it's not in Paystack metadata).
+        if delivery_location:
+            Order.objects.filter(id=txn.order_id, delivery_location="").update(
+                delivery_location=delivery_location
+            )
         return txn.order_id, None
 
     order_id = None
