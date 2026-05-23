@@ -375,10 +375,9 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                 className="text-sm font-semibold text-teal-600 border-b-2 border-teal-500 pb-0.5">
                 New Arrivals
               </button>
-              <button onClick={() => { setActiveTab("listings"); setActiveFilter("All"); setTimeout(() => featuredRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); }}
-                className="text-sm font-medium text-stone-500 hover:text-stone-700 transition">
-                Services
-              </button>
+              <Link href="/categories" className="text-sm font-medium text-stone-500 hover:text-stone-700 transition">
+                Explore
+              </Link>
               <button onClick={() => { setActiveTab("vendors"); setTimeout(() => featuredRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); }}
                 className="text-sm font-medium text-stone-500 hover:text-stone-700 transition">
                 Vendors
@@ -542,7 +541,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                             Shop Now <ArrowRight className="w-3 h-3 sm:w-4 sm:h-4" />
                           </motion.button>
                         </Link>
-                        <button onClick={() => setActiveTab("vendors")}
+                        <button onClick={() => { setActiveTab("vendors"); setTimeout(() => featuredRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); }}
                           className="bg-white/20 border border-white/30 text-white font-semibold px-3 py-1.5 sm:px-6 sm:py-2.5 rounded-full text-[11px] sm:text-sm inline-flex items-center gap-1 sm:gap-1.5 backdrop-blur-sm hover:bg-white/30 transition">
                           View Vendors
                         </button>
