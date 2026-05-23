@@ -138,6 +138,15 @@ export default function AdminUsers() {
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-stone-900 text-sm truncate">{user.username}</p>
                   <p className="text-stone-400 text-xs truncate">{user.email}</p>
+                  {(user.matric_number || user.nin) && (
+                    <p className="text-stone-400 text-xs truncate">
+                      {user.verification_type === "nin" && user.nin
+                        ? `NIN: ${user.nin}`
+                        : user.matric_number
+                        ? `Matric: ${user.matric_number}`
+                        : ""}
+                    </p>
+                  )}
                   <ActivityStatus lastSeen={user.last_seen} />
                 </div>
                 <span className={`px-2 py-0.5 rounded-full text-xs font-semibold flex-shrink-0 ${

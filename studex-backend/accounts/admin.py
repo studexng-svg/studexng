@@ -57,8 +57,8 @@ class UserAdmin(BaseUserAdmin):
         from accounts.fields import decrypt_field
         value = decrypt_field(obj.nin) if obj.nin else None
         if not value:
-            return format_html('<span style="color:#9ca3af;">—</span>')
-        return format_html('<code style="background:#f3f4f6;padding:2px 6px;border-radius:4px;">{}</code>', value)
+            return '—'
+        return value
     nin_display.short_description = 'NIN'
 
     def changelist_view(self, request, extra_context=None):

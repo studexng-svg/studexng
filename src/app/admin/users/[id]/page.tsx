@@ -174,11 +174,13 @@ export default function AdminUserDetail() {
 
         {/* Personal info */}
         <Section title="Personal Info">
-          <Row icon={Mail}    label="Email"          value={user.email} />
-          <Row icon={Phone}   label="Phone"          value={user.phone} />
-          <Row icon={User}    label="Username"       value={user.username} />
-          <Row icon={Hash}    label="Matric Number"  value={user.matric_number} />
-          <Row icon={Home}    label="Hostel"         value={user.hostel} />
+          <Row icon={Mail}    label="Email"              value={user.email} />
+          <Row icon={Phone}   label="Phone"              value={user.phone} />
+          <Row icon={User}    label="Username"           value={user.username} />
+          <Row icon={Shield}  label="Verification Type"  value={user.verification_type === "nin" ? "NIN" : user.verification_type === "matric" ? "Matric Number" : user.verification_type} />
+          <Row icon={Hash}    label="Matric Number"      value={user.matric_number} />
+          <Row icon={BadgeCheck} label="NIN"             value={user.nin} />
+          <Row icon={Home}    label="Hostel"             value={user.hostel} />
           <Row icon={Calendar} label="Date Joined"
             value={new Date(user.date_joined).toLocaleDateString("en-NG", {
               year: "numeric", month: "long", day: "numeric",
