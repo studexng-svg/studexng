@@ -32,7 +32,7 @@ export default function AdminCartPage() {
   const uniqueUsers = new Set(items.map(i => i.user_id)).size;
 
   return (
-    <div className="min-h-screen bg-[#FAF9F6]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+    <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       <AdminTopBar title="Cart Overview" back="/admin" />
 
       <div className="px-4 pt-4 pb-28 max-w-2xl mx-auto space-y-4">

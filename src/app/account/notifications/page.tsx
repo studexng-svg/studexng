@@ -112,7 +112,7 @@ export default function NotificationsPage() {
 
   if (!isHydrated || loading) {
     return (
-      <div className="min-h-screen bg-[#FAF9F6] flex items-center justify-center">
+      <div className="min-h-screen bg-[#F5F5F5] flex items-center justify-center">
         <div className="w-10 h-10 border-4 border-stone-200 border-t-teal-500 rounded-full animate-spin" />
       </div>
     );
@@ -166,7 +166,7 @@ export default function NotificationsPage() {
         )}
       </AnimatePresence>
 
-      <div className="min-h-screen bg-[#FAF9F6]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+      <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
         <TopNav showBack backHref="/account" />
         {unreadCount > 0 && (
           <div className="max-w-2xl mx-auto px-4 pt-3 flex items-center justify-between">

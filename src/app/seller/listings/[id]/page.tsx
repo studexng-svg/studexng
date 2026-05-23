@@ -64,7 +64,7 @@ export default function SellerProductDetails() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#FAF9F6]">
+      <div className="min-h-screen flex items-center justify-center bg-[#F5F5F5]">
         <div className="animate-spin">
           <Package className="w-10 h-10 text-teal-600" />
         </div>
@@ -74,7 +74,7 @@ export default function SellerProductDetails() {
 
   if (error || !product) {
     return (
-      <div className="min-h-screen bg-[#FAF9F6] flex flex-col items-center justify-center p-6 text-center" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+      <div className="min-h-screen bg-[#F5F5F5] flex flex-col items-center justify-center p-6 text-center" style={{ fontFamily: "'DM Sans', sans-serif" }}>
         <AlertCircle className="w-14 h-14 text-red-400 mx-auto mb-4" />
         <h2 className="text-lg font-bold text-stone-800 mb-2" style={SERIF}>
           Product Not Found
@@ -94,7 +94,7 @@ export default function SellerProductDetails() {
   }
 
   return (
-    <div className="min-h-screen bg-[#FAF9F6]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+    <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       <TopNav showBack backHref="/seller/listings" />
 
       <div className="px-4 pt-6 pb-32 space-y-5 max-w-2xl mx-auto">

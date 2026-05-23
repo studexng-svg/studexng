@@ -78,7 +78,7 @@ export default function SellerListings() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#FAF9F6]">
+      <div className="min-h-screen flex items-center justify-center bg-[#F5F5F5]">
         <div className="animate-spin">
           <Package className="w-10 h-10 text-teal-600" />
         </div>
@@ -87,7 +87,7 @@ export default function SellerListings() {
   }
 
   return (
-    <div className="min-h-screen bg-[#FAF9F6]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+    <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       <TopNav showBack backHref="/seller" />
       <div className="flex justify-end px-4 pt-3 max-w-2xl mx-auto">
         <Link href="/seller/add">

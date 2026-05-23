@@ -199,14 +199,14 @@ export default function BankAccountPage() {
 
   if (!isHydrated || pageLoading) {
     return (
-      <div className="min-h-screen bg-[#FAF9F6] flex items-center justify-center">
+      <div className="min-h-screen bg-[#F5F5F5] flex items-center justify-center">
         <Loader className="w-8 h-8 text-teal-600 animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#FAF9F6] pb-24" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+    <div className="min-h-screen bg-[#F5F5F5] pb-24" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       <TopNav showBack backHref="/account" />
 
       <div className="max-w-lg mx-auto px-4 pt-5 space-y-5">

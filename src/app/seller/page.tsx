@@ -134,7 +134,7 @@ export default function SellerDashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#FAF9F6] flex items-center justify-center">
+      <div className="min-h-screen bg-[#F5F5F5] flex items-center justify-center">
         <div className="w-10 h-10 border-2 border-teal-600 border-t-transparent rounded-full animate-spin" />
       </div>
     );
@@ -183,7 +183,7 @@ export default function SellerDashboard() {
   const maxHeight = Math.max(...graphData);
 
   return (
-    <div className="min-h-screen bg-[#FAF9F6]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+    <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       {/* HEADER */}
       <div className="sticky top-0 bg-white z-40 border-b border-stone-100 shadow-sm">
         <div className="flex items-center justify-between px-4 py-3 max-w-2xl mx-auto">

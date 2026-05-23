@@ -125,7 +125,7 @@ export default function FAQPage() {
   const toggle = (key: string) => setOpenItem(prev => prev === key ? null : key);
 
   return (
-    <div className="min-h-screen bg-[#FAF9F6]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+    <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       <TopNav showBack />
 
       <div className="pb-28 p-4 space-y-5 max-w-2xl mx-auto">

@@ -322,13 +322,13 @@ export default function ChatRoomPage() {
   };
 
   if (loading) return (
-    <div className="flex justify-center items-center min-h-screen bg-[#FAF9F6]">
+    <div className="flex justify-center items-center min-h-screen bg-[#F5F5F5]">
       <Loader className="w-8 h-8 text-teal-600 animate-spin" />
     </div>
   );
 
   return (
-    <div className="flex flex-col bg-[#FAF9F6]" style={{ height: "100dvh", fontFamily: "'DM Sans', sans-serif" }}>
+    <div className="flex flex-col bg-[#F5F5F5]" style={{ height: "100dvh", fontFamily: "'DM Sans', sans-serif" }}>
 
       {/* HEADER */}
       <div className="bg-white border-b border-stone-100 px-4 py-3 flex items-center gap-3 flex-shrink-0 shadow-sm">

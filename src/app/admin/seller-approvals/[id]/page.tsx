@@ -204,7 +204,7 @@ export default function SellerApplicationDetail() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#FAF9F6] flex items-center justify-center">
+      <div className="min-h-screen bg-[#F5F5F5] flex items-center justify-center">
         <div className="w-8 h-8 border-4 border-stone-200 border-t-teal-500 rounded-full animate-spin" />
       </div>
     );
@@ -212,7 +212,7 @@ export default function SellerApplicationDetail() {
 
   if (!app) {
     return (
-      <div className="min-h-screen bg-[#FAF9F6] flex flex-col items-center justify-center px-6 gap-4">
+      <div className="min-h-screen bg-[#F5F5F5] flex flex-col items-center justify-center px-6 gap-4">
         <AlertTriangle className="w-12 h-12 text-stone-300" />
         <p className="text-stone-500 font-medium">Application not found</p>
         <button onClick={() => router.push("/admin/seller-approvals")}
@@ -226,7 +226,7 @@ export default function SellerApplicationDetail() {
   const initials = (app.applicant_business_name || app.applicant_name || "?").slice(0, 2).toUpperCase();
 
   return (
-    <div className="min-h-screen bg-[#FAF9F6]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+    <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       {preview && <DocModal url={preview.url} label={preview.label} onClose={() => setPreview(null)} />}
 
       <AdminTopBar title="Application Detail" back="/admin/seller-approvals" />

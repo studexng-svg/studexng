@@ -77,13 +77,13 @@ export default function SellerOrderDetailPage() {
   }, [isHydrated, isLoggedIn, orderId, router, retryCount]);
 
   if (!isHydrated || loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-[#FAF9F6]">
+    <div className="min-h-screen flex items-center justify-center bg-[#F5F5F5]">
       <div className="animate-spin"><Clock className="w-10 h-10 text-teal-600" /></div>
     </div>
   );
 
   if (error || !order) return (
-    <div className="min-h-screen bg-[#FAF9F6] flex items-center justify-center p-6" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+    <div className="min-h-screen bg-[#F5F5F5] flex items-center justify-center p-6" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       <div className="text-center bg-white border border-stone-200 rounded-2xl p-8 shadow-sm max-w-sm w-full">
         <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
         <h2 className="text-lg font-bold text-stone-800 mb-2" style={SERIF}>
@@ -120,7 +120,7 @@ export default function SellerOrderDetailPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#FAF9F6]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+    <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       <TopNav showBack backHref="/seller/orders" />
 
       <div className="px-4 pt-6 pb-20 space-y-4 max-w-2xl mx-auto">

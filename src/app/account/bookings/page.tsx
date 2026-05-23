@@ -289,14 +289,14 @@ export default function BuyerBookingsPage() {
 
   if (!isHydrated || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#FAF9F6]">
+      <div className="min-h-screen flex items-center justify-center bg-[#F5F5F5]">
         <Loader className="w-10 h-10 text-teal-600 animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#FAF9F6]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+    <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       {/* TOAST */}
       <AnimatePresence>
         {toast && (

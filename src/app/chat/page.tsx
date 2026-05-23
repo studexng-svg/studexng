@@ -53,7 +53,7 @@ export default function ChatListPage() {
   const totalUnread = conversations.reduce((sum, c) => sum + (c.unread_count || 0), 0);
 
   return (
-    <div className="min-h-screen bg-[#FAF9F6]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+    <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
 
       <TopNav showBack />
 
