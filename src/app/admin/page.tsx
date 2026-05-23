@@ -82,6 +82,7 @@ const QUICK_LINKS = [
   { label: "Orders",              href: "/admin/orders",           icon: Package,      desc: "Monitor all orders" },
   { label: "Disputes",            href: "/admin/disputes",         icon: AlertTriangle,desc: "Resolve buyer/seller disputes" },
   { label: "Payouts",             href: "/admin/payouts",          icon: DollarSign,   desc: "Payments, bank accounts, escrow" },
+  { label: "Bank Accounts",      href: "/admin/bank-accounts",    icon: CreditCard,   desc: "Vendor bank accounts & payout setup" },
   { label: "Reviews",             href: "/admin/reviews",          icon: Star,         desc: "Manage platform reviews" },
   { label: "Categories",          href: "/admin/categories",       icon: Tag,          desc: "Manage listing categories" },
   { label: "Payout Transactions", href: "/admin/transactions",     icon: ArrowUpRight, desc: "Escrow and release tracking" },
@@ -207,7 +208,7 @@ export default function AdminDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+    <div className="min-h-screen bg-[#FAF9F6]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       <AdminTopBar title="Admin Dashboard" back="/home" />
 
       <div className="px-4 pt-5 pb-28 max-w-2xl mx-auto space-y-5">

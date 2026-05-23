@@ -111,13 +111,13 @@ export default function OrderDetailPage() {
   }[s] || s);
 
   if (!isHydrated || loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-[#F5F5F5]">
+    <div className="min-h-screen flex items-center justify-center bg-[#FAF9F6]">
       <div className="animate-spin"><Clock className="w-10 h-10 text-teal-600" /></div>
     </div>
   );
 
   if (error === "not_found" || !order) return (
-    <div className="min-h-screen bg-[#F5F5F5] flex items-center justify-center p-6">
+    <div className="min-h-screen bg-[#FAF9F6] flex items-center justify-center p-6">
       <div className="text-center bg-white rounded-2xl p-8 shadow-sm border border-stone-200">
         <AlertCircle className="w-14 h-14 text-red-500 mx-auto mb-3" />
         <h2 className="text-xl font-bold text-stone-800 mb-2">Order Not Found</h2>
@@ -135,7 +135,7 @@ export default function OrderDetailPage() {
   const isCancelled = order.status === "cancelled" || order.current_status === "cancelled";
 
   return (
-    <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+    <div className="min-h-screen bg-[#FAF9F6]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       <TopNav showBack backHref="/account/orders" />
 
       <div className="px-4 pt-6 pb-24 space-y-4 max-w-4xl mx-auto">

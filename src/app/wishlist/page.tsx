@@ -44,7 +44,7 @@ export default function WishlistPage() {
   // Not logged in
   if (!isLoggedIn) {
     return (
-      <div className="min-h-screen bg-[#F5F5F5] flex items-center justify-center p-6" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+      <div className="min-h-screen bg-[#FAF9F6] flex items-center justify-center p-6" style={{ fontFamily: "'DM Sans', sans-serif" }}>
         <div className="text-center">
           <Heart className="w-16 h-16 text-stone-300 mx-auto mb-4" />
           <p className="text-stone-500 text-lg mb-5">Please login to view your wishlist</p>
@@ -63,7 +63,7 @@ export default function WishlistPage() {
   // Empty wishlist
   if (wishlist.length === 0) {
     return (
-      <div className="min-h-screen bg-[#F5F5F5] flex items-center justify-center p-6" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+      <div className="min-h-screen bg-[#FAF9F6] flex items-center justify-center p-6" style={{ fontFamily: "'DM Sans', sans-serif" }}>
         <div className="text-center">
           <Heart className="w-16 h-16 text-stone-300 mx-auto mb-4" />
           <p className="text-stone-500 text-lg mb-5">Your wishlist is empty</p>
@@ -80,7 +80,7 @@ export default function WishlistPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+    <div className="min-h-screen bg-[#FAF9F6]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       {toast && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full shadow-lg z-50 font-medium text-sm text-white bg-teal-600 animate-fadeIn">
           {toast}

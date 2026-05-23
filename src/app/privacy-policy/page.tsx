@@ -51,7 +51,7 @@ const sections = [
 
 export default function PrivacyPolicyPage() {
   return (
-    <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+    <div className="min-h-screen bg-[#FAF9F6]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       <div className="sticky top-0 bg-white z-40 border-b border-stone-100 shadow-sm">
         <div className="flex items-center justify-between px-4 py-3 max-w-2xl mx-auto">
           <Link href="/" className="p-2 bg-stone-100 hover:bg-stone-200 rounded-full transition-all">

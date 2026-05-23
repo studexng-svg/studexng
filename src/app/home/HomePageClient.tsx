@@ -345,7 +345,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
         </motion.div>
       )}
 
-      <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+      <div className="min-h-screen bg-[#FAF9F6]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
 
         {/* ── HEADER (white, like prototype) ── */}
         <header className="sticky top-0 bg-white z-40 border-b border-stone-200 shadow-sm">

@@ -102,7 +102,7 @@ export default function OrdersPage() {
 
   if (!isHydrated || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F5F5F5]">
+      <div className="min-h-screen flex items-center justify-center bg-[#FAF9F6]">
         <div className="animate-spin">
           <Clock className="w-12 h-12 text-teal-600" />
         </div>
@@ -111,7 +111,7 @@ export default function OrdersPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+    <div className="min-h-screen bg-[#FAF9F6]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       <TopNav showBack backHref="/account" />
 
       <div className="px-4 pt-6 pb-32 space-y-4 max-w-4xl mx-auto">

@@ -7,7 +7,7 @@ import AdminTopBar from "@/components/layout/AdminTopBar";
 
 export default function AdminPayoutsPage() {
   return (
-    <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+    <div className="min-h-screen bg-[#FAF9F6]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       <AdminTopBar title="Payouts" back="/admin" />
 
       <div className="px-4 pt-5 pb-28 max-w-2xl mx-auto space-y-3">

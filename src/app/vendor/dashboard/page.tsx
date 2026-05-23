@@ -60,7 +60,7 @@ export default function VendorDashboard() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#F5F5F5] flex flex-col" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+    <div className="min-h-screen bg-[#FAF9F6] flex flex-col" style={{ fontFamily: "'DM Sans', sans-serif" }}>
 
       {/* Header — dark gradient matches site hero */}
       <div className="sticky top-0 z-40 flex-shrink-0 relative overflow-hidden" style={{ background: GRAD_DARK }}>

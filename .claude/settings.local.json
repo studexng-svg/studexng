@@ -33,7 +33,9 @@
       "Bash(git stash *)",
       "Bash(git checkout *)",
       "Bash(git merge *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(python manage.py makemigrations payments --name \"dynamic_service_fee\")",
+      "Bash(echo \"EXIT_CODE: $?\")"
     ]
   }
 }

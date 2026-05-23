@@ -71,12 +71,12 @@ export default function AdminDisputeDetail() {
   };
 
   if (loading) return (
-    <div className="min-h-screen bg-[#F5F5F5] flex items-center justify-center">
+    <div className="min-h-screen bg-[#FAF9F6] flex items-center justify-center">
       <div className="w-8 h-8 border-4 border-stone-200 border-t-teal-500 rounded-full animate-spin" />
     </div>
   );
   if (!dispute) return (
-    <div className="min-h-screen bg-[#F5F5F5] flex flex-col items-center justify-center gap-4">
+    <div className="min-h-screen bg-[#FAF9F6] flex flex-col items-center justify-center gap-4">
       <AlertTriangle className="w-12 h-12 text-stone-300" />
       <p className="text-stone-500">Dispute not found</p>
       <button onClick={() => router.back()} className="px-5 py-2.5 bg-white border border-stone-200 rounded-full text-sm font-semibold">Go back</button>
@@ -86,7 +86,7 @@ export default function AdminDisputeDetail() {
   const resolved = dispute.status === "resolved" || dispute.status === "closed";
 
   return (
-    <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+    <div className="min-h-screen bg-[#FAF9F6]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       <AdminTopBar title={`Dispute #${dispute.id}`} back="/admin/disputes" />
 
       <div className="px-4 pt-5 pb-28 max-w-2xl mx-auto space-y-4">
