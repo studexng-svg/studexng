@@ -908,7 +908,7 @@ function OrdersTab() {
   const markComplete = async (orderId: number) => {
     setMarking(orderId); setError("");
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/orders/orders/${orderId}/mark-complete/`, { method: "POST" });
+      const res = await fetchWithAuth(`${API_URL}/api/orders/orders/${orderId}/mark-complete/`, { method: "PATCH" });
       const data = await res.json();
       if (!res.ok) {
         setError(data.detail || data.error || "Could not mark complete.");
