@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth, fetchWithAuth } from "@/lib/authStore";
 import { GRAD, SERIF } from "@/lib/tokens";
+import { useScrollRestoration } from "@/hooks/useScrollRestoration";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -22,6 +23,7 @@ interface Listing {
 }
 
 export default function SellerListings() {
+  useScrollRestoration("seller-listings", ["/seller/listings/", "/seller/edit/"]);
   const [products, setProducts] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");

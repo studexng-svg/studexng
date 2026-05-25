@@ -9,8 +9,10 @@ import { useWishlistStore } from "@/lib/wishlistStore";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { GRAD, GRAD_TEXT, SERIF } from "@/lib/tokens";
+import { useScrollRestoration } from "@/hooks/useScrollRestoration";
 
 export default function WishlistPage() {
+  useScrollRestoration("wishlist", ["/listing/"]);
   const router = useRouter();
   const { isLoggedIn } = useAuth();
   const addToCart = useCartStore((state) => state.addToCart);

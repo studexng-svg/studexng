@@ -8,6 +8,7 @@ import TopNav from "@/components/layout/TopNav";
 import { useState, useEffect } from "react";
 import { useAuth, fetchWithAuth } from "@/lib/authStore";
 import { GRAD, SERIF } from "@/lib/tokens";
+import { useScrollRestoration } from "@/hooks/useScrollRestoration";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -23,6 +24,7 @@ interface Conversation {
 }
 
 export default function ChatListPage() {
+  useScrollRestoration("chat-list", ["/chat/"]);
   const { isLoggedIn, isHydrated } = useAuth();
   const router = useRouter();
   const [conversations, setConversations] = useState<Conversation[]>([]);

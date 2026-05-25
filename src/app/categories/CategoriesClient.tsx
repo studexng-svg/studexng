@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Sparkles } from "lucide-react";
 import { GRAD, GRAD_TEXT, SERIF } from "@/lib/tokens";
 import TopNav from "@/components/layout/TopNav";
+import { useScrollRestoration } from "@/hooks/useScrollRestoration";
 
 interface Category {
   id: number;
@@ -13,6 +14,7 @@ interface Category {
 }
 
 export default function CategoriesClient({ categories }: { categories: Category[] }) {
+  useScrollRestoration("categories", ["/category/"]);
   return (
     <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
 

@@ -8,6 +8,7 @@ import { useState, useEffect } from "react";
 import { useAuth, fetchWithAuth } from "@/lib/authStore";
 import { GRAD, SERIF } from "@/lib/tokens";
 import TopNav from "@/components/layout/TopNav";
+import { useScrollRestoration } from "@/hooks/useScrollRestoration";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -24,6 +25,7 @@ interface Order {
 }
 
 export default function OrdersPage() {
+  useScrollRestoration("account-orders", ["/account/orders/"]);
   const router = useRouter();
   const { isLoggedIn, isHydrated } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);

@@ -14,6 +14,7 @@ import { useAuth, fetchWithAuth } from "@/lib/authStore";
 import { useWishlistStore } from "@/lib/wishlistStore";
 import ChatWindow from "@/components/ChatWindow";
 import { GRAD, SERIF } from "@/lib/tokens";
+import { useScrollRestoration } from "@/hooks/useScrollRestoration";
 
 interface Listing {
   id: number;
@@ -112,6 +113,7 @@ export default function CategoryPageClient({ slug, initialListings }: Props) {
   const { isLoggedIn, user, isHydrated } = useAuth();
   const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlistStore();
 
+  useScrollRestoration(`category-${slug}`, ["/listing/"]);
   const [mounted, setMounted] = useState(false);
   const [campusReady, setCampusReady] = useState(false);
   const [listings, setListings] = useState<Listing[]>(initialListings);

@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth, fetchWithAuth } from "@/lib/authStore";
 import { GRAD, SERIF } from "@/lib/tokens";
+import { useScrollRestoration } from "@/hooks/useScrollRestoration";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -23,6 +24,7 @@ interface Order {
 }
 
 export default function SellerOrdersPage() {
+  useScrollRestoration("seller-orders", ["/seller/orders/"]);
   const router = useRouter();
   const { user: authUser } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
