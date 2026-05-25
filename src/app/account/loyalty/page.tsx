@@ -40,7 +40,7 @@ export default function LoyaltyPage() {
 
   return (
     <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-      <TopNav showBack backHref="/account" />
+      <TopNav showBack />
 
       <div className="pb-24 p-4 space-y-4 max-w-2xl mx-auto">
         {loading ? (

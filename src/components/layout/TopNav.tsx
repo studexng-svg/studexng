@@ -19,8 +19,11 @@ export default function TopNav({ showBack = false, backHref, activeNav }: TopNav
   const { cart } = useCart();
 
   const handleBack = () => {
-    if (backHref) router.push(backHref);
-    else router.back();
+    if (backHref && window.history.length <= 1) {
+      router.push(backHref);
+    } else {
+      router.back();
+    }
   };
 
   return (

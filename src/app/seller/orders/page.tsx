@@ -82,7 +82,7 @@ export default function SellerOrdersPage() {
 
   return (
     <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-      <TopNav showBack backHref="/seller" />
+      <TopNav showBack />
       <div className="flex justify-end px-4 pt-3 max-w-2xl mx-auto">
         <Link href="/seller/orders/history">
           <button className="px-3 py-1.5 text-xs font-semibold text-teal-700 bg-teal-50 border border-teal-200 rounded-full hover:bg-teal-100 transition-all">

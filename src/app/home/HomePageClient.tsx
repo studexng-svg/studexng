@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import { useRouter } from "next/navigation";
 import {
   Search, ArrowRight, Heart, X, Sparkles, Star,
   ChevronRight, ChevronDown, Clock, Plus, Trophy, ShoppingCart, User,
@@ -100,11 +101,14 @@ export default function HomePageClient({ initialVendors, initialListings, initia
   const { isLoggedIn, user, isHydrated } = useAuth();
   const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlistStore();
   const { addToCart, cart } = useCart();
+  const router = useRouter();
 
   const [mounted, setMounted]           = useState(false);
   const [campusReady, setCampusReady]   = useState(false);
   const [toast, setToast]               = useState("");
   const [activeTab, setActiveTab]       = useState<"listings" | "vendors">("listings");
+  const [minPrice, setMinPrice]         = useState<string>("");
+  const [maxPrice, setMaxPrice]         = useState<string>("");
 
   const [vendors, setVendors]           = useState<Vendor[]>(initialVendors);
   const [allListings, setAllListings]   = useState<any[]>(initialListings);
@@ -137,7 +141,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
     try {
       const [l, v, c] = await Promise.all([
         fetch(`${API_URL}/api/services/listings/?campus=${campus}&page_size=500`),
-        fetch(`${API_URL}/api/auth/vendors/?campus=${campus}`),
+        fetch(`${API_URL}/api/auth/vendors/?campus=${campus}&page_size=500`),
         fetch(`${API_URL}/api/services/categories/?campus=${campus}`),
       ]);
       if (l.ok) { const d = await l.json(); setAllListings(d.results || d || []); }
@@ -157,7 +161,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
     document.cookie = `studex_campus=${school}; path=/; max-age=31536000; SameSite=Lax${https ? "; Secure" : ""}`;
     Promise.all([
       fetchWithAuth(`${API_URL}/api/services/listings/?campus=${school}&page_size=500`),
-      fetchWithAuth(`${API_URL}/api/auth/vendors/?campus=${school}`),
+      fetchWithAuth(`${API_URL}/api/auth/vendors/?campus=${school}&page_size=500`),
       fetchWithAuth(`${API_URL}/api/services/categories/?campus=${school}`),
     ]).then(async ([l, v, c]) => {
       if (l.ok) { const d = await l.json(); setAllListings(d.results || d || []); }
@@ -187,11 +191,23 @@ export default function HomePageClient({ initialVendors, initialListings, initia
     setTimeout(() => featuredRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
   };
 
-  const filteredListings   = activeFilter === "All" ? allListings : allListings.filter(l => l.category === activeFilter);
+  const priceMin = minPrice ? Number(minPrice) : null;
+  const priceMax = maxPrice ? Number(maxPrice) : null;
+  const applyPriceFilter = (listings: any[]) => {
+    if (!priceMin && !priceMax) return listings;
+    return listings.filter(l => {
+      const p = Number(l.price);
+      if (priceMin && p < priceMin) return false;
+      if (priceMax && p > priceMax) return false;
+      return true;
+    });
+  };
+
+  const filteredListings   = applyPriceFilter(activeFilter === "All" ? allListings : allListings.filter(l => l.category === activeFilter));
   const TWENTY_FOUR_HOURS  = 24 * 60 * 60 * 1000;
-  const newArrivals        = allListings.filter(l => Date.now() - new Date(l.created_at).getTime() < TWENTY_FOUR_HOURS);
+  const newArrivals        = applyPriceFilter(allListings.filter(l => Date.now() - new Date(l.created_at).getTime() < TWENTY_FOUR_HOURS));
   const newArrivalIds      = new Set(newArrivals.map(l => l.id));
-  const olderListings      = allListings.filter(l => !newArrivalIds.has(l.id));
+  const olderListings      = applyPriceFilter(allListings.filter(l => !newArrivalIds.has(l.id)));
 
   const categorySections   = categories.map(cat => ({ ...cat, items: olderListings.filter(l => l.category === cat.slug) })).filter(s => s.items.length > 0);
   const categorisedSlugs   = new Set(categories.map(c => c.slug));
@@ -273,8 +289,12 @@ export default function HomePageClient({ initialVendors, initialListings, initia
               ) : (
                 <button
                   onClick={e => {
-                    // Services and own listings: let the outer Link navigate to the detail page
-                    if (isOwn || isService) return;
+                    if (isOwn) {
+                      e.preventDefault(); e.stopPropagation();
+                      router.push('/vendor/dashboard/listings');
+                      return;
+                    }
+                    if (isService) return;
                     e.preventDefault(); e.stopPropagation();
                     addToCart({ id: listing.id, title: listing.title, price: listing.price, img: listing.image || "" });
                     showToast(inCart ? "Added again (+1)" : "Added to cart");
@@ -582,6 +602,30 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                   {c}
                 </button>
               ))}
+            </div>
+          )}
+
+          {/* ── PRICE FILTER ── */}
+          {activeTab === "listings" && (
+            <div className="flex items-center gap-2 mt-3 flex-wrap">
+              <span className="text-[11px] text-stone-400 font-medium">Price:</span>
+              <input
+                type="number" placeholder="Min ₦" value={minPrice}
+                onChange={e => setMinPrice(e.target.value)}
+                className="w-24 px-2.5 py-1 text-xs border border-stone-200 rounded-lg bg-white text-stone-700 focus:outline-none focus:border-teal-400 placeholder:text-stone-300"
+              />
+              <span className="text-stone-300 text-xs">—</span>
+              <input
+                type="number" placeholder="Max ₦" value={maxPrice}
+                onChange={e => setMaxPrice(e.target.value)}
+                className="w-24 px-2.5 py-1 text-xs border border-stone-200 rounded-lg bg-white text-stone-700 focus:outline-none focus:border-teal-400 placeholder:text-stone-300"
+              />
+              {(minPrice || maxPrice) && (
+                <button onClick={() => { setMinPrice(""); setMaxPrice(""); }}
+                  className="text-xs text-stone-400 hover:text-stone-600 transition px-2 py-1 bg-stone-100 rounded-lg">
+                  Clear
+                </button>
+              )}
             </div>
           )}
 

@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useRouter, useParams } from "next/navigation";
 import {
   ChevronLeft, Send, Loader, ImageIcon, X, Pin, Pencil,
-  Trash2, Check, CheckCheck, PinOff, ChevronDown, UserX, Users
+  Trash2, Check, CheckCheck, PinOff, ChevronDown, UserX, Users, CornerDownLeft
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { useAuth, fetchWithAuth, getToken } from "@/lib/authStore";
@@ -12,6 +12,13 @@ import { GRAD } from "@/lib/tokens";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 const DELETE_EVERYONE_LIMIT_HOURS = 60;
+
+function parseQuoted(content: string): { quoted: { sender: string; text: string } | null; main: string } {
+  if (!content) return { quoted: null, main: content || '' };
+  const match = content.match(/^\[quoted:@([^|]+)\|([^\]]*)\]\n([\s\S]*)$/);
+  if (match) return { quoted: { sender: match[1], text: match[2] }, main: match[3] || '' };
+  return { quoted: null, main: content };
+}
 
 interface Message {
   id: number;
@@ -62,12 +69,15 @@ export default function ChatRoomPage() {
   const [pinnedMessages, setPinnedMessages] = useState<Message[]>([]);
   const [showPinnedBanner, setShowPinnedBanner] = useState(true);
   const [pinnedIndex, setPinnedIndex] = useState(0);
+  const [replyingTo, setReplyingTo] = useState<Message | null>(null);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const editInputRef = useRef<HTMLInputElement>(null);
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const swipeTouchStart = useRef<{ x: number; y: number; id: number } | null>(null);
+  const isSwipe = useRef(false);
 
   useEffect(() => {
     if (isHydrated && !isLoggedIn) { router.push("/auth"); return; }
@@ -189,6 +199,34 @@ export default function ChatRoomPage() {
     if (longPressTimer.current) clearTimeout(longPressTimer.current);
   };
 
+  const handleMsgTouchStart = (e: React.TouchEvent, msg: Message) => {
+    const t = e.touches[0];
+    swipeTouchStart.current = { x: t.clientX, y: t.clientY, id: msg.id };
+    isSwipe.current = false;
+    handlePressStart(e, msg);
+  };
+
+  const handleMsgTouchMove = (e: React.TouchEvent) => {
+    if (!swipeTouchStart.current) return;
+    const t = e.touches[0];
+    const dx = Math.abs(t.clientX - swipeTouchStart.current.x);
+    const dy = Math.abs(t.clientY - swipeTouchStart.current.y);
+    if (dx > 15 && dx > dy) {
+      isSwipe.current = true;
+      handlePressEnd();
+    }
+  };
+
+  const handleMsgTouchEnd = (e: React.TouchEvent, msg: Message) => {
+    handlePressEnd();
+    if (isSwipe.current && swipeTouchStart.current?.id === msg.id) {
+      const dx = e.changedTouches[0].clientX - swipeTouchStart.current.x;
+      if (dx > 60) setReplyingTo(msg);
+    }
+    swipeTouchStart.current = null;
+    isSwipe.current = false;
+  };
+
   const canDeleteForEveryone = (createdAt: string) => {
     const msgTime = new Date(createdAt).getTime();
     const limitMs = DELETE_EVERYONE_LIMIT_HOURS * 60 * 60 * 1000;
@@ -299,12 +337,18 @@ export default function ChatRoomPage() {
         if (!res.ok) throw new Error("Send failed");
         cancelImage();
       } else {
+        let content = input.trim();
+        if (replyingTo) {
+          const quotedText = (replyingTo.content || '📷 Image').replace(/\]/g, '').substring(0, 100);
+          content = `[quoted:@${replyingTo.sender_username}|${quotedText}]\n${content}`;
+        }
         const res = await fetchWithAuth(`${API_URL}/api/chat/conversations/${conversationId}/send/`, {
-          method: "POST", body: JSON.stringify({ content: input.trim(), message_type: "text" }),
+          method: "POST", body: JSON.stringify({ content, message_type: "text" }),
         });
         if (!res.ok) throw new Error("Send failed");
       }
       setInput("");
+      setReplyingTo(null);
       await loadMessages();
     } catch {
       setError("Failed to send. Try again.");
@@ -406,8 +450,9 @@ export default function ChatRoomPage() {
               onMouseDown={(e) => handlePressStart(e, msg)}
               onMouseUp={handlePressEnd}
               onMouseLeave={handlePressEnd}
-              onTouchStart={(e) => handlePressStart(e, msg)}
-              onTouchEnd={handlePressEnd}
+              onTouchStart={(e) => handleMsgTouchStart(e, msg)}
+              onTouchMove={handleMsgTouchMove}
+              onTouchEnd={(e) => handleMsgTouchEnd(e, msg)}
               onContextMenu={(e) => { e.preventDefault(); handlePressStart(e, msg); }}
               className="relative max-w-[75%] select-none"
             >
@@ -456,9 +501,20 @@ export default function ChatRoomPage() {
                     </a>
                     {msg.content && msg.content !== "📷 Image" && <p className="text-sm mt-1">{msg.content}</p>}
                   </div>
-                ) : (
-                  <p className="text-sm leading-relaxed">{msg.content}</p>
-                )}
+                ) : (() => {
+                  const { quoted, main } = parseQuoted(msg.content);
+                  return (
+                    <>
+                      {quoted && (
+                        <div className={`mb-2 pl-2 border-l-2 rounded-sm py-0.5 ${msg.is_mine ? 'border-white/50 bg-white/10' : 'border-teal-400 bg-teal-50/60'}`}>
+                          <p className={`text-[10px] font-semibold ${msg.is_mine ? 'text-white/70' : 'text-teal-600'}`}>↩ @{quoted.sender}</p>
+                          <p className={`text-xs truncate ${msg.is_mine ? 'text-white/60' : 'text-stone-500'}`}>{quoted.text}</p>
+                        </div>
+                      )}
+                      <p className="text-sm leading-relaxed">{main}</p>
+                    </>
+                  );
+                })()}
 
                 <div className="flex items-center gap-1.5 mt-1 justify-end">
                   {msg.is_edited && <span className={`text-xs italic ${msg.is_mine ? 'text-white/50' : 'text-stone-400'}`}>edited</span>}
@@ -497,10 +553,23 @@ export default function ChatRoomPage() {
               }}
               className="bg-white rounded-2xl shadow-2xl border border-stone-100 overflow-hidden min-w-[200px]"
             >
+              {/* Reply */}
+              <button
+                onClick={() => {
+                  const msg = messages.find(m => m.id === actionMenu.messageId);
+                  if (msg) setReplyingTo(msg);
+                  setActionMenu(null);
+                }}
+                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-stone-50 transition text-left"
+              >
+                <CornerDownLeft className="w-4 h-4 text-teal-500" />
+                <span className="text-sm font-medium text-stone-800">Reply</span>
+              </button>
+
               {/* Pin / Unpin */}
               <button
                 onClick={() => togglePin(actionMenu.messageId)}
-                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-stone-50 transition text-left"
+                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-stone-50 transition text-left border-t border-stone-50"
               >
                 {actionMenu.is_pinned
                   ? <><PinOff className="w-4 h-4 text-teal-500" /><span className="text-sm font-medium text-stone-800">Unpin</span></>
@@ -588,29 +657,44 @@ export default function ChatRoomPage() {
       )}
 
       {/* INPUT BAR */}
-      <div className="fixed bottom-28 left-0 right-0 bg-white border-t border-stone-100 px-4 py-3 flex items-center gap-2 z-20">
-        <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageSelect} />
-        <button
-          onClick={() => fileInputRef.current?.click()}
-          className="p-2.5 bg-teal-50 text-teal-600 rounded-xl hover:bg-teal-100 transition flex-shrink-0"
-        >
-          <ImageIcon className="w-5 h-5" />
-        </button>
-        <input
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-          placeholder={imageFile ? "Add a caption (optional)..." : "Type a message..."}
-          className="flex-1 px-4 py-2.5 bg-stone-50 text-stone-900 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/30 border border-stone-200 placeholder-stone-400"
-        />
-        <button
-          onClick={handleSend}
-          disabled={sending || (!input.trim() && !imageFile)}
-          className="p-2.5 text-white rounded-xl disabled:opacity-40 flex-shrink-0 transition active:scale-95"
-          style={{ background: GRAD }}
-        >
-          {sending ? <Loader className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
-        </button>
+      <div className="fixed bottom-28 left-0 right-0 bg-white border-t border-stone-100 z-20">
+        {/* Reply preview */}
+        {replyingTo && (
+          <div className="px-4 pt-2.5 pb-2 flex items-center gap-2 border-b border-stone-100 bg-teal-50/60">
+            <div className="w-0.5 self-stretch bg-teal-500 rounded-full flex-shrink-0" />
+            <div className="flex-1 min-w-0 pl-1">
+              <p className="text-[11px] font-semibold text-teal-600">↩ @{replyingTo.sender_username}</p>
+              <p className="text-xs text-stone-400 truncate">{parseQuoted(replyingTo.content || '').main || '📷 Image'}</p>
+            </div>
+            <button onClick={() => setReplyingTo(null)} className="p-1 text-stone-400 hover:text-stone-600 flex-shrink-0">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+        <div className="px-4 py-3 flex items-center gap-2">
+          <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageSelect} />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="p-2.5 bg-teal-50 text-teal-600 rounded-xl hover:bg-teal-100 transition flex-shrink-0"
+          >
+            <ImageIcon className="w-5 h-5" />
+          </button>
+          <input
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+            placeholder={imageFile ? "Add a caption (optional)..." : replyingTo ? "Write your reply..." : "Type a message..."}
+            className="flex-1 px-4 py-2.5 bg-stone-50 text-stone-900 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/30 border border-stone-200 placeholder-stone-400"
+          />
+          <button
+            onClick={handleSend}
+            disabled={sending || (!input.trim() && !imageFile)}
+            className="p-2.5 text-white rounded-xl disabled:opacity-40 flex-shrink-0 transition active:scale-95"
+            style={{ background: GRAD }}
+          >
+            {sending ? <Loader className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
+          </button>
+        </div>
       </div>
     </div>
   );

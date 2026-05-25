@@ -16,7 +16,7 @@ export default function CategoriesClient({ categories }: { categories: Category[
   return (
     <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
 
-      <TopNav showBack backHref="/home" activeNav="services" />
+      <TopNav showBack activeNav="services" />
 
       <div className="px-4 pt-6 pb-28 max-w-4xl mx-auto space-y-6">
 

@@ -112,7 +112,7 @@ export default function SellerPayouts() {
 
   return (
     <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-      <TopNav showBack backHref="/seller" />
+      <TopNav showBack />
 
       <div className="px-4 pt-6 pb-32 space-y-5 max-w-2xl mx-auto">
         {/* WALLET OVERVIEW CARD */}

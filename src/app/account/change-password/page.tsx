@@ -91,7 +91,7 @@ export default function ChangePasswordPage() {
 
   return (
     <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-      <TopNav showBack backHref="/account" />
+      <TopNav showBack />
 
       <div className="px-4 pt-6 pb-32">
         <div className="max-w-md mx-auto space-y-8">

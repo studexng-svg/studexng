@@ -176,7 +176,7 @@ export default function OrderDetailPage() {
 
   return (
     <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-      <TopNav showBack backHref="/account/orders" />
+      <TopNav showBack />
 
       <div className="px-4 pt-6 pb-24 space-y-4 max-w-4xl mx-auto">
         <div className="flex justify-end">

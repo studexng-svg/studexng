@@ -167,7 +167,7 @@ export default function NotificationsPage() {
       </AnimatePresence>
 
       <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-        <TopNav showBack backHref="/account" />
+        <TopNav showBack />
         {unreadCount > 0 && (
           <div className="max-w-2xl mx-auto px-4 pt-3 flex items-center justify-between">
             <p className="text-xs text-stone-500 font-medium">{unreadCount} unread</p>

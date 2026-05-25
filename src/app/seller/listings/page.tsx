@@ -88,7 +88,7 @@ export default function SellerListings() {
 
   return (
     <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-      <TopNav showBack backHref="/seller" />
+      <TopNav showBack />
       <div className="flex justify-end px-4 pt-3 max-w-2xl mx-auto">
         <Link href="/seller/add">
           <button className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white rounded-full shadow-sm active:scale-95 transition-all" style={{ background: "linear-gradient(135deg,#2DD4BF 0%,#0D9488 100%)" }}>

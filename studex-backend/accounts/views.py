@@ -611,6 +611,8 @@ from .serializers import VendorListSerializer
 
 class VendorPagination(PageNumberPagination):
     page_size = 20
+    page_size_query_param = 'page_size'
+    max_page_size = 500
 
 
 class VendorListView(ListAPIView):
@@ -641,7 +643,7 @@ class VendorListView(ListAPIView):
             campus_param = self.request.query_params.get('campus', '').lower()
             campus = campus_param if campus_param in ('pau', 'futo') else 'pau'
 
-        qs = User.objects.filter(is_verified_vendor=True, seller_application__status='approved')
+        qs = User.objects.filter(is_verified_vendor=True).distinct()
         # Treat null/blank school as PAU (existing vendors pre-dating the school field)
         if campus == 'pau':
             qs = qs.filter(Q(school__iexact='pau') | Q(school='') | Q(school__isnull=True))

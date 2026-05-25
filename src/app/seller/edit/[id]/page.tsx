@@ -140,7 +140,7 @@ export default function EditProductPage() {
 
   return (
     <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-      <TopNav showBack backHref="/seller/listings" />
+      <TopNav showBack />
 
       {error && (
         <div className="mx-4 mt-4 bg-red-50 border border-red-200 rounded-2xl p-4 flex gap-3">

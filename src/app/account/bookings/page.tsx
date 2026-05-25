@@ -1,7 +1,7 @@
 // src/app/account/bookings/page.tsx
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -78,9 +78,6 @@ export default function BuyerBookingsPage() {
   const [paystackReady, setPaystackReady] = useState(false);
   const [verifying, setVerifying] = useState(false);
 
-  const referenceRef = useRef(`STUDEX-BKG-${Date.now()}`);
-  const activeBookingRef = useRef<Booking | null>(null);
-  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Load Paystack script on mount
   useEffect(() => {
@@ -113,17 +110,6 @@ export default function BuyerBookingsPage() {
       .catch(() => {});
   }, [isLoggedIn]);
 
-  useEffect(() => {
-    if (payingId) {
-      referenceRef.current = `STUDEX-BKG-${Date.now()}-${payingId}`;
-      activeBookingRef.current = bookings.find(b => b.id === payingId) || null;
-    }
-  }, [payingId, bookings]);
-
-  // Cleanup polling on unmount
-  useEffect(() => {
-    return () => { if (pollIntervalRef.current) clearInterval(pollIntervalRef.current); };
-  }, []);
 
   const loadBookings = async () => {
     setLoading(true);
@@ -155,80 +141,6 @@ export default function BuyerBookingsPage() {
     } catch { showToast("Error cancelling booking.", false); }
   };
 
-  /**
-   * Poll the backend every 2 seconds for up to 30 seconds.
-   * The webhook creates the order server-side — we just wait for it.
-   */
-  const startPolling = (txRef: string) => {
-    setVerifying(true);
-    showToast("Verifying payment...", true);
-    let attempts = 0;
-    const maxAttempts = 15; // 15 × 2s = 30s
-
-    if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-
-    pollIntervalRef.current = setInterval(async () => {
-      attempts++;
-      try {
-        const res = await fetchWithAuth(`${API_URL}/api/payments/check-status/?tx_ref=${txRef}`);
-        if (res.ok) {
-          const data = await res.json();
-          if (data.status === "paid" && data.order_id) {
-            clearInterval(pollIntervalRef.current!);
-            setVerifying(false);
-            showToast("🎉 Payment confirmed! Booking is now paid.");
-            await loadBookings();
-            setTimeout(() => router.push(`/account/orders/${data.order_id}`), 1200);
-            return;
-          }
-        }
-      } catch { /* continue polling */ }
-
-      if (attempts >= maxAttempts) {
-        clearInterval(pollIntervalRef.current!);
-        setVerifying(false);
-        await fallbackVerify(txRef);
-      }
-    }, 2000);
-  };
-
-  /**
-   * Fallback: call verify endpoint directly if polling times out.
-   */
-  const fallbackVerify = async (txRef: string) => {
-    const booking = activeBookingRef.current;
-    if (!booking) {
-      showToast("Payment received. Refresh to see updated status.", true);
-      await loadBookings();
-      return;
-    }
-
-    try {
-      const res = await fetchWithAuth(`${API_URL}/api/payments/verify/`, {
-        method: "POST",
-        body: JSON.stringify({
-          reference: txRef,
-          listing_id: booking.listing,
-          order_type: "service",
-          use_credits: useCredits,
-          credits_applied: useCredits ? creditsToApply : 0,
-        }),
-      });
-      const data = await res.json();
-      if (res.ok && data.order_id) {
-        showToast("🎉 Payment confirmed!");
-        await loadBookings();
-        setTimeout(() => router.push(`/account/orders/${data.order_id}`), 1200);
-      } else {
-        showToast("Payment received. Check your orders page.", true);
-        await loadBookings();
-      }
-    } catch {
-      showToast("Payment received. Check your orders page.", true);
-      await loadBookings();
-    }
-  };
-
   const activeBooking = bookings.find(b => b.id === payingId);
   const listingPrice = activeBooking ? parseFloat(activeBooking.listing_price) : 0;
   const fullCheckoutAmount = listingPrice + calcServiceFee(listingPrice);
@@ -256,7 +168,7 @@ export default function BuyerBookingsPage() {
           setLoyaltyBalance(prev => Math.max(0, prev - creditsToApply));
           showToast("Order placed with loyalty credits!");
           await loadBookings();
-          setTimeout(() => router.push(`/account/orders/${data.order_id}`), 1200);
+          router.push(`/order-confirmation/${data.order_id}`);
         } else {
           setVerifying(false);
           showToast(data.error || "Payment failed. Try again.", false);
@@ -270,38 +182,86 @@ export default function BuyerBookingsPage() {
 
     const PaystackPop = (window as any).PaystackPop;
     if (!PaystackPop) {
-      const script = document.createElement("script");
-      script.src = "https://js.paystack.co/v1/inline.js";
-      script.onload = () => { setPaystackReady(true); showToast("Ready! Tap Pay again.", true); };
-      document.head.appendChild(script);
-      showToast("Loading payment... tap Pay again in 3 seconds.", false);
+      showToast("Payment system not ready. Please refresh and try again.", false);
       return;
     }
 
-    const txRef = referenceRef.current;
+    // Capture booking before closing modal
+    const bookingToCharge = activeBooking;
+    setPayingId(null);
 
-    setPayingId(null); // Close modal before opening Paystack
+    // Initialize payment via backend to get access_code (same as checkout page)
+    setVerifying(true);
+    let accessCode: string, reference: string, amountKobo: number, appliedCredits = 0;
+    try {
+      const initRes = await fetchWithAuth(`${API_URL}/api/payments/initialize/`, {
+        method: "POST",
+        body: JSON.stringify({
+          listing_id: bookingToCharge.listing,
+          ...(useCredits && creditsToApply > 0 ? { use_credits: true } : {}),
+        }),
+      });
+      const initData = await initRes.json();
+      if (!initRes.ok) throw new Error(initData.error || "Failed to initialize payment");
+      accessCode = initData.access_code;
+      reference = initData.reference;
+      amountKobo = initData.amount_kobo;
+      appliedCredits = initData.credits_applied ?? 0;
+      if (!accessCode) throw new Error("Payment initialization failed. Please try again.");
+    } catch (err: any) {
+      setVerifying(false);
+      showToast(err.message || "Could not start payment. Try again.", false);
+      return;
+    }
+
+    // Hide the verifying overlay while the Paystack iframe is open
+    setVerifying(false);
 
     const handler = PaystackPop.setup({
       key: (process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || "").trim(),
+      access_code: accessCode,
       email: (user?.email || "").trim(),
-      // Paystack amounts are in kobo — multiply naira × 100
-      amount: totalWithFee * 100,
+      amount: amountKobo ?? Math.round(totalWithFee * 100),
       currency: "NGN",
-      ref: txRef,
-      metadata: {
-        custom_fields: [],
-        listing_id: (activeBookingRef.current || activeBooking).listing,
-        type: "booking_payment",
-        ...(useCredits && creditsToApply > 0 ? { credits_applied: creditsToApply } : {}),
-      },
-      callback: (response: any) => {
+      ref: reference,
+      callback: async (response: any) => {
         if (response.status === "success") {
-          startPolling(response.reference || txRef);
+          // Payment successful — verify and create the order (same as checkout page)
+          setVerifying(true);
+          try {
+            const res = await fetchWithAuth(`${API_URL}/api/payments/verify/`, {
+              method: "POST",
+              body: JSON.stringify({
+                reference: response.reference,
+                transaction_id: response.reference,
+                listing_id: bookingToCharge.listing,
+                order_type: "service",
+                use_credits: appliedCredits > 0,
+                credits_applied: appliedCredits,
+              }),
+            });
+            const data = await res.json();
+            if (res.ok && data.order_id) {
+              await loadBookings();
+              router.push(`/order-confirmation/${data.order_id}`);
+            } else {
+              setVerifying(false);
+              showToast(data.error || `Payment received. Save this reference: ${response.reference}`, true);
+              loadBookings();
+            }
+          } catch {
+            setVerifying(false);
+            showToast(`Payment received. Save this reference: ${response.reference}`, true);
+            loadBookings();
+          }
+        } else {
+          // Payment was not completed (e.g. card declined) — stop loading
+          setVerifying(false);
         }
       },
       onClose: () => {
-        startPolling(txRef);
+        // User closed/cancelled the Paystack modal — just stop loading, no polling
+        setVerifying(false);
       },
     });
     handler.openIframe();
@@ -448,7 +408,7 @@ export default function BuyerBookingsPage() {
         )}
       </AnimatePresence>
 
-      <TopNav showBack backHref="/account" />
+      <TopNav showBack />
 
       <div className="max-w-2xl mx-auto px-4 pt-5 pb-44 space-y-4">
         {/* FILTER TABS */}

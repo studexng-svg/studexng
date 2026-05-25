@@ -36,7 +36,7 @@ export default async function HomePage() {
   let vendorOfMonth: any = null;
 
   try {
-    const res = await fetch(`${API_URL}/api/auth/vendors/?campus=${campus}`, {
+    const res = await fetch(`${API_URL}/api/auth/vendors/?campus=${campus}&page_size=500`, {
       cache: 'no-store',
       headers: { "Content-Type": "application/json" },
     });

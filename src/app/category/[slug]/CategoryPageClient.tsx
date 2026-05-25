@@ -299,7 +299,7 @@ export default function CategoryPageClient({ slug, initialListings }: Props) {
         )}
       </AnimatePresence>
 
-      <TopNav showBack backHref="/categories" activeNav="services" />
+      <TopNav showBack activeNav="services" />
 
       {/* ── SEARCH SUB-BAR ── */}
       <div className="bg-white border-b border-stone-100">

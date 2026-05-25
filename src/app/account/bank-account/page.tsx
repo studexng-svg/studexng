@@ -207,7 +207,7 @@ export default function BankAccountPage() {
 
   return (
     <div className="min-h-screen bg-[#F5F5F5] pb-24" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-      <TopNav showBack backHref="/account" />
+      <TopNav showBack />
 
       <div className="max-w-lg mx-auto px-4 pt-5 space-y-5">
         {/* Info Banner */}

@@ -116,7 +116,7 @@ export default function AddService() {
 
   return (
     <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-      <TopNav showBack backHref="/seller" />
+      <TopNav showBack />
 
       {/* ERROR BANNER */}
       {error && (

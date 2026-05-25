@@ -357,7 +357,7 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-      <TopNav showBack backHref="/account" />
+      <TopNav showBack />
 
       <div className="px-4 pt-5 pb-32 space-y-6 max-w-2xl mx-auto">
 
