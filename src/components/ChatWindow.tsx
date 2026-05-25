@@ -110,8 +110,13 @@ export default function ChatWindow({
   const editInputRef = useRef<HTMLInputElement>(null);
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const isInitialLoad = useRef(true);
 
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
+  useEffect(() => {
+    if (!bottomRef.current) return;
+    bottomRef.current.scrollIntoView({ behavior: isInitialLoad.current ? "instant" : "smooth" });
+    isInitialLoad.current = false;
+  }, [messages]);
   useEffect(() => { if (editingId) editInputRef.current?.focus(); }, [editingId]);
 
   useEffect(() => {

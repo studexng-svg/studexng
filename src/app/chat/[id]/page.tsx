@@ -78,6 +78,7 @@ export default function ChatRoomPage() {
   const menuRef = useRef<HTMLDivElement>(null);
   const swipeTouchStart = useRef<{ x: number; y: number; id: number } | null>(null);
   const isSwipe = useRef(false);
+  const isInitialLoad = useRef(true);
 
   useEffect(() => {
     if (isHydrated && !isLoggedIn) { router.push("/auth"); return; }
@@ -87,7 +88,11 @@ export default function ChatRoomPage() {
     return () => clearInterval(interval);
   }, [isHydrated, isLoggedIn, conversationId]);
 
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
+  useEffect(() => {
+    if (!bottomRef.current) return;
+    bottomRef.current.scrollIntoView({ behavior: isInitialLoad.current ? "instant" : "smooth" });
+    isInitialLoad.current = false;
+  }, [messages]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
