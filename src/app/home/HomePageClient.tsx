@@ -122,15 +122,44 @@ export default function HomePageClient({ initialVendors, initialListings, initia
   const [showResults, setShowResults]     = useState(false);
 
   const featuredRef = useRef<HTMLDivElement>(null);
+  const activeTabRef = useRef<"listings" | "vendors">("listings");
+
+  useEffect(() => { activeTabRef.current = activeTab; }, [activeTab]);
 
   useEffect(() => {
     setMounted(true);
     const c = document.cookie.split(";").find(s => s.trim().startsWith("studex_campus="))?.split("=")?.[1]?.toLowerCase();
     if (c === "pau" || c === "futo") setCurrentCampus(c);
-    if (window.location.hash === "#vendors") {
+
+    // Restore tab + scroll after back navigation from a vendor/listing page
+    const saved = sessionStorage.getItem("home_page_state");
+    if (saved) {
+      try {
+        const { scrollY, tab } = JSON.parse(saved);
+        if (tab === "vendors") setActiveTab("vendors");
+        if (typeof scrollY === "number" && scrollY > 0) {
+          requestAnimationFrame(() => requestAnimationFrame(() => window.scrollTo(0, scrollY)));
+        }
+      } catch {}
+      sessionStorage.removeItem("home_page_state");
+    } else if (window.location.hash === "#vendors") {
       setActiveTab("vendors");
       setTimeout(() => featuredRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 200);
     }
+
+    // Save state before navigating deeper (vendor pages, listings)
+    const handleClick = (e: MouseEvent) => {
+      const link = (e.target as Element).closest("a");
+      const href = link?.getAttribute("href") ?? "";
+      if (href.startsWith("/vendor/") || href.startsWith("/listing/")) {
+        sessionStorage.setItem("home_page_state", JSON.stringify({
+          scrollY: window.scrollY,
+          tab: activeTabRef.current,
+        }));
+      }
+    };
+    document.addEventListener("click", handleClick, true);
+    return () => document.removeEventListener("click", handleClick, true);
   }, []);
 
   const switchCampus = async (campus: "pau" | "futo") => {
