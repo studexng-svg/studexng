@@ -543,8 +543,8 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          {/* Matric — read-only, FUTO students only */}
-          {profile.school === "FUTO" && (
+          {/* Matric — show only if user has a matric number */}
+          {profile.matric_number ? (
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-purple-50 rounded-xl flex items-center justify-center flex-shrink-0">
                 <Hash className="w-5 h-5 text-purple-600" />
@@ -552,19 +552,15 @@ export default function ProfilePage() {
               <div className="flex-1">
                 <p className="text-xs font-semibold text-stone-500 uppercase tracking-wide mb-1">Matric Number</p>
                 <div className="flex items-center gap-2">
-                  <p className={`font-semibold text-base ${profile.matric_number ? "text-stone-900" : "text-stone-400 italic"}`}>
-                    {profile.matric_number || "Not set"}
-                  </p>
+                  <p className="font-semibold text-base text-stone-900">{profile.matric_number}</p>
                   <span className="text-xs text-stone-400 flex items-center gap-1">
                     <Lock className="w-3 h-3" /> permanent
                   </span>
                 </div>
               </div>
             </div>
-          )}
-
-          {/* NIN — read-only, non-students only */}
-          {!profile.school && (
+          ) : profile.nin ? (
+            /* NIN — show if user has a NIN (non-student or registered with NIN) */
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-purple-50 rounded-xl flex items-center justify-center flex-shrink-0">
                 <Hash className="w-5 h-5 text-purple-600" />
@@ -572,16 +568,14 @@ export default function ProfilePage() {
               <div className="flex-1">
                 <p className="text-xs font-semibold text-stone-500 uppercase tracking-wide mb-1">NIN</p>
                 <div className="flex items-center gap-2">
-                  <p className={`font-semibold text-base ${profile.nin ? "text-stone-900" : "text-stone-400 italic"}`}>
-                    {profile.nin || "Not set"}
-                  </p>
+                  <p className="font-semibold text-base text-stone-900">{profile.nin}</p>
                   <span className="text-xs text-stone-400 flex items-center gap-1">
                     <Lock className="w-3 h-3" /> permanent
                   </span>
                 </div>
               </div>
             </div>
-          )}
+          ) : null}
 
           {/* Hostel / Location — editable */}
           <div className="flex items-start gap-3">
