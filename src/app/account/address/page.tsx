@@ -408,8 +408,8 @@ export default function ProfilePage() {
         <div className="text-center">
           <div className="relative inline-block">
             <div className="w-28 h-28 rounded-full overflow-hidden bg-gradient-to-br from-teal-100 to-purple-100 shadow-xl border-4 border-white">
-              {profile.avatar ? (
-                <Image src={profile.avatar} alt="Profile" width={112} height={112} className="w-full h-full object-cover" />
+              {(profile.avatar || user?.profile_image) ? (
+                <Image src={(profile.avatar || user?.profile_image)!} alt="Profile" width={112} height={112} className="w-full h-full object-cover" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-4xl font-bold text-teal-600">
                   {profile.name?.[0]?.toUpperCase() || "S"}
