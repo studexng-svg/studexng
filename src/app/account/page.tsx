@@ -381,7 +381,7 @@ export default function AccountPage() {
             <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
               className="w-full max-w-xs" onClick={e => e.stopPropagation()}>
               <div className="w-64 h-64 mx-auto rounded-2xl overflow-hidden shadow-2xl ring-4 ring-white/20">
-                {profilePic ? <img src={profilePic} alt="Profile" className="w-full h-full object-cover block" /> : (
+                {(profilePic ?? user?.profile_image) ? <img src={(profilePic ?? user?.profile_image)!} alt="Profile" className="w-full h-full object-cover block" /> : (
                   <div className="w-full h-full flex items-center justify-center text-white text-6xl font-bold" style={{ background: GRAD }}>{initials}</div>
                 )}
               </div>
@@ -500,8 +500,8 @@ export default function AccountPage() {
                       <div className="w-full h-full flex items-center justify-center" style={{ background: GRAD }}>
                         <div className="w-6 h-6 border-2 border-white/40 border-t-white rounded-full animate-spin" />
                       </div>
-                    ) : profilePic ? (
-                      <img src={profilePic} alt="Profile" className="w-full h-full object-cover block" />
+                    ) : (profilePic ?? user?.profile_image) ? (
+                      <img src={(profilePic ?? user?.profile_image)!} alt="Profile" className="w-full h-full object-cover block" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-white text-3xl font-bold" style={{ background: GRAD }}>{initials}</div>
                     )}
