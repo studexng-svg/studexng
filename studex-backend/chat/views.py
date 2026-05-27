@@ -56,7 +56,7 @@ def _has_suspicious_content(content: str):
 class ConversationViewSet(viewsets.ModelViewSet):
     serializer_class = ConversationSerializer
     permission_classes = [permissions.IsAuthenticated]
-    http_method_names = ['get', 'post', 'head', 'options']
+    http_method_names = ['get', 'post', 'delete', 'head', 'options']
 
     def get_queryset(self):
         user = self.request.user
@@ -92,6 +92,16 @@ class ConversationViewSet(viewsets.ModelViewSet):
 
         serializer = self.get_serializer(conversation)
         return Response(serializer.data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+
+    def destroy(self, request, *args, **kwargs):
+        conversation = self.get_object()
+        if conversation.messages.exists():
+            return Response(
+                {'error': 'Cannot delete a conversation that has messages.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        conversation.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=True, methods=['get'])
     def messages(self, request, pk=None):
