@@ -4,7 +4,11 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { Bell, CheckCheck, X, ExternalLink } from "lucide-react";
+import {
+  Bell, CheckCheck, X, ExternalLink,
+  CheckCircle, XCircle, AlertTriangle, Calendar, Ban, Wallet,
+  AlarmClock, Package, ShoppingBag, Tag, Store, FileText, MessageCircle,
+} from "lucide-react";
 import TopNav from "@/components/layout/TopNav";
 import { useAuth, fetchWithAuth } from "@/lib/authStore";
 import { GRAD, SERIF } from "@/lib/tokens";
@@ -21,29 +25,50 @@ interface Notification {
   created_at: string;
 }
 
-const NOTIF_ICONS: Record<string, string> = {
-  seller_approved: "🎉",
-  seller_rejected: "❌",
-  seller_revoked: "⚠️",
-  vendor_approved: "🎉",
-  vendor_revoked: "⚠️",
-  new_booking_request: "📅",
-  booking_confirmed: "✅",
-  booking_cancelled: "🚫",
-  booking_paid: "💰",
-  booking_reminder_5min: "⏰",
-  booking_time_now: "🔔",
-  payment_received: "💰",
-  order_completed: "📦",
-  order_confirmed: "✓",
-  listing_approved: "✅",
-  new_listing: "🏷️",
-  vendor_application: "📋",
-  message: "💬",
-};
+interface NotifIconDef {
+  Icon: React.ComponentType<{ style?: React.CSSProperties }>;
+  color: string;
+  bg: string;
+}
 
-function getIcon(type: string) {
-  return NOTIF_ICONS[type] ?? "🔔";
+function getNotifIcon(type: string): NotifIconDef {
+  switch (type) {
+    case "seller_approved":
+    case "vendor_approved":
+      return { Icon: CheckCircle,   color: "#16a34a", bg: "#dcfce7" };
+    case "seller_rejected":
+      return { Icon: XCircle,       color: "#dc2626", bg: "#fee2e2" };
+    case "seller_revoked":
+    case "vendor_revoked":
+      return { Icon: AlertTriangle, color: "#d97706", bg: "#fef3c7" };
+    case "new_booking_request":
+      return { Icon: Calendar,      color: "#0D9488", bg: "#CCFBF1" };
+    case "booking_confirmed":
+      return { Icon: CheckCircle,   color: "#0D9488", bg: "#CCFBF1" };
+    case "booking_cancelled":
+      return { Icon: Ban,           color: "#dc2626", bg: "#fee2e2" };
+    case "booking_paid":
+    case "payment_received":
+      return { Icon: Wallet,        color: "#16a34a", bg: "#dcfce7" };
+    case "booking_reminder_5min":
+      return { Icon: AlarmClock,    color: "#d97706", bg: "#fef3c7" };
+    case "booking_time_now":
+      return { Icon: Bell,          color: "#7C3AED", bg: "#ede9fe" };
+    case "order_completed":
+      return { Icon: Package,       color: "#16a34a", bg: "#dcfce7" };
+    case "order_confirmed":
+      return { Icon: ShoppingBag,   color: "#0D9488", bg: "#CCFBF1" };
+    case "listing_approved":
+      return { Icon: Tag,           color: "#0D9488", bg: "#CCFBF1" };
+    case "new_listing":
+      return { Icon: Store,         color: "#7C3AED", bg: "#ede9fe" };
+    case "vendor_application":
+      return { Icon: FileText,      color: "#2563eb", bg: "#dbeafe" };
+    case "message":
+      return { Icon: MessageCircle, color: "#0D9488", bg: "#CCFBF1" };
+    default:
+      return { Icon: Bell,          color: "#6b7280", bg: "#f5f5f4" };
+  }
 }
 
 function timeAgo(iso: string) {
@@ -135,7 +160,14 @@ export default function NotificationsPage() {
             >
               <div className="flex items-center justify-between px-5 py-4 border-b border-stone-100">
                 <div className="flex items-center gap-2">
-                  <span className="text-xl">{getIcon(selected.type)}</span>
+                  {(() => {
+                    const { Icon, color, bg } = getNotifIcon(selected.type);
+                    return (
+                      <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: bg }}>
+                        <Icon style={{ color, width: 18, height: 18 }} />
+                      </div>
+                    );
+                  })()}
                   <h3 className="font-bold text-stone-900 text-sm" style={SERIF}>{selected.title}</h3>
                 </div>
                 <button onClick={closeDetail} className="w-8 h-8 rounded-full bg-stone-100 flex items-center justify-center text-stone-500 hover:bg-stone-200 transition">
@@ -208,11 +240,14 @@ export default function NotificationsPage() {
                 }`}
               >
                 {/* Icon */}
-                <div className={`flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center text-lg ${
-                  !n.is_read ? "bg-teal-100" : "bg-stone-100"
-                }`}>
-                  {getIcon(n.type)}
-                </div>
+                {(() => {
+                  const { Icon, color, bg } = getNotifIcon(n.type);
+                  return (
+                    <div className="flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: bg }}>
+                      <Icon style={{ color, width: 20, height: 20 }} />
+                    </div>
+                  );
+                })()}
 
                 {/* Content */}
                 <div className="flex-1 min-w-0">
