@@ -110,7 +110,7 @@ export default function ProfilePage() {
           campus: djangoUser.hostel || "",
           matric_number: djangoUser.matric_number || "",
           nin: djangoUser.nin || "",
-          avatar: parsed.avatar || "",
+          avatar: djangoUser.profile_image || parsed.avatar || "",
           dob: parsed.dob || "",
           gender: parsed.gender || "",
         });
@@ -138,7 +138,7 @@ export default function ProfilePage() {
       campus: "",
       matric_number: "",
       nin: "",
-      avatar: parsed.avatar || "",
+      avatar: user?.profile_image || parsed.avatar || "",
       dob: parsed.dob || "",
       gender: parsed.gender || "",
     });
