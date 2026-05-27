@@ -11,6 +11,7 @@ interface UserProfile {
   phone: string;
   user_type: string;
   matric_number?: string | null;
+  nin?: string | null;
   hostel?: string;
   business_name?: string | null;
   is_verified_vendor: boolean;

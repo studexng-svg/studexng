@@ -109,7 +109,7 @@ export default function ProfilePage() {
           school: djangoUser.school || schoolFromEmail,
           campus: djangoUser.hostel || "",
           matric_number: djangoUser.matric_number || "",
-          nin: djangoUser.nin || "",
+          nin: djangoUser.nin || user?.nin || "",
           avatar: djangoUser.profile_image || parsed.avatar || "",
           dob: parsed.dob || "",
           gender: parsed.gender || "",
@@ -137,7 +137,7 @@ export default function ProfilePage() {
       school: schoolFromEmail,
       campus: "",
       matric_number: "",
-      nin: "",
+      nin: user?.nin || "",
       avatar: user?.profile_image || parsed.avatar || "",
       dob: parsed.dob || "",
       gender: parsed.gender || "",
@@ -559,7 +559,7 @@ export default function ProfilePage() {
                 </div>
               </div>
             </div>
-          ) : profile.nin ? (
+          ) : (profile.nin || user?.nin) ? (
             /* NIN — show if user has a NIN (non-student or registered with NIN) */
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-purple-50 rounded-xl flex items-center justify-center flex-shrink-0">
@@ -568,7 +568,7 @@ export default function ProfilePage() {
               <div className="flex-1">
                 <p className="text-xs font-semibold text-stone-500 uppercase tracking-wide mb-1">NIN</p>
                 <div className="flex items-center gap-2">
-                  <p className="font-semibold text-base text-stone-900">{profile.nin}</p>
+                  <p className="font-semibold text-base text-stone-900">{profile.nin || user?.nin}</p>
                   <span className="text-xs text-stone-400 flex items-center gap-1">
                     <Lock className="w-3 h-3" /> permanent
                   </span>
