@@ -193,6 +193,12 @@ class ConversationViewSet(viewsets.ModelViewSet):
         recipient = conversation.seller if request.user == conversation.buyer else conversation.buyer
         try:
             from accounts.utils import send_notification
+            from notifications.models import FCMToken
+            tokens = list(FCMToken.objects.filter(user=recipient).values_list('token', flat=True))
+            for token in tokens:
+                token_type = "expo" if token.startswith("ExponentPushToken[") else "fcm"
+                print(f"[chat push] Sending to token: {token}")
+                print(f"[chat push] Token type: {token_type}")
             preview = '📷 Image' if image else (content[:60] + ('...' if len(content) > 60 else ''))
             send_notification(
                 recipient=recipient,

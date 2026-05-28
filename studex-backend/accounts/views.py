@@ -273,6 +273,18 @@ def update_user_profile(request):
     if serializer.is_valid():
         serializer.save()
         user.refresh_from_db()
+
+        # Handle disclaimer/terms acceptance
+        if request.data.get('disclaimer_accepted'):
+            try:
+                profile, _ = Profile.objects.get_or_create(user=user)
+                if not profile.disclaimer_accepted:
+                    profile.disclaimer_accepted = True
+                    profile.disclaimer_accepted_at = timezone.now()
+                    profile.save(update_fields=['disclaimer_accepted', 'disclaimer_accepted_at'])
+            except Exception:
+                pass
+
         return Response({
             'message': 'Profile updated successfully',
             'user': UserProfileSerializer(user, context={'request': request}).data,

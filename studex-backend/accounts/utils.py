@@ -73,28 +73,57 @@ def send_notification(
         except Exception:
             pass
 
-        # ── FCM push to all registered devices ──────────────────────────────
+        # ── FCM / Expo push to all registered devices ───────────────────────
         try:
-            import firebase_admin
-            from firebase_admin import messaging as fcm_messaging
-            if not firebase_admin._apps:
-                from studex.firebase_admin_init import initialize_firebase
-                initialize_firebase()
             from notifications.models import FCMToken
             tokens = list(FCMToken.objects.filter(user=recipient).values_list('token', flat=True))
+            logger.debug(f"[push] Tokens for user {recipient.id}: {tokens}")
             if tokens:
-                fcm_msg = fcm_messaging.MulticastMessage(
-                    notification=fcm_messaging.Notification(title=title, body=message),
-                    tokens=tokens,
-                    data={'action_url': action_url or ''},
-                )
-                response = fcm_messaging.send_each_for_multicast(fcm_msg)
-                if response.failure_count > 0:
-                    invalid = [tokens[i] for i, r in enumerate(response.responses) if not r.success]
-                    if invalid:
-                        FCMToken.objects.filter(token__in=invalid).delete()
-        except Exception:
-            pass
+                expo_tokens = [t for t in tokens if t.startswith("ExponentPushToken[")]
+                fcm_tokens  = [t for t in tokens if not t.startswith("ExponentPushToken[")]
+
+                # Expo push tokens → Expo push relay (https://exp.host/--/api/v2/push/send)
+                if expo_tokens:
+                    print(f"[push] Sending to Expo tokens: {expo_tokens}")
+                    import httpx
+                    resp = httpx.post(
+                        "https://exp.host/--/api/v2/push/send",
+                        json=[
+                            {
+                                "to": token,
+                                "title": title,
+                                "body": message,
+                                "data": {"action_url": action_url or ""},
+                                "sound": "default",
+                                "priority": "high",
+                            }
+                            for token in expo_tokens
+                        ],
+                        headers={"Accept": "application/json", "Content-Type": "application/json"},
+                        timeout=10,
+                    )
+                    print(f"[push] Expo API response {resp.status_code}: {resp.text[:300]}")
+
+                # Raw FCM tokens → firebase_admin (web push tokens)
+                if fcm_tokens:
+                    print(f"[push] Sending to FCM tokens: {fcm_tokens}")
+                    import firebase_admin
+                    from firebase_admin import messaging as fcm_messaging
+                    if not firebase_admin._apps:
+                        from studex.firebase_admin_init import initialize_firebase
+                        initialize_firebase()
+                    fcm_msg = fcm_messaging.MulticastMessage(
+                        notification=fcm_messaging.Notification(title=title, body=message),
+                        tokens=fcm_tokens,
+                        data={'action_url': action_url or ''},
+                    )
+                    response = fcm_messaging.send_each_for_multicast(fcm_msg)
+                    if response.failure_count > 0:
+                        invalid = [fcm_tokens[i] for i, r in enumerate(response.responses) if not r.success]
+                        if invalid:
+                            FCMToken.objects.filter(token__in=invalid).delete()
+        except Exception as e:
+            logger.error(f"[push] Push delivery failed: {e}", exc_info=True)
 
         # ── Email (Resend → Brevo fallback) ──────────────────────────────────
         # Skipped for admin-facing notifications (send_email=False)

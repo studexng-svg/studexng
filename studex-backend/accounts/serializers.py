@@ -172,6 +172,8 @@ class UserProfileSerializer(serializers.ModelSerializer):
     is_admin = serializers.SerializerMethodField()
     whatsapp = serializers.CharField(write_only=True, required=False, allow_blank=True, allow_null=True)
     instagram = serializers.CharField(write_only=True, required=False, allow_blank=True, allow_null=True)
+    disclaimer_accepted = serializers.BooleanField(required=False)
+    disclaimer_accepted_at = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -182,12 +184,19 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'bio', 'profile_image', 'wallet_balance', 'created_at', 'profile',
             'is_staff', 'is_superuser', 'is_admin',
             'whatsapp', 'instagram',
+            'disclaimer_accepted', 'disclaimer_accepted_at',
         ]
         read_only_fields = ['wallet_balance', 'is_verified_vendor', 'created_at', 'is_staff', 'is_superuser', 'is_admin']
 
     def get_is_admin(self, obj):
         from studex.permissions import _is_platform_admin
         return _is_platform_admin(obj)
+
+    def get_disclaimer_accepted_at(self, obj):
+        try:
+            return obj.profile.disclaimer_accepted_at
+        except Exception:
+            return None
 
     def get_profile_image(self, obj):
         """Always return an absolute URL — works with Cloudinary, S3, and local storage."""
@@ -239,6 +248,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         whatsapp = validated_data.pop('whatsapp', None)
         instagram = validated_data.pop('instagram', None)
+        validated_data.pop('disclaimer_accepted', None)  # handled in view against Profile
 
         for attr, value in validated_data.items():
             setattr(instance, attr, value)

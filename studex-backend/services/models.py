@@ -119,6 +119,8 @@ class Listing(models.Model):
             models.Index(fields=['listing_type']),
             models.Index(fields=['campus']),
             models.Index(fields=['campus', 'is_available']),
+            models.Index(fields=['-created_at']),
+            models.Index(fields=['campus', '-created_at']),
         ]
 
 
