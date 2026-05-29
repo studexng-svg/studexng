@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   Search, ArrowRight, Heart, X, Sparkles, Star,
-  ChevronRight, ChevronDown, Clock, Plus, Trophy, ShoppingCart, User,
+  ChevronRight, ChevronDown, Clock, Plus, Trophy, ShoppingCart, User, LayoutGrid, List,
   ShieldCheck, Tag, Zap, Headphones,
   Shirt, Monitor, Home, BookOpen, Car,
   UtensilsCrossed, Smartphone, Scissors, WashingMachine,
@@ -135,6 +135,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
   const [minPrice, setMinPrice]         = useState<string>("");
   const [maxPrice, setMaxPrice]         = useState<string>("");
   const [heroIndex, setHeroIndex]       = useState(0);
+  const [viewMode, setViewMode]         = useState<"grid" | "list">("grid");
 
   const [vendors, setVendors]           = useState<Vendor[]>(initialVendors);
   const [allListings, setAllListings]   = useState<any[]>(initialListings);
@@ -263,15 +264,76 @@ export default function HomePageClient({ initialVendors, initialListings, initia
     });
   };
 
-  const filteredListings   = applyPriceFilter(activeFilter === "All" ? allListings : allListings.filter(l => l.category === activeFilter));
+  const renderListingRow = (listing: any, i: number) => {
+    const rating       = listing.vendor?.profile?.rating;
+    const totalReviews = listing.vendor?.profile?.total_reviews;
+    const wishlisted   = mounted && isInWishlist(listing.id);
+    const isService    = (listing.listing_type || "").toLowerCase() === "service";
+    const isOwn        = !!(user?.id && user.id === listing.vendor?.id);
+    const isReserved   = !isService && !isOwn && !!listing.is_reserved;
+    const inCart       = cart.some(ci => ci.id === listing.id);
+    return (
+      <motion.div key={listing.id} initial={{ opacity: 0, y: 8 }} whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }} transition={{ delay: Math.min(i * 0.02, 0.1) }}
+        className="bg-white rounded-xl border border-stone-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow flex items-center gap-3 p-2.5">
+        <Link href={`/listing/${listing.id}`} className="flex items-center gap-3 flex-1 min-w-0">
+          <div className="w-16 h-16 rounded-xl overflow-hidden flex-shrink-0 bg-stone-50 relative">
+            <SafeImage src={listing.image?.startsWith("http") ? listing.image : null} alt={listing.title} />
+            {!listing.is_available && (
+              <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                <span className="text-white text-[9px] font-bold">Unavailable</span>
+              </div>
+            )}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-bold text-stone-900 text-sm truncate">{listing.title}</p>
+            <p className="text-stone-400 text-xs mt-0.5 truncate">@{listing.vendor?.username || listing.vendor}</p>
+            {(totalReviews ?? 0) > 0 && (
+              <div className="flex items-center gap-0.5 mt-1">
+                <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                <span className="text-xs text-stone-600 font-medium">{rating}</span>
+                <span className="text-xs text-stone-400">({totalReviews})</span>
+              </div>
+            )}
+            <p className="font-bold text-stone-900 text-sm mt-1">₦{Number(listing.price).toLocaleString()}</p>
+          </div>
+        </Link>
+        {!isOwn && listing.is_available && !isReserved && (
+          <button
+            onClick={() => {
+              if (!isService) {
+                addToCart({ id: listing.id, title: listing.title, price: listing.price, img: listing.image || "" });
+                showToast(inCart ? "Added again (+1)" : "Added to cart");
+              } else {
+                router.push(`/listing/${listing.id}`);
+              }
+            }}
+            className="flex-shrink-0 px-3 py-2 text-white text-xs font-bold rounded-xl"
+            style={{ background: GRAD }}
+          >
+            {isService ? "Book" : "Cart"}
+          </button>
+        )}
+      </motion.div>
+    );
+  };
+
+  const gridClass = viewMode === "grid"
+    ? "grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4"
+    : "space-y-2";
+  const renderItem = (l: any, i: number) =>
+    viewMode === "grid" ? renderListingCard(l, i) : renderListingRow(l, i);
+
+  const catSlug = (l: any) => (typeof l.category === "object" ? l.category?.slug : l.category) ?? "";
+  const filteredListings   = applyPriceFilter(activeFilter === "All" ? allListings : allListings.filter(l => catSlug(l) === activeFilter));
   const TWENTY_FOUR_HOURS  = 24 * 60 * 60 * 1000;
   const newArrivals        = applyPriceFilter(allListings.filter(l => Date.now() - new Date(l.created_at).getTime() < TWENTY_FOUR_HOURS));
   const newArrivalIds      = new Set(newArrivals.map(l => l.id));
   const olderListings      = applyPriceFilter(allListings.filter(l => !newArrivalIds.has(l.id)));
 
-  const categorySections   = categories.map(cat => ({ ...cat, items: olderListings.filter(l => l.category === cat.slug) })).filter(s => s.items.length > 0);
+  const categorySections   = categories.map(cat => ({ ...cat, items: olderListings.filter(l => catSlug(l) === cat.slug) })).filter(s => s.items.length > 0);
   const categorisedSlugs   = new Set(categories.map(c => c.slug));
-  const uncategorised      = olderListings.filter(l => !categorisedSlugs.has(l.category));
+  const uncategorised      = olderListings.filter(l => !categorisedSlugs.has(catSlug(l)));
   const allSections        = uncategorised.length > 0 ? [...categorySections, { id: 0, title: "Other", slug: "__other__", image: null, items: uncategorised }] : categorySections;
 
   const renderListingCard = (listing: any, i: number) => {
@@ -777,6 +839,19 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                     </button>
                   ))}
                 </div>
+                {/* Grid / List toggle */}
+                {activeTab === "listings" && (
+                  <div className="flex bg-stone-100 rounded-lg p-0.5 gap-0.5">
+                    <button onClick={() => setViewMode("grid")}
+                      className={`p-1.5 rounded-md transition-all ${viewMode === "grid" ? "bg-white shadow-sm text-stone-700" : "text-stone-400 hover:text-stone-600"}`}>
+                      <LayoutGrid className="w-3.5 h-3.5" />
+                    </button>
+                    <button onClick={() => setViewMode("list")}
+                      className={`p-1.5 rounded-md transition-all ${viewMode === "list" ? "bg-white shadow-sm text-stone-700" : "text-stone-400 hover:text-stone-600"}`}>
+                      <List className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
                 <button onClick={() => handleFilter("All")}
                   className="text-teal-600 text-sm font-semibold flex items-center gap-1 hover:text-teal-700 transition">
                   View All <ArrowRight className="w-3.5 h-3.5" />
@@ -818,8 +893,8 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                               <h3 className="text-lg font-bold text-stone-900 mt-0.5">New Arrivals</h3>
                             </div>
                           </div>
-                          <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                            {newArrivals.map((l, i) => renderListingCard(l, i))}
+                          <div className={gridClass}>
+                            {newArrivals.map((l, i) => renderItem(l, i))}
                           </div>
                         </div>
                       )}
@@ -836,8 +911,8 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                               </button>
                             )}
                           </div>
-                          <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                            {section.items.map((l, i) => renderListingCard(l, i))}
+                          <div className={gridClass}>
+                            {section.items.map((l, i) => renderItem(l, i))}
                           </div>
                         </div>
                       ))}
@@ -852,8 +927,8 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                         <p className="text-stone-400 text-sm mt-1">No listings in this category.</p>
                       </div>
                     ) : (
-                      <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                        {filteredListings.map((l, i) => renderListingCard(l, i))}
+                      <div className={gridClass}>
+                        {filteredListings.map((l, i) => renderItem(l, i))}
                       </div>
                     )}
                   </>
