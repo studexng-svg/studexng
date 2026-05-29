@@ -633,7 +633,7 @@ class VendorListView(ListAPIView):
     pagination_class = VendorPagination
 
     def get_queryset(self):
-        from django.db.models import Q
+        from django.db.models import Q, Count
         from datetime import timedelta
         online_threshold = timezone.now() - timedelta(minutes=3)
         online_order = Case(
@@ -665,8 +665,16 @@ class VendorListView(ListAPIView):
         return (
             qs
             .select_related('profile')
-            .annotate(online_order=online_order, badge_order=badge_order)
-            .order_by('online_order', 'badge_order', '-profile__rating')
+            .annotate(
+                online_order=online_order,
+                badge_order=badge_order,
+                completed_order_count=Count(
+                    'listings__order_set',
+                    filter=Q(listings__order_set__status='completed'),
+                    distinct=True,
+                ),
+            )
+            .order_by('-completed_order_count', '-profile__rating')
         )
 
 
@@ -676,7 +684,18 @@ class VendorDetailView(generics.RetrieveAPIView):
     lookup_field = 'username'
 
     def get_queryset(self):
-        return User.objects.filter(is_verified_vendor=True).select_related('profile')
+        from django.db.models import Count, Q
+        return (
+            User.objects.filter(is_verified_vendor=True)
+            .select_related('profile')
+            .annotate(
+                completed_order_count=Count(
+                    'listings__order_set',
+                    filter=Q(listings__order_set__status='completed'),
+                    distinct=True,
+                )
+            )
+        )
 
 
 @api_view(['POST'])

@@ -451,6 +451,7 @@ class VendorListSerializer(serializers.ModelSerializer):
     completion_rate = serializers.SerializerMethodField()
     total_listings = serializers.SerializerMethodField()
     is_online = serializers.SerializerMethodField()
+    completed_order_count = serializers.IntegerField(default=0)
 
     class Meta:
         model = User
@@ -458,6 +459,7 @@ class VendorListSerializer(serializers.ModelSerializer):
             'id', 'username', 'business_name', 'profile_picture',
             'bio', 'vendor_badge', 'rating', 'total_reviews',
             'completion_rate', 'total_listings', 'hostel', 'is_online', 'school',
+            'completed_order_count',
         ]
 
     def get_is_online(self, obj):

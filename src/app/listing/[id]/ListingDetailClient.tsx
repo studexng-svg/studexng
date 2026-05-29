@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Star, MessageCircle, ShoppingCart, Calendar,
@@ -48,17 +49,59 @@ interface Listing {
   track_inventory?: boolean;
   stock_quantity?: number;
   category: { id: number; title: string; slug: string };
+  campus?: string;
   vendor: {
     id: number;
     username: string;
     business_name?: string;
-    profile?: {
-      vendor_badge: "none" | "rising" | "trusted" | "top";
-      completion_rate: number;
-      rating: number;
-      total_reviews: number;
-    };
+    vendor_badge?: "none" | "rising" | "trusted" | "top" | null;
+    completion_rate?: number;
+    rating?: number;
+    total_reviews?: number;
   };
+}
+
+function RelatedSkeleton() {
+  return (
+    <div className="flex gap-3 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
+      {[0, 1, 2].map(i => (
+        <div key={i} className="w-40 flex-shrink-0 bg-stone-100 rounded-2xl h-56 animate-pulse" />
+      ))}
+    </div>
+  );
+}
+
+function RelatedCard({ item }: { item: any }) {
+  const router = useRouter();
+  const isService = (item.listing_type || "").toLowerCase() === "service";
+  const src = item.image?.startsWith("http") ? item.image : null;
+  return (
+    <div
+      className="w-40 flex-shrink-0 bg-white rounded-2xl overflow-hidden shadow-sm border border-stone-100 cursor-pointer hover:shadow-md transition-shadow"
+      onClick={() => router.push(`/listing/${item.id}`)}
+    >
+      <div className="aspect-square bg-stone-100 overflow-hidden">
+        {src ? (
+          <img src={src} alt={item.title} className="w-full h-full object-cover" loading="lazy" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center" style={{ background: GRAD }}>
+            <Sparkles className="w-6 h-6 text-white/60" />
+          </div>
+        )}
+      </div>
+      <div className="p-2.5">
+        <p className="text-xs font-semibold text-stone-800 truncate leading-snug">{item.title}</p>
+        <p className="text-sm font-bold text-teal-600 mt-0.5">₦{Number(item.price).toLocaleString()}</p>
+        <button
+          className="mt-2 w-full py-1.5 text-white text-[10px] font-bold rounded-lg"
+          style={{ background: GRAD }}
+          onClick={e => { e.stopPropagation(); router.push(`/listing/${item.id}`); }}
+        >
+          {isService ? "Book" : "Add to Cart"}
+        </button>
+      </div>
+    </div>
+  );
 }
 
 function getStockWarning(data: Listing | null): string {
@@ -98,10 +141,67 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
   const [toast, setToast] = useState("");
   const [imageOpen, setImageOpen] = useState(false);
 
+  const [vendorListings, setVendorListings]           = useState<any[]>([]);
+  const [vendorListingsLoading, setVendorListingsLoading] = useState(false);
+  const [similarItems, setSimilarItems]               = useState<any[]>([]);
+  const [similarLoading, setSimilarLoading]           = useState(false);
+  const [alsoLike, setAlsoLike]                       = useState<any[]>([]);
+  const [alsoLikeLoading, setAlsoLikeLoading]         = useState(false);
+
   const showToast = (msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(""), 2500);
   };
+
+  // ── More from this vendor ─────────────────────────────────────────────────
+  useEffect(() => {
+    if (!listing?.vendor?.username) return;
+    setVendorListingsLoading(true);
+    fetch(`${API_URL}/api/services/listings/?vendor_username=${listing.vendor.username}&page_size=6`)
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(d => {
+        const items = (d.results || d || [])
+          .filter((l: any) => l.id !== listing.id && l.is_available !== false)
+          .slice(0, 4);
+        setVendorListings(items);
+      })
+      .catch(() => {})
+      .finally(() => setVendorListingsLoading(false));
+  }, [listing?.vendor?.username, listing?.id]);
+
+  // ── Similar items ─────────────────────────────────────────────────────────
+  useEffect(() => {
+    const slug = listing?.category?.slug;
+    const campus = listing?.campus;
+    if (!slug || !campus) return;
+    setSimilarLoading(true);
+    fetch(`${API_URL}/api/services/listings/?campus=${campus}&category=${slug}&page_size=8`)
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(d => {
+        const items = (d.results || d || [])
+          .filter((l: any) => l.id !== listing.id && l.vendor?.username !== listing.vendor?.username)
+          .slice(0, 6);
+        setSimilarItems(items);
+      })
+      .catch(() => {})
+      .finally(() => setSimilarLoading(false));
+  }, [listing?.category?.slug, listing?.campus, listing?.id, listing?.vendor?.username]);
+
+  // ── You might also like ───────────────────────────────────────────────────
+  useEffect(() => {
+    const campus = listing?.campus;
+    if (!campus) return;
+    setAlsoLikeLoading(true);
+    fetch(`${API_URL}/api/services/listings/?campus=${campus}&page_size=12`)
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(d => {
+        const all = (d.results || d || []).filter((l: any) => l.id !== listing.id);
+        const shuffled = [...all].sort(() => Math.random() - 0.5).slice(0, 4);
+        setAlsoLike(shuffled);
+      })
+      .catch(() => {})
+      .finally(() => setAlsoLikeLoading(false));
+  }, [listing?.campus, listing?.id]);
 
   const handleAddToCart = async () => {
     if (!listing) return;
@@ -251,10 +351,10 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
   );
 
   const vendorName = listing.vendor.business_name || listing.vendor.username;
-  const badge = listing.vendor.profile?.vendor_badge;
-  const rating = listing.vendor.profile?.rating || 0;
-  const totalReviews = listing.vendor.profile?.total_reviews || 0;
-  const completionRate = listing.vendor.profile?.completion_rate || 0;
+  const badge = listing.vendor.vendor_badge;
+  const rating = listing.vendor.rating || 0;
+  const totalReviews = listing.vendor.total_reviews || 0;
+  const completionRate = listing.vendor.completion_rate || 0;
 
   return (
     <>
@@ -673,6 +773,54 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {/* ── MORE FROM VENDOR ── */}
+            {(vendorListingsLoading || vendorListings.length > 0) && (
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <p className="font-bold text-stone-900 text-sm">More from @{listing.vendor.username}</p>
+                  <Link href={`/vendor/${listing.vendor.username}`} className="text-teal-600 text-xs font-semibold hover:text-teal-700 transition">
+                    View all →
+                  </Link>
+                </div>
+                {vendorListingsLoading ? <RelatedSkeleton /> : (
+                  <div className="flex gap-3 overflow-x-auto pb-2" style={{ scrollbarWidth: "none" }}>
+                    {vendorListings.map(item => <RelatedCard key={item.id} item={item} />)}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── SIMILAR ITEMS ── */}
+            {(similarLoading || similarItems.length > 0) && (
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <p className="font-bold text-stone-900 text-sm">Similar Items</p>
+                  {listing.category?.title && (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold text-teal-700 bg-teal-50 border border-teal-100">
+                      {listing.category.title}
+                    </span>
+                  )}
+                </div>
+                {similarLoading ? <RelatedSkeleton /> : (
+                  <div className="flex gap-3 overflow-x-auto pb-2" style={{ scrollbarWidth: "none" }}>
+                    {similarItems.map(item => <RelatedCard key={item.id} item={item} />)}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── YOU MIGHT ALSO LIKE ── */}
+            {(alsoLikeLoading || alsoLike.length > 0) && (
+              <div>
+                <p className="font-bold text-stone-900 text-sm mb-3">You might also like</p>
+                {alsoLikeLoading ? <RelatedSkeleton /> : (
+                  <div className="flex gap-3 overflow-x-auto pb-2" style={{ scrollbarWidth: "none" }}>
+                    {alsoLike.map(item => <RelatedCard key={item.id} item={item} />)}
+                  </div>
+                )}
               </div>
             )}
 

@@ -1,6 +1,9 @@
 # services/serializers.py
 from rest_framework import serializers
 from .models import Category, Listing, Transaction
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -21,8 +24,20 @@ class VendorSerializer(serializers.Serializer):
         return profile.business_name if profile and hasattr(profile, 'business_name') else None
 
 
+class ListingVendorSerializer(serializers.ModelSerializer):
+    """Vendor serializer for listing detail — includes profile stats."""
+    vendor_badge = serializers.CharField(source='profile.vendor_badge', default=None)
+    completion_rate = serializers.DecimalField(source='profile.completion_rate', max_digits=5, decimal_places=2, default=0)
+    rating = serializers.DecimalField(source='profile.rating', max_digits=3, decimal_places=2, default=0)
+    total_reviews = serializers.IntegerField(source='profile.total_reviews', default=0)
+
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'business_name', 'vendor_badge', 'completion_rate', 'rating', 'total_reviews']
+
+
 class ListingSerializer(serializers.ModelSerializer):
-    vendor = VendorSerializer(read_only=True)
+    vendor = ListingVendorSerializer(read_only=True)
     vendor_is_verified = serializers.ReadOnlyField(source='vendor.is_verified_vendor')
     category = serializers.SlugRelatedField(
         slug_field='slug',
@@ -32,6 +47,7 @@ class ListingSerializer(serializers.ModelSerializer):
     image = serializers.SerializerMethodField()
     image_upload = serializers.CharField(required=False, allow_null=True, allow_blank=True, write_only=True, source='image')
     is_reserved = serializers.SerializerMethodField()
+    campus = serializers.CharField(source='vendor.school', read_only=True, default='')
 
     class Meta:
         model = Listing
@@ -40,9 +56,19 @@ class ListingSerializer(serializers.ModelSerializer):
             'is_available', 'listing_type', 'track_inventory', 'stock_quantity',
             'is_reserved',
             'category', 'vendor', 'vendor_is_verified',
+            'campus',
             'created_at', 'updated_at'
         ]
         read_only_fields = ['vendor', 'vendor_is_verified', 'created_at', 'updated_at']
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        # Expand category slug into a full object for frontend consumption.
+        # Writes still use SlugRelatedField (slug string) as before.
+        cat = instance.category
+        if cat:
+            data['category'] = {'id': cat.id, 'title': cat.title, 'slug': cat.slug}
+        return data
 
     def get_is_reserved(self, obj):
         if not (obj.track_inventory and obj.stock_quantity == 1):

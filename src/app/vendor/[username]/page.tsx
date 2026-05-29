@@ -70,7 +70,7 @@ export default function VendorProfilePage() {
       try {
         const [vRes, lRes] = await Promise.all([
           fetch(`${API_URL}/api/auth/vendors/${username}/`),
-          fetchWithAuth(`${API_URL}/api/services/listings/?vendor_username=${username}`),
+          fetch(`${API_URL}/api/services/listings/?vendor_username=${username}`),
         ]);
         if (vRes.ok) setVendor(await vRes.json());
         if (lRes.ok) {

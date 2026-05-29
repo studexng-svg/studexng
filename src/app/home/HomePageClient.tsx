@@ -33,6 +33,7 @@ interface Vendor {
   total_listings: number;
   hostel: string;
   is_online?: boolean;
+  completed_order_count?: number;
 }
 
 interface Category {
@@ -90,6 +91,30 @@ const TRUST_ITEMS = [
 
 const HERO_GRAD = "linear-gradient(135deg,#6D28D9 0%,#4F46E5 45%,#06B6D4 100%)";
 
+const heroBackgrounds = [
+  { type: "gradient", value: "linear-gradient(135deg,#6D28D9 0%,#4F46E5 45%,#06B6D4 100%)" },
+  // Nails / nail art
+  { type: "image", value: "https://images.unsplash.com/photo-1604654894610-df63bc536371?w=1200&q=80" },
+  // Lashes / eye makeup close-up
+  { type: "image", value: "https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=1200&q=80" },
+  // Hair styling / braiding
+  { type: "image", value: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=1200&q=80" },
+  // Food — jollof rice / Nigerian cuisine
+  { type: "image", value: "https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=1200&q=80" },
+  // Drinks / beverages
+  { type: "image", value: "https://images.unsplash.com/photo-1546171753-97d7676e4602?w=1200&q=80" },
+  // Laundry / clothing
+  { type: "image", value: "https://images.unsplash.com/photo-1582735689369-4fe89db7114c?w=1200&q=80" },
+  // Fashion / outfit
+  { type: "image", value: "https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=1200&q=80" },
+  // Photography / camera
+  { type: "image", value: "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=1200&q=80" },
+  // Makeup / beauty
+  { type: "image", value: "https://images.unsplash.com/photo-1487412947147-5cebf100ffc2?w=1200&q=80" },
+  // Fitness / gym
+  { type: "image", value: "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=1200&q=80" },
+];
+
 interface Props {
   initialVendors: Vendor[];
   initialListings: any[];
@@ -109,6 +134,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
   const [activeTab, setActiveTab]       = useState<"listings" | "vendors">("listings");
   const [minPrice, setMinPrice]         = useState<string>("");
   const [maxPrice, setMaxPrice]         = useState<string>("");
+  const [heroIndex, setHeroIndex]       = useState(0);
 
   const [vendors, setVendors]           = useState<Vendor[]>(initialVendors);
   const [allListings, setAllListings]   = useState<any[]>(initialListings);
@@ -160,6 +186,11 @@ export default function HomePageClient({ initialVendors, initialListings, initia
     };
     document.addEventListener("click", handleClick, true);
     return () => document.removeEventListener("click", handleClick, true);
+  }, []);
+
+  useEffect(() => {
+    const t = setInterval(() => setHeroIndex(p => (p + 1) % heroBackgrounds.length), 4000);
+    return () => clearInterval(t);
   }, []);
 
   const switchCampus = async (campus: "pau" | "futo") => {
@@ -431,6 +462,9 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                 className="text-sm font-medium text-stone-500 hover:text-stone-700 transition">
                 Vendors
               </button>
+              <Link href="/leaderboard" className="text-sm font-medium text-stone-500 hover:text-stone-700 transition flex items-center gap-1.5">
+                <Trophy className="w-3.5 h-3.5 text-amber-500" /> Leaderboard
+              </Link>
             </nav>
 
             {/* Search */}
@@ -517,10 +551,39 @@ export default function HomePageClient({ initialVendors, initialListings, initia
 
           {/* ── HERO ── */}
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
-            className="relative rounded-2xl overflow-hidden"
-            style={{ background: HERO_GRAD }}>
+            className="relative rounded-2xl overflow-hidden bg-purple-900">
 
-            {/* Blobs */}
+            {/* Carousel backgrounds */}
+            {heroBackgrounds.map((bg, i) =>
+              bg.type === "gradient" ? (
+                <div
+                  key={i}
+                  className="absolute inset-0 transition-opacity duration-1000"
+                  style={{ opacity: i === heroIndex ? 1 : 0, background: bg.value }}
+                />
+              ) : (
+                <img
+                  key={i}
+                  src={bg.value}
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                  className="absolute inset-0 w-full h-full object-cover transition-opacity duration-1000"
+                  style={{ opacity: i === heroIndex ? 1 : 0, objectPosition: 'center' }}
+                />
+              )
+            )}
+
+            {/* Dark overlay for image slides so text stays readable */}
+            <div
+              className="absolute inset-0 transition-opacity duration-1000 pointer-events-none"
+              style={{
+                opacity: heroBackgrounds[heroIndex]?.type === "image" ? 1 : 0,
+                background: "linear-gradient(135deg,rgba(109,40,217,0.80) 0%,rgba(79,70,229,0.70) 45%,rgba(6,182,212,0.55) 100%)",
+              }}
+            />
+
+            {/* Decorative blobs — visible on gradient slide */}
             <div className="absolute top-1/2 left-[45%] -translate-y-1/2 w-80 h-80 rounded-full pointer-events-none"
               style={{ background: "radial-gradient(circle,rgba(165,180,252,0.35) 0%,transparent 70%)" }} />
             <div className="absolute bottom-0 left-[20%] w-56 h-56 rounded-full pointer-events-none"
@@ -608,8 +671,35 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                   />
                 </div>
               </div>
+
+              {/* Hero dot indicators */}
+              <div className="flex justify-center gap-2 mt-5">
+                {heroBackgrounds.map((_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setHeroIndex(i)}
+                    className={`rounded-full transition-all duration-300 ${
+                      i === heroIndex ? "w-6 h-1.5 bg-white" : "w-1.5 h-1.5 bg-white/40 hover:bg-white/60"
+                    }`}
+                  />
+                ))}
+              </div>
             </div>
           </motion.div>
+
+          {/* ── LEADERBOARD ENTRY ── */}
+          <Link href="/leaderboard">
+            <div className="mt-4 bg-white rounded-2xl p-4 flex items-center gap-3 border border-stone-100 shadow-sm hover:shadow-md transition-shadow cursor-pointer">
+              <div className="w-10 h-10 rounded-full bg-amber-50 border border-amber-100 flex items-center justify-center flex-shrink-0">
+                <Trophy className="w-5 h-5 text-amber-500" />
+              </div>
+              <div className="flex-1">
+                <p className="font-bold text-stone-900 text-sm">🏆 Vendor Leaderboard</p>
+                <p className="text-xs text-stone-400 mt-0.5">See top vendors ranked by completed orders</p>
+              </div>
+              <ChevronRight className="w-4 h-4 text-stone-400 flex-shrink-0" />
+            </div>
+          </Link>
 
           {/* ── CATEGORY TABS ── */}
           <div className="mt-4 flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
