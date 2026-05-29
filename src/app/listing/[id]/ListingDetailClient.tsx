@@ -94,7 +94,10 @@ function RelatedCard({ item }: { item: any }) {
         <p className="text-sm font-bold text-teal-600 mt-0.5">₦{Number(item.price).toLocaleString()}</p>
         <button
           className="mt-2 w-full py-1.5 text-white text-[10px] font-bold rounded-lg"
-          style={{ background: GRAD }}
+          style={{
+            background: "linear-gradient(135deg, #2DD4BF 0%, #0D9488 55%, #0f766e 100%)",
+            boxShadow: "0 4px 12px rgba(13,148,136,0.35), inset 0 1px 0 rgba(255,255,255,0.25)",
+          }}
           onClick={e => { e.stopPropagation(); router.push(`/listing/${item.id}`); }}
         >
           {isService ? "Book" : "Add to Cart"}
