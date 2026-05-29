@@ -275,27 +275,27 @@ export default function HomePageClient({ initialVendors, initialListings, initia
     return (
       <motion.div key={listing.id} initial={{ opacity: 0, y: 8 }} whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }} transition={{ delay: Math.min(i * 0.02, 0.1) }}
-        className="bg-white rounded-xl border border-stone-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow flex items-center gap-3 p-2.5">
-        <Link href={`/listing/${listing.id}`} className="flex items-center gap-3 flex-1 min-w-0">
-          <div className="w-16 h-16 rounded-xl overflow-hidden flex-shrink-0 bg-stone-50 relative">
+        className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow flex items-center gap-4 p-4">
+        <Link href={`/listing/${listing.id}`} className="flex items-center gap-4 flex-1 min-w-0">
+          <div className="w-24 h-24 rounded-xl overflow-hidden flex-shrink-0 bg-stone-50 relative">
             <SafeImage src={listing.image?.startsWith("http") ? listing.image : null} alt={listing.title} />
             {!listing.is_available && (
               <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                <span className="text-white text-[9px] font-bold">Unavailable</span>
+                <span className="text-white text-[10px] font-bold">Unavailable</span>
               </div>
             )}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="font-bold text-stone-900 text-sm truncate">{listing.title}</p>
-            <p className="text-stone-400 text-xs mt-0.5 truncate">@{listing.vendor?.username || listing.vendor}</p>
+            <p className="font-bold text-stone-900 text-base truncate">{listing.title}</p>
+            <p className="text-stone-400 text-sm mt-0.5 truncate">@{listing.vendor?.username || listing.vendor}</p>
             {(totalReviews ?? 0) > 0 && (
-              <div className="flex items-center gap-0.5 mt-1">
-                <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
-                <span className="text-xs text-stone-600 font-medium">{rating}</span>
-                <span className="text-xs text-stone-400">({totalReviews})</span>
+              <div className="flex items-center gap-1 mt-1.5">
+                <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                <span className="text-sm text-stone-600 font-medium">{rating}</span>
+                <span className="text-sm text-stone-400">({totalReviews})</span>
               </div>
             )}
-            <p className="font-bold text-stone-900 text-sm mt-1">₦{Number(listing.price).toLocaleString()}</p>
+            <p className="font-bold text-stone-900 text-base mt-1.5">₦{Number(listing.price).toLocaleString()}</p>
           </div>
         </Link>
         {!isOwn && listing.is_available && !isReserved && (
@@ -308,8 +308,11 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                 router.push(`/listing/${listing.id}`);
               }
             }}
-            className="flex-shrink-0 px-3 py-2 text-white text-xs font-bold rounded-xl"
-            style={{ background: GRAD }}
+            className="flex-shrink-0 px-4 py-3 text-white text-sm font-bold rounded-xl"
+            style={{
+              background: "linear-gradient(135deg, #2DD4BF 0%, #0D9488 55%, #0f766e 100%)",
+              boxShadow: "0 4px 12px rgba(13,148,136,0.35), inset 0 1px 0 rgba(255,255,255,0.25)",
+            }}
           >
             {isService ? "Book" : "Cart"}
           </button>
