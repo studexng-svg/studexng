@@ -53,6 +53,7 @@ export default function VendorProfilePage() {
   const [vendor, setVendor] = useState<any>(null);
   const [listings, setListings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const scrollKey = `vendor_scroll:${username}`;
   const [adminLoading, setAdminLoading] = useState<string | null>(null);
   const [adminToast, setAdminToast] = useState("");
   const [notifyOpen, setNotifyOpen] = useState(false);
@@ -78,10 +79,29 @@ export default function VendorProfilePage() {
           setListings(d.results || d || []);
         }
       } catch {}
-      finally { setLoading(false); }
+      finally {
+        setLoading(false);
+        // Restore scroll after data is loaded (global LayoutClient fires before data arrives)
+        const saved = sessionStorage.getItem(scrollKey);
+        if (saved) {
+          const y = parseInt(saved, 10);
+          sessionStorage.removeItem(scrollKey);
+          if (y > 0) requestAnimationFrame(() => requestAnimationFrame(() => window.scrollTo(0, y)));
+        }
+      }
     };
     load();
-  }, [username]);
+
+    // Save scroll when navigating into a listing
+    const handleClick = (e: MouseEvent) => {
+      const href = (e.target as Element).closest("a")?.getAttribute("href") ?? "";
+      if (href.startsWith("/listing/")) {
+        sessionStorage.setItem(scrollKey, String(window.scrollY));
+      }
+    };
+    document.addEventListener("click", handleClick, true);
+    return () => document.removeEventListener("click", handleClick, true);
+  }, [username, scrollKey]);
 
   const handleRevokeVendor = async () => {
     if (!vendor?.id) return;
