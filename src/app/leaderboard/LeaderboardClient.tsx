@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import TopNav from "@/components/layout/TopNav";
 
@@ -77,10 +77,8 @@ function PodiumCard({ vendor, rank }: { vendor: Vendor; rank: 1 | 2 | 3 }) {
   return (
     <Link href={`/vendor/${vendor.username}`} className={`flex-1 ${isFirst ? "" : rank === 2 ? "mt-10" : "mt-14"}`}>
       <div className="bg-white rounded-2xl shadow-md border border-stone-100 flex flex-col items-center px-2 pt-4 pb-4 hover:shadow-lg transition-shadow cursor-pointer h-full">
-        {/* Crown for 1st */}
         {isFirst && <span className="text-3xl leading-none mb-2">👑</span>}
 
-        {/* Avatar + rank badge */}
         <div className="relative">
           <Avatar vendor={vendor} size={avatarSize} ring={RING[rank]} />
           <div
@@ -91,12 +89,10 @@ function PodiumCard({ vendor, rank }: { vendor: Vendor; rank: 1 | 2 | 3 }) {
           </div>
         </div>
 
-        {/* Name */}
         <p className={`font-bold text-stone-900 text-center truncate mt-4 w-full px-1 ${isFirst ? "text-sm" : "text-xs"}`}>
           {vendor.business_name || vendor.username}
         </p>
 
-        {/* Score */}
         <div className="flex items-center gap-1 mt-1">
           <span className="text-emerald-500 font-black" style={{ fontSize: 9 }}>▲</span>
           <span className={`font-bold text-stone-700 ${isFirst ? "text-sm" : "text-xs"}`}>
@@ -116,23 +112,17 @@ function PodiumCard({ vendor, rank }: { vendor: Vendor; rank: 1 | 2 | 3 }) {
 
 export default function LeaderboardClient({ initialVendors, initialCampus }: Props) {
   const [vendors, setVendors] = useState<Vendor[]>(initialVendors);
-  const [campus, setCampus] = useState<"pau" | "futo">(initialCampus);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(initialVendors.length === 0);
 
-  const switchCampus = async (c: "pau" | "futo") => {
-    if (c === campus) return;
-    setCampus(c);
+  // Always fetch client-side — SSR fetch can silently fail between Vercel and Render
+  useEffect(() => {
     setLoading(true);
-    try {
-      const res = await fetch(`${API_URL}/api/auth/vendors/?campus=${c}&page_size=50`);
-      if (res.ok) {
-        const data = await res.json();
-        setVendors(data.results || data || []);
-      }
-    } catch {} finally {
-      setLoading(false);
-    }
-  };
+    fetch(`${API_URL}/api/auth/vendors/?campus=${initialCampus}&page_size=50`)
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(d => setVendors(d.results || d || []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [initialCampus]);
 
   const ranked = [...vendors].sort((a, b) => (b.completed_order_count || 0) - (a.completed_order_count || 0));
   const [p1, p2, p3] = ranked;
@@ -147,24 +137,14 @@ export default function LeaderboardClient({ initialVendors, initialCampus }: Pro
 
       <div className="max-w-lg mx-auto px-4 pt-6 pb-32">
 
-        {/* Header row */}
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl font-black text-stone-900 tracking-tight">Leaderboard</h1>
-            <p className="text-stone-400 text-xs mt-0.5">Ranked by completed orders</p>
-          </div>
-          <div className="flex items-center gap-1 bg-white rounded-full p-1 shadow-sm border border-stone-100">
-            {(["pau", "futo"] as const).map(c => (
-              <button
-                key={c}
-                onClick={() => switchCampus(c)}
-                className={`px-3 py-1 rounded-full text-xs font-bold uppercase transition-all ${campus === c ? "text-white" : "text-stone-400 hover:text-stone-600"}`}
-                style={campus === c ? { background: "linear-gradient(135deg,#0D9488,#7C3AED)" } : {}}
-              >
-                {c}
-              </button>
-            ))}
-          </div>
+        {/* Header */}
+        <div className="mb-6">
+          <h1 className="text-2xl font-black text-stone-900 tracking-tight">Leaderboard</h1>
+          <p className="text-stone-400 text-xs mt-0.5">
+            Top vendors at{" "}
+            <span className="font-bold text-stone-600 uppercase">{initialCampus}</span>
+            {" "}ranked by completed orders
+          </p>
         </div>
 
         {loading ? (
@@ -207,11 +187,7 @@ export default function LeaderboardClient({ initialVendors, initialCampus }: Pro
                 return (
                   <Link key={vendor.id} href={`/vendor/${vendor.username}`}>
                     <div className="bg-white rounded-2xl p-3 flex items-center gap-3 shadow-sm border border-stone-100 hover:shadow-md transition-shadow cursor-pointer">
-                      <Avatar
-                        vendor={vendor}
-                        size={48}
-                        ring="linear-gradient(135deg,#0D9488,#7C3AED)"
-                      />
+                      <Avatar vendor={vendor} size={48} ring="linear-gradient(135deg,#0D9488,#7C3AED)" />
                       <div className="flex-1 min-w-0">
                         <p className="font-bold text-sm text-stone-900 truncate">
                           {vendor.business_name || vendor.username}
