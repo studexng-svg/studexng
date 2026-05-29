@@ -206,8 +206,8 @@ export default function ListingsPage() {
           {listings.map(listing => (
             <div key={listing.id} className="bg-white border border-stone-200 rounded-2xl overflow-hidden shadow-sm hover:border-teal-300 hover:shadow-md transition-all">
               {listing.image && (
-                <div className="w-full aspect-square bg-stone-50 overflow-hidden flex items-center justify-center">
-                  <img src={listing.image} alt={listing.title} loading="lazy" decoding="async" className="w-full h-full object-contain" />
+                <div className="w-full aspect-square overflow-hidden">
+                  <img src={listing.image} alt={listing.title} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                 </div>
               )}
               <div className="p-4">
