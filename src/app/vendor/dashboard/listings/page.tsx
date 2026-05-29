@@ -202,7 +202,7 @@ export default function ListingsPage() {
       {listings.length === 0 ? (
         <EmptyState icon={Plus} message="No listings yet. Add your first service!" />
       ) : (
-        <div className="grid md:grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3">
           {listings.map(listing => (
             <div key={listing.id} className="bg-white border border-stone-200 rounded-2xl overflow-hidden shadow-sm hover:border-teal-300 hover:shadow-md transition-all">
               {listing.image && (
