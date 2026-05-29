@@ -26,7 +26,7 @@ export default function HistoryPage() {
         ]);
         if (ordersRes.ok) {
           const data = toArray(await ordersRes.json());
-          setOrders(data.filter((o: any) => o.status === "completed"));
+          setOrders(data.filter((o: any) => ["paid", "seller_completed", "completed"].includes(o.status)));
         }
         if (bookingsRes.ok) {
           const data = toArray(await bookingsRes.json());
@@ -156,8 +156,14 @@ export default function HistoryPage() {
                     <p className="text-xl font-bold text-emerald-600">
                       ₦{Number(order.listing?.price ?? order.amount).toLocaleString()}
                     </p>
-                    <span className="mt-1 px-2.5 py-0.5 bg-emerald-50 rounded-full text-xs font-medium text-emerald-700 inline-block">
-                      ✓ Completed
+                    <span className={`mt-1 px-2.5 py-0.5 rounded-full text-xs font-medium inline-block ${
+                      order.status === "completed" ? "bg-emerald-50 text-emerald-700"
+                      : order.status === "seller_completed" ? "bg-teal-50 text-teal-700"
+                      : "bg-amber-50 text-amber-700"
+                    }`}>
+                      {order.status === "completed" ? "✓ Completed"
+                        : order.status === "seller_completed" ? "⏳ Awaiting Confirmation"
+                        : "💰 Paid — In Progress"}
                     </span>
                   </div>
                 </div>
