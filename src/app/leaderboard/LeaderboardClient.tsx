@@ -74,11 +74,9 @@ function PodiumCard({ vendor, rank }: { vendor: Vendor; rank: 1 | 2 | 3 }) {
   const hasBadge = vendor.vendor_badge && vendor.vendor_badge !== "none";
   const avatarSize = isFirst ? 76 : 60;
 
-  const minHeight = rank === 1 ? "min-h-64" : rank === 2 ? "min-h-52" : "min-h-44";
-
   return (
-    <Link href={`/vendor/${vendor.username}`} className="flex-1 min-w-0 overflow-hidden">
-      <div className={`bg-white rounded-2xl shadow-md border border-stone-100 flex flex-col items-center px-2 pt-4 pb-4 hover:shadow-lg transition-shadow cursor-pointer ${minHeight}`}>
+    <Link href={`/vendor/${vendor.username}`} className={`flex-1 min-w-0 overflow-hidden ${isFirst ? "" : rank === 2 ? "mt-8" : "mt-20"}`}>
+      <div className="bg-white rounded-2xl shadow-md border border-stone-100 flex flex-col items-center px-2 pt-4 pb-4 hover:shadow-lg transition-shadow cursor-pointer h-full">
         {isFirst && <span className="text-3xl leading-none mb-2">👑</span>}
 
         <div className="relative">
