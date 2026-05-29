@@ -315,17 +315,6 @@ export default function HomePageClient({ initialVendors, initialListings, initia
               <Heart className={`w-3.5 h-3.5 ${wishlisted ? "fill-red-500 text-red-500" : "text-stone-400"}`} />
             </motion.button>
 
-            {!isOwn && !isService && (
-              <motion.button onClick={e => {
-                e.preventDefault(); e.stopPropagation();
-                addToCart({ id: listing.id, title: listing.title, price: listing.price, img: listing.image || "" });
-                showToast(inCart ? "Added again (+1)" : "Added to cart");
-              }} whileTap={{ scale: 0.85 }}
-                className="absolute bottom-2.5 right-2.5 z-10 w-7 h-7 rounded-full shadow flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                style={{ background: GRAD }}>
-                <Plus className="w-3.5 h-3.5 text-white" />
-              </motion.button>
-            )}
           </div>
 
           <div className="p-3">

@@ -157,12 +157,12 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
   useEffect(() => {
     if (!listing?.vendor?.username) return;
     setVendorListingsLoading(true);
-    fetch(`${API_URL}/api/services/listings/?vendor_username=${listing.vendor.username}&page_size=6`)
+    fetch(`${API_URL}/api/services/listings/?vendor_username=${listing.vendor.username}&page_size=12`)
       .then(r => r.ok ? r.json() : Promise.reject())
       .then(d => {
         const items = (d.results || d || [])
           .filter((l: any) => l.id !== listing.id && l.is_available !== false)
-          .slice(0, 4);
+          .slice(0, 8);
         setVendorListings(items);
       })
       .catch(() => {})
