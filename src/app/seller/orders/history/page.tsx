@@ -26,7 +26,7 @@ interface Order {
   amount: number;
   created_at: string;
   completed_at?: string;
-  status: "completed";
+  status: "paid" | "seller_completed" | "completed" | "disputed" | "cancelled" | "pending";
 }
 
 export default function SellerOrderHistoryPage() {
@@ -61,7 +61,10 @@ export default function SellerOrderHistoryPage() {
 
         const data = await res.json();
         const allOrders = Array.isArray(data) ? data : data.results || [];
-        const completedOrders = allOrders.filter((o: Order) => o.status === "completed");
+        // Include paid (escrow), seller_completed (delivered, awaiting buyer), and completed (buyer confirmed)
+        const completedOrders = allOrders.filter((o: Order) =>
+          ["paid", "seller_completed", "completed"].includes(o.status)
+        );
         setOrders(completedOrders);
 
         const revenue = completedOrders.reduce((sum: number, o: Order) => sum + parseFloat(String(o.amount)), 0);
@@ -243,8 +246,18 @@ export default function SellerOrderHistoryPage() {
                     <p className="text-xl font-bold text-emerald-600">
                       ₦{parseFloat(String(order.amount)).toLocaleString()}
                     </p>
-                    <span className="mt-1.5 px-2.5 py-0.5 bg-emerald-50 rounded-full text-xs font-medium text-emerald-700 inline-block">
-                      ✓ Completed
+                    <span className={`mt-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium inline-block ${
+                      order.status === "completed"
+                        ? "bg-emerald-50 text-emerald-700"
+                        : order.status === "seller_completed"
+                        ? "bg-teal-50 text-teal-700"
+                        : "bg-amber-50 text-amber-700"
+                    }`}>
+                      {order.status === "completed"
+                        ? "✓ Completed"
+                        : order.status === "seller_completed"
+                        ? "⏳ Awaiting Confirmation"
+                        : "💰 Paid — In Progress"}
                     </span>
                   </div>
                 </div>
