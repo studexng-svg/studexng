@@ -352,9 +352,9 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
 
   const vendorName = listing.vendor.business_name || listing.vendor.username;
   const badge = listing.vendor.vendor_badge;
-  const rating = listing.vendor.rating || 0;
-  const totalReviews = listing.vendor.total_reviews || 0;
-  const completionRate = listing.vendor.completion_rate || 0;
+  const rating = Number(listing.vendor.rating) || 0;
+  const totalReviews = Number(listing.vendor.total_reviews) || 0;
+  const completionRate = Number(listing.vendor.completion_rate) || 0;
 
   return (
     <>
