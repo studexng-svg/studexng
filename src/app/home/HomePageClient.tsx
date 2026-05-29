@@ -150,8 +150,10 @@ export default function HomePageClient({ initialVendors, initialListings, initia
 
   const featuredRef = useRef<HTMLDivElement>(null);
   const activeTabRef = useRef<"listings" | "vendors">("listings");
+  const activeFilterRef = useRef<string>("All");
 
   useEffect(() => { activeTabRef.current = activeTab; }, [activeTab]);
+  useEffect(() => { activeFilterRef.current = activeFilter; }, [activeFilter]);
 
   useEffect(() => {
     setMounted(true);
@@ -162,8 +164,9 @@ export default function HomePageClient({ initialVendors, initialListings, initia
     const saved = sessionStorage.getItem("home_page_state");
     if (saved) {
       try {
-        const { scrollY, tab } = JSON.parse(saved);
+        const { scrollY, tab, filter } = JSON.parse(saved);
         if (tab === "vendors") setActiveTab("vendors");
+        if (filter && filter !== "All") setActiveFilter(filter);
         if (typeof scrollY === "number" && scrollY > 0) {
           requestAnimationFrame(() => requestAnimationFrame(() => window.scrollTo(0, scrollY)));
         }
@@ -182,6 +185,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
         sessionStorage.setItem("home_page_state", JSON.stringify({
           scrollY: window.scrollY,
           tab: activeTabRef.current,
+          filter: activeFilterRef.current,
         }));
       }
     };
