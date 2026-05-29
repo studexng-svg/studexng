@@ -33,7 +33,7 @@ class ListingVendorSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ['id', 'username', 'business_name', 'vendor_badge', 'completion_rate', 'rating', 'total_reviews']
+        fields = ['id', 'username', 'business_name', 'hostel', 'vendor_badge', 'completion_rate', 'rating', 'total_reviews']
 
 
 class ListingSerializer(serializers.ModelSerializer):

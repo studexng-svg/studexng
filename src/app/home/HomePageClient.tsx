@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   Search, ArrowRight, Heart, X, Sparkles, Star,
-  ChevronRight, ChevronDown, Clock, Plus, Trophy, ShoppingCart, User, LayoutGrid, List,
+  ChevronRight, ChevronDown, Clock, Plus, Trophy, ShoppingCart, User, LayoutGrid, List, MapPin,
   ShieldCheck, Tag, Zap, Headphones,
   Shirt, Monitor, Home, BookOpen, Car,
   UtensilsCrossed, Smartphone, Scissors, WashingMachine,
@@ -288,6 +288,12 @@ export default function HomePageClient({ initialVendors, initialListings, initia
           <div className="flex-1 min-w-0">
             <p className="font-bold text-stone-900 text-base truncate">{listing.title}</p>
             <p className="text-stone-400 text-sm mt-0.5 truncate">@{listing.vendor?.username || listing.vendor}</p>
+            {listing.vendor?.hostel && (
+              <div className="flex items-center gap-0.5 mt-0.5">
+                <MapPin className="w-3.5 h-3.5 text-teal-400 flex-shrink-0" />
+                <span className="text-sm text-stone-400 truncate">{listing.vendor.hostel}</span>
+              </div>
+            )}
             {(totalReviews ?? 0) > 0 && (
               <div className="flex items-center gap-1 mt-1.5">
                 <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
@@ -385,6 +391,12 @@ export default function HomePageClient({ initialVendors, initialListings, initia
           <div className="p-3">
             <p className="font-bold text-stone-900 text-sm line-clamp-1">{listing.title}</p>
             <p className="text-stone-400 text-xs mt-0.5 truncate">@{listing.vendor?.username || listing.vendor}</p>
+            {listing.vendor?.hostel && (
+              <div className="flex items-center gap-0.5 mt-0.5">
+                <MapPin className="w-3 h-3 text-teal-400 flex-shrink-0" />
+                <span className="text-xs text-stone-400 truncate">{listing.vendor.hostel}</span>
+              </div>
+            )}
 
             {totalReviews > 0 && (
               <div className="flex items-center gap-0.5 mt-1.5">
