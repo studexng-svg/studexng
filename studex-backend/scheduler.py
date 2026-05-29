@@ -394,7 +394,7 @@ def pick_vendor_of_month():
         logger.info(f"pick_vendor_of_month: already picked for {month_start.strftime('%B %Y')}")
         return
 
-    from django.db.models import Count, Q
+    from django.db.models import Count, Q, Avg, ExpressionWrapper, F, DurationField
 
     # Single query: annotate each vendor with their completed order count for the month
     vendors = (
@@ -427,13 +427,49 @@ def pick_vendor_of_month():
         # Weighted score: orders drive most of it, rating and completion fine-tune
         score = completed * 5 + avg_rating * 10 + completion_rate * 0.5
 
-        if score > best_score:
+        # Average seconds from paid_at → seller_completed_at (lower = faster)
+        avg_time_result = Order.objects.filter(
+            listing__vendor=vendor,
+            status__in=['completed', 'seller_completed'],
+            created_at__date__gte=month_start,
+            created_at__date__lt=month_end,
+            seller_completed_at__isnull=False,
+            paid_at__isnull=False,
+        ).aggregate(
+            avg_time=Avg(ExpressionWrapper(
+                F('seller_completed_at') - F('paid_at'),
+                output_field=DurationField(),
+            ))
+        )
+        avg_secs = (
+            avg_time_result['avg_time'].total_seconds()
+            if avg_time_result['avg_time'] else None
+        )
+
+        # Determine whether this vendor beats the current leader
+        def beats(s=score, c=completed, r=avg_rating, t=avg_secs):
+            if s != best_score:
+                return s > best_score
+            # Tie on score — tiebreaker 1: more completed orders
+            if c != best_stats.get('total_orders', 0):
+                return c > best_stats.get('total_orders', 0)
+            # Tiebreaker 2: higher rating
+            if r != best_stats.get('avg_rating', 0):
+                return r > best_stats.get('avg_rating', 0)
+            # Tiebreaker 3: faster average completion time
+            best_t = best_stats.get('avg_completion_seconds')
+            if t is not None and best_t is not None:
+                return t < best_t
+            return t is not None  # has timing data; current best does not
+
+        if best_vendor is None or beats():
             best_score  = score
             best_vendor = vendor
             best_stats  = {
-                'total_orders': completed,
-                'avg_rating':   avg_rating,
-                'completion_rate': completion_rate,
+                'total_orders':          completed,
+                'avg_rating':            avg_rating,
+                'completion_rate':       completion_rate,
+                'avg_completion_seconds': avg_secs,
             }
 
     if not best_vendor:
@@ -444,7 +480,9 @@ def pick_vendor_of_month():
         vendor=best_vendor,
         month=month_start,
         score=best_score,
-        **best_stats,
+        total_orders=best_stats['total_orders'],
+        avg_rating=best_stats['avg_rating'],
+        completion_rate=best_stats['completion_rate'],
     )
 
     try:
