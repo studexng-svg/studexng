@@ -670,7 +670,7 @@ class VendorListView(ListAPIView):
                 badge_order=badge_order,
                 completed_order_count=Count(
                     'listings__order',
-                    filter=Q(listings__order__status__in=['paid', 'seller_completed', 'completed']),
+                    filter=Q(listings__order__status__in=['seller_completed', 'completed']),
                     distinct=True,
                 ),
             )
@@ -691,7 +691,7 @@ class VendorDetailView(generics.RetrieveAPIView):
             .annotate(
                 completed_order_count=Count(
                     'listings__order',
-                    filter=Q(listings__order__status__in=['paid', 'seller_completed', 'completed']),
+                    filter=Q(listings__order__status__in=['seller_completed', 'completed']),
                     distinct=True,
                 )
             )
