@@ -126,15 +126,23 @@ class UserAdmin(BaseUserAdmin):
         approved_count = 0
         for user in queryset:
             if not user.is_verified_vendor:
-                user.is_verified_vendor = True
-                user.user_type = 'vendor'
-                user.save()
+                Vendor.objects.update_or_create(
+                    user=user,
+                    defaults={
+                        'is_verified': True,
+                        'verified_at': timezone.now(),
+                        'verified_by': request.user,
+                        'unverified_at': None,
+                        'unverified_by': None,
+                        'unverification_reason': None,
+                    },
+                )
                 send_notification(
                     recipient=user,
                     notification_type='seller_approved',
                     title='🎉 Application Accepted!',
                     message='Your seller application has been approved. You are now a verified vendor on StudEx. Start listing your services!',
-                    action_url='/seller',
+                    action_url='/vendor/dashboard',
                 )
                 approved_count += 1
         self.message_user(request, f"{approved_count} vendor(s) approved and notified.")
@@ -143,16 +151,18 @@ class UserAdmin(BaseUserAdmin):
     def unverify_vendors(self, request, queryset):
         unverified_count = 0
         for user in queryset.filter(is_verified_vendor=True):
-            user.is_verified_vendor = False
-            user.user_type = 'student'
-            user.save()
+            Vendor.objects.filter(user=user).update(
+                is_verified=False,
+                unverified_at=timezone.now(),
+                unverified_by=request.user,
+            )
             SellerApplication.objects.filter(user=user).delete()
             send_notification(
                 recipient=user,
                 notification_type='seller_revoked',
                 title='⚠️ Vendor Status Removed',
                 message='You have been unverified. Please re-apply if you would like to be a vendor again.',
-                action_url='/seller/onboarding',
+                action_url='/vendor/apply',
             )
             unverified_count += 1
         self.message_user(request, f"{unverified_count} vendor(s) unverified and notified.")
@@ -286,15 +296,23 @@ class SellerApplicationAdmin(admin.ModelAdmin):
             app.reviewed_at = timezone.now()
             app.reviewed_by = request.user
             app.save()
-            app.user.is_verified_vendor = True
-            app.user.user_type = 'vendor'
-            app.user.save()
+            Vendor.objects.update_or_create(
+                user=app.user,
+                defaults={
+                    'is_verified': True,
+                    'verified_at': timezone.now(),
+                    'verified_by': request.user,
+                    'unverified_at': None,
+                    'unverified_by': None,
+                    'unverification_reason': None,
+                },
+            )
             send_notification(
                 recipient=app.user,
                 notification_type='seller_approved',
                 title='🎉 Application Accepted!',
                 message='Your seller application has been approved. You are now a verified vendor on StudEx. Start listing your services!',
-                action_url='/seller',
+                action_url='/vendor/dashboard',
             )
             approved_count += 1
         self.message_user(request, f"{approved_count} application(s) approved and vendors notified.")
@@ -312,7 +330,7 @@ class SellerApplicationAdmin(admin.ModelAdmin):
                 notification_type='seller_rejected',
                 title='❌ Application Rejected',
                 message='Your seller application was rejected. Please upload your ID card details correctly and try again.',
-                action_url='/seller/onboarding',
+                action_url='/vendor/apply',
             )
             app.delete()
             rejected_count += 1
@@ -385,7 +403,7 @@ class VendorAdmin(admin.ModelAdmin):
                 notification_type='seller_revoked',
                 title='⚠️ Vendor Status Removed',
                 message='Your vendor status has been removed by admin. Please reapply if you wish to become a vendor again.',
-                action_url='/vendor/onboarding',
+                action_url='/vendor/apply',
             )
             count += 1
         self.message_user(request, f"{count} vendor(s) unverified.")
