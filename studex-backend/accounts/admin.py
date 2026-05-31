@@ -9,7 +9,7 @@ from django.utils.html import format_html
 from django.http import HttpResponse
 from django.db.models import Count, Avg, Sum, Q
 import csv
-from .models import User, Profile, SellerApplication
+from .models import User, Profile, SellerApplication, Vendor
 from .utils import send_notification
 
 SCHOOL_CHOICES = [
@@ -336,3 +336,67 @@ class SellerApplicationAdmin(admin.ModelAdmin):
 
     def has_add_permission(self, request):
         return False
+
+
+@admin.register(Vendor)
+class VendorAdmin(admin.ModelAdmin):
+    list_display = ['user', 'is_verified', 'verified_at', 'verified_by', 'unverified_at', 'unverified_by']
+    list_filter = ['is_verified']
+    search_fields = ['user__username', 'user__email', 'user__business_name']
+    readonly_fields = ['created_at', 'verified_at', 'unverified_at']
+    ordering = ['-created_at']
+
+    fieldsets = (
+        ('Vendor', {'fields': ('user', 'is_verified', 'created_at')}),
+        ('Verification', {'fields': ('verified_at', 'verified_by')}),
+        ('Unverification', {'fields': ('unverified_at', 'unverified_by', 'unverification_reason')}),
+    )
+
+    actions = ['verify_vendors', 'unverify_vendors']
+
+    def verify_vendors(self, request, queryset):
+        count = 0
+        for vendor in queryset.filter(is_verified=False):
+            vendor.is_verified = True
+            vendor.verified_at = timezone.now()
+            vendor.verified_by = request.user
+            vendor.unverification_reason = None
+            vendor.save()
+            send_notification(
+                recipient=vendor.user,
+                notification_type='seller_approved',
+                title='✅ Vendor Status Restored',
+                message='Your vendor status has been reinstated. You can now list your services again.',
+                action_url='/vendor',
+            )
+            count += 1
+        self.message_user(request, f"{count} vendor(s) verified.")
+    verify_vendors.short_description = "Verify selected vendors"
+
+    def unverify_vendors(self, request, queryset):
+        count = 0
+        for vendor in queryset.filter(is_verified=True):
+            vendor.is_verified = False
+            vendor.unverified_at = timezone.now()
+            vendor.unverified_by = request.user
+            vendor.save()
+            send_notification(
+                recipient=vendor.user,
+                notification_type='seller_revoked',
+                title='⚠️ Vendor Status Removed',
+                message='Your vendor status has been removed by admin. Please reapply if you wish to become a vendor again.',
+                action_url='/vendor/onboarding',
+            )
+            count += 1
+        self.message_user(request, f"{count} vendor(s) unverified.")
+    unverify_vendors.short_description = "Unverify selected vendors"
+
+    def changelist_view(self, request, extra_context=None):
+        v = Vendor.objects
+        extra_context = extra_context or {}
+        extra_context['summary_stats'] = [
+            {'label': 'Total Vendors',    'value': v.count(),                          'color': '#fff'},
+            {'label': 'Verified',         'value': v.filter(is_verified=True).count(), 'color': '#34d399'},
+            {'label': 'Unverified',       'value': v.filter(is_verified=False).count(),'color': '#f87171'},
+        ]
+        return super().changelist_view(request, extra_context=extra_context)

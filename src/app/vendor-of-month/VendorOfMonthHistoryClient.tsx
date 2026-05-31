@@ -24,7 +24,7 @@ interface VotmEntry {
 export default function VendorOfMonthHistoryClient({ history }: { history: VotmEntry[] }) {
   return (
     <div className="min-h-screen bg-gray-50">
-      <TopNav />
+      <TopNav showBack backHref="/home" />
 
       <div className="max-w-2xl mx-auto px-4 pt-6 pb-20">
         {/* Header */}
