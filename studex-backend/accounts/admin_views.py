@@ -1533,7 +1533,12 @@ class AdminVendorOfMonthView(APIView):
 
         from datetime import date
         today = date.today()
-        month_start = date(today.year, today.month, 1)
+        # Award covers the previous calendar month, same as the scheduler.
+        # A manual override on June 1 should award May, not June.
+        if today.month == 1:
+            month_start = date(today.year - 1, 12, 1)
+        else:
+            month_start = date(today.year, today.month - 1, 1)
 
         from orders.models import Order
         profile = getattr(vendor, 'profile', None)
@@ -1573,15 +1578,13 @@ class AdminVendorOfMonthView(APIView):
         }, status=201 if created else 200)
 
     def delete(self, request):
-        """DELETE /api/admin/vendor-of-month/ — remove the current month's winner."""
+        """DELETE /api/admin/vendor-of-month/ — remove the most recent winner."""
         from services.models import VendorOfTheMonth
-        from datetime import date
-        today = date.today()
-        month_start = date(today.year, today.month, 1)
-        deleted, _ = VendorOfTheMonth.objects.filter(month=month_start).delete()
-        if deleted:
+        record = VendorOfTheMonth.objects.order_by('-month').first()
+        if record:
+            record.delete()
             return Response({'message': 'Vendor of the Month removed.'})
-        return Response({'error': 'No vendor of the month set for this month.'}, status=404)
+        return Response({'error': 'No vendor of the month set.'}, status=404)
 
 
 class AdminActivityView(APIView):
