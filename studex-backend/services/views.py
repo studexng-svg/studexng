@@ -250,7 +250,7 @@ class VendorOfMonthView(APIView):
             return Response({
                 'id': vendor.id,
                 'username': vendor.username,
-                'business_name': (getattr(profile, 'business_name', None) or vendor.username),
+                'business_name': vendor.business_name or vendor.username,
                 'profile_picture': pic,
                 'rating': float(getattr(profile, 'rating', 0) or 0),
                 'total_reviews': int(getattr(profile, 'total_reviews', 0) or 0),
@@ -263,3 +263,54 @@ class VendorOfMonthView(APIView):
             import logging
             logging.getLogger(__name__).error(f"VendorOfMonthView error: {e}", exc_info=True)
             return Response(None)
+
+
+class VendorOfMonthHistoryView(APIView):
+    """GET /api/services/vendor-of-month/history/ — all past VOTM winners, newest first."""
+    permission_classes = [AllowAny]
+
+    def _profile_pic(self, vendor, request):
+        img = getattr(vendor, 'profile_image', None)
+        if not img:
+            return None
+        name = getattr(img, 'name', None)
+        if not name or name == 'profiles/default.jpg':
+            return None
+        if name.startswith('http'):
+            return name
+        try:
+            url = img.url
+            return url if url.startswith('http') else request.build_absolute_uri(url)
+        except Exception:
+            return None
+
+    def get(self, request):
+        try:
+            entries = VendorOfTheMonth.objects.select_related(
+                'vendor', 'vendor__profile'
+            ).order_by('-month')
+
+            results = []
+            for entry in entries:
+                vendor = entry.vendor
+                if not vendor:
+                    continue
+                profile = getattr(vendor, 'profile', None)
+                results.append({
+                    'month': entry.month.strftime('%B %Y'),
+                    'month_key': entry.month.strftime('%Y-%m'),
+                    'username': vendor.username,
+                    'business_name': vendor.business_name or vendor.username,
+                    'profile_picture': self._profile_pic(vendor, request),
+                    'rating': float(getattr(profile, 'rating', 0) or 0),
+                    'total_reviews': int(getattr(profile, 'total_reviews', 0) or 0),
+                    'vendor_badge': getattr(profile, 'vendor_badge', 'none') or 'none',
+                    'total_orders': entry.total_orders,
+                    'completion_rate': entry.completion_rate,
+                    'is_manual_override': entry.is_manual_override,
+                })
+            return Response(results)
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"VendorOfMonthHistoryView error: {e}", exc_info=True)
+            return Response([])

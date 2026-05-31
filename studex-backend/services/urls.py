@@ -2,7 +2,7 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import CategoryViewSet, ListingViewSet, TransactionViewSet
-from .views import ChangePasswordView, VendorOfMonthView
+from .views import ChangePasswordView, VendorOfMonthView, VendorOfMonthHistoryView
 
 router = DefaultRouter()
 router.register(r'categories', CategoryViewSet, basename='category')
@@ -14,4 +14,5 @@ urlpatterns = [
     path('', include(router.urls)),
     path('auth/change-password/', ChangePasswordView.as_view(), name='change-password'),
     path('vendor-of-month/', VendorOfMonthView.as_view(), name='vendor-of-month'),
+    path('vendor-of-month/history/', VendorOfMonthHistoryView.as_view(), name='vendor-of-month-history'),
 ]
