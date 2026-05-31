@@ -34,7 +34,7 @@ export default function VendorDashboardLayout({ children }: { children: React.Re
   useEffect(() => {
     if (!isHydrated) return;
     if (!isLoggedIn) { router.push("/auth"); return; }
-    if (!user?.is_verified_vendor) { router.push("/home"); return; }
+    if (!user?.is_verified_vendor) { router.push("/vendor/apply"); return; }
   }, [isHydrated, isLoggedIn, user]);
 
   useEffect(() => {
