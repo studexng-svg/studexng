@@ -219,6 +219,35 @@ class SellerApplication(models.Model):
         return None
 
 
+class Vendor(models.Model):
+    """Dedicated vendor record — single source of truth for verification status."""
+
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='vendor')
+    is_verified = models.BooleanField(default=True)
+
+    verified_at = models.DateTimeField(null=True, blank=True)
+    verified_by = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='vendors_approved',
+    )
+
+    unverified_at = models.DateTimeField(null=True, blank=True)
+    unverified_by = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='vendors_unverified',
+    )
+    unverification_reason = models.TextField(blank=True, null=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        status = 'Verified' if self.is_verified else 'Unverified'
+        return f"{self.user.username} — {status} Vendor"
+
+
 class AdminChatSession(models.Model):
     """Persisted admin AI chat sessions accessible via history."""
     title = models.CharField(max_length=200)
@@ -245,6 +274,19 @@ def create_user_profile(sender, instance, created, **kwargs):
 def save_user_profile(sender, instance, **kwargs):
     if hasattr(instance, 'profile'):
         instance.profile.save()
+
+
+@receiver(post_save, sender=Vendor)
+def sync_user_from_vendor(sender, instance, **kwargs):
+    """Keep User.is_verified_vendor and listing visibility in sync with Vendor.is_verified."""
+    from services.models import Listing
+    User.objects.filter(pk=instance.user_id).update(
+        is_verified_vendor=instance.is_verified,
+        user_type='vendor' if instance.is_verified else 'student',
+    )
+    Listing.objects.filter(vendor_id=instance.user_id).update(
+        is_available=instance.is_verified,
+    )
 
 
 @receiver(pre_save, sender=User)

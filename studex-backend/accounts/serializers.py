@@ -1,7 +1,7 @@
 # accounts/serializers.py
 from rest_framework import serializers
 from django.contrib.auth import get_user_model, authenticate
-from .models import Profile, SellerApplication
+from .models import Profile, SellerApplication, Vendor
 import re
 
 User = get_user_model()
@@ -514,3 +514,24 @@ class VendorListSerializer(serializers.ModelSerializer):
 
     def get_total_listings(self, obj):
         return obj.listings.filter(is_available=True).count()
+
+
+class VendorSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(source='user.username', read_only=True)
+    email = serializers.CharField(source='user.email', read_only=True)
+    business_name = serializers.CharField(source='user.business_name', read_only=True)
+    verified_by_username = serializers.CharField(source='verified_by.username', read_only=True, allow_null=True, default=None)
+    unverified_by_username = serializers.CharField(source='unverified_by.username', read_only=True, allow_null=True, default=None)
+
+    class Meta:
+        model = Vendor
+        fields = [
+            'id', 'user_id', 'username', 'email', 'business_name',
+            'is_verified', 'verified_at', 'verified_by_username',
+            'unverified_at', 'unverified_by_username', 'unverification_reason',
+            'created_at',
+        ]
+        read_only_fields = [
+            'user_id', 'verified_at', 'verified_by_username',
+            'unverified_at', 'unverified_by_username', 'created_at',
+        ]

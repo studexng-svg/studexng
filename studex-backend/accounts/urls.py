@@ -2,13 +2,13 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenRefreshView
 from . import views
-from .views import SellerApplicationViewSet, ForgotPasswordView, ResetPasswordView
+from .views import SellerApplicationViewSet, VendorViewSet, ForgotPasswordView, ResetPasswordView
 from .views import check_profile_completion, check_username, send_otp, verify_otp
 from .views import VendorDetailView, cookie_token_refresh, heartbeat
 
-# Router for Seller Application endpoints
 router = DefaultRouter()
 router.register(r'seller/applications', SellerApplicationViewSet, basename='seller-application')
+router.register(r'vendor/manage', VendorViewSet, basename='vendor-management')
 
 urlpatterns = [
     # Auth endpoints

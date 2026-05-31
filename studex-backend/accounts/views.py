@@ -36,8 +36,9 @@ from .serializers import (
     UserLoginSerializer,
     UserProfileSerializer,
     SellerApplicationSerializer,
+    VendorSerializer,
 )
-from .models import User, SellerApplication, Profile
+from .models import User, SellerApplication, Profile, Vendor
 from .utils import send_notification
 import re
 
@@ -460,16 +461,24 @@ class SellerApplicationViewSet(viewsets.ModelViewSet):
         application.save()
 
         user = application.user
-        user.is_verified_vendor = True
-        user.user_type = 'vendor'
-        user.save()
+        Vendor.objects.update_or_create(
+            user=user,
+            defaults={
+                'is_verified': True,
+                'verified_at': timezone.now(),
+                'verified_by': request.user,
+                'unverified_at': None,
+                'unverified_by': None,
+                'unverification_reason': None,
+            },
+        )
 
         send_notification(
             recipient=user,
             notification_type='seller_approved',
             title='🎉 Application Accepted!',
             message='Your seller application has been approved. You are now a verified vendor on StudEx. Start listing your services!',
-            action_url='/seller',
+            action_url='/vendor',
         )
 
         return Response({
@@ -518,9 +527,13 @@ class SellerApplicationViewSet(viewsets.ModelViewSet):
         if not user.is_verified_vendor:
             return Response({'error': 'User is not a verified vendor'}, status=status.HTTP_400_BAD_REQUEST)
 
-        user.is_verified_vendor = False
-        user.user_type = 'student'
-        user.save()
+        reason = request.data.get('reason', '')
+        vendor, _ = Vendor.objects.get_or_create(user=user)
+        vendor.is_verified = False
+        vendor.unverified_at = timezone.now()
+        vendor.unverified_by = request.user
+        vendor.unverification_reason = reason
+        vendor.save()
 
         SellerApplication.objects.filter(user=user).delete()
 
@@ -529,13 +542,71 @@ class SellerApplicationViewSet(viewsets.ModelViewSet):
             notification_type='seller_revoked',
             title='⚠️ Vendor Status Removed',
             message='Your vendor status has been removed by admin. Your account has been reset to a student account. If you wish to become a vendor again, please reapply.',
-            action_url='/seller/onboarding',
+            action_url='/vendor/onboarding',
         )
 
         return Response({
             'message': f"{user.username}'s vendor status has been revoked. They are now a student.",
             'user_type': 'student',
         }, status=status.HTTP_200_OK)
+
+
+# ─── Vendor Management ────────────────────────────────────────────────────────
+
+class VendorViewSet(viewsets.ReadOnlyModelViewSet):
+    """Admin-only viewset for listing and toggling vendor verification."""
+    permission_classes = [IsAdminUser]
+    serializer_class = VendorSerializer
+
+    def get_queryset(self):
+        return Vendor.objects.select_related(
+            'user', 'verified_by', 'unverified_by'
+        ).all()
+
+    @action(detail=True, methods=['post'])
+    def unverify(self, request, pk=None):
+        vendor = self.get_object()
+        if not vendor.is_verified:
+            return Response({'error': 'Vendor is already unverified'}, status=status.HTTP_400_BAD_REQUEST)
+
+        reason = request.data.get('reason', '')
+        vendor.is_verified = False
+        vendor.unverified_at = timezone.now()
+        vendor.unverified_by = request.user
+        vendor.unverification_reason = reason
+        vendor.save()
+
+        send_notification(
+            recipient=vendor.user,
+            notification_type='seller_revoked',
+            title='⚠️ Vendor Status Removed',
+            message='Your vendor status has been removed by admin. If you wish to become a vendor again, please reapply.',
+            action_url='/vendor/onboarding',
+        )
+
+        return Response({'message': f"{vendor.user.username} has been unverified.", 'status': 'unverified'})
+
+    @action(detail=True, methods=['post'])
+    def verify(self, request, pk=None):
+        vendor = self.get_object()
+        if vendor.is_verified:
+            return Response({'error': 'Vendor is already verified'}, status=status.HTTP_400_BAD_REQUEST)
+
+        vendor.is_verified = True
+        vendor.verified_at = timezone.now()
+        vendor.verified_by = request.user
+        vendor.unverification_reason = None
+        vendor.save()
+
+        send_notification(
+            recipient=vendor.user,
+            notification_type='seller_approved',
+            title='✅ Vendor Status Restored',
+            message='Your vendor status has been reinstated. You can now list your services again.',
+            action_url='/vendor',
+        )
+
+        return Response({'message': f"{vendor.user.username} has been re-verified.", 'status': 'verified'})
 
 
 # ─── Password Reset ───────────────────────────────────────────────────────────
