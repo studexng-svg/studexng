@@ -136,12 +136,21 @@ export default function VendorOfMonthModal({ vendor }: { vendor: VendorOfMonth |
                 </motion.button>
               </Link>
 
-              <button
-                onClick={dismiss}
-                className="w-full text-center text-stone-400 text-xs py-1"
-              >
-                Maybe later
-              </button>
+              <div className="flex items-center justify-between">
+                <button
+                  onClick={dismiss}
+                  className="text-stone-400 text-xs py-1"
+                >
+                  Maybe later
+                </button>
+                <Link
+                  href="/vendor-of-month"
+                  onClick={dismiss}
+                  className="text-teal-600 text-xs font-semibold py-1 hover:underline"
+                >
+                  🏆 Hall of Fame →
+                </Link>
+              </div>
             </div>
           </motion.div>
         </motion.div>

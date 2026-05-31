@@ -700,12 +700,17 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                         )}
                       </div>
 
-                      <Link href={`/vendor/${vendorOfMonth.username}`}>
-                        <motion.button whileTap={{ scale: 0.97 }}
-                          className="bg-white text-stone-900 font-bold px-3 py-1.5 sm:px-6 sm:py-2.5 rounded-full text-[11px] sm:text-sm inline-flex items-center gap-1.5 sm:gap-2 shadow-lg">
-                          Shop Now <ArrowRight className="w-3 h-3 sm:w-4 sm:h-4" />
-                        </motion.button>
-                      </Link>
+                      <div className="flex items-center gap-3">
+                        <Link href={`/vendor/${vendorOfMonth.username}`}>
+                          <motion.button whileTap={{ scale: 0.97 }}
+                            className="bg-white text-stone-900 font-bold px-3 py-1.5 sm:px-6 sm:py-2.5 rounded-full text-[11px] sm:text-sm inline-flex items-center gap-1.5 sm:gap-2 shadow-lg">
+                            Shop Now <ArrowRight className="w-3 h-3 sm:w-4 sm:h-4" />
+                          </motion.button>
+                        </Link>
+                        <Link href="/vendor-of-month" className="text-white/70 text-[10px] sm:text-xs font-semibold hover:text-white transition-colors">
+                          🏆 Hall of Fame
+                        </Link>
+                      </div>
                     </>
                   ) : (
                     <>
