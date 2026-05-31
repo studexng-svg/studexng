@@ -16,15 +16,18 @@ export default async function LeaderboardPage() {
   const campus = (cookieStore.get('studex_campus')?.value || 'pau') as "pau" | "futo";
 
   let vendors: any[] = [];
-  try {
-    const res = await fetch(`${API_URL}/api/auth/vendors/?campus=${campus}&page_size=50`, {
-      cache: 'no-store',
-    });
-    if (res.ok) {
-      const data = await res.json();
-      vendors = data.results || data || [];
-    }
-  } catch {}
+  let currentVotm: any = null;
 
-  return <LeaderboardClient initialVendors={vendors} initialCampus={campus} />;
+  await Promise.all([
+    fetch(`${API_URL}/api/auth/vendors/?campus=${campus}&page_size=50`, { cache: 'no-store' })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) vendors = d.results || d || []; })
+      .catch(() => {}),
+    fetch(`${API_URL}/api/services/vendor-of-month/`, { cache: 'no-store' })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) currentVotm = d; })
+      .catch(() => {}),
+  ]);
+
+  return <LeaderboardClient initialVendors={vendors} initialCampus={campus} currentVotm={currentVotm} />;
 }
