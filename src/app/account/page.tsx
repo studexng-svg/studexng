@@ -179,7 +179,7 @@ export default function AccountPage() {
       useAuth.getState().updateUser({ is_verified_vendor: data.is_verified_vendor, user_type: data.user_type });
       const wasVendor = prevVendorStatus.current;
       const isNowVendor = !!data.is_verified_vendor;
-      if (wasVendor === false && isNowVendor) { router.push("/seller"); return; }
+      if (wasVendor === false && isNowVendor) { router.push("/vendor/dashboard"); return; }
       prevVendorStatus.current = isNowVendor;
     } catch {}
   }, [router]);
@@ -662,7 +662,7 @@ export default function AccountPage() {
                           <p className="text-xs text-white/80">Earn on campus. List now.</p>
                         </div>
                       </div>
-                      <Link href="/seller/onboarding">
+                      <Link href="/vendor/apply">
                         <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
                           className="px-4 py-2 bg-white text-stone-900 rounded-full text-xs font-semibold shadow-sm flex items-center gap-1.5">
                           Start <ArrowRight className="w-3.5 h-3.5" />

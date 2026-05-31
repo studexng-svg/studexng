@@ -50,13 +50,12 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/maintenance", request.url));
   }
 
-  // Redirect all /seller/* routes to /vendor/dashboard EXCEPT /seller/onboarding,
-  // which is the public page for new vendors to apply and must remain accessible.
-  if (
-    pathname.startsWith("/seller") &&
-    !pathname.startsWith("/seller/onboarding")
-  ) {
-    return NextResponse.redirect(new URL("/vendor/dashboard", request.url));
+  // Redirect all legacy /seller/* routes to their vendor equivalents.
+  if (pathname.startsWith("/seller")) {
+    const dest = pathname.startsWith("/seller/onboarding")
+      ? "/vendor/apply"
+      : "/vendor/dashboard";
+    return NextResponse.redirect(new URL(dest, request.url));
   }
 
   return NextResponse.next();
