@@ -151,11 +151,11 @@ class UserAdmin(BaseUserAdmin):
     def unverify_vendors(self, request, queryset):
         unverified_count = 0
         for user in queryset.filter(is_verified_vendor=True):
-            Vendor.objects.filter(user=user).update(
-                is_verified=False,
-                unverified_at=timezone.now(),
-                unverified_by=request.user,
-            )
+            vendor, _ = Vendor.objects.get_or_create(user=user)
+            vendor.is_verified = False
+            vendor.unverified_at = timezone.now()
+            vendor.unverified_by = request.user
+            vendor.save()  # triggers sync_user_from_vendor signal
             SellerApplication.objects.filter(user=user).delete()
             send_notification(
                 recipient=user,
@@ -370,7 +370,7 @@ class VendorAdmin(admin.ModelAdmin):
         ('Unverification', {'fields': ('unverified_at', 'unverified_by', 'unverification_reason')}),
     )
 
-    actions = ['verify_vendors', 'unverify_vendors']
+    actions = ['verify_vendors', 'unverify_vendors', 'backfill_vendor_records']
 
     def verify_vendors(self, request, queryset):
         count = 0
@@ -397,7 +397,8 @@ class VendorAdmin(admin.ModelAdmin):
             vendor.is_verified = False
             vendor.unverified_at = timezone.now()
             vendor.unverified_by = request.user
-            vendor.save()
+            vendor.unverification_reason = "Unverified via admin action"
+            vendor.save()  # triggers sync_user_from_vendor signal
             send_notification(
                 recipient=vendor.user,
                 notification_type='seller_revoked',
@@ -408,6 +409,21 @@ class VendorAdmin(admin.ModelAdmin):
             count += 1
         self.message_user(request, f"{count} vendor(s) unverified.")
     unverify_vendors.short_description = "Unverify selected vendors"
+
+    def backfill_vendor_records(self, request, queryset):
+        created = 0
+        skipped = 0
+        for user in User.objects.filter(is_verified_vendor=True):
+            _, was_created = Vendor.objects.get_or_create(
+                user=user,
+                defaults={'is_verified': True, 'verified_at': timezone.now()},
+            )
+            if was_created:
+                created += 1
+            else:
+                skipped += 1
+        self.message_user(request, f"Backfill done: {created} created, {skipped} already existed.")
+    backfill_vendor_records.short_description = "Backfill Vendor records for all verified users"
 
     def changelist_view(self, request, extra_context=None):
         v = Vendor.objects
