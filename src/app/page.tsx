@@ -435,10 +435,10 @@ export default function LandingPage() {
       {/* ── LIVE LISTINGS ────────────────────────────────── */}
       <section className="py-20 px-6 bg-[#FAFAF9]">
         <div className="max-w-6xl mx-auto">
-          <div className="lg:grid lg:grid-cols-5 lg:gap-12 lg:items-start">
+          <div className="lg:grid lg:grid-cols-5 lg:gap-12 lg:items-center">
 
             {/* Left col: heading + CTA (desktop) */}
-            <div className="lg:col-span-2 mb-8 lg:mb-0">
+            <div className="lg:col-span-3 mb-8 lg:mb-0">
               <div className="flex items-center justify-between lg:flex-col lg:items-start lg:gap-4 mb-4 lg:mb-8">
                 <div>
                   <p className="text-teal-700 text-xs tracking-[0.25em] uppercase font-bold mb-1">Live Now</p>
@@ -467,8 +467,8 @@ export default function LandingPage() {
             </div>
 
             {/* Right col: slideshow */}
-            <div className="lg:col-span-3">
-              <div className="relative rounded-2xl overflow-hidden" style={{ height: "320px" }}>
+            <div className="lg:col-span-2">
+              <div className="relative rounded-2xl overflow-hidden aspect-[4/5]">
                 {featuredListings.length > 0 ? featuredListings.map((listing: any, i: number) => (
                   <Link
                     key={listing.id}
