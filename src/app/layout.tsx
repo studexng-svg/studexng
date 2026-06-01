@@ -7,7 +7,7 @@ import LayoutClient from "./LayoutClient";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://studex.com.ng"),
+  metadataBase: new URL("https://www.studex.com.ng"),
   title: {
     default: "StudEx — The Student Marketplace",
     template: "%s | StudEx",
@@ -30,7 +30,7 @@ export const metadata: Metadata = {
   creator: "StudEx",
   publisher: "StudEx",
   alternates: {
-    canonical: "https://studex.com.ng",
+    canonical: "https://www.studex.com.ng",
   },
   robots: {
     index: true,
@@ -40,7 +40,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "en_NG",
-    url: "https://studex.com.ng",
+    url: "https://www.studex.com.ng",
     siteName: "StudEx",
     title: "StudEx — The Student Marketplace",
     description:
@@ -75,6 +75,7 @@ export const metadata: Metadata = {
     "apple-mobile-web-app-capable": "yes",
     "apple-mobile-web-app-status-bar-style": "default",
     "apple-mobile-web-app-title": "StudEx",
+    "instagram:site": "@studextechnologies",
   },
 };
 

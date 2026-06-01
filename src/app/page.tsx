@@ -188,7 +188,6 @@ function ReviewCarousel() {
 export default function LandingPage() {
   const { isLoggedIn, isHydrated } = useAuth();
   const router = useRouter();
-  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     if (isHydrated && isLoggedIn) router.replace("/home");
@@ -200,9 +199,6 @@ export default function LandingPage() {
   const vendorCount = 38;
 
   useEffect(() => {
-    setMounted(true);
-    document.title = "StudEx — Campus Marketplace for Student Services";
-
     const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
     const shuffle = (arr: any[]) => arr.map(v => ({ v, k: Math.random() })).sort((a, b) => a.k - b.k).map(x => x.v);
     Promise.all([
@@ -229,16 +225,6 @@ export default function LandingPage() {
     return () => clearInterval(t);
   }, [featuredListings.length]);
 
-
-  if (!mounted) {
-    return (
-      <div className="min-h-screen bg-stone-50 flex items-center justify-center">
-        <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: "linear" }}>
-          <Sparkles className="w-10 h-10 text-teal-500" />
-        </motion.div>
-      </div>
-    );
-  }
 
   return (
     <>
@@ -621,9 +607,33 @@ export default function LandingPage() {
             StudEx
           </p>
 
-          <div className="flex gap-8 text-sm">
+          <div className="flex gap-8 text-sm items-center">
             <Link href="/terms" className="text-stone-400 hover:text-stone-700 transition">Terms</Link>
             <Link href="/privacy-policy" className="text-stone-400 hover:text-stone-700 transition">Privacy</Link>
+            <a
+              href="https://www.instagram.com/studextechnologies/"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="StudEx on Instagram"
+              className="text-stone-400 hover:text-pink-500 transition"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/>
+                <circle cx="12" cy="12" r="4"/>
+                <circle cx="17.5" cy="6.5" r="0.5" fill="currentColor" stroke="none"/>
+              </svg>
+            </a>
+            <a
+              href="https://www.tiktok.com/@studex_solutions"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="StudEx on TikTok"
+              className="text-stone-400 hover:text-stone-900 transition"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 0 0-.79-.05 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.33-6.34V8.69a8.18 8.18 0 0 0 4.78 1.52V6.76a4.85 4.85 0 0 1-1.01-.07z"/>
+              </svg>
+            </a>
           </div>
 
           <p className="text-stone-300 text-sm">© 2026 StudEx. All rights reserved.</p>
