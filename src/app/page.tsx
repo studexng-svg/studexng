@@ -250,6 +250,7 @@ export default function LandingPage() {
             alt={img.label}
             crossOrigin="anonymous"
             loading={i === 0 ? "eager" : "lazy"}
+            fetchPriority={i === 0 ? "high" : "low"}
             decoding="async"
             className="absolute inset-0 w-full h-full object-cover object-center transition-opacity duration-1000"
             style={{ zIndex: 0, opacity: i === heroIndex ? 1 : 0 }}
@@ -369,7 +370,7 @@ export default function LandingPage() {
       <section className="py-20 px-6 text-white" style={{ background: "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)" }}>
         <div className="max-w-6xl mx-auto">
           <h2 className="text-4xl md:text-5xl font-black italic tracking-tighter uppercase mb-16 text-center">
-            Order in <span style={{ color: "#ccfbf1" }}>3 Steps</span>
+            Order Campus Services in <span style={{ color: "#ccfbf1" }}>3 Steps</span>
           </h2>
           <div className="max-w-3xl mx-auto grid grid-cols-3 lg:gap-20 gap-6">
             {[
@@ -486,7 +487,6 @@ export default function LandingPage() {
                       <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
                       <div className="absolute bottom-0 left-0 right-0 p-4">
                         <p className="text-white font-bold text-base line-clamp-1">{listing.title}</p>
-                        <p className="text-white/70 text-xs mt-1">@{listing.vendor?.username}</p>
                       </div>
                     </div>
                   </Link>

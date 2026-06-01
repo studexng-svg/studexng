@@ -9,11 +9,11 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   metadataBase: new URL("https://www.studex.com.ng"),
   title: {
-    default: "StudEx — The Student Marketplace",
+    default: "StudEx — Campus Marketplace for Students in Nigeria",
     template: "%s | StudEx",
   },
   description:
-    "Nigeria's #1 campus marketplace. Book lashes, nails, laundry, food and more from verified student vendors at Pan-Atlantic University. Fast, safe, and affordable.",
+    "Nigeria's #1 student campus marketplace. Order food, beauty, laundry, photography and more from verified vendors on campus. Fast, safe, affordable.",
   keywords: [
     "campus marketplace",
     "student services",
@@ -42,9 +42,9 @@ export const metadata: Metadata = {
     locale: "en_NG",
     url: "https://www.studex.com.ng",
     siteName: "StudEx",
-    title: "StudEx — The Student Marketplace",
+    title: "StudEx — Campus Marketplace for Students in Nigeria",
     description:
-      "Nigeria's #1 campus marketplace. Book lashes, nails, laundry, food and more from verified student vendors.",
+      "Nigeria's #1 student campus marketplace. Order food, beauty, laundry, photography and more from verified vendors on campus.",
     images: [
       {
         url: "/images/og-image.jpg",
@@ -57,8 +57,8 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     site: "@studexng",
-    title: "StudEx — The Student Marketplace",
-    description: "Nigeria's #1 campus marketplace for student services.",
+    title: "StudEx — Campus Marketplace for Students in Nigeria",
+    description: "Nigeria's #1 student campus marketplace for food, beauty, laundry & more.",
     images: ["/images/og-image.jpg"],
   },
   icons: {

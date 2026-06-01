@@ -1,0 +1,39 @@
+# StudEx
+
+> Nigeria's #1 student campus marketplace. Students order food, beauty, laundry, photography, fashion, and fitness services from verified vendors directly on campus.
+
+## About
+
+StudEx is a peer-to-peer campus marketplace platform operating across Nigerian universities. Verified student vendors list their services, and students can browse, pay securely via Paystack, and receive delivery confirmation — all within campus.
+
+## Campuses
+
+- Pan-Atlantic University (PAU), Ibeju-Lekki, Lagos
+- Federal University of Technology Owerri (FUTO), Owerri, Imo State
+
+## Service Categories
+
+- Food & Drinks: Jollof rice, pasta, zobo, meals
+- Beauty: Nails, lashes, makeup, hair
+- Laundry: Wash, dry, and fold
+- Photography: Shoots and editing
+- Fashion: Tailoring and styling
+- Fitness: Personal trainers
+
+## Key Pages
+
+- Homepage: https://www.studex.com.ng/
+- Browse Services: https://www.studex.com.ng/home
+- Sign Up / Login: https://www.studex.com.ng/auth
+- Become a Vendor: https://www.studex.com.ng/vendor/apply
+- Terms of Service: https://www.studex.com.ng/terms
+- Privacy Policy: https://www.studex.com.ng/privacy-policy
+
+## Social
+
+- Instagram: https://www.instagram.com/studextechnologies/
+- TikTok: https://www.tiktok.com/@studex_solutions
+
+## Contact
+
+- Email: studex.ng@gmail.com
