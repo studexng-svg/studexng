@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { headers } from "next/headers";
+import Script from "next/script";
 import "./globals.css";
 import LayoutClient from "./LayoutClient";
+
+const GA_ID = "G-RZMK0KLZHB";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -89,6 +92,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <meta name="theme-color" content="#7C3AED" />
       </head>
       <body className={`${inter.className} bg-[#FFF8F0] dark:bg-gray-950 text-gray-900 dark:text-gray-100`}>
+        <Script src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`} strategy="afterInteractive" />
+        <Script id="ga4-init" strategy="afterInteractive">{`
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', '${GA_ID}');
+        `}</Script>
         {isMaintenance ? children : <LayoutClient>{children}</LayoutClient>}
       </body>
     </html>
