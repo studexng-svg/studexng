@@ -5,10 +5,16 @@ from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
 from rest_framework.pagination import PageNumberPagination
 from django.db.models import Q
+from django.core.cache import cache
 from .models import Category, Listing, Transaction, VendorOfTheMonth
 from .serializers import CategorySerializer, ListingSerializer, TransactionSerializer
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
+
+
+def _invalidate_listing_cache(campus):
+    for ps in ['20', '50', '100', '200', '500']:
+        cache.delete(f'listings_{campus}_{ps}')
 
 
 class ListingPagination(PageNumberPagination):
@@ -77,6 +83,25 @@ class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
                 campus = campus_param
         return Category.objects.filter(campus__in=[campus, 'all']).order_by('title')
 
+    def list(self, request, *args, **kwargs):
+        user = request.user
+        if user.is_authenticated:
+            campus = (getattr(user, 'school', '') or 'pau').lower()
+            if campus not in ('pau', 'futo'):
+                campus_param = request.query_params.get('campus', '').lower()
+                campus = campus_param if campus_param in ('pau', 'futo') else 'pau'
+        else:
+            campus_param = request.query_params.get('campus', '').lower()
+            campus = campus_param if campus_param in ('pau', 'futo') else 'pau'
+
+        cache_key = f'categories_{campus}'
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return Response(cached)
+        response = super().list(request, *args, **kwargs)
+        cache.set(cache_key, response.data, 300)  # 5 minutes — categories rarely change
+        return response
+
 
 class ListingViewSet(viewsets.ModelViewSet):
     queryset = Listing.objects.all()
@@ -93,6 +118,31 @@ class ListingViewSet(viewsets.ModelViewSet):
         else:
             permission_classes = [permissions.IsAuthenticated]
         return [perm() for perm in permission_classes]
+
+    def list(self, request, *args, **kwargs):
+        # Never cache staff requests (they see unavailable listings too)
+        # Never cache filtered/search queries — those are too varied to key efficiently
+        if (request.user.is_authenticated and request.user.is_staff
+                or request.query_params.get('search')
+                or request.query_params.get('vendor_username')
+                or request.query_params.get('category')):
+            return super().list(request, *args, **kwargs)
+
+        user = request.user
+        if user.is_authenticated:
+            campus = (getattr(user, 'school', '') or 'pau').lower()
+        else:
+            campus_param = request.query_params.get('campus', '').lower()
+            campus = campus_param if campus_param in ('pau', 'futo') else 'pau'
+
+        page_size = request.query_params.get('page_size', '20')
+        cache_key = f'listings_{campus}_{page_size}'
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return Response(cached)
+        response = super().list(request, *args, **kwargs)
+        cache.set(cache_key, response.data, 60)  # 1 minute
+        return response
 
     def get_queryset(self):
         user = self.request.user
@@ -165,9 +215,11 @@ class ListingViewSet(viewsets.ModelViewSet):
         if image_file:
             image_url = upload_to_cloudinary(image_file, folder='studex/listings')
             if image_url:
-                serializer.save(image=image_url)
+                instance = serializer.save(image=image_url)
+                _invalidate_listing_cache(instance.campus)
                 return
-        serializer.save()
+        instance = serializer.save()
+        _invalidate_listing_cache(instance.campus)
 
     def perform_create(self, serializer):
         image_url = None
@@ -181,12 +233,18 @@ class ListingViewSet(viewsets.ModelViewSet):
             image=image_url or '',
             campus=campus,
         )
+        _invalidate_listing_cache(campus)
         # Notify admin that a new listing needs review and approval
         try:
             from studex.notifications import notify_admin_new_listing
             notify_admin_new_listing(listing)
         except Exception:
             pass
+
+    def perform_destroy(self, instance):
+        campus = instance.campus
+        super().perform_destroy(instance)
+        _invalidate_listing_cache(campus)
 
 
 class TransactionViewSet(viewsets.ReadOnlyModelViewSet):

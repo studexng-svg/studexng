@@ -748,6 +748,23 @@ class VendorListView(ListAPIView):
             .order_by('-completed_order_count', '-profile__rating')
         )
 
+    def list(self, request, *args, **kwargs):
+        user = request.user
+        if user.is_authenticated:
+            campus = (getattr(user, 'school', '') or 'pau').lower()
+        else:
+            campus_param = request.query_params.get('campus', '').lower()
+            campus = campus_param if campus_param in ('pau', 'futo') else 'pau'
+
+        page_size = request.query_params.get('page_size', '20')
+        cache_key = f'vendors_{campus}_{page_size}'
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return Response(cached)
+        response = super().list(request, *args, **kwargs)
+        cache.set(cache_key, response.data, 60)  # 1 minute
+        return response
+
 
 class VendorDetailView(generics.RetrieveAPIView):
     serializer_class = VendorListSerializer
