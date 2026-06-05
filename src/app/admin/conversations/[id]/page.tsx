@@ -132,7 +132,7 @@ export default function AdminConversationDetail() {
                       {msg.content && <p className="text-stone-600 text-sm mt-1">{msg.content}</p>}
                     </div>
                   ) : (
-                    <div className={`px-3.5 py-2.5 rounded-2xl text-sm ${
+                    <div className={`px-3.5 py-2.5 rounded-2xl text-sm break-words ${
                       isBuyer
                         ? "bg-white border border-stone-200 text-stone-800 rounded-tl-sm"
                         : "text-white rounded-tr-sm"

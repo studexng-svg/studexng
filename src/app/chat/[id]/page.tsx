@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useRouter, useParams } from "next/navigation";
 import {
   ChevronLeft, Send, Loader, ImageIcon, X, Pin, Pencil,
-  Trash2, Check, CheckCheck, PinOff, ChevronDown, UserX, Users, CornerDownLeft
+  Trash2, Check, CheckCheck, PinOff, ChevronDown, UserX, Users, CornerDownLeft, Copy
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { useAuth, fetchWithAuth, getToken } from "@/lib/authStore";
@@ -504,7 +504,7 @@ export default function ChatRoomPage() {
                     <a href={msg.image_url} target="_blank" rel="noopener noreferrer">
                       <img src={msg.image_url} alt="shared" className="rounded-xl max-w-[220px] max-h-[220px] object-cover mb-1 cursor-pointer hover:opacity-90 transition" />
                     </a>
-                    {msg.content && msg.content !== "📷 Image" && <p className="text-sm mt-1">{msg.content}</p>}
+                    {msg.content && msg.content !== "📷 Image" && <p className="text-sm mt-1 break-words">{msg.content}</p>}
                   </div>
                 ) : (() => {
                   const { quoted, main } = parseQuoted(msg.content);
@@ -516,7 +516,7 @@ export default function ChatRoomPage() {
                           <p className={`text-xs truncate ${msg.is_mine ? 'text-white/60' : 'text-stone-500'}`}>{quoted.text}</p>
                         </div>
                       )}
-                      <p className="text-sm leading-relaxed">{main}</p>
+                      <p className="text-sm leading-relaxed break-words">{main}</p>
                     </>
                   );
                 })()}
@@ -569,6 +569,22 @@ export default function ChatRoomPage() {
               >
                 <CornerDownLeft className="w-4 h-4 text-teal-500" />
                 <span className="text-sm font-medium text-stone-800">Reply</span>
+              </button>
+
+              {/* Copy */}
+              <button
+                onClick={() => {
+                  const msg = messages.find(m => m.id === actionMenu.messageId);
+                  if (msg) {
+                    const { main } = parseQuoted(msg.content || '');
+                    navigator.clipboard.writeText(main);
+                  }
+                  setActionMenu(null);
+                }}
+                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-stone-50 transition text-left border-t border-stone-50"
+              >
+                <Copy className="w-4 h-4 text-stone-500" />
+                <span className="text-sm font-medium text-stone-800">Copy</span>
               </button>
 
               {/* Pin / Unpin */}

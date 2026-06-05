@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import {
   X, Send, Loader, ImageIcon,
   Pin, PinOff, Pencil, Trash2, Check, CheckCheck,
-  UserX, Users, ChevronDown, ChevronLeft,
+  UserX, Users, ChevronDown, ChevronLeft, Copy,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { fetchWithAuth, getToken, useAuth } from "@/lib/authStore";
@@ -564,11 +564,11 @@ export default function ChatWindow({
                             />
                           </a>
                           {msg.text && msg.text !== "📷 Image" && (
-                            <p className="text-sm mt-1 leading-relaxed">{msg.text}</p>
+                            <p className="text-sm mt-1 leading-relaxed break-words">{msg.text}</p>
                           )}
                         </div>
                       ) : (
-                        <p className="text-sm leading-relaxed">{msg.text}</p>
+                        <p className="text-sm leading-relaxed break-words">{msg.text}</p>
                       )}
 
                       {msg.created_at && editingId !== msg.id && (
@@ -655,9 +655,23 @@ export default function ChatWindow({
               }}
               className="bg-white rounded-2xl shadow-2xl border border-stone-100 overflow-hidden min-w-[200px]"
             >
+              {actionMenu.message_type !== 'image' && (
+                <button
+                  onClick={() => {
+                    const msg = messages.find(m => m.id === actionMenu.messageId);
+                    if (msg) navigator.clipboard.writeText(msg.text || '');
+                    setActionMenu(null);
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-stone-50 transition text-left"
+                >
+                  <Copy className="w-4 h-4 text-stone-500" />
+                  <span className="text-sm font-medium text-stone-800">Copy</span>
+                </button>
+              )}
+
               <button
                 onClick={() => togglePin(actionMenu.messageId)}
-                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-stone-50 transition text-left"
+                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-stone-50 transition text-left border-t border-stone-50"
               >
                 {actionMenu.is_pinned
                   ? <><PinOff className="w-4 h-4 text-teal-500" /><span className="text-sm font-medium text-stone-800">Unpin</span></>

@@ -104,7 +104,7 @@ export default function MessagesPage() {
             <p className={`text-xs font-medium mb-1 ${msg.is_mine ? "text-teal-100 text-right" : "text-stone-500"}`}>
               {msg.sender_username || (msg.is_mine ? user?.username : activeConv?.buyer_username)}
             </p>
-            <p className="text-sm">{msg.content}</p>
+            <p className="text-sm break-words">{msg.content}</p>
             <div className="flex items-center justify-end gap-1 mt-1">
               <p className="text-xs opacity-50">
                 {new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
