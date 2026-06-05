@@ -6,6 +6,7 @@ import {
   Search, CreditCard, CheckCircle, GraduationCap, Store,
   ShieldCheck, Zap, Utensils, Droplets, Camera, Shirt, Dumbbell,
 } from "lucide-react";
+import { Mail } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -581,8 +582,8 @@ export default function LandingClient({ initialListings }: { initialListings: an
       <footer className="bg-white border-t border-stone-100 py-12" style={{ fontFamily: "'DM Sans', sans-serif" }}>
         <div className="max-w-6xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-6">
           <p
-            className="text-stone-900 font-bold text-xl"
-            style={{ fontFamily: "'Playfair Display', serif" }}
+            className="font-bold text-xl"
+            style={{ fontFamily: "'Playfair Display', serif", ...GRAD_TEXT }}
           >
             StudEx
           </p>
@@ -595,7 +596,7 @@ export default function LandingClient({ initialListings }: { initialListings: an
               target="_blank"
               rel="noopener noreferrer"
               aria-label="StudEx on Instagram"
-              className="text-stone-400 hover:text-[#E1306C] transition"
+              style={{ color: '#E1306C' }}
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/>
@@ -608,11 +609,18 @@ export default function LandingClient({ initialListings }: { initialListings: an
               target="_blank"
               rel="noopener noreferrer"
               aria-label="StudEx on TikTok"
-              className="text-stone-400 hover:text-black transition"
+              style={{ color: '#000000' }}
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 0 0-.79-.05 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.33-6.34V8.69a8.18 8.18 0 0 0 4.78 1.52V6.76a4.85 4.85 0 0 1-1.01-.07z"/>
               </svg>
+            </a>
+            <a
+              href="mailto:studex.ng@gmail.com"
+              aria-label="Email StudEx"
+              style={{ color: '#0D9488' }}
+            >
+              <Mail size={24} strokeWidth={1.75} />
             </a>
           </div>
 
