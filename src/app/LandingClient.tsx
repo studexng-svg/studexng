@@ -588,8 +588,8 @@ export default function LandingClient({ initialListings }: { initialListings: an
           </p>
 
           <div className="flex gap-8 text-sm items-center">
-            <Link href="/terms" className="text-stone-400 hover:text-stone-700 transition">Terms</Link>
-            <Link href="/privacy-policy" className="text-stone-400 hover:text-stone-700 transition">Privacy</Link>
+            <Link href="/terms" className="text-stone-900 font-bold hover:text-stone-600 transition">Terms</Link>
+            <Link href="/privacy-policy" className="text-stone-900 font-bold hover:text-stone-600 transition">Privacy</Link>
             <a
               href="https://www.instagram.com/studextechnologies/"
               target="_blank"
@@ -639,7 +639,7 @@ export default function LandingClient({ initialListings }: { initialListings: an
             </a>
           </div>
 
-          <p className="text-stone-300 text-sm">© 2026 StudEx. All rights reserved.</p>
+          <p className="text-stone-900 font-bold text-sm">© 2026 StudEx. All rights reserved.</p>
         </div>
       </footer>
     </>
