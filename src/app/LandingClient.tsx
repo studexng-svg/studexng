@@ -578,7 +578,7 @@ export default function LandingClient({ initialListings }: { initialListings: an
       </section>
 
       {/* ── FOOTER ───────────────────────────────────────── */}
-      <footer className="py-12" style={{ fontFamily: "'DM Sans', sans-serif", background: GRAD }}>
+      <footer className="bg-white border-t border-stone-100 py-12" style={{ fontFamily: "'DM Sans', sans-serif" }}>
         <div className="max-w-6xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-6">
           <p
             className="font-bold text-xl text-stone-900"
@@ -588,8 +588,8 @@ export default function LandingClient({ initialListings }: { initialListings: an
           </p>
 
           <div className="flex gap-8 text-sm items-center">
-            <Link href="/terms" className="text-white/70 hover:text-white transition">Terms</Link>
-            <Link href="/privacy-policy" className="text-white/70 hover:text-white transition">Privacy</Link>
+            <Link href="/terms" className="text-stone-400 hover:text-stone-700 transition">Terms</Link>
+            <Link href="/privacy-policy" className="text-stone-400 hover:text-stone-700 transition">Privacy</Link>
             <a
               href="https://www.instagram.com/studextechnologies/"
               target="_blank"
@@ -623,7 +623,7 @@ export default function LandingClient({ initialListings }: { initialListings: an
             </a>
           </div>
 
-          <p className="text-white/50 text-sm">© 2026 StudEx. All rights reserved.</p>
+          <p className="text-stone-300 text-sm">© 2026 StudEx. All rights reserved.</p>
         </div>
       </footer>
     </>
