@@ -107,7 +107,7 @@ function LiveActivity() {
         .catch(() => {});
     };
     fetch_();
-    const id = setInterval(fetch_, 60_000);
+    const id = setInterval(() => { if (document.visibilityState !== 'hidden') fetch_(); }, 60_000);
     return () => clearInterval(id);
   }, []);
 
@@ -183,7 +183,7 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     load();
-    const id = setInterval(() => load(), 60_000);
+    const id = setInterval(() => { if (document.visibilityState !== 'hidden') load(); }, 60_000);
     return () => clearInterval(id);
   }, []);
 

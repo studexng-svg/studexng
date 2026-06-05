@@ -54,6 +54,7 @@ export default function AdminOrders() {
   useEffect(() => {
     load();
     const interval = setInterval(() => {
+      if (document.visibilityState === 'hidden') return;
       const f = filtersRef.current;
       load(undefined, f.statusFilter || undefined, f.campus || undefined, true);
     }, 60000);

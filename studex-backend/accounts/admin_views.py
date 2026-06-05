@@ -11,6 +11,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.db.models import Q, Count, Sum, Avg
 from django.conf import settings
+from django.core.cache import cache
 
 from studex.permissions import IsAdminUser, IsSuperAdminUser
 from accounts.models import User, Profile
@@ -27,8 +28,12 @@ class AdminDashboardView(APIView):
     permission_classes = [IsAdminUser]
 
     def get(self, request):
+        cached = cache.get('admin_dashboard')
+        if cached is not None:
+            return Response(cached)
         try:
             data = AdminAnalytics.get_dashboard_summary()
+            cache.set('admin_dashboard', data, 30)
             return Response(data, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -49,6 +54,11 @@ class AdminAnalyticsTimeSeriesView(APIView):
             days = min(int(request.query_params.get('days', 30)), 90)
         except (ValueError, TypeError):
             days = 30
+
+        cache_key = f'admin_analytics_{days}'
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return Response(cached)
 
         try:
             today = tz.now().date()
@@ -106,10 +116,9 @@ class AdminAnalyticsTimeSeriesView(APIView):
             except Exception:
                 pass
 
-            return Response({
-                'series': series,
-                'status_distribution': status_dist,
-            })
+            result = {'series': series, 'status_distribution': status_dist}
+            cache.set(cache_key, result, 300)  # 5 minutes
+            return Response(result)
         except Exception as e:
             return Response({
                 'series': [],
@@ -178,6 +187,16 @@ class AdminUserListView(generics.ListAPIView):
             queryset = queryset.filter(school__iexact=school)
 
         return queryset
+
+    def list(self, request, *args, **kwargs):
+        p = request.query_params
+        cache_key = f'admin_users_{p.get("search","")}_{p.get("user_type","")}_{p.get("is_active","")}_{p.get("school","")}'
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return Response(cached)
+        response = super().list(request, *args, **kwargs)
+        cache.set(cache_key, response.data, 30)
+        return response
 
 
 class AdminUserDetailView(APIView):
@@ -349,6 +368,16 @@ try:
 
             return queryset
 
+        def list(self, request, *args, **kwargs):
+            p = request.query_params
+            cache_key = f'admin_listings_{p.get("search","")}_{p.get("is_available","")}_{p.get("category","")}_{p.get("campus","")}'
+            cached = cache.get(cache_key)
+            if cached is not None:
+                return Response(cached)
+            response = super().list(request, *args, **kwargs)
+            cache.set(cache_key, response.data, 30)
+            return response
+
 
     class AdminListingDetailView(APIView):
         """
@@ -504,6 +533,16 @@ try:
 
             return queryset
 
+        def list(self, request, *args, **kwargs):
+            p = request.query_params
+            cache_key = f'admin_orders_{p.get("status","")}_{p.get("campus","")}'
+            cached = cache.get(cache_key)
+            if cached is not None:
+                return Response(cached)
+            response = super().list(request, *args, **kwargs)
+            cache.set(cache_key, response.data, 30)
+            return response
+
 
     class AdminOrderDetailView(APIView):
         """
@@ -640,6 +679,16 @@ try:
                 qs = qs.filter(order__listing__campus__iexact=campus)
             return qs
 
+        def list(self, request, *args, **kwargs):
+            p = request.query_params
+            cache_key = f'admin_disputes_{p.get("status","")}_{p.get("search","")}_{p.get("campus","")}'
+            cached = cache.get(cache_key)
+            if cached is not None:
+                return Response(cached)
+            response = super().list(request, *args, **kwargs)
+            cache.set(cache_key, response.data, 30)
+            return response
+
     class AdminDisputeDetailView(APIView):
         """
         GET   /api/admin/disputes/{id}/
@@ -723,6 +772,11 @@ try:
             return qs
 
         def list(self, request, *args, **kwargs):
+            params = request.query_params
+            cache_key = f'admin_payments_{params.get("status","")}_{params.get("search","")}_{params.get("campus","")}'
+            cached = cache.get(cache_key)
+            if cached is not None:
+                return Response(cached)
             qs = self.get_queryset()
             data = []
             for p in qs:
@@ -744,6 +798,7 @@ try:
                     'order_id': p.order_id,
                     'created_at': p.created_at.isoformat(),
                 })
+            cache.set(cache_key, data, 30)
             return Response(data)
 
     class AdminPaymentDetailView(APIView):
@@ -1358,11 +1413,17 @@ try:
         permission_classes = [IsAdminUser]
 
         def get(self, request):
+            search = request.query_params.get('search', '')
+            campus = request.query_params.get('campus', '')
+            cache_key = f'admin_conversations_{search}_{campus}'
+            cached = cache.get(cache_key)
+            if cached is not None:
+                return Response(cached)
+
             qs = Conversation.objects.all().select_related(
                 'buyer', 'seller', 'listing'
             ).order_by('-updated_at')
 
-            search = request.query_params.get('search')
             if search:
                 qs = qs.filter(
                     Q(buyer__username__icontains=search) |
@@ -1370,7 +1431,6 @@ try:
                     Q(listing__title__icontains=search)
                 )
 
-            campus = request.query_params.get('campus')
             if campus:
                 qs = qs.filter(listing__campus__iexact=campus)
 
@@ -1392,6 +1452,7 @@ try:
                     'created_at': conv.created_at.isoformat(),
                     'updated_at': conv.updated_at.isoformat(),
                 })
+            cache.set(cache_key, data, 30)
             return Response(data)
 
     class AdminConversationDetailView(APIView):

@@ -51,6 +51,7 @@ export default function AdminPaymentsPage() {
   useEffect(() => {
     load();
     const interval = setInterval(() => {
+      if (document.visibilityState === 'hidden') return;
       const f = filtersRef.current;
       load(f.search, f.tab, f.campus, true);
     }, 60000);

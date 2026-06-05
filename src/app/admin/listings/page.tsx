@@ -64,6 +64,7 @@ export default function AdminListingsPage() {
       .catch(() => {});
 
     const interval = setInterval(() => {
+      if (document.visibilityState === 'hidden') return;
       const f = filtersRef.current;
       load(f.search, f.tab, f.campus, f.categoryFilter, true);
     }, 60000);

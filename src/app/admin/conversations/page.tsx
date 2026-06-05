@@ -44,6 +44,7 @@ export default function AdminConversationsPage() {
   useEffect(() => {
     load();
     const interval = setInterval(() => {
+      if (document.visibilityState === 'hidden') return;
       const f = filtersRef.current;
       load(f.search, f.campus, true);
     }, 60000);

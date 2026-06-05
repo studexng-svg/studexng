@@ -97,7 +97,7 @@ export default function AdminAnalytics() {
 
   // Auto-refresh every 60s
   useEffect(() => {
-    const id = setInterval(() => load(days, true), 60_000);
+    const id = setInterval(() => { if (document.visibilityState !== 'hidden') load(days, true); }, 60_000);
     return () => clearInterval(id);
   }, [days, load]);
 
