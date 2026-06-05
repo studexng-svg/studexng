@@ -14,7 +14,7 @@ import Script from "next/script";
 import Link from "next/link";
 import { useAuth } from "@/lib/authStore";
 import { generateStructuredData } from "@/lib/metadata";
-import { GRAD_TEXT, SERIF } from "@/lib/tokens";
+import { GRAD, GRAD_TEXT, SERIF } from "@/lib/tokens";
 
 /* ─── DATA ─────────────────────────────────────────────── */
 const reviews = [
