@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect } from "react";
-import { getToken, onMessage } from "firebase/messaging";
 import { useAuth, getToken as getAuthToken } from "@/lib/authStore";
 import { getFirebaseMessaging } from "@/lib/firebase";
 
@@ -22,6 +21,8 @@ export function usePushNotifications() {
 
         const messaging = await getFirebaseMessaging();
         if (!messaging) return;
+
+        const { getToken, onMessage } = await import("firebase/messaging");
 
         // Register SW and wait until it is active before asking for a token
         const swReg = await navigator.serviceWorker.register("/firebase-messaging-sw.js");

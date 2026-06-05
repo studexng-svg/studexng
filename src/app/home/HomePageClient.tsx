@@ -205,8 +205,8 @@ export default function HomePageClient({ initialVendors, initialListings, initia
     setCurrentCampus(campus); setCampusReady(false); setActiveFilter("All");
     try {
       const [l, v, c] = await Promise.all([
-        fetch(`${API_URL}/api/services/listings/?campus=${campus}&page_size=500`),
-        fetch(`${API_URL}/api/auth/vendors/?campus=${campus}&page_size=500`),
+        fetch(`${API_URL}/api/services/listings/?campus=${campus}&page_size=100`),
+        fetch(`${API_URL}/api/auth/vendors/?campus=${campus}&page_size=100`),
         fetch(`${API_URL}/api/services/categories/?campus=${campus}`),
       ]);
       if (l.ok) { const d = await l.json(); setAllListings(d.results || d || []); }
@@ -225,8 +225,8 @@ export default function HomePageClient({ initialVendors, initialListings, initia
     const https = typeof window !== "undefined" && window.location.protocol === "https:";
     document.cookie = `studex_campus=${school}; path=/; max-age=31536000; SameSite=Lax${https ? "; Secure" : ""}`;
     Promise.all([
-      fetchWithAuth(`${API_URL}/api/services/listings/?campus=${school}&page_size=500`),
-      fetchWithAuth(`${API_URL}/api/auth/vendors/?campus=${school}&page_size=500`),
+      fetchWithAuth(`${API_URL}/api/services/listings/?campus=${school}&page_size=100`),
+      fetchWithAuth(`${API_URL}/api/auth/vendors/?campus=${school}&page_size=100`),
       fetchWithAuth(`${API_URL}/api/services/categories/?campus=${school}`),
     ]).then(async ([l, v, c]) => {
       if (l.ok) { const d = await l.json(); setAllListings(d.results || d || []); }
@@ -277,9 +277,8 @@ export default function HomePageClient({ initialVendors, initialListings, initia
     const isReserved   = !isService && !isOwn && !!listing.is_reserved;
     const inCart       = cart.some(ci => ci.id === listing.id);
     return (
-      <motion.div key={listing.id} initial={{ opacity: 0, y: 8 }} whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true }} transition={{ delay: Math.min(i * 0.02, 0.1) }}
-        className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow flex items-center gap-4 p-4">
+      <div key={listing.id} className="animate-fadeUp bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow flex items-center gap-4 p-4"
+        style={{ animationDelay: `${Math.min(i * 0.02, 0.1)}s` }}>
         <Link href={`/listing/${listing.id}`} className="flex items-center gap-4 flex-1 min-w-0">
           <div className="w-24 h-24 rounded-xl overflow-hidden flex-shrink-0 bg-stone-50 relative">
             <SafeImage src={listing.image?.startsWith("http") ? listing.image : null} alt={listing.title} />
@@ -327,7 +326,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
             {isService ? "Book" : "Cart"}
           </button>
         )}
-      </motion.div>
+      </div>
     );
   };
 
@@ -360,9 +359,8 @@ export default function HomePageClient({ initialVendors, initialListings, initia
     const inCart       = cart.some(ci => ci.id === listing.id);
 
     return (
-      <motion.div key={listing.id} initial={{ opacity: 0, y: 12 }} whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true }} transition={{ delay: Math.min(i * 0.04, 0.2) }}
-        className="bg-white rounded-xl border border-stone-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow group">
+      <div key={listing.id} className="animate-fadeUp bg-white rounded-xl border border-stone-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow group"
+        style={{ animationDelay: `${Math.min(i * 0.04, 0.2)}s` }}>
 
         <Link href={`/listing/${listing.id}`} className="block">
           <div className="relative w-full aspect-square overflow-hidden bg-stone-50">
@@ -438,7 +436,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
             </div>
           </div>
         </Link>
-      </motion.div>
+      </div>
     );
   };
 
@@ -447,8 +445,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
     const displaySrc = src?.startsWith("http") ? src : null;
     const initials = (vendor.business_name || vendor.username || "??").slice(0, 2).toUpperCase();
     return (
-      <motion.div key={vendor.id} initial={{ opacity: 0, y: 12 }} whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true }} transition={{ delay: Math.min(i * 0.05, 0.3) }}>
+      <div key={vendor.id} className="animate-fadeUp" style={{ animationDelay: `${Math.min(i * 0.05, 0.3)}s` }}>
         <Link href={`/vendor/${vendor.username}`}>
           <div className="bg-white rounded-xl border border-stone-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow group cursor-pointer">
             <div className="relative w-full aspect-square overflow-hidden bg-stone-50">
@@ -489,7 +486,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
             </div>
           </div>
         </Link>
-      </motion.div>
+      </div>
     );
   };
 
@@ -978,8 +975,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
           </div>
 
           {/* ── CTA BANNER ── */}
-          <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
-            className="mt-10 rounded-2xl overflow-hidden" style={{ background: HERO_GRAD }}>
+          <div className="animate-fadeUp mt-10 rounded-2xl overflow-hidden" style={{ background: HERO_GRAD }}>
             <div className="px-6 lg:px-10 py-8 lg:py-10 flex flex-col sm:flex-row items-center justify-between gap-5">
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0">
@@ -999,7 +995,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                 </motion.button>
               </Link>
             </div>
-          </motion.div>
+          </div>
 
         </div>
       </div>
