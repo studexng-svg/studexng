@@ -579,18 +579,18 @@ export default function LandingClient({ initialListings }: { initialListings: an
       </section>
 
       {/* ── FOOTER ───────────────────────────────────────── */}
-      <footer className="bg-white border-t border-stone-100 py-12" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+      <footer className="py-12" style={{ fontFamily: "'DM Sans', sans-serif", background: GRAD }}>
         <div className="max-w-6xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-6">
           <p
-            className="font-bold text-xl"
-            style={{ fontFamily: "'Playfair Display', serif", ...GRAD_TEXT }}
+            className="font-bold text-xl text-stone-900"
+            style={{ fontFamily: "'Playfair Display', serif" }}
           >
             StudEx
           </p>
 
           <div className="flex gap-8 text-sm items-center">
-            <Link href="/terms" className="text-stone-400 hover:text-stone-700 transition">Terms</Link>
-            <Link href="/privacy-policy" className="text-stone-400 hover:text-stone-700 transition">Privacy</Link>
+            <Link href="/terms" className="text-white/70 hover:text-white transition">Terms</Link>
+            <Link href="/privacy-policy" className="text-white/70 hover:text-white transition">Privacy</Link>
             <a
               href="https://www.instagram.com/studextechnologies/"
               target="_blank"
@@ -609,7 +609,7 @@ export default function LandingClient({ initialListings }: { initialListings: an
               target="_blank"
               rel="noopener noreferrer"
               aria-label="StudEx on TikTok"
-              style={{ color: '#000000' }}
+              className="text-white"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 0 0-.79-.05 6.34 6.34 0 0 0-6.34 6.34 6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.33-6.34V8.69a8.18 8.18 0 0 0 4.78 1.52V6.76a4.85 4.85 0 0 1-1.01-.07z"/>
@@ -618,13 +618,13 @@ export default function LandingClient({ initialListings }: { initialListings: an
             <a
               href="mailto:studex.ng@gmail.com"
               aria-label="Email StudEx"
-              style={{ color: '#0D9488' }}
+              className="text-white"
             >
               <Mail size={24} strokeWidth={1.75} />
             </a>
           </div>
 
-          <p className="text-stone-300 text-sm">© 2026 StudEx. All rights reserved.</p>
+          <p className="text-white/50 text-sm">© 2026 StudEx. All rights reserved.</p>
         </div>
       </footer>
     </>
