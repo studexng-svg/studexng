@@ -22,10 +22,6 @@ const FUTO_HOSTELS = [
   "Umuchima", "PG Hostel", "Eziobodo", "Ihiagwa", "Off-Campus",
 ];
 
-const IMSU_HOSTELS = [
-  "Alvan Hall", "Odim Hall", "Imo Hall", "Post-Graduate Hostel",
-  "Ekeonunwa", "Owerri Town", "Off-Campus",
-];
 
 const NON_STUDENT_LOCATIONS = [
   "Umuchima", "Eziobodo", "Ihiagwa", "Off-Campus",
@@ -735,26 +731,38 @@ export default function AuthPage() {
                       </div>
                     )}
 
-                    {/* HOSTEL — students only */}
+                    {/* HOSTEL / LOCATION — students only */}
                     {!isNonStudent && (
                     <div>
                       <label className="text-sm font-medium text-stone-700 flex items-center gap-1.5 mb-1.5">
-                        <MapPin className="w-4 h-4" /> {isFUTO ? "Hostel / Hall" : "Hostel / Location"}
+                        <MapPin className="w-4 h-4" /> {signupForm.school === "IMSU" ? "Location / Area" : isFUTO ? "Hostel / Hall" : "Hostel / Location"}
                       </label>
-                      <select
-                        name="hostel"
-                        value={signupForm.hostel}
-                        onChange={handleSignupChange}
-                        className={`${inputClass("hostel", hostelOk)} appearance-none`}
-                        disabled={isLoading || !signupForm.school}>
-                        <option value="">
-                          {!signupForm.school ? "Select school first" : `Select your hostel`}
-                        </option>
-                        {(signupForm.school === "FUTO" ? FUTO_HOSTELS : signupForm.school === "IMSU" ? IMSU_HOSTELS : PAU_HOSTELS).map(h => (
-                          <option key={h} value={h}>{h}</option>
-                        ))}
-                      </select>
-                      {touched.hostel && !hostelOk && <FieldFeedback ok={false} msg="Please select your hostel" />}
+                      {signupForm.school === "IMSU" ? (
+                        <input
+                          type="text"
+                          name="hostel"
+                          value={signupForm.hostel}
+                          onChange={handleSignupChange}
+                          placeholder="e.g. School Road, Owerri, Off-campus..."
+                          className={inputClass("hostel", hostelOk)}
+                          disabled={isLoading}
+                        />
+                      ) : (
+                        <select
+                          name="hostel"
+                          value={signupForm.hostel}
+                          onChange={handleSignupChange}
+                          className={`${inputClass("hostel", hostelOk)} appearance-none`}
+                          disabled={isLoading || !signupForm.school}>
+                          <option value="">
+                            {!signupForm.school ? "Select school first" : "Select your hostel"}
+                          </option>
+                          {(signupForm.school === "FUTO" ? FUTO_HOSTELS : PAU_HOSTELS).map(h => (
+                            <option key={h} value={h}>{h}</option>
+                          ))}
+                        </select>
+                      )}
+                      {touched.hostel && !hostelOk && <FieldFeedback ok={false} msg={signupForm.school === "IMSU" ? "Please enter your location" : "Please select your hostel"} />}
                     </div>
                     )}
 
