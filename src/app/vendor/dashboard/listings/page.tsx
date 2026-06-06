@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useAuth, fetchWithAuth } from "@/lib/authStore";
 import { GRAD, toArray } from "@/lib/tokens";
-import { Plus, Edit2, Trash2, Loader, ToggleLeft, ToggleRight, Image as ImageIcon } from "lucide-react";
+import { Plus, Edit2, Trash2, Loader, ToggleLeft, ToggleRight, X } from "lucide-react";
 import { EmptyState, LoadingSpinner, HEADING_FONT } from "../_shared";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
@@ -18,7 +18,7 @@ export default function ListingsPage() {
   const [form, setForm] = useState({
     title: "", description: "", price: "", category: "",
     listing_type: "service", track_inventory: false,
-    stock_quantity: 0, image: null as File | null,
+    stock_quantity: 0, images: Array(5).fill(null) as (File | null)[],
   });
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState("");
@@ -50,13 +50,14 @@ export default function ListingsPage() {
       price: listing.price.toString(), category: listing.category,
       listing_type: listing.listing_type || "service",
       track_inventory: listing.track_inventory || false,
-      stock_quantity: listing.stock_quantity || 0, image: null,
+      stock_quantity: listing.stock_quantity || 0,
+      images: Array(5).fill(null),
     });
     setShowForm(true);
   };
 
   const resetForm = () => {
-    setForm({ title: "", description: "", price: "", category: "", listing_type: "service", track_inventory: false, stock_quantity: 0, image: null });
+    setForm({ title: "", description: "", price: "", category: "", listing_type: "service", track_inventory: false, stock_quantity: 0, images: Array(5).fill(null) });
     setEditing(null);
     setShowForm(false);
   };
@@ -76,7 +77,8 @@ export default function ListingsPage() {
       const isInventoryType = form.listing_type === "food" || form.listing_type === "product";
       fd.append("track_inventory", isInventoryType ? "true" : "false");
       fd.append("stock_quantity", isInventoryType ? form.stock_quantity.toString() : "0");
-      if (form.image) fd.append("image", form.image);
+      const slots = ['image', 'image2', 'image3', 'image4', 'image5'];
+      form.images.forEach((file, i) => { if (file) fd.append(slots[i], file); });
 
       const url = editing
         ? `${API_URL}/api/services/listings/${editing.id}/`
@@ -142,11 +144,54 @@ export default function ListingsPage() {
                 ))}
               </select>
             </div>
-            <label className="flex items-center bg-white border border-dashed border-stone-300 rounded-xl px-4 py-3 cursor-pointer hover:border-teal-400 hover:bg-teal-50/30 transition gap-2">
-              <ImageIcon className="w-4 h-4 text-stone-400" />
-              <span className="text-sm text-stone-400">{form.image ? form.image.name : "Upload image"}</span>
-              <input type="file" accept="image/*" className="hidden" onChange={e => setForm(f => ({ ...f, image: e.target.files?.[0] || null }))} />
-            </label>
+            <div>
+              <p className="text-xs text-stone-400 mb-2">Photos · up to 5 · first is the main photo</p>
+              <div className="grid grid-cols-5 gap-2">
+                {[0,1,2,3,4].map(i => {
+                  const imgSlots = ['image','image2','image3','image4','image5'];
+                  const existingUrl: string | null = editing ? editing[imgSlots[i]] || null : null;
+                  const newFile = form.images[i];
+                  return (
+                    <div key={i} className="relative aspect-square">
+                      {newFile ? (
+                        <>
+                          <img src={URL.createObjectURL(newFile)} alt="" className="w-full h-full object-cover rounded-xl border-2 border-teal-400" />
+                          <button type="button" onClick={() => {
+                            const imgs = [...form.images]; imgs[i] = null;
+                            setForm(f => ({ ...f, images: imgs }));
+                          }} className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center shadow">
+                            <X className="w-2.5 h-2.5 text-white" />
+                          </button>
+                        </>
+                      ) : existingUrl ? (
+                        <div className="relative w-full h-full group">
+                          <img src={existingUrl} alt="" className="w-full h-full object-cover rounded-xl border border-stone-200" />
+                          <label className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 rounded-xl cursor-pointer transition">
+                            <span className="text-white text-[10px] font-semibold">Replace</span>
+                            <input type="file" accept="image/*" className="hidden" onChange={e => {
+                              const f = e.target.files?.[0]; if (!f) return;
+                              const imgs = [...form.images]; imgs[i] = f;
+                              setForm(prev => ({ ...prev, images: imgs }));
+                            }} />
+                          </label>
+                          {i === 0 && <span className="absolute bottom-1 left-1 text-[9px] bg-teal-600 text-white px-1.5 py-0.5 rounded-full font-semibold">Main</span>}
+                        </div>
+                      ) : (
+                        <label className="w-full h-full border-2 border-dashed border-stone-200 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-teal-400 hover:bg-teal-50/30 transition">
+                          <Plus className="w-4 h-4 text-stone-300" />
+                          <span className="text-[9px] text-stone-300 mt-0.5">{i === 0 ? 'Main' : `Photo ${i+1}`}</span>
+                          <input type="file" accept="image/*" className="hidden" onChange={e => {
+                            const f = e.target.files?.[0]; if (!f) return;
+                            const imgs = [...form.images]; imgs[i] = f;
+                            setForm(prev => ({ ...prev, images: imgs }));
+                          }} />
+                        </label>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
             <select value={form.listing_type} onChange={e => setForm(f => ({ ...f, listing_type: e.target.value }))}
               className="w-full bg-white border border-stone-200 rounded-xl px-4 py-3 text-stone-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 transition">
               <option value="service">Service (e.g. nails, lashes)</option>

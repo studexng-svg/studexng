@@ -44,6 +44,10 @@ class Listing(models.Model):
         help_text="Type of listing — affects inventory tracking"
     )
     image = models.URLField(max_length=500, blank=True, null=True)
+    image2 = models.URLField(max_length=500, blank=True, null=True)
+    image3 = models.URLField(max_length=500, blank=True, null=True)
+    image4 = models.URLField(max_length=500, blank=True, null=True)
+    image5 = models.URLField(max_length=500, blank=True, null=True)
     campus = models.CharField(
         max_length=20,
         default='pau',

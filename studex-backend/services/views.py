@@ -211,27 +211,30 @@ class ListingViewSet(viewsets.ModelViewSet):
         return super().update(request, *args, **kwargs)
 
     def perform_update(self, serializer):
-        image_file = self.request.FILES.get('image')
-        if image_file:
-            image_url = upload_to_cloudinary(image_file, folder='studex/listings')
-            if image_url:
-                instance = serializer.save(image=image_url)
-                _invalidate_listing_cache(instance.campus)
-                return
-        instance = serializer.save()
+        extra = {}
+        for slot in ['image', 'image2', 'image3', 'image4', 'image5']:
+            f = self.request.FILES.get(slot)
+            if f:
+                url = upload_to_cloudinary(f, folder='studex/listings')
+                if url:
+                    extra[slot] = url
+        instance = serializer.save(**extra)
         _invalidate_listing_cache(instance.campus)
 
     def perform_create(self, serializer):
-        image_url = None
-        image_file = self.request.FILES.get('image')
-        if image_file:
-            image_url = upload_to_cloudinary(image_file, folder='studex/listings')
+        extra = {}
+        for slot in ['image', 'image2', 'image3', 'image4', 'image5']:
+            f = self.request.FILES.get(slot)
+            if f:
+                url = upload_to_cloudinary(f, folder='studex/listings')
+                if url:
+                    extra[slot] = url
         campus = (getattr(self.request.user, 'school', '') or 'pau').lower()
         listing = serializer.save(
             vendor=self.request.user,
             is_available=False,
-            image=image_url or '',
             campus=campus,
+            **extra,
         )
         _invalidate_listing_cache(campus)
         # Notify admin that a new listing needs review and approval

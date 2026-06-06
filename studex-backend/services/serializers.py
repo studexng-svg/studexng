@@ -45,6 +45,10 @@ class ListingSerializer(serializers.ModelSerializer):
         help_text="Category slug (e.g., 'food', 'nails')"
     )
     image = serializers.SerializerMethodField()
+    image2 = serializers.SerializerMethodField()
+    image3 = serializers.SerializerMethodField()
+    image4 = serializers.SerializerMethodField()
+    image5 = serializers.SerializerMethodField()
     image_upload = serializers.CharField(required=False, allow_null=True, allow_blank=True, write_only=True, source='image')
     is_reserved = serializers.SerializerMethodField()
     campus = serializers.CharField(source='vendor.school', read_only=True, default='')
@@ -52,7 +56,8 @@ class ListingSerializer(serializers.ModelSerializer):
     class Meta:
         model = Listing
         fields = [
-            'id', 'title', 'description', 'price', 'image', 'image_upload',
+            'id', 'title', 'description', 'price',
+            'image', 'image2', 'image3', 'image4', 'image5', 'image_upload',
             'is_available', 'listing_type', 'track_inventory', 'stock_quantity',
             'is_reserved',
             'category', 'vendor', 'vendor_is_verified',
@@ -76,18 +81,31 @@ class ListingSerializer(serializers.ModelSerializer):
         from django.core.cache import cache
         return cache.get(f'reserved:{obj.pk}') is not None
 
-    def get_image(self, obj):
-        """Return image URL as-is — could be Cloudinary URL or local path."""
-        if not obj.image:
+    def _resolve_image(self, url):
+        if not url:
             return None
-        img = str(obj.image)
+        img = str(url)
         if img.startswith('http'):
             return img
-        # Local file — prepend media URL
         request = self.context.get('request')
         if request:
             return request.build_absolute_uri(f'/media/{img}')
         return f'/media/{img}'
+
+    def get_image(self, obj):
+        return self._resolve_image(obj.image)
+
+    def get_image2(self, obj):
+        return self._resolve_image(obj.image2)
+
+    def get_image3(self, obj):
+        return self._resolve_image(obj.image3)
+
+    def get_image4(self, obj):
+        return self._resolve_image(obj.image4)
+
+    def get_image5(self, obj):
+        return self._resolve_image(obj.image5)
 
     def validate_image(self, value):
         # If it's already a URL string, just return it

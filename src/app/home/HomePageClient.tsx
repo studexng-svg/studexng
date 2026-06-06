@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   Search, ArrowRight, Heart, X, Sparkles, Star,
   ChevronRight, ChevronDown, Clock, Plus, Trophy, ShoppingCart, User, LayoutGrid, List, MapPin,
-  ShieldCheck, Tag, Zap, Headphones,
+  Share2, ShieldCheck, Tag, Zap, Headphones,
   Shirt, Monitor, Home, BookOpen, Car,
   UtensilsCrossed, Smartphone, Scissors, WashingMachine,
   Flower2, Dumbbell, Package, Palette, Music, Camera,
@@ -415,23 +415,40 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                   <Clock className="w-3 h-3" /> Reserved
                 </span>
               ) : (
-                <button
-                  onClick={e => {
-                    if (isOwn) {
+                <div className="flex gap-1.5">
+                  <button
+                    onClick={e => {
+                      if (isOwn) {
+                        e.preventDefault(); e.stopPropagation();
+                        router.push('/vendor/dashboard/listings');
+                        return;
+                      }
+                      if (isService) return;
                       e.preventDefault(); e.stopPropagation();
-                      router.push('/vendor/dashboard/listings');
-                      return;
-                    }
-                    if (isService) return;
-                    e.preventDefault(); e.stopPropagation();
-                    addToCart({ id: listing.id, title: listing.title, price: listing.price, img: listing.image || "" });
-                    showToast(inCart ? "Added again (+1)" : "Added to cart");
-                  }}
-                  className="w-full py-2 rounded-xl text-white text-xs font-bold flex items-center justify-center gap-1.5 hover:opacity-90 transition-opacity"
-                  style={{ background: "linear-gradient(135deg,#2DD4BF 0%,#0D9488 100%)" }}>
-                  <ShoppingCart className="w-3.5 h-3.5" />
-                  {isOwn ? "Manage" : isService ? "Book Now" : "Add to Cart"}
-                </button>
+                      addToCart({ id: listing.id, title: listing.title, price: listing.price, img: listing.image || "" });
+                      showToast(inCart ? "Added again (+1)" : "Added to cart");
+                    }}
+                    className="flex-1 py-2 rounded-xl text-white text-xs font-bold flex items-center justify-center gap-1.5 hover:opacity-90 transition-opacity"
+                    style={{ background: "linear-gradient(135deg,#2DD4BF 0%,#0D9488 100%)" }}>
+                    <ShoppingCart className="w-3.5 h-3.5" />
+                    {isOwn ? "Manage" : isService ? "Book Now" : "Add to Cart"}
+                  </button>
+                  <button
+                    onClick={async e => {
+                      e.preventDefault(); e.stopPropagation();
+                      const url = `${window.location.origin}/listing/${listing.id}`;
+                      if (navigator.share) {
+                        await navigator.share({ title: listing.title, url }).catch(() => {});
+                      } else {
+                        await navigator.clipboard.writeText(url);
+                        showToast("Link copied!");
+                      }
+                    }}
+                    className="p-2 rounded-xl bg-stone-100 hover:bg-stone-200 transition flex items-center justify-center flex-shrink-0"
+                  >
+                    <Share2 className="w-3.5 h-3.5 text-stone-500" />
+                  </button>
+                </div>
               )}
             </div>
           </div>

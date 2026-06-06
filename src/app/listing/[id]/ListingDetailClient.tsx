@@ -143,6 +143,7 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
   const [bookingError, setBookingError] = useState("");
   const [toast, setToast] = useState("");
   const [imageOpen, setImageOpen] = useState(false);
+  const [activeImageIdx, setActiveImageIdx] = useState(0);
 
   const [vendorListings, setVendorListings]           = useState<any[]>([]);
   const [vendorListingsLoading, setVendorListingsLoading] = useState(false);
@@ -389,44 +390,60 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
 
         <div className="pb-28 max-w-2xl mx-auto">
 
-          {/* ── HERO IMAGE ── */}
-          <div
-            className={`relative w-full bg-stone-100 ${listing.image?.startsWith("http") ? "cursor-zoom-in" : "h-48"}`}
-            onClick={() => listing.image?.startsWith("http") && setImageOpen(true)}
-          >
-            {listing.image?.startsWith("http") ? (
-              <img
-                src={listing.image}
-                alt={listing.title}
-                loading="lazy"
-                decoding="async"
-                className="w-full max-h-[260px] object-contain"
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center">
-                <Sparkles className="w-12 h-12 text-stone-300" />
+          {/* ── IMAGE GALLERY ── */}
+          {(() => {
+            const allImages = [
+              (listing as any).image, (listing as any).image2, (listing as any).image3,
+              (listing as any).image4, (listing as any).image5,
+            ].filter((img): img is string => !!img && img.startsWith('http'));
+            const activeImg = allImages[activeImageIdx] ?? null;
+            return (
+              <div>
+                {/* Main image */}
+                <div
+                  className={`relative w-full bg-stone-100 ${activeImg ? "cursor-zoom-in" : "h-48"}`}
+                  onClick={() => activeImg && setImageOpen(true)}
+                >
+                  {activeImg ? (
+                    <img src={activeImg} alt={listing.title} loading="lazy" decoding="async" className="w-full max-h-[280px] object-contain" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Sparkles className="w-12 h-12 text-stone-300" />
+                    </div>
+                  )}
+                  <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-black/30 to-transparent pointer-events-none" />
+                  {activeImg && (
+                    <div className="absolute bottom-3 right-3 bg-black/40 backdrop-blur-sm rounded-full p-1.5">
+                      <ZoomIn className="w-4 h-4 text-white" />
+                    </div>
+                  )}
+                  {!listing.is_available && (
+                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                      <span className="bg-red-500 text-white font-bold px-6 py-2 rounded-full text-sm">Unavailable</span>
+                    </div>
+                  )}
+                </div>
+                {/* Thumbnails */}
+                {allImages.length > 1 && (
+                  <div className="flex gap-2 px-4 pt-2 overflow-x-auto hide-scrollbar">
+                    {allImages.map((img, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => setActiveImageIdx(idx)}
+                        className={`flex-shrink-0 w-14 h-14 rounded-xl overflow-hidden border-2 transition ${activeImageIdx === idx ? 'border-teal-500' : 'border-transparent opacity-60 hover:opacity-100'}`}
+                      >
+                        <img src={img} alt="" className="w-full h-full object-cover" />
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
-            )}
-            {/* Gradient overlay */}
-            <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-black/30 to-transparent pointer-events-none" />
-
-            {/* Zoom hint */}
-            {listing.image?.startsWith("http") && listing.is_available && (
-              <div className="absolute bottom-3 right-3 bg-black/40 backdrop-blur-sm rounded-full p-1.5">
-                <ZoomIn className="w-4 h-4 text-white" />
-              </div>
-            )}
-
-            {!listing.is_available && (
-              <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                <span className="bg-red-500 text-white font-bold px-6 py-2 rounded-full text-sm">Unavailable</span>
-              </div>
-            )}
-          </div>
+            );
+          })()}
 
           {/* ── IMAGE LIGHTBOX ── */}
           <AnimatePresence>
-            {imageOpen && listing.image?.startsWith("http") && (
+            {imageOpen && (
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -446,7 +463,7 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
                   animate={{ scale: 1, opacity: 1 }}
                   exit={{ scale: 0.9, opacity: 0 }}
                   transition={{ duration: 0.2 }}
-                  src={listing.image}
+                  src={[listing.image,(listing as any).image2,(listing as any).image3,(listing as any).image4,(listing as any).image5].filter(Boolean)[activeImageIdx] ?? listing.image ?? ''}
                   alt={listing.title}
                   className="max-w-full max-h-full object-contain rounded-xl shadow-2xl"
                   onClick={(e) => e.stopPropagation()}
