@@ -150,7 +150,13 @@ export default function ChatListPage() {
                         {conv.listing_title ? `Re: ${conv.listing_title}` : ""}
                       </p>
                       <p className={`text-xs truncate mt-0.5 ${conv.unread_count > 0 ? "text-stone-700 font-medium" : "text-stone-400"}`}>
-                        {conv.last_message || "No messages yet"}
+                        {(() => {
+                          const msg = conv.last_message;
+                          if (!msg) return "No messages yet";
+                          if (!msg.startsWith('[quoted:@')) return msg;
+                          const closeIdx = msg.indexOf(']\n');
+                          return closeIdx !== -1 ? msg.substring(closeIdx + 2) || msg : msg;
+                        })()}
                       </p>
                     </div>
 
