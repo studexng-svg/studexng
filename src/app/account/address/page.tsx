@@ -71,6 +71,16 @@ export default function ProfilePage() {
   const [closingTime, setClosingTime] = useState("");
   const [hoursSaving, setHoursSaving] = useState(false);
   const [hoursSaved, setHoursSaved] = useState(false);
+  const [hoursError, setHoursError] = useState("");
+
+  const TIME_OPTIONS = Array.from({ length: 36 }, (_, i) => {
+    const totalMins = 360 + i * 30; // start at 6:00 AM
+    const h = Math.floor(totalMins / 60);
+    const m = totalMins % 60;
+    const val = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    const label = `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`;
+    return { val, label };
+  });
 
   const [stats, setStats] = useState({ sold: 0, bought: 0, wishlist: 0 });
   const [memberSince, setMemberSince] = useState("");
@@ -315,6 +325,7 @@ export default function ProfilePage() {
   const handleHoursSave = async () => {
     setHoursSaving(true);
     setHoursSaved(false);
+    setHoursError("");
     try {
       const res = await fetchWithAuth(`${API_URL}/api/auth/profile/update/`, {
         method: "PATCH",
@@ -325,8 +336,21 @@ export default function ProfilePage() {
           closing_time: closingTime || null,
         }),
       });
-      if (res.ok) { setHoursSaved(true); setTimeout(() => setHoursSaved(false), 3000); }
-    } catch {}
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        // Refresh state from response so next page load matches
+        const p = data?.user?.profile;
+        if (p) {
+          setActiveDays(Array.isArray(p.available_days) ? p.available_days : activeDays);
+          setOpeningTime(p.opening_time || openingTime);
+          setClosingTime(p.closing_time || closingTime);
+        }
+        setHoursSaved(true);
+        setTimeout(() => setHoursSaved(false), 3000);
+      } else {
+        setHoursError(data?.detail || JSON.stringify(data) || "Failed to save. Try again.");
+      }
+    } catch { setHoursError("Network error. Try again."); }
     finally { setHoursSaving(false); }
   };
 
@@ -709,28 +733,40 @@ export default function ProfilePage() {
               })}
             </div>
 
-            {/* Time inputs */}
+            {/* Time selects */}
             <p className="text-xs font-semibold text-stone-500 uppercase tracking-wide mb-2">Hours</p>
             <div className="grid grid-cols-2 gap-3 mb-4">
               <div>
                 <label className="text-xs text-stone-400 mb-1 block">Opens at</label>
-                <input
-                  type="time"
+                <select
                   value={openingTime}
                   onChange={e => setOpeningTime(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-xl border-2 border-stone-200 bg-white text-stone-900 focus:border-teal-400 focus:outline-none text-sm"
-                />
+                  className="w-full px-3 py-2.5 rounded-xl border-2 border-stone-200 bg-white text-stone-900 focus:border-teal-400 focus:outline-none text-sm appearance-none"
+                >
+                  <option value="">Not set</option>
+                  {TIME_OPTIONS.map(t => (
+                    <option key={t.val} value={t.val}>{t.label}</option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="text-xs text-stone-400 mb-1 block">Closes at</label>
-                <input
-                  type="time"
+                <select
                   value={closingTime}
                   onChange={e => setClosingTime(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-xl border-2 border-stone-200 bg-white text-stone-900 focus:border-teal-400 focus:outline-none text-sm"
-                />
+                  className="w-full px-3 py-2.5 rounded-xl border-2 border-stone-200 bg-white text-stone-900 focus:border-teal-400 focus:outline-none text-sm appearance-none"
+                >
+                  <option value="">Not set</option>
+                  {TIME_OPTIONS.map(t => (
+                    <option key={t.val} value={t.val}>{t.label}</option>
+                  ))}
+                </select>
               </div>
             </div>
+
+            {hoursError && (
+              <p className="text-xs text-red-500 mb-3">{hoursError}</p>
+            )}
 
             <button
               onClick={handleHoursSave}
