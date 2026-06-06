@@ -95,9 +95,9 @@ export default function AdminCartPage() {
                   </div>
                   <div className="flex flex-col items-end gap-1 flex-shrink-0">
                     <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
-                      item.listing_campus === "futo"
-                        ? "bg-orange-100 text-orange-700"
-                        : "bg-teal-50 text-teal-700"
+                      item.listing_campus === "futo" ? "bg-orange-100 text-orange-700"
+                      : item.listing_campus === "imsu" ? "bg-amber-100 text-amber-700"
+                      : "bg-teal-50 text-teal-700"
                     }`}>
                       {item.listing_campus?.toUpperCase() || "PAU"}
                     </span>

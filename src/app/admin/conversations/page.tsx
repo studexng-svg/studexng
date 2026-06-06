@@ -117,9 +117,9 @@ export default function AdminConversationsPage() {
                       <div className="flex items-center gap-1.5 flex-shrink-0">
                         {conv.listing_campus && (
                           <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
-                            conv.listing_campus === "futo"
-                              ? "bg-orange-100 text-orange-700"
-                              : "bg-teal-50 text-teal-700"
+                            conv.listing_campus === "futo" ? "bg-orange-100 text-orange-700"
+                            : conv.listing_campus === "imsu" ? "bg-amber-100 text-amber-700"
+                            : "bg-teal-50 text-teal-700"
                           }`}>
                             {conv.listing_campus.toUpperCase()}
                           </span>
