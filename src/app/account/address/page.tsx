@@ -33,6 +33,15 @@ const NON_STUDENT_LOCATIONS = [
   "Umuchima", "Eziobodo", "Ihiagwa", "Off-Campus",
 ];
 
+const TIME_OPTIONS = Array.from({ length: 36 }, (_, i) => {
+  const totalMins = 360 + i * 30; // start at 6:00 AM
+  const h = Math.floor(totalMins / 60);
+  const m = totalMins % 60;
+  const val = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+  const label = `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`;
+  return { val, label };
+});
+
 interface Profile {
   name: string;
   email: string;
@@ -72,15 +81,6 @@ export default function ProfilePage() {
   const [hoursSaving, setHoursSaving] = useState(false);
   const [hoursSaved, setHoursSaved] = useState(false);
   const [hoursError, setHoursError] = useState("");
-
-  const TIME_OPTIONS = Array.from({ length: 36 }, (_, i) => {
-    const totalMins = 360 + i * 30; // start at 6:00 AM
-    const h = Math.floor(totalMins / 60);
-    const m = totalMins % 60;
-    const val = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-    const label = `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`;
-    return { val, label };
-  });
 
   const [stats, setStats] = useState({ sold: 0, bought: 0, wishlist: 0 });
   const [memberSince, setMemberSince] = useState("");
