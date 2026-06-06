@@ -13,22 +13,36 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     );
     if (res.ok) {
       const listing = await res.json();
-      const desc = listing.description
-        ? listing.description.slice(0, 155) + (listing.description.length > 155 ? "…" : "")
-        : "View this listing on StudEx campus marketplace.";
+      const price = listing.price
+        ? `₦${Number(listing.price).toLocaleString("en-NG")}`
+        : null;
       const vendorName = listing.vendor?.business_name || listing.vendor?.username || "a student vendor";
+      const rawDesc = listing.description
+        ? listing.description.slice(0, 120) + (listing.description.length > 120 ? "…" : "")
+        : "";
+      const ogTitle = price
+        ? `${listing.title} — ${price} | StudEx`
+        : `${listing.title} | StudEx`;
+      const ogDesc = [
+        price ? `${price} · Sold by @${vendorName}` : `Sold by @${vendorName}`,
+        rawDesc,
+      ].filter(Boolean).join(" · ");
+
       return {
-        title: listing.title,
-        description: `${desc} — offered by ${vendorName} on StudEx.`,
+        title: ogTitle,
+        description: ogDesc,
         openGraph: {
-          title: `${listing.title} | StudEx`,
-          description: desc,
-          images: listing.image ? [{ url: listing.image, alt: listing.title }] : undefined,
+          title: ogTitle,
+          description: ogDesc,
+          images: listing.image
+            ? [{ url: listing.image, alt: listing.title, width: 1200, height: 630 }]
+            : undefined,
+          type: "website",
         },
         twitter: {
           card: "summary_large_image",
-          title: `${listing.title} | StudEx`,
-          description: desc,
+          title: ogTitle,
+          description: ogDesc,
           images: listing.image ? [listing.image] : undefined,
         },
       };
