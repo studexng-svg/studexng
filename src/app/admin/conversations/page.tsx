@@ -131,7 +131,12 @@ export default function AdminConversationsPage() {
                       <p className="text-teal-600 text-xs font-medium truncate mt-0.5">{conv.listing_title}</p>
                     )}
                     {conv.last_message && (
-                      <p className="text-stone-400 text-xs truncate mt-0.5">{conv.last_message}</p>
+                      <p className="text-stone-400 text-xs truncate mt-0.5">{(() => {
+                        const m = conv.last_message;
+                        if (!m.startsWith('[quoted:@')) return m;
+                        const ci = m.indexOf(']\n');
+                        return ci !== -1 ? m.substring(ci + 2) || m : m;
+                      })()}</p>
                     )}
                     <div className="flex items-center gap-3 mt-1">
                       <span className="text-stone-300 text-xs">

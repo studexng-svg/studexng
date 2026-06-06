@@ -16,6 +16,17 @@ function fmt(iso: string) {
   });
 }
 
+function parseQuoted(content: string) {
+  if (!content || !content.startsWith('[quoted:@')) return { quoted: null, main: content || '' };
+  const pipeIdx = content.indexOf('|', 9);
+  if (pipeIdx === -1) return { quoted: null, main: content };
+  const closeIdx = content.indexOf(']\n', pipeIdx);
+  if (closeIdx === -1) return { quoted: null, main: content };
+  const sender = content.substring(9, pipeIdx);
+  const rawText = content.substring(pipeIdx + 1, closeIdx).replace(/\[quoted:@[^\n]*/g, '').replace(/\s+/g, ' ').trim();
+  return { quoted: { sender, text: rawText }, main: content.substring(closeIdx + 2) };
+}
+
 export default function AdminConversationDetail() {
   const { id } = useParams();
   const router = useRouter();
@@ -138,7 +149,20 @@ export default function AdminConversationDetail() {
                         : "text-white rounded-tr-sm"
                     }`}
                       style={!isBuyer ? { background: "linear-gradient(135deg,#0D9488,#7C3AED)" } : {}}>
-                      {msg.content}
+                      {(() => {
+                        const { quoted, main } = parseQuoted(msg.content);
+                        return (
+                          <>
+                            {quoted && (
+                              <div className={`mb-2 pl-2 border-l-2 rounded-sm py-0.5 ${isBuyer ? 'border-teal-400 bg-teal-50/60' : 'border-white/50 bg-white/10'}`}>
+                                <p className={`text-[10px] font-semibold ${isBuyer ? 'text-teal-600' : 'text-white/70'}`}>↩ @{quoted.sender}</p>
+                                <p className={`text-xs truncate ${isBuyer ? 'text-stone-500' : 'text-white/60'}`}>{quoted.text}</p>
+                              </div>
+                            )}
+                            <p>{main}</p>
+                          </>
+                        );
+                      })()}
                     </div>
                   )}
 
