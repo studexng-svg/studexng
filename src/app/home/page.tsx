@@ -35,48 +35,19 @@ export default async function HomePage() {
   let initialCategories: any[] = [];
   let vendorOfMonth: any = null;
 
-  try {
-    const res = await fetch(`${API_URL}/api/auth/vendors/?campus=${campus}&page_size=500`, {
-      cache: 'no-store',
-      headers: { "Content-Type": "application/json" },
-    });
-    if (res.ok) {
-      const data = await res.json();
-      initialVendors = data.results || data || [];
-    }
-  } catch {}
+  const opts = { next: { revalidate: 60 }, headers: { "Content-Type": "application/json" } };
 
   try {
-    const res = await fetch(`${API_URL}/api/services/listings/?campus=${campus}&page_size=500`, {
-      cache: 'no-store',
-      headers: { "Content-Type": "application/json" },
-    });
-    if (res.ok) {
-      const data = await res.json();
-      initialListings = data.results || data || [];
-    }
-  } catch {}
-
-  try {
-    const res = await fetch(`${API_URL}/api/services/categories/?campus=${campus}`, {
-      cache: 'no-store',
-      headers: { "Content-Type": "application/json" },
-    });
-    if (res.ok) {
-      const data = await res.json();
-      initialCategories = data.results || data || [];
-    }
-  } catch {}
-
-  try {
-    const res = await fetch(`${API_URL}/api/services/vendor-of-month/`, {
-      cache: 'no-store',
-      headers: { "Content-Type": "application/json" },
-    });
-    if (res.ok) {
-      const data = await res.json();
-      vendorOfMonth = data || null;
-    }
+    const [vRes, lRes, cRes, mRes] = await Promise.all([
+      fetch(`${API_URL}/api/auth/vendors/?campus=${campus}&page_size=100`, opts),
+      fetch(`${API_URL}/api/services/listings/?campus=${campus}&page_size=100`, opts),
+      fetch(`${API_URL}/api/services/categories/?campus=${campus}`, opts),
+      fetch(`${API_URL}/api/services/vendor-of-month/`, opts),
+    ]);
+    if (vRes.ok) { const d = await vRes.json(); initialVendors = d.results || d || []; }
+    if (lRes.ok) { const d = await lRes.json(); initialListings = d.results || d || []; }
+    if (cRes.ok) { const d = await cRes.json(); initialCategories = d.results || d || []; }
+    if (mRes.ok) { vendorOfMonth = await mRes.json(); }
   } catch {}
 
   return (

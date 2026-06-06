@@ -199,13 +199,17 @@ export default function LandingClient({ initialListings }: { initialListings: an
   const vendorCount = 38;
 
   useEffect(() => {
-    const t = setInterval(() => setHeroIndex(p => (p + 1) % heroImages.length), 4000);
+    const t = setInterval(() => {
+      if (document.visibilityState !== 'hidden') setHeroIndex(p => (p + 1) % heroImages.length);
+    }, 4000);
     return () => clearInterval(t);
   }, []);
 
   useEffect(() => {
     if (featuredListings.length < 2) return;
-    const t = setInterval(() => setListingIndex(p => (p + 1) % featuredListings.length), 4000);
+    const t = setInterval(() => {
+      if (document.visibilityState !== 'hidden') setListingIndex(p => (p + 1) % featuredListings.length);
+    }, 4000);
     return () => clearInterval(t);
   }, [featuredListings.length]);
 

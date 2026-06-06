@@ -42,7 +42,7 @@ export default function BottomNav() {
       } catch {}
     };
     fetchUnread();
-    const interval = setInterval(fetchUnread, 30000);
+    const interval = setInterval(() => { if (document.visibilityState !== 'hidden') fetchUnread(); }, 30000);
     return () => clearInterval(interval);
   }, [isLoggedIn]);
 
