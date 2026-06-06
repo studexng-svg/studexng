@@ -403,8 +403,18 @@ export default function ChatRoomPage() {
     </div>
   );
 
+  function getDateLabel(iso: string): string {
+    const d = new Date(iso);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+    if (d.toDateString() === today.toDateString()) return 'Today';
+    if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
+    return d.toLocaleDateString('en-NG', { weekday: 'long', day: 'numeric', month: 'long' });
+  }
+
   return (
-    <div className="flex flex-col bg-[#F5F5F5]" style={{ height: "100dvh", fontFamily: "'DM Sans', sans-serif" }}>
+    <div className="flex flex-col bg-[#F5F5F5]" style={{ height: "100dvh", paddingBottom: "5rem", fontFamily: "'DM Sans', sans-serif" }}>
 
       {/* HEADER */}
       <div className="bg-white border-b border-stone-100 px-4 py-3 flex items-center gap-3 flex-shrink-0 shadow-sm">
@@ -471,13 +481,25 @@ export default function ChatRoomPage() {
       )}
 
       {/* MESSAGES */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-1 pb-44">
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-1">
         {messages.length === 0 && (
           <p className="text-center text-stone-400 text-sm py-10">No messages yet. Say hello! 👋</p>
         )}
 
-        {messages.map((msg) => (
-          <div key={msg.id} id={`msg-${msg.id}`} data-message className={`flex ${msg.is_mine ? "justify-end" : "justify-start"}`}>
+        {messages.map((msg, idx) => {
+          const msgDate = new Date(msg.created_at).toDateString();
+          const prevDate = idx > 0 ? new Date(messages[idx - 1].created_at).toDateString() : null;
+          const showDate = msgDate !== prevDate;
+          return (
+            <div key={msg.id}>
+              {showDate && (
+                <div className="flex items-center justify-center my-3">
+                  <span className="bg-stone-200/80 text-stone-500 text-xs px-3 py-1 rounded-full font-medium">
+                    {getDateLabel(msg.created_at)}
+                  </span>
+                </div>
+              )}
+              <div id={`msg-${msg.id}`} data-message className={`flex ${msg.is_mine ? "justify-end" : "justify-start"}`}>
             <div
               onMouseDown={(e) => handlePressStart(e, msg)}
               onMouseUp={handlePressEnd}
@@ -562,7 +584,9 @@ export default function ChatRoomPage() {
               </motion.div>
             </div>
           </div>
-        ))}
+            </div>
+          );
+        })}
         <div ref={bottomRef} />
       </div>
 
@@ -695,7 +719,7 @@ export default function ChatRoomPage() {
       {showScrollBtn && (
         <button
           onClick={() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' })}
-          className="fixed bottom-44 right-4 z-30 w-10 h-10 bg-white shadow-lg border border-stone-200 rounded-full flex items-center justify-center active:scale-95 transition"
+          className="fixed bottom-24 right-4 z-30 w-10 h-10 bg-white shadow-lg border border-stone-200 rounded-full flex items-center justify-center active:scale-95 transition"
         >
           <ChevronDown className="w-5 h-5 text-stone-600" />
         </button>
@@ -703,7 +727,7 @@ export default function ChatRoomPage() {
 
       {/* IMAGE PREVIEW */}
       {imagePreview && (
-        <div className="fixed left-0 right-0 bg-white border-t border-stone-100 px-4 py-2 flex items-center gap-3 z-20" style={{ bottom: "calc(80px + 68px)" }}>
+        <div className="flex-shrink-0 bg-white border-t border-stone-100 px-4 py-2 flex items-center gap-3">
           <div className="relative flex-shrink-0">
             <img src={imagePreview} alt="preview" className="h-14 w-14 object-cover rounded-xl border-2 border-teal-400" />
             <button onClick={cancelImage} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center">
@@ -715,7 +739,7 @@ export default function ChatRoomPage() {
       )}
 
       {/* INPUT BAR */}
-      <div className="fixed bottom-28 left-0 right-0 bg-white border-t border-stone-100 z-20">
+      <div className="flex-shrink-0 bg-white border-t border-stone-100">
         {/* Reply preview */}
         {replyingTo && (
           <div className="px-4 pt-2.5 pb-2 flex items-center gap-2 border-b border-stone-100 bg-teal-50/60">
