@@ -168,6 +168,13 @@ class AdminUserListView(generics.ListAPIView):
         if user_type:
             queryset = queryset.filter(user_type=user_type)
 
+        # Verification type filter — 'nin' = non-students, 'matric' = enrolled students
+        verification_type = self.request.query_params.get('verification_type', None)
+        if verification_type == 'nin':
+            queryset = queryset.filter(nin__isnull=False).exclude(nin='')
+        elif verification_type == 'matric':
+            queryset = queryset.filter(matric_number__isnull=False).exclude(matric_number='')
+
         # Active status filter
         is_active = self.request.query_params.get('is_active', None)
         if is_active is not None:
@@ -190,7 +197,7 @@ class AdminUserListView(generics.ListAPIView):
 
     def list(self, request, *args, **kwargs):
         p = request.query_params
-        cache_key = f'admin_users_{p.get("search","")}_{p.get("user_type","")}_{p.get("is_active","")}_{p.get("school","")}'
+        cache_key = f'admin_users_{p.get("search","")}_{p.get("user_type","")}_{p.get("is_active","")}_{p.get("school","")}_{p.get("verification_type","")}'
         cached = cache.get(cache_key)
         if cached is not None:
             return Response(cached)

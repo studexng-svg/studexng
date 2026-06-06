@@ -61,10 +61,17 @@ export default function AdminUsers() {
   const handleCampus = (c: Campus) => { setCampus(c); load(search, c); };
   const handleSearch = (s: string) => { setSearch(s); load(s, campus); };
 
-  const vendors  = users.filter(u => u.user_type === "vendor").length;
-  const students = users.filter(u => u.user_type === "student").length;
-  const [typeFilter, setTypeFilter] = useState<"" | "vendor" | "student">("");
-  const visible = typeFilter ? users.filter(u => u.user_type === typeFilter) : users;
+  const vendors     = users.filter(u => u.user_type === "vendor").length;
+  const nonStudents = users.filter(u => u.verification_type === "nin").length;
+  const students    = users.filter(u => u.user_type === "student" && u.verification_type !== "nin").length;
+  const [typeFilter, setTypeFilter] = useState<"" | "vendor" | "student" | "non_student">("");
+  const visible = typeFilter === "non_student"
+    ? users.filter(u => u.verification_type === "nin")
+    : typeFilter === "student"
+    ? users.filter(u => u.user_type === "student" && u.verification_type !== "nin")
+    : typeFilter === "vendor"
+    ? users.filter(u => u.user_type === "vendor")
+    : users;
 
   return (
     <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
@@ -73,11 +80,12 @@ export default function AdminUsers() {
       <div className="px-4 pt-4 pb-28 max-w-2xl mx-auto space-y-4">
 
         {/* Stats */}
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 gap-3">
           {[
-            { label: "Total",    value: users.length, icon: Users, color: "#7C3AED", key: ""        as const },
-            { label: "Vendors",  value: vendors,      icon: Store, color: "#0D9488", key: "vendor"  as const },
-            { label: "Students", value: students,     icon: User,  color: "#6366F1", key: "student" as const },
+            { label: "Total",        value: users.length, icon: Users, color: "#7C3AED", key: ""            as const },
+            { label: "Vendors",      value: vendors,      icon: Store, color: "#0D9488", key: "vendor"      as const },
+            { label: "Students",     value: students,     icon: User,  color: "#6366F1", key: "student"     as const },
+            { label: "Non-Students", value: nonStudents,  icon: User,  color: "#f59e0b", key: "non_student" as const },
           ].map(({ label, value, icon: Icon, color, key }) => {
             const active = typeFilter === key;
             return (
@@ -150,16 +158,20 @@ export default function AdminUsers() {
                   <ActivityStatus lastSeen={user.last_seen} />
                 </div>
                 <span className={`px-2 py-0.5 rounded-full text-xs font-semibold flex-shrink-0 ${
-                  user.school?.toLowerCase() === "futo"
-                    ? "bg-orange-100 text-orange-700"
-                    : "bg-teal-50 text-teal-700"
+                  user.school?.toLowerCase() === "futo" ? "bg-orange-100 text-orange-700"
+                  : user.school?.toLowerCase() === "imsu" ? "bg-amber-100 text-amber-700"
+                  : "bg-teal-50 text-teal-700"
                 }`}>
                   {user.school?.toUpperCase() || "PAU"}
                 </span>
                 <span className={`px-2 py-0.5 rounded-full text-xs font-semibold flex-shrink-0 ${
-                  user.user_type === "vendor" ? "bg-purple-100 text-purple-700" : "bg-stone-100 text-stone-600"
+                  user.user_type === "vendor" ? "bg-purple-100 text-purple-700"
+                  : user.verification_type === "nin" ? "bg-amber-100 text-amber-700"
+                  : "bg-stone-100 text-stone-600"
                 }`}>
-                  {user.user_type === "vendor" ? "Vendor" : "Student"}
+                  {user.user_type === "vendor" ? "Vendor"
+                   : user.verification_type === "nin" ? "Non-Student"
+                   : "Student"}
                 </span>
               </div>
             ))}
