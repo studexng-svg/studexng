@@ -12,6 +12,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 const CAMPUS_LABEL: Record<string, string> = {
   pau:  "PAU",
   futo: "FUTO",
+  imsu: "IMSU",
   all:  "All Campuses",
 };
 
@@ -119,6 +120,7 @@ export default function AdminCategoriesPage() {
               value={newCampus} onChange={e => setNewCampus(e.target.value)}>
               <option value="pau">PAU</option>
               <option value="futo">FUTO</option>
+              <option value="imsu">IMSU</option>
               <option value="all">All Campuses</option>
             </select>
             <div className="flex gap-2">

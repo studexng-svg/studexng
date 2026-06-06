@@ -141,7 +141,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
   const [allListings, setAllListings]   = useState<any[]>(initialListings);
   const [categories, setCategories]     = useState<Category[]>(initialCategories);
   const [activeFilter, setActiveFilter] = useState("All");
-  const [currentCampus, setCurrentCampus] = useState<"pau" | "futo">("pau");
+  const [currentCampus, setCurrentCampus] = useState<"pau" | "futo" | "imsu">("pau");
 
   const [searchQuery, setSearchQuery]     = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
@@ -158,7 +158,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
   useEffect(() => {
     setMounted(true);
     const c = document.cookie.split(";").find(s => s.trim().startsWith("studex_campus="))?.split("=")?.[1]?.toLowerCase();
-    if (c === "pau" || c === "futo") setCurrentCampus(c);
+    if (c === "pau" || c === "futo" || c === "imsu") setCurrentCampus(c as "pau" | "futo" | "imsu");
 
     // Restore tab + scroll after back navigation from a vendor/listing page
     const saved = sessionStorage.getItem("home_page_state");
@@ -198,7 +198,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
     return () => clearInterval(t);
   }, []);
 
-  const switchCampus = async (campus: "pau" | "futo") => {
+  const switchCampus = async (campus: "pau" | "futo" | "imsu") => {
     if (campus === currentCampus) return;
     const isHttps = window.location.protocol === "https:";
     document.cookie = `studex_campus=${campus}; path=/; max-age=31536000; SameSite=Lax${isHttps ? "; Secure" : ""}`;
@@ -803,7 +803,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
           {mounted && (!isLoggedIn || !(user as any)?.school) && (
             <div className="flex items-center gap-2 mt-3">
               <span className="text-[11px] text-stone-400 font-medium">Campus:</span>
-              {(["pau", "futo"] as const).map(c => (
+              {(["pau", "futo", "imsu"] as const).map(c => (
                 <button key={c} onClick={() => switchCampus(c)}
                   className={`px-3 py-1 rounded-full text-xs font-bold uppercase transition ${currentCampus === c ? "text-white" : "bg-white text-stone-500 border border-stone-200"}`}
                   style={currentCampus === c ? { background: GRAD } : {}}>

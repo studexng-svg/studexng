@@ -514,7 +514,7 @@ def pick_vendor_of_month():
 # Vendors:  Tue / Thu / Sat at 10:00 WAT
 # ─────────────────────────────────────────────────────────────────────────────
 
-_CAMPUSES = ('pau', 'futo')
+_CAMPUSES = ('pau', 'futo', 'imsu')
 
 
 def groq_notify_students():

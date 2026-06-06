@@ -150,7 +150,7 @@ def register_user(request):
         cache.delete(f'otp_verified:{email}')
 
         campus = getattr(user, 'school', 'pau') or 'pau'
-        campus_name = 'FUTO' if campus.lower() == 'futo' else 'PAU'
+        campus_name = {'futo': 'FUTO', 'imsu': 'IMSU'}.get(campus.lower(), 'PAU')
 
         send_notification(
             recipient=user,
@@ -724,7 +724,7 @@ class VendorListView(ListAPIView):
             campus = (getattr(user, 'school', '') or 'pau').lower()
         else:
             campus_param = self.request.query_params.get('campus', '').lower()
-            campus = campus_param if campus_param in ('pau', 'futo') else 'pau'
+            campus = campus_param if campus_param in ('pau', 'futo', 'imsu') else 'pau'
 
         qs = User.objects.filter(is_verified_vendor=True)
         # Treat null/blank school as PAU (existing vendors pre-dating the school field)
@@ -754,7 +754,7 @@ class VendorListView(ListAPIView):
             campus = (getattr(user, 'school', '') or 'pau').lower()
         else:
             campus_param = request.query_params.get('campus', '').lower()
-            campus = campus_param if campus_param in ('pau', 'futo') else 'pau'
+            campus = campus_param if campus_param in ('pau', 'futo', 'imsu') else 'pau'
 
         page_size = request.query_params.get('page_size', '20')
         cache_key = f'vendors_{campus}_{page_size}'

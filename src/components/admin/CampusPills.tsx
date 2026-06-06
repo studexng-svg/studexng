@@ -1,12 +1,13 @@
 // src/components/admin/CampusPills.tsx
 "use client";
 
-export type Campus = "" | "pau" | "futo";
+export type Campus = "" | "pau" | "futo" | "imsu";
 
 const PILLS: { value: Campus; label: string }[] = [
   { value: "",     label: "All" },
   { value: "pau",  label: "PAU" },
   { value: "futo", label: "FUTO" },
+  { value: "imsu", label: "IMSU" },
 ];
 
 export function CampusPills({

@@ -12,7 +12,7 @@ class Category(models.Model):
     campus = models.CharField(
         max_length=20,
         default='pau',
-        choices=[('pau', 'PAU'), ('futo', 'FUTO'), ('all', 'All Campuses')],
+        choices=[('pau', 'PAU'), ('futo', 'FUTO'), ('imsu', 'IMSU'), ('all', 'All Campuses')],
     )
 
     def __str__(self):
@@ -51,7 +51,7 @@ class Listing(models.Model):
     campus = models.CharField(
         max_length=20,
         default='pau',
-        choices=[('pau', 'PAU'), ('futo', 'FUTO')],
+        choices=[('pau', 'PAU'), ('futo', 'FUTO'), ('imsu', 'IMSU')],
         help_text="Set automatically from vendor's school on creation",
     )
     is_available = models.BooleanField(

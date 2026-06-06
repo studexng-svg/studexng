@@ -146,7 +146,7 @@ export default function CategoryPageClient({ slug, initialListings }: Props) {
 
     const userSchool = ((user as any).school || '').toLowerCase();
     // Admin users have no school — trust the existing cookie, don't override it
-    if (userSchool !== 'pau' && userSchool !== 'futo') {
+    if (userSchool !== 'pau' && userSchool !== 'futo' && userSchool !== 'imsu') {
       setCampusReady(true);
       return;
     }

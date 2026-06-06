@@ -35,7 +35,9 @@
       "Bash(git merge *)",
       "Bash(git push *)",
       "Bash(python manage.py makemigrations payments --name \"dynamic_service_fee\")",
-      "Bash(echo \"EXIT_CODE: $?\")"
+      "Bash(echo \"EXIT_CODE: $?\")",
+      "Read(//c/Users/HomePC/Documents/studex-mobile/**)",
+      "Bash(npx expo *)"
     ]
   }
 }

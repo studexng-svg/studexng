@@ -49,10 +49,10 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
     def validate_email(self, value):
         value = value.lower().strip()
 
-        allowed_domains = ('@pau.edu.ng', '@futo.edu.ng', '@gmail.com')
+        allowed_domains = ('@pau.edu.ng', '@futo.edu.ng', '@imsu.edu.ng', '@gmail.com')
         if not any(value.endswith(d) for d in allowed_domains):
             raise serializers.ValidationError(
-                "Use your @pau.edu.ng, @futo.edu.ng, or Gmail address"
+                "Use your @pau.edu.ng, @futo.edu.ng, @imsu.edu.ng, or Gmail address"
             )
 
         if User.objects.filter(email__iexact=value).exists():

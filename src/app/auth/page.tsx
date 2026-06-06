@@ -22,11 +22,16 @@ const FUTO_HOSTELS = [
   "Umuchima", "PG Hostel", "Eziobodo", "Ihiagwa", "Off-Campus",
 ];
 
+const IMSU_HOSTELS = [
+  "Alvan Hall", "Odim Hall", "Imo Hall", "Post-Graduate Hostel",
+  "Ekeonunwa", "Owerri Town", "Off-Campus",
+];
+
 const NON_STUDENT_LOCATIONS = [
   "Umuchima", "Eziobodo", "Ihiagwa", "Off-Campus",
 ];
 
-const SCHOOLS = ["PAU", "FUTO"];
+const SCHOOLS = ["PAU", "FUTO", "IMSU"];
 
 // ── Validators ────────────────────────────────────────────────────────────────
 const validateUsername = (v: string) => {
@@ -49,6 +54,11 @@ const validateEmail = (v: string, school: string) => {
     const ok = v.toLowerCase().endsWith("@futo.edu.ng") || v.toLowerCase().endsWith("@gmail.com");
     if (!ok) return { ok: false, msg: "Use your @futo.edu.ng or Gmail address" };
     return { ok: true, msg: "Valid FUTO email ✓" };
+  }
+  if (school === "IMSU") {
+    const ok = v.toLowerCase().endsWith("@imsu.edu.ng") || v.toLowerCase().endsWith("@gmail.com");
+    if (!ok) return { ok: false, msg: "Use your @imsu.edu.ng or Gmail address" };
+    return { ok: true, msg: "Valid IMSU email ✓" };
   }
   return { ok: false, msg: "Please select your school first" };
 };
@@ -590,6 +600,7 @@ export default function AuthPage() {
                         <option value="">Select your university</option>
                         <option value="PAU">Pan-Atlantic University (PAU)</option>
                         <option value="FUTO">Federal University of Technology Owerri (FUTO)</option>
+                        <option value="IMSU">Imo State University, Owerri (IMSU)</option>
                       </select>
                       {touched.school && !schoolOk && <FieldFeedback ok={false} msg="Please select your school" />}
                     </div>
@@ -626,7 +637,7 @@ export default function AuthPage() {
                       </label>
                       <input type="email" name="email" value={signupForm.email}
                         onChange={handleSignupChange}
-                        placeholder={isNonStudent ? "you@gmail.com" : isFUTO ? "you@futo.edu.ng or gmail" : "john.doe@pau.edu.ng"}
+                        placeholder={isNonStudent ? "you@gmail.com" : signupForm.school === "FUTO" ? "you@futo.edu.ng or gmail" : signupForm.school === "IMSU" ? "you@imsu.edu.ng or gmail" : "john.doe@pau.edu.ng"}
                         className={inputClass("email", emailVal.ok)} disabled={isLoading} />
                       {touched.email && signupForm.email && <FieldFeedback ok={emailVal.ok} msg={emailVal.msg} />}
                       {!touched.email && (
@@ -739,7 +750,7 @@ export default function AuthPage() {
                         <option value="">
                           {!signupForm.school ? "Select school first" : `Select your hostel`}
                         </option>
-                        {(isFUTO ? FUTO_HOSTELS : PAU_HOSTELS).map(h => (
+                        {(signupForm.school === "FUTO" ? FUTO_HOSTELS : signupForm.school === "IMSU" ? IMSU_HOSTELS : PAU_HOSTELS).map(h => (
                           <option key={h} value={h}>{h}</option>
                         ))}
                       </select>

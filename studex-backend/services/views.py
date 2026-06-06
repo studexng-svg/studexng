@@ -71,15 +71,15 @@ class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
         campus = 'pau'
         if user.is_authenticated:
             user_school = (getattr(user, 'school', '') or '').lower()
-            if user_school in ('pau', 'futo'):
+            if user_school in ('pau', 'futo', 'imsu'):
                 campus = user_school
             # Users with no school (admins) can use the campus query param
             campus_param = self.request.query_params.get('campus', '').lower()
-            if campus_param in ('pau', 'futo') and (not user_school or user_school not in ('pau', 'futo')):
+            if campus_param in ('pau', 'futo', 'imsu') and (not user_school or user_school not in ('pau', 'futo', 'imsu')):
                 campus = campus_param
         else:
             campus_param = self.request.query_params.get('campus', '').lower()
-            if campus_param in ('pau', 'futo'):
+            if campus_param in ('pau', 'futo', 'imsu'):
                 campus = campus_param
         return Category.objects.filter(campus__in=[campus, 'all']).order_by('title')
 
@@ -87,12 +87,12 @@ class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
         user = request.user
         if user.is_authenticated:
             campus = (getattr(user, 'school', '') or 'pau').lower()
-            if campus not in ('pau', 'futo'):
+            if campus not in ('pau', 'futo', 'imsu'):
                 campus_param = request.query_params.get('campus', '').lower()
-                campus = campus_param if campus_param in ('pau', 'futo') else 'pau'
+                campus = campus_param if campus_param in ('pau', 'futo', 'imsu') else 'pau'
         else:
             campus_param = request.query_params.get('campus', '').lower()
-            campus = campus_param if campus_param in ('pau', 'futo') else 'pau'
+            campus = campus_param if campus_param in ('pau', 'futo', 'imsu') else 'pau'
 
         cache_key = f'categories_{campus}'
         cached = cache.get(cache_key)
@@ -133,7 +133,7 @@ class ListingViewSet(viewsets.ModelViewSet):
             campus = (getattr(user, 'school', '') or 'pau').lower()
         else:
             campus_param = request.query_params.get('campus', '').lower()
-            campus = campus_param if campus_param in ('pau', 'futo') else 'pau'
+            campus = campus_param if campus_param in ('pau', 'futo', 'imsu') else 'pau'
 
         page_size = request.query_params.get('page_size', '20')
         cache_key = f'listings_{campus}_{page_size}'
@@ -165,11 +165,11 @@ class ListingViewSet(viewsets.ModelViewSet):
             # Staff (admin) can override campus via query param
             if user.is_staff:
                 campus_param = self.request.query_params.get('campus', campus).lower()
-                if campus_param in ('pau', 'futo'):
+                if campus_param in ('pau', 'futo', 'imsu'):
                     campus = campus_param
         else:
             campus_param = self.request.query_params.get('campus', '').lower()
-            if campus_param in ('pau', 'futo'):
+            if campus_param in ('pau', 'futo', 'imsu'):
                 campus = campus_param
 
         # Staff see all listings regardless of availability; others see only available

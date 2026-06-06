@@ -17,6 +17,10 @@ export const validateEmail = (v: string, school?: string) => {
     const ok = v.toLowerCase().endsWith("@futo.edu.ng") || v.toLowerCase().endsWith("@gmail.com");
     return ok ? { ok: true, msg: "Valid FUTO email ✓" } : { ok: false, msg: "Use @futo.edu.ng or Gmail" };
   }
+  if (school === "IMSU") {
+    const ok = v.toLowerCase().endsWith("@imsu.edu.ng") || v.toLowerCase().endsWith("@gmail.com");
+    return ok ? { ok: true, msg: "Valid IMSU email ✓" } : { ok: false, msg: "Use @imsu.edu.ng or Gmail" };
+  }
   if (!v.includes(".")) return { ok: false, msg: "Enter a valid email" };
   return { ok: true, msg: "" };
 };
