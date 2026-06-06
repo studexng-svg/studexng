@@ -405,6 +405,8 @@ def me(request):
         'school': user.school or '',
         'date_joined': user.date_joined.isoformat(),
         'unread_notifications': unread_notifications,
+        'profile_bonus_eligible': profile_data.get('profile_bonus_eligible', False),
+        'profile_bonus_used': profile_data.get('profile_bonus_used', False),
         'profile': profile_data if profile_data else None,
     })
 
