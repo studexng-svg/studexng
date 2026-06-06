@@ -78,7 +78,8 @@ export default function ChatRoomPage() {
   const menuRef = useRef<HTMLDivElement>(null);
   const swipeTouchStart = useRef<{ x: number; y: number; id: number } | null>(null);
   const isSwipe = useRef(false);
-  const isInitialLoad = useRef(true);
+  const hasScrolled = useRef(false);
+  const [showScrollBtn, setShowScrollBtn] = useState(false);
 
   useEffect(() => {
     if (isHydrated && !isLoggedIn) { router.push("/auth"); return; }
@@ -88,11 +89,24 @@ export default function ChatRoomPage() {
     return () => clearInterval(interval);
   }, [isHydrated, isLoggedIn, conversationId]);
 
+  // Scroll to bottom — instant on first load, smooth for new messages
   useEffect(() => {
-    if (!bottomRef.current) return;
-    bottomRef.current.scrollIntoView({ behavior: isInitialLoad.current ? "instant" : "smooth" });
-    isInitialLoad.current = false;
+    if (!bottomRef.current || messages.length === 0) return;
+    bottomRef.current.scrollIntoView({ behavior: hasScrolled.current ? "smooth" : "instant" });
+    hasScrolled.current = true;
   }, [messages]);
+
+  // Show scroll-to-bottom button when user scrolls up
+  useEffect(() => {
+    const el = bottomRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setShowScrollBtn(!entry.isIntersecting),
+      { threshold: 0 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -663,6 +677,16 @@ export default function ChatRoomPage() {
           </>
         )}
       </AnimatePresence>
+
+      {/* SCROLL TO BOTTOM BUTTON */}
+      {showScrollBtn && (
+        <button
+          onClick={() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' })}
+          className="fixed bottom-44 right-4 z-30 w-10 h-10 bg-white shadow-lg border border-stone-200 rounded-full flex items-center justify-center active:scale-95 transition"
+        >
+          <ChevronDown className="w-5 h-5 text-stone-600" />
+        </button>
+      )}
 
       {/* IMAGE PREVIEW */}
       {imagePreview && (
