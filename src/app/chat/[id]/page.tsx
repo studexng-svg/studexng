@@ -13,11 +13,21 @@ import { GRAD } from "@/lib/tokens";
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 const DELETE_EVERYONE_LIMIT_HOURS = 60;
 
+function stripQuotedMarkup(text: string): string {
+  // Remove nested [quoted:@sender|...] markup (with or without closing bracket)
+  return text.replace(/\[quoted:@[^\n]*/g, '').replace(/\s+/g, ' ').trim();
+}
+
 function parseQuoted(content: string): { quoted: { sender: string; text: string } | null; main: string } {
-  if (!content) return { quoted: null, main: content || '' };
-  const match = content.match(/^\[quoted:@([^|]+)\|([^\]]*)\]\n([\s\S]*)$/);
-  if (match) return { quoted: { sender: match[1], text: match[2] }, main: match[3] || '' };
-  return { quoted: null, main: content };
+  if (!content || !content.startsWith('[quoted:@')) return { quoted: null, main: content || '' };
+  const pipeIdx = content.indexOf('|', 9);
+  if (pipeIdx === -1) return { quoted: null, main: content };
+  const closeIdx = content.indexOf(']\n', pipeIdx);
+  if (closeIdx === -1) return { quoted: null, main: content };
+  const sender = content.substring(9, pipeIdx);
+  const rawText = content.substring(pipeIdx + 1, closeIdx);
+  const main = content.substring(closeIdx + 2);
+  return { quoted: { sender, text: stripQuotedMarkup(rawText) }, main };
 }
 
 interface Message {
@@ -360,7 +370,8 @@ export default function ChatRoomPage() {
       } else {
         let content = input.trim();
         if (replyingTo) {
-          const quotedText = (replyingTo.content || '📷 Image').replace(/\]/g, '').substring(0, 100);
+          const mainText = parseQuoted(replyingTo.content || '').main || '📷 Image';
+          const quotedText = mainText.substring(0, 100);
           content = `[quoted:@${replyingTo.sender_username}|${quotedText}]\n${content}`;
         }
         const res = await fetchWithAuth(`${API_URL}/api/chat/conversations/${conversationId}/send/`, {
