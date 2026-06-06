@@ -135,6 +135,12 @@ class Profile(models.Model):
     opening_time = models.TimeField(null=True, blank=True)       # e.g. 09:00
     closing_time = models.TimeField(null=True, blank=True)       # e.g. 18:00
 
+    # Additional profile fields
+    date_of_birth = models.DateField(null=True, blank=True)
+    gender = models.CharField(max_length=20, blank=True, null=True)  # e.g. "Male", "Female", "Prefer not to say"
+    department = models.CharField(max_length=100, blank=True, null=True)
+    level = models.CharField(max_length=20, blank=True, null=True)  # e.g. "100", "200", "300", "400"
+
     def __str__(self):
         return f"{self.user.username}'s Profile"
 

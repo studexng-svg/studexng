@@ -386,6 +386,10 @@ def me(request):
             'available_days': p.available_days or [],
             'opening_time': p.opening_time.strftime('%H:%M') if p.opening_time else None,
             'closing_time': p.closing_time.strftime('%H:%M') if p.closing_time else None,
+            'date_of_birth': p.date_of_birth.isoformat() if p.date_of_birth else None,
+            'gender': p.gender or '',
+            'department': p.department or '',
+            'level': p.level or '',
         }
     except Profile.DoesNotExist:
         pass

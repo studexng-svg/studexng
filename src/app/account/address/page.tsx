@@ -138,7 +138,14 @@ export default function ProfilePage() {
         if (djangoUser.profile_bonus_eligible) setBonusGranted(true);
         if (djangoUser.profile_bonus_used) setBonusUsed(true);
         if (djangoUser.profile) {
-          if (djangoUser.profile.whatsapp) setProfile(p => ({ ...p, whatsapp: djangoUser.profile.whatsapp }));
+          setProfile(p => ({
+            ...p,
+            whatsapp: djangoUser.profile.whatsapp || "",
+            dob: djangoUser.profile.date_of_birth || "",
+            gender: djangoUser.profile.gender || "",
+            department: djangoUser.profile.department || "",
+            level: djangoUser.profile.level || "",
+          }));
           setActiveDays(Array.isArray(djangoUser.profile.available_days) ? djangoUser.profile.available_days : []);
           setOpeningTime(djangoUser.profile.opening_time || "");
           setClosingTime(djangoUser.profile.closing_time || "");
@@ -275,6 +282,10 @@ export default function ProfilePage() {
           bio: profile.bio,
           whatsapp: profile.whatsapp,
           hostel: profile.campus,
+          date_of_birth: profile.dob || null,
+          gender: profile.gender || null,
+          department: profile.department || null,
+          level: profile.level || null,
         }),
       });
 

@@ -175,6 +175,10 @@ class UserProfileSerializer(serializers.ModelSerializer):
     available_days = serializers.ListField(child=serializers.CharField(), write_only=True, required=False, allow_null=True)
     opening_time = serializers.TimeField(write_only=True, required=False, allow_null=True)
     closing_time = serializers.TimeField(write_only=True, required=False, allow_null=True)
+    date_of_birth = serializers.DateField(write_only=True, required=False, allow_null=True)
+    gender = serializers.CharField(write_only=True, required=False, allow_blank=True, allow_null=True)
+    department = serializers.CharField(write_only=True, required=False, allow_blank=True, allow_null=True)
+    level = serializers.CharField(write_only=True, required=False, allow_blank=True, allow_null=True)
     disclaimer_accepted = serializers.BooleanField(required=False)
     disclaimer_accepted_at = serializers.SerializerMethodField()
 
@@ -187,6 +191,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'bio', 'profile_image', 'wallet_balance', 'created_at', 'profile',
             'is_staff', 'is_superuser', 'is_admin',
             'whatsapp', 'instagram', 'available_days', 'opening_time', 'closing_time',
+            'date_of_birth', 'gender', 'department', 'level',
             'disclaimer_accepted', 'disclaimer_accepted_at',
         ]
         read_only_fields = ['wallet_balance', 'is_verified_vendor', 'created_at', 'is_staff', 'is_superuser', 'is_admin']
@@ -238,6 +243,10 @@ class UserProfileSerializer(serializers.ModelSerializer):
                 'available_days': profile.available_days or [],
                 'opening_time': profile.opening_time.strftime('%H:%M') if profile.opening_time else None,
                 'closing_time': profile.closing_time.strftime('%H:%M') if profile.closing_time else None,
+                'date_of_birth': profile.date_of_birth.isoformat() if profile.date_of_birth else None,
+                'gender': profile.gender or '',
+                'department': profile.department or '',
+                'level': profile.level or '',
             }
         except Profile.DoesNotExist:
             return None
@@ -257,6 +266,10 @@ class UserProfileSerializer(serializers.ModelSerializer):
         available_days = validated_data.pop('available_days', None)
         opening_time = validated_data.pop('opening_time', None)
         closing_time = validated_data.pop('closing_time', None)
+        date_of_birth = validated_data.pop('date_of_birth', None)
+        gender = validated_data.pop('gender', None)
+        department = validated_data.pop('department', None)
+        level = validated_data.pop('level', None)
         validated_data.pop('disclaimer_accepted', None)  # handled in view against Profile
 
         for attr, value in validated_data.items():
@@ -275,6 +288,14 @@ class UserProfileSerializer(serializers.ModelSerializer):
                 profile.opening_time = opening_time
             if closing_time is not None:
                 profile.closing_time = closing_time
+            if date_of_birth is not None:
+                profile.date_of_birth = date_of_birth
+            if gender is not None:
+                profile.gender = gender
+            if department is not None:
+                profile.department = department
+            if level is not None:
+                profile.level = level
             profile.save()
         except Profile.DoesNotExist:
             Profile.objects.create(user=instance, whatsapp=whatsapp or '', instagram=instagram or '')
