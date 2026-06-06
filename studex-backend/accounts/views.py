@@ -383,6 +383,9 @@ def me(request):
             'vendor_badge': p.vendor_badge,
             'rating': str(p.rating),
             'total_reviews': p.total_reviews,
+            'available_days': p.available_days or [],
+            'opening_time': p.opening_time.strftime('%H:%M') if p.opening_time else None,
+            'closing_time': p.closing_time.strftime('%H:%M') if p.closing_time else None,
         }
     except Profile.DoesNotExist:
         pass
@@ -402,7 +405,7 @@ def me(request):
         'school': user.school or '',
         'date_joined': user.date_joined.isoformat(),
         'unread_notifications': unread_notifications,
-        **profile_data,
+        'profile': profile_data if profile_data else None,
     })
 
 
