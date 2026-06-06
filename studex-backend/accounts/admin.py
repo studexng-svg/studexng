@@ -16,6 +16,7 @@ SCHOOL_CHOICES = [
     ('', '— Not set —'),
     ('pau', 'Pan-Atlantic University (PAU)'),
     ('futo', 'Federal University of Technology Owerri (FUTO)'),
+    ('imsu', 'Imo State University, Owerri (IMSU)'),
 ]
 
 class UserChangeForm(forms.ModelForm):
@@ -347,6 +348,7 @@ class SellerApplicationAdmin(admin.ModelAdmin):
             {'label': 'Rejected',       'value': s.filter(status='rejected').count(),'color': '#f87171'},
             {'label': 'PAU Pending',    'value': s.filter(status='pending', user__school__iexact='pau').count(), 'color': '#60a5fa'},
             {'label': 'FUTO Pending',   'value': s.filter(status='pending', user__school__iexact='futo').count(),'color': '#c084fc'},
+            {'label': 'IMSU Pending',   'value': s.filter(status='pending', user__school__iexact='imsu').count(),'color': '#fb923c'},
             {'label': 'Unassigned',     'value': s.filter(Q(user__school='') | Q(user__school__isnull=True)).count(), 'color': '#9ca3af',
              'sub': 'no campus set'},
         ]
