@@ -716,7 +716,7 @@ export default function ProfilePage() {
                   type="time"
                   value={openingTime}
                   onChange={e => setOpeningTime(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-xl border-2 border-stone-200 focus:border-teal-400 focus:outline-none text-sm text-stone-900"
+                  className="w-full px-3 py-2.5 rounded-xl border-2 border-stone-200 bg-white text-stone-900 focus:border-teal-400 focus:outline-none text-sm"
                 />
               </div>
               <div>
@@ -725,7 +725,7 @@ export default function ProfilePage() {
                   type="time"
                   value={closingTime}
                   onChange={e => setClosingTime(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-xl border-2 border-stone-200 focus:border-teal-400 focus:outline-none text-sm text-stone-900"
+                  className="w-full px-3 py-2.5 rounded-xl border-2 border-stone-200 bg-white text-stone-900 focus:border-teal-400 focus:outline-none text-sm"
                 />
               </div>
             </div>
