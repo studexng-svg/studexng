@@ -97,7 +97,9 @@ export default function ChatRoomPage() {
   }, [messages]);
 
   // Show scroll-to-bottom button when user scrolls up
+  // Depends on `loading` so it sets up AFTER the spinner goes away and bottomRef is in the DOM
   useEffect(() => {
+    if (loading) return;
     const el = bottomRef.current;
     if (!el) return;
     const observer = new IntersectionObserver(
@@ -106,7 +108,7 @@ export default function ChatRoomPage() {
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, []);
+  }, [loading]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
