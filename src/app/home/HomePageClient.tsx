@@ -338,8 +338,8 @@ export default function HomePageClient({ initialVendors, initialListings, initia
 
   const catSlug = (l: any) => (typeof l.category === "object" ? l.category?.slug : l.category) ?? "";
   const filteredListings   = applyPriceFilter(activeFilter === "All" ? allListings : allListings.filter(l => catSlug(l) === activeFilter));
-  const TWENTY_FOUR_HOURS  = 24 * 60 * 60 * 1000;
-  const newArrivals        = applyPriceFilter(allListings.filter(l => Date.now() - new Date(l.created_at).getTime() < TWENTY_FOUR_HOURS));
+  const SEVENTY_TWO_HOURS  = 72 * 60 * 60 * 1000;
+  const newArrivals        = applyPriceFilter(allListings.filter(l => Date.now() - new Date(l.created_at).getTime() < SEVENTY_TWO_HOURS));
   const newArrivalIds      = new Set(newArrivals.map(l => l.id));
   const olderListings      = applyPriceFilter(allListings.filter(l => !newArrivalIds.has(l.id)));
 
