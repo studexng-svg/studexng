@@ -219,7 +219,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
     if (!isHydrated) return;
     if (!isLoggedIn || !user) { setCampusReady(true); return; }
     const school = ((user as any).school || "").toLowerCase();
-    if (school !== "pau" && school !== "futo") { setCampusReady(true); return; }
+    if (school !== "pau" && school !== "futo" && school !== "imsu") { setCampusReady(true); return; }
     const cookie = document.cookie.split(";").find(c => c.trim().startsWith("studex_campus="))?.split("=")?.[1]?.toLowerCase() || "pau";
     if (cookie === school) { setCampusReady(true); return; }
     const https = typeof window !== "undefined" && window.location.protocol === "https:";

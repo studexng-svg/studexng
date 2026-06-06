@@ -13,7 +13,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 export default async function LeaderboardPage() {
   const cookieStore = await cookies();
-  const campus = (cookieStore.get('studex_campus')?.value || 'pau') as "pau" | "futo";
+  const campus = (cookieStore.get('studex_campus')?.value || 'pau') as "pau" | "futo" | "imsu";
 
   let vendors: any[] = [];
   let currentVotm: any = null;

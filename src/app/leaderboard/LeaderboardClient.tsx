@@ -46,7 +46,7 @@ interface Votm {
 
 interface Props {
   initialVendors: Vendor[];
-  initialCampus: "pau" | "futo";
+  initialCampus: "pau" | "futo" | "imsu";
   currentVotm?: Votm | null;
 }
 
