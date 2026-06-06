@@ -592,6 +592,25 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
                         <span className="text-xs text-stone-400">{listing.vendor.hostel}</span>
                       </div>
                     )}
+                    {(() => {
+                      const days: string[] = (listing.vendor as any)?.profile?.available_days || [];
+                      const open: string | null = (listing.vendor as any)?.profile?.opening_time ?? null;
+                      const close: string | null = (listing.vendor as any)?.profile?.closing_time ?? null;
+                      if (!days.length && !open) return null;
+                      const fmt = (t: string) => {
+                        const [h, m] = t.split(':');
+                        const hr = parseInt(h);
+                        return `${hr % 12 || 12}:${m}${hr < 12 ? 'am' : 'pm'}`;
+                      };
+                      return (
+                        <div className="flex items-center gap-0.5 mt-0.5 flex-wrap">
+                          <Clock className="w-3 h-3 text-teal-400 flex-shrink-0" />
+                          <span className="text-xs text-stone-400">
+                            {days.join(', ')}{open && close ? ` · ${fmt(open)}–${fmt(close)}` : ''}
+                          </span>
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
                 <motion.button

@@ -130,6 +130,11 @@ class Profile(models.Model):
     disclaimer_accepted = models.BooleanField(default=False)
     disclaimer_accepted_at = models.DateTimeField(null=True, blank=True)
 
+    # Active hours
+    available_days = models.JSONField(default=list, blank=True)  # e.g. ["Mon","Tue","Wed","Thu","Fri"]
+    opening_time = models.TimeField(null=True, blank=True)       # e.g. 09:00
+    closing_time = models.TimeField(null=True, blank=True)       # e.g. 18:00
+
     def __str__(self):
         return f"{self.user.username}'s Profile"
 

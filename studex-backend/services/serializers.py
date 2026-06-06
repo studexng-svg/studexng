@@ -30,10 +30,22 @@ class ListingVendorSerializer(serializers.ModelSerializer):
     completion_rate = serializers.DecimalField(source='profile.completion_rate', max_digits=5, decimal_places=2, default=0)
     rating = serializers.DecimalField(source='profile.rating', max_digits=3, decimal_places=2, default=0)
     total_reviews = serializers.IntegerField(source='profile.total_reviews', default=0)
+    profile = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ['id', 'username', 'business_name', 'hostel', 'vendor_badge', 'completion_rate', 'rating', 'total_reviews']
+        fields = ['id', 'username', 'business_name', 'hostel', 'vendor_badge', 'completion_rate', 'rating', 'total_reviews', 'profile']
+
+    def get_profile(self, obj):
+        try:
+            p = obj.profile
+            return {
+                'available_days': p.available_days or [],
+                'opening_time': p.opening_time.strftime('%H:%M') if p.opening_time else None,
+                'closing_time': p.closing_time.strftime('%H:%M') if p.closing_time else None,
+            }
+        except Exception:
+            return {'available_days': [], 'opening_time': None, 'closing_time': None}
 
 
 class ListingSerializer(serializers.ModelSerializer):

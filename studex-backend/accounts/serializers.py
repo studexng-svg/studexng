@@ -172,6 +172,9 @@ class UserProfileSerializer(serializers.ModelSerializer):
     is_admin = serializers.SerializerMethodField()
     whatsapp = serializers.CharField(write_only=True, required=False, allow_blank=True, allow_null=True)
     instagram = serializers.CharField(write_only=True, required=False, allow_blank=True, allow_null=True)
+    available_days = serializers.ListField(child=serializers.CharField(), write_only=True, required=False, allow_null=True)
+    opening_time = serializers.TimeField(write_only=True, required=False, allow_null=True)
+    closing_time = serializers.TimeField(write_only=True, required=False, allow_null=True)
     disclaimer_accepted = serializers.BooleanField(required=False)
     disclaimer_accepted_at = serializers.SerializerMethodField()
 
@@ -183,7 +186,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'business_name', 'is_verified_vendor',
             'bio', 'profile_image', 'wallet_balance', 'created_at', 'profile',
             'is_staff', 'is_superuser', 'is_admin',
-            'whatsapp', 'instagram',
+            'whatsapp', 'instagram', 'available_days', 'opening_time', 'closing_time',
             'disclaimer_accepted', 'disclaimer_accepted_at',
         ]
         read_only_fields = ['wallet_balance', 'is_verified_vendor', 'created_at', 'is_staff', 'is_superuser', 'is_admin']
@@ -232,6 +235,9 @@ class UserProfileSerializer(serializers.ModelSerializer):
                 'profile_bonus_eligible': profile.profile_bonus_eligible,
                 'profile_bonus_used': profile.profile_bonus_used,
                 'vendor_badge': profile.vendor_badge,
+                'available_days': profile.available_days or [],
+                'opening_time': profile.opening_time.strftime('%H:%M') if profile.opening_time else None,
+                'closing_time': profile.closing_time.strftime('%H:%M') if profile.closing_time else None,
             }
         except Profile.DoesNotExist:
             return None
@@ -248,6 +254,9 @@ class UserProfileSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         whatsapp = validated_data.pop('whatsapp', None)
         instagram = validated_data.pop('instagram', None)
+        available_days = validated_data.pop('available_days', None)
+        opening_time = validated_data.pop('opening_time', None)
+        closing_time = validated_data.pop('closing_time', None)
         validated_data.pop('disclaimer_accepted', None)  # handled in view against Profile
 
         for attr, value in validated_data.items():
@@ -260,6 +269,12 @@ class UserProfileSerializer(serializers.ModelSerializer):
                 profile.whatsapp = whatsapp
             if instagram is not None:
                 profile.instagram = instagram
+            if available_days is not None:
+                profile.available_days = available_days
+            if opening_time is not None:
+                profile.opening_time = opening_time
+            if closing_time is not None:
+                profile.closing_time = closing_time
             profile.save()
         except Profile.DoesNotExist:
             Profile.objects.create(user=instance, whatsapp=whatsapp or '', instagram=instagram or '')
@@ -452,6 +467,9 @@ class VendorListSerializer(serializers.ModelSerializer):
     total_listings = serializers.SerializerMethodField()
     is_online = serializers.SerializerMethodField()
     completed_order_count = serializers.IntegerField(default=0)
+    available_days = serializers.SerializerMethodField()
+    opening_time = serializers.SerializerMethodField()
+    closing_time = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -459,7 +477,7 @@ class VendorListSerializer(serializers.ModelSerializer):
             'id', 'username', 'business_name', 'profile_picture',
             'bio', 'vendor_badge', 'rating', 'total_reviews',
             'completion_rate', 'total_listings', 'hostel', 'is_online', 'school',
-            'completed_order_count',
+            'completed_order_count', 'available_days', 'opening_time', 'closing_time',
         ]
 
     def get_is_online(self, obj):
@@ -493,6 +511,26 @@ class VendorListSerializer(serializers.ModelSerializer):
             return obj.profile.vendor_badge
         except Profile.DoesNotExist:
             return 'none'
+
+    def get_available_days(self, obj):
+        try:
+            return obj.profile.available_days or []
+        except Profile.DoesNotExist:
+            return []
+
+    def get_opening_time(self, obj):
+        try:
+            t = obj.profile.opening_time
+            return t.strftime('%H:%M') if t else None
+        except Profile.DoesNotExist:
+            return None
+
+    def get_closing_time(self, obj):
+        try:
+            t = obj.profile.closing_time
+            return t.strftime('%H:%M') if t else None
+        except Profile.DoesNotExist:
+            return None
 
     def get_rating(self, obj):
         try:

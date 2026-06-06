@@ -6,7 +6,7 @@ import {
   User, Mail, Phone, BookOpen, Layers, School, Heart,
   ShoppingBag, Store, Edit3, CheckCircle2, Lock, Save,
   Camera, X, Cake, Users, Gift, MessageCircle,
-  GraduationCap, Hash, MapPin,
+  GraduationCap, Hash, MapPin, Clock,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -65,6 +65,13 @@ export default function ProfilePage() {
   const [hostelSaved, setHostelSaved] = useState(false);
   const [hostelError, setHostelError] = useState("");
 
+  const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const [activeDays, setActiveDays] = useState<string[]>([]);
+  const [openingTime, setOpeningTime] = useState("");
+  const [closingTime, setClosingTime] = useState("");
+  const [hoursSaving, setHoursSaving] = useState(false);
+  const [hoursSaved, setHoursSaved] = useState(false);
+
   const [stats, setStats] = useState({ sold: 0, bought: 0, wishlist: 0 });
   const [memberSince, setMemberSince] = useState("");
 
@@ -120,6 +127,9 @@ export default function ProfilePage() {
         }
         if (djangoUser.profile_bonus_eligible) setBonusGranted(true);
         if (djangoUser.profile_bonus_used) setBonusUsed(true);
+        if (djangoUser.profile?.available_days) setActiveDays(djangoUser.profile.available_days);
+        if (djangoUser.profile?.opening_time) setOpeningTime(djangoUser.profile.opening_time);
+        if (djangoUser.profile?.closing_time) setClosingTime(djangoUser.profile.closing_time);
         return;
       }
     } catch (e) {
@@ -298,6 +308,24 @@ export default function ProfilePage() {
         : "Profile saved!"
     );
     setTimeout(() => setSavedMsg(""), 4000);
+  };
+
+  const handleHoursSave = async () => {
+    setHoursSaving(true);
+    setHoursSaved(false);
+    try {
+      const res = await fetchWithAuth(`${API_URL}/api/auth/profile/update/`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          available_days: activeDays,
+          opening_time: openingTime || null,
+          closing_time: closingTime || null,
+        }),
+      });
+      if (res.ok) { setHoursSaved(true); setTimeout(() => setHoursSaved(false), 3000); }
+    } catch {}
+    finally { setHoursSaving(false); }
   };
 
   const handleHostelSave = async () => {
@@ -645,6 +673,74 @@ export default function ProfilePage() {
             </div>
           ))}
         </div>
+
+        {/* Active Hours — vendors only */}
+        {user?.is_verified_vendor && (
+          <div className="bg-white rounded-2xl p-5 shadow-sm border border-stone-200">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-9 h-9 bg-teal-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                <Clock className="w-5 h-5 text-teal-600" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-stone-900 text-base">Active Hours</h3>
+                <p className="text-xs text-stone-400">Let customers know when you're available</p>
+              </div>
+            </div>
+
+            {/* Day toggles */}
+            <p className="text-xs font-semibold text-stone-500 uppercase tracking-wide mb-2">Available Days</p>
+            <div className="flex gap-2 flex-wrap mb-4">
+              {DAYS.map(day => {
+                const on = activeDays.includes(day);
+                return (
+                  <button
+                    key={day}
+                    onClick={() => setActiveDays(prev => on ? prev.filter(d => d !== day) : [...prev, day])}
+                    className={`px-3 py-1.5 rounded-full text-xs font-bold transition border ${
+                      on ? "text-white border-transparent" : "bg-white border-stone-200 text-stone-500"
+                    }`}
+                    style={on ? { background: "linear-gradient(135deg,#0D9488,#7C3AED)" } : {}}
+                  >
+                    {day}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Time inputs */}
+            <p className="text-xs font-semibold text-stone-500 uppercase tracking-wide mb-2">Hours</p>
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              <div>
+                <label className="text-xs text-stone-400 mb-1 block">Opens at</label>
+                <input
+                  type="time"
+                  value={openingTime}
+                  onChange={e => setOpeningTime(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl border-2 border-stone-200 focus:border-teal-400 focus:outline-none text-sm text-stone-900"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-stone-400 mb-1 block">Closes at</label>
+                <input
+                  type="time"
+                  value={closingTime}
+                  onChange={e => setClosingTime(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl border-2 border-stone-200 focus:border-teal-400 focus:outline-none text-sm text-stone-900"
+                />
+              </div>
+            </div>
+
+            <button
+              onClick={handleHoursSave}
+              disabled={hoursSaving}
+              className="w-full py-3 text-white rounded-full font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-50"
+              style={{ background: "linear-gradient(135deg,#0D9488,#7C3AED)" }}
+            >
+              <Save className="w-4 h-4" />
+              {hoursSaving ? "Saving..." : hoursSaved ? "Saved ✓" : "Save Hours"}
+            </button>
+          </div>
+        )}
 
         {/* Action Buttons */}
         <div className="space-y-3">
