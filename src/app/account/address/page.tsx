@@ -114,7 +114,6 @@ export default function ProfilePage() {
       const res = await fetchWithAuth(`${API_URL}/api/auth/me/`);
       if (res.ok) {
         const djangoUser = await res.json();
-        console.log("API response profile:", djangoUser.profile);
         const schoolFromEmail = getSchool(djangoUser.email);
         setProfile({
           name: djangoUser.username || "",
