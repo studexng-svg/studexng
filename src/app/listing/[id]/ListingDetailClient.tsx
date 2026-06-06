@@ -8,7 +8,7 @@ import {
   Star, MessageCircle, ShoppingCart, Calendar,
   Clock, FileText, CheckCircle, AlertCircle,
   ChevronDown, ChevronUp, Send, MapPin, Sparkles, ZoomIn, X as XIcon,
-  Shield
+  Shield, Share2
 } from "lucide-react";
 import TopNav from "@/components/layout/TopNav";
 import { useAuth, fetchWithAuth } from "@/lib/authStore";
@@ -515,9 +515,27 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
                     {listing.title}
                   </h2>
                 </div>
-                <p className="text-2xl font-bold whitespace-nowrap" style={GRAD_TEXT}>
-                  ₦{Number(listing.price).toLocaleString()}
-                </p>
+                <div className="flex flex-col items-end gap-2">
+                  <p className="text-2xl font-bold whitespace-nowrap" style={GRAD_TEXT}>
+                    ₦{Number(listing.price).toLocaleString()}
+                  </p>
+                  <button
+                    onClick={async () => {
+                      const url = window.location.href;
+                      const price = `₦${Number(listing.price).toLocaleString()}`;
+                      if (navigator.share) {
+                        await navigator.share({ title: `${listing.title} — ${price}`, url }).catch(() => {});
+                      } else {
+                        await navigator.clipboard.writeText(url);
+                        showToast("Link copied!");
+                      }
+                    }}
+                    className="flex items-center gap-1.5 text-xs text-stone-500 hover:text-teal-600 transition"
+                  >
+                    <Share2 className="w-4 h-4" />
+                    Share
+                  </button>
+                </div>
               </div>
 
               {totalReviews > 0 && (
