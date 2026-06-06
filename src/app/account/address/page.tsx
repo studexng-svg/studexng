@@ -138,6 +138,7 @@ export default function ProfilePage() {
         if (djangoUser.profile_bonus_eligible) setBonusGranted(true);
         if (djangoUser.profile_bonus_used) setBonusUsed(true);
         if (djangoUser.profile) {
+          if (djangoUser.profile.whatsapp) setProfile(p => ({ ...p, whatsapp: djangoUser.profile.whatsapp }));
           setActiveDays(Array.isArray(djangoUser.profile.available_days) ? djangoUser.profile.available_days : []);
           setOpeningTime(djangoUser.profile.opening_time || "");
           setClosingTime(djangoUser.profile.closing_time || "");
