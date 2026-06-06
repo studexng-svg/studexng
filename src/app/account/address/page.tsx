@@ -127,9 +127,11 @@ export default function ProfilePage() {
         }
         if (djangoUser.profile_bonus_eligible) setBonusGranted(true);
         if (djangoUser.profile_bonus_used) setBonusUsed(true);
-        if (djangoUser.profile?.available_days) setActiveDays(djangoUser.profile.available_days);
-        if (djangoUser.profile?.opening_time) setOpeningTime(djangoUser.profile.opening_time);
-        if (djangoUser.profile?.closing_time) setClosingTime(djangoUser.profile.closing_time);
+        if (djangoUser.profile) {
+          setActiveDays(Array.isArray(djangoUser.profile.available_days) ? djangoUser.profile.available_days : []);
+          setOpeningTime(djangoUser.profile.opening_time || "");
+          setClosingTime(djangoUser.profile.closing_time || "");
+        }
         return;
       }
     } catch (e) {
