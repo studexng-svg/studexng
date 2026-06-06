@@ -572,53 +572,58 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
             {/* ── VENDOR CARD ── */}
             <div className="bg-white border border-stone-200 rounded-2xl p-4 shadow-sm">
               <p className="text-teal-600 text-xs tracking-[0.2em] uppercase font-semibold mb-3">Vendor</p>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-sm"
-                    style={{ background: GRAD }}>
-                    {vendorName[0]?.toUpperCase()}
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="font-semibold text-stone-900 text-sm">{vendorName}</p>
-                      {badge && badge !== "none" && <VendorBadge badge={badge} size="sm" />}
-                    </div>
-                    {completionRate > 0 && (
-                      <p className="text-xs text-stone-400 mt-0.5">{completionRate}% completion rate</p>
-                    )}
-                    {listing.vendor.hostel && (
-                      <div className="flex items-center gap-0.5 mt-0.5">
-                        <MapPin className="w-3 h-3 text-teal-400 flex-shrink-0" />
-                        <span className="text-xs text-stone-400">{listing.vendor.hostel}</span>
-                      </div>
-                    )}
-                    {(() => {
-                      const days: string[] = (listing.vendor as any)?.profile?.available_days || [];
-                      const open: string | null = (listing.vendor as any)?.profile?.opening_time ?? null;
-                      const close: string | null = (listing.vendor as any)?.profile?.closing_time ?? null;
-                      if (!days.length && !open) return null;
-                      const fmt = (t: string) => {
-                        const [h, m] = t.split(':');
-                        const hr = parseInt(h);
-                        return `${hr % 12 || 12}:${m}${hr < 12 ? 'am' : 'pm'}`;
-                      };
-                      return (
-                        <div className="flex items-center gap-0.5 mt-0.5 flex-wrap">
-                          <Clock className="w-3 h-3 text-teal-400 flex-shrink-0" />
-                          <span className="text-xs text-stone-400">
-                            {days.join(', ')}{open && close ? ` · ${fmt(open)}–${fmt(close)}` : ''}
-                          </span>
-                        </div>
-                      );
-                    })()}
-                  </div>
+              <div className="flex items-start gap-3">
+                <div className="w-11 h-11 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-sm flex-shrink-0"
+                  style={{ background: GRAD }}>
+                  {vendorName[0]?.toUpperCase()}
                 </div>
-                <motion.button
-                  whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
-                  onClick={() => { if (!isLoggedIn) { router.push("/auth"); return; } setShowChat(true); }}
-                  className="flex items-center gap-1.5 px-3 py-2 border border-stone-200 hover:border-teal-300 text-stone-600 hover:text-teal-600 rounded-full text-sm font-medium transition-all">
-                  <MessageCircle className="w-4 h-4" /> Message
-                </motion.button>
+                <div className="flex-1 min-w-0">
+                  {/* Name + Message button on same row */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-semibold text-stone-900 text-sm">{vendorName}</p>
+                        {badge && badge !== "none" && <VendorBadge badge={badge} size="sm" />}
+                      </div>
+                      {completionRate > 0 && (
+                        <p className="text-xs text-stone-400 mt-0.5">{completionRate}% completion rate</p>
+                      )}
+                    </div>
+                    <motion.button
+                      whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+                      onClick={() => { if (!isLoggedIn) { router.push("/auth"); return; } setShowChat(true); }}
+                      className="flex items-center gap-1.5 px-3 py-2 border border-stone-200 hover:border-teal-300 text-stone-600 hover:text-teal-600 rounded-full text-sm font-medium transition-all flex-shrink-0">
+                      <MessageCircle className="w-4 h-4" /> Message
+                    </motion.button>
+                  </div>
+                  {/* Location */}
+                  {listing.vendor.hostel && (
+                    <div className="flex items-center gap-0.5 mt-1">
+                      <MapPin className="w-3 h-3 text-teal-400 flex-shrink-0" />
+                      <span className="text-xs text-stone-400">{listing.vendor.hostel}</span>
+                    </div>
+                  )}
+                  {/* Active hours — full width so text wraps cleanly */}
+                  {(() => {
+                    const days: string[] = (listing.vendor as any)?.profile?.available_days || [];
+                    const open: string | null = (listing.vendor as any)?.profile?.opening_time ?? null;
+                    const close: string | null = (listing.vendor as any)?.profile?.closing_time ?? null;
+                    if (!days.length && !open) return null;
+                    const fmt = (t: string) => {
+                      const [h, m] = t.split(':');
+                      const hr = parseInt(h);
+                      return `${hr % 12 || 12}:${m}${hr < 12 ? 'am' : 'pm'}`;
+                    };
+                    return (
+                      <div className="flex items-start gap-0.5 mt-1">
+                        <Clock className="w-3 h-3 text-teal-400 flex-shrink-0 mt-0.5" />
+                        <span className="text-xs text-stone-400">
+                          {days.join(', ')}{open && close ? ` · ${fmt(open)}–${fmt(close)}` : ''}
+                        </span>
+                      </div>
+                    );
+                  })()}
+                </div>
               </div>
             </div>
 
