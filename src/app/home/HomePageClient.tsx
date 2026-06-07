@@ -346,11 +346,16 @@ export default function HomePageClient({ initialVendors, initialListings, initia
     viewMode === "grid" ? renderListingCard(l, i) : renderListingRow(l, i);
 
   const catSlug = (l: any) => (typeof l.category === "object" ? l.category?.slug : l.category) ?? "";
-  const filteredListings   = applyPriceFilter(activeFilter === "All" ? allListings : allListings.filter(l => catSlug(l) === activeFilter));
+
+  // Listings currently on an active deal are shown only in the Deals section above
+  const dealListingIds     = new Set(deals.map((d: any) => d.listing?.id).filter(Boolean));
+  const nonDealListings    = allListings.filter(l => !dealListingIds.has(l.id));
+
+  const filteredListings   = applyPriceFilter(activeFilter === "All" ? nonDealListings : nonDealListings.filter(l => catSlug(l) === activeFilter));
   const SEVENTY_TWO_HOURS  = 72 * 60 * 60 * 1000;
-  const newArrivals        = applyPriceFilter(allListings.filter(l => Date.now() - new Date(l.created_at).getTime() < SEVENTY_TWO_HOURS));
+  const newArrivals        = applyPriceFilter(nonDealListings.filter(l => Date.now() - new Date(l.created_at).getTime() < SEVENTY_TWO_HOURS));
   const newArrivalIds      = new Set(newArrivals.map(l => l.id));
-  const olderListings      = applyPriceFilter(allListings.filter(l => !newArrivalIds.has(l.id)));
+  const olderListings      = applyPriceFilter(nonDealListings.filter(l => !newArrivalIds.has(l.id)));
 
   const categorySections   = categories.map(cat => ({ ...cat, items: olderListings.filter(l => catSlug(l) === cat.slug) })).filter(s => s.items.length > 0);
   const categorisedSlugs   = new Set(categories.map(c => c.slug));
@@ -1057,13 +1062,13 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                     ))}
                   </div>
                 ) : activeFilter === "All" ? (
-                  allListings.length === 0 ? (
+                  nonDealListings.length === 0 && deals.length === 0 ? (
                     <div className="bg-white rounded-2xl p-16 text-center border border-stone-100 shadow-sm">
                       <Sparkles className="w-12 h-12 text-stone-200 mx-auto mb-3" />
                       <h3 className="text-lg font-bold text-stone-400">No listings yet</h3>
                       <p className="text-stone-400 text-sm mt-1">Check back soon!</p>
                     </div>
-                  ) : (
+                  ) : nonDealListings.length === 0 ? null : (
                     <div className="space-y-10">
                       {/* New Arrivals — listings posted within 48 hours */}
                       {newArrivals.length > 0 && (
