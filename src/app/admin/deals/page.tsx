@@ -2,7 +2,7 @@
 
 import { Trash2, Plus, Loader2, Search, Tag, Pencil, Check, X, ToggleLeft, ToggleRight } from "lucide-react";
 import AdminTopBar from "@/components/layout/AdminTopBar";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { fetchWithAuth } from "@/lib/authStore";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
@@ -17,21 +17,29 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 export default function DealsPage() {
-  const [deals, setDeals] = useState<any[]>([]);
-  const [listings, setListings] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadingListings, setLoadingListings] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedListingId, setSelectedListingId] = useState<number | null>(null);
+  const [deals, setDeals]               = useState<any[]>([]);
+  const [loading, setLoading]           = useState(true);
+  const [dealSearch, setDealSearch]     = useState("");
+
+  // Listing search state (replaces the full paginated fetch)
+  const [listingQuery, setListingQuery]       = useState("");
+  const [listingResults, setListingResults]   = useState<any[]>([]);
+  const [searchingListings, setSearchingListings] = useState(false);
+  const [showDropdown, setShowDropdown]       = useState(false);
+  const [selectedListing, setSelectedListing] = useState<any | null>(null);
+
   const [discountPercent, setDiscountPercent] = useState("");
-  const [savingDeal, setSavingDeal] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
-  const [deletingId, setDeletingId] = useState<number | null>(null);
-  const [editingId, setEditingId] = useState<number | null>(null);
+  const [savingDeal, setSavingDeal]     = useState(false);
+  const [error, setError]               = useState("");
+  const [success, setSuccess]           = useState("");
+  const [deletingId, setDeletingId]     = useState<number | null>(null);
+  const [editingId, setEditingId]       = useState<number | null>(null);
   const [editDiscount, setEditDiscount] = useState("");
-  const [savingEdit, setSavingEdit] = useState(false);
-  const [togglingId, setTogglingId] = useState<number | null>(null);
+  const [savingEdit, setSavingEdit]     = useState(false);
+  const [togglingId, setTogglingId]     = useState<number | null>(null);
+
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const showError = useCallback((msg: string) => {
     setError(msg);
@@ -43,89 +51,101 @@ export default function DealsPage() {
     setTimeout(() => setSuccess(""), 3000);
   }, []);
 
-  const loadDeals = async () => {
+  // ── Load existing deals (single request, small payload) ──────────────
+  const loadDeals = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetchWithAuth(`${API_URL}/api/admin/deals/`);
-      if (res.ok) {
-        const data = await res.json();
-        setDeals(Array.isArray(data) ? data : []);
-      } else {
-        showError("Failed to load deals");
-      }
+      if (res.ok) { const d = await res.json(); setDeals(Array.isArray(d) ? d : []); }
     } catch {
       showError("Failed to load deals");
     } finally {
       setLoading(false);
     }
-  };
+  }, [showError]);
 
-  const loadListings = async () => {
-    setLoadingListings(true);
+  useEffect(() => { loadDeals(); }, [loadDeals]);
+
+  // ── Listing search — debounced, fires only when admin types ──────────
+  const dealListingIds = new Set(deals.map((d) => d.listing?.id));
+
+  const searchListings = useCallback(async (query: string) => {
+    if (!query.trim()) { setListingResults([]); setShowDropdown(false); return; }
+    setSearchingListings(true);
     try {
-      const allItems: any[] = [];
-      let url: string | null = `${API_URL}/api/admin/listings/?page_size=100`;
-      while (url) {
-        const res = await fetchWithAuth(url);
-        if (!res.ok) break;
-        const data = await res.json();
-        if (Array.isArray(data)) {
-          allItems.push(...data);
-          url = null;
-        } else {
-          allItems.push(...(data.results ?? []));
-          url = data.next ?? null;
-        }
-      }
-      setListings(allItems);
+      const res = await fetchWithAuth(
+        `${API_URL}/api/admin/listings/?search=${encodeURIComponent(query)}&page_size=8`
+      );
+      if (!res.ok) return;
+      const data = await res.json();
+      const items: any[] = Array.isArray(data) ? data : (data.results ?? []);
+      // Filter out listings already on a deal
+      setListingResults(items.filter((l) => !dealListingIds.has(l.id)));
+      setShowDropdown(true);
     } catch {
-      // non-critical, dropdown will just be empty
+      // silently ignore
     } finally {
-      setLoadingListings(false);
+      setSearchingListings(false);
     }
+  }, [dealListingIds]);
+
+  const handleListingQueryChange = (value: string) => {
+    setListingQuery(value);
+    setSelectedListing(null);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => searchListings(value), 300);
   };
 
+  const selectListing = (listing: any) => {
+    setSelectedListing(listing);
+    setListingQuery(listing.title);
+    setShowDropdown(false);
+  };
+
+  const clearSelection = () => {
+    setSelectedListing(null);
+    setListingQuery("");
+    setListingResults([]);
+    setShowDropdown(false);
+  };
+
+  // Close dropdown on outside click
   useEffect(() => {
-    loadDeals();
-    loadListings();
+    const handler = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  // Listings not yet on any deal
-  const dealListingIds = new Set(deals.map((d) => d.listing?.id));
-  const availableListings = listings.filter((l) => !dealListingIds.has(l.id));
-
+  // ── Validation ───────────────────────────────────────────────────────
   const validateDiscount = (value: string): number | null => {
     if (!/^\d+$/.test(value.trim())) return null;
     const n = parseInt(value, 10);
     return n >= 1 && n <= 100 ? n : null;
   };
 
+  // ── Create deal ──────────────────────────────────────────────────────
   const saveDeal = async () => {
-    if (!selectedListingId) {
-      showError("Please select a listing");
-      return;
-    }
+    if (!selectedListing) { showError("Please select a listing"); return; }
     const percent = validateDiscount(discountPercent);
-    if (percent === null) {
-      showError("Discount must be a whole number between 1 and 100");
-      return;
-    }
+    if (percent === null) { showError("Discount must be a whole number between 1 and 100"); return; }
 
     setSavingDeal(true);
     try {
       const res = await fetchWithAuth(`${API_URL}/api/admin/deals/`, {
         method: "POST",
-        body: JSON.stringify({ listing_id: selectedListingId, discount_percent: percent }),
+        body: JSON.stringify({ listing_id: selectedListing.id, discount_percent: percent }),
       });
-
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data.error || "Failed to save deal");
       }
-
       await loadDeals();
       showSuccess("Deal created!");
-      setSelectedListingId(null);
+      clearSelection();
       setDiscountPercent("");
     } catch (e: any) {
       showError(e.message || "Failed to save deal");
@@ -134,35 +154,20 @@ export default function DealsPage() {
     }
   };
 
-  const startEdit = (deal: any) => {
-    setEditingId(deal.id);
-    setEditDiscount(String(deal.discount_percent));
-  };
-
-  const cancelEdit = () => {
-    setEditingId(null);
-    setEditDiscount("");
-  };
+  // ── Edit / toggle / delete ───────────────────────────────────────────
+  const startEdit  = (deal: any) => { setEditingId(deal.id); setEditDiscount(String(deal.discount_percent)); };
+  const cancelEdit = () => { setEditingId(null); setEditDiscount(""); };
 
   const saveEdit = async (dealId: number) => {
     const percent = validateDiscount(editDiscount);
-    if (percent === null) {
-      showError("Discount must be a whole number between 1 and 100");
-      return;
-    }
-
+    if (percent === null) { showError("Discount must be a whole number between 1 and 100"); return; }
     setSavingEdit(true);
     try {
       const res = await fetchWithAuth(`${API_URL}/api/admin/deals/${dealId}/`, {
         method: "PATCH",
         body: JSON.stringify({ discount_percent: percent }),
       });
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Failed to update deal");
-      }
-
+      if (!res.ok) { const d = await res.json(); throw new Error(d.error || "Failed to update deal"); }
       await loadDeals();
       showSuccess("Deal updated!");
       cancelEdit();
@@ -180,7 +185,6 @@ export default function DealsPage() {
         method: "PATCH",
         body: JSON.stringify({ is_active: !deal.is_active }),
       });
-
       if (!res.ok) throw new Error("Failed to toggle deal");
       await loadDeals();
     } catch (e: any) {
@@ -192,13 +196,9 @@ export default function DealsPage() {
 
   const deleteDeal = async (dealId: number) => {
     if (!window.confirm("Delete this deal?")) return;
-
     setDeletingId(dealId);
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/admin/deals/${dealId}/`, {
-        method: "DELETE",
-      });
-
+      const res = await fetchWithAuth(`${API_URL}/api/admin/deals/${dealId}/`, { method: "DELETE" });
       if (!res.ok) throw new Error("Failed to delete");
       await loadDeals();
       showSuccess("Deal deleted");
@@ -211,8 +211,8 @@ export default function DealsPage() {
 
   const filteredDeals = deals.filter(
     (deal) =>
-      deal.listing?.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      deal.listing?.vendor?.username?.toLowerCase().includes(searchQuery.toLowerCase())
+      deal.listing?.title?.toLowerCase().includes(dealSearch.toLowerCase()) ||
+      deal.listing?.vendor?.username?.toLowerCase().includes(dealSearch.toLowerCase())
   );
 
   return (
@@ -225,41 +225,70 @@ export default function DealsPage() {
         </div>
 
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
-            {error}
-          </div>
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">{error}</div>
         )}
-
         {success && (
-          <div className="bg-teal-50 border border-teal-200 text-teal-700 px-4 py-3 rounded-xl text-sm">
-            ✓ {success}
-          </div>
+          <div className="bg-teal-50 border border-teal-200 text-teal-700 px-4 py-3 rounded-xl text-sm">✓ {success}</div>
         )}
 
-        {/* Create Deal Section */}
+        {/* ── Create Deal ── */}
         <div className="bg-white border border-stone-200 rounded-2xl p-6 shadow-sm space-y-4">
           <h2 className="text-lg font-bold text-stone-900 flex items-center gap-2">
             <Plus className="w-5 h-5 text-teal-600" /> Add New Deal
           </h2>
 
           <div className="grid grid-cols-2 gap-4">
-            <Field label="Select Listing">
-              <select
-                value={selectedListingId || ""}
-                onChange={(e) => setSelectedListingId(e.target.value ? parseInt(e.target.value, 10) : null)}
-                disabled={loadingListings}
-                className="w-full px-3 py-2.5 bg-stone-50 border border-stone-200 rounded-xl text-sm text-stone-900 focus:outline-none focus:border-teal-400 disabled:opacity-60"
-              >
-                <option value="">
-                  {loadingListings ? "Loading listings..." : "Choose a product or service..."}
-                </option>
-                {availableListings.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.title} — ₦{parseFloat(l.price).toLocaleString()}
-                    {l.vendor?.username ? ` (@${l.vendor.username})` : ""}
-                  </option>
-                ))}
-              </select>
+            <Field label="Search Listing">
+              <div className="relative" ref={dropdownRef}>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={listingQuery}
+                    onChange={(e) => handleListingQueryChange(e.target.value)}
+                    onFocus={() => listingResults.length > 0 && setShowDropdown(true)}
+                    placeholder="Type product name to search..."
+                    className="w-full pl-9 pr-8 py-2.5 bg-stone-50 border border-stone-200 rounded-xl text-sm text-stone-900 placeholder:text-stone-400 focus:outline-none focus:border-teal-400"
+                  />
+                  {searchingListings && (
+                    <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-stone-400" />
+                  )}
+                  {selectedListing && !searchingListings && (
+                    <button onClick={clearSelection} className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600">
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+
+                {showDropdown && listingResults.length > 0 && (
+                  <div className="absolute z-50 top-full mt-1 w-full bg-white border border-stone-200 rounded-xl shadow-lg overflow-hidden">
+                    {listingResults.map((l) => (
+                      <button
+                        key={l.id}
+                        onMouseDown={(e) => { e.preventDefault(); selectListing(l); }}
+                        className="w-full text-left px-4 py-2.5 hover:bg-stone-50 transition border-b border-stone-100 last:border-0"
+                      >
+                        <p className="text-sm font-medium text-stone-900 truncate">{l.title}</p>
+                        <p className="text-xs text-stone-400">
+                          ₦{parseFloat(l.price).toLocaleString()}
+                          {l.vendor?.username ? ` · @${l.vendor.username}` : ""}
+                        </p>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {showDropdown && !searchingListings && listingQuery && listingResults.length === 0 && (
+                  <div className="absolute z-50 top-full mt-1 w-full bg-white border border-stone-200 rounded-xl shadow-lg px-4 py-3 text-sm text-stone-400">
+                    No listings found
+                  </div>
+                )}
+              </div>
+              {selectedListing && (
+                <p className="text-xs text-teal-600 font-medium mt-1">
+                  ✓ Selected: {selectedListing.title} — ₦{parseFloat(selectedListing.price).toLocaleString()}
+                </p>
+              )}
             </Field>
 
             <Field label="Discount % (1–100)">
@@ -278,7 +307,7 @@ export default function DealsPage() {
 
           <button
             onClick={saveDeal}
-            disabled={savingDeal || !selectedListingId || !discountPercent}
+            disabled={savingDeal || !selectedListing || !discountPercent}
             className="w-full py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition disabled:opacity-40 bg-teal-600 hover:bg-teal-700 text-white"
           >
             {savingDeal ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
@@ -286,15 +315,15 @@ export default function DealsPage() {
           </button>
         </div>
 
-        {/* Deals List */}
+        {/* ── Deals List ── */}
         <div className="bg-white border border-stone-200 rounded-2xl shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-stone-200">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
               <input
                 type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                value={dealSearch}
+                onChange={(e) => setDealSearch(e.target.value)}
                 placeholder="Search deals by product or vendor..."
                 className="w-full pl-10 pr-4 py-2 bg-stone-50 border border-stone-200 rounded-lg text-sm focus:outline-none focus:border-teal-400"
               />
@@ -310,7 +339,7 @@ export default function DealsPage() {
             <div className="p-8 text-center text-stone-400">
               <Tag className="w-8 h-8 mx-auto mb-2 opacity-50" />
               <p className="font-medium">No deals yet</p>
-              <p className="text-xs mt-1">Create your first deal above</p>
+              <p className="text-xs mt-1">Search for a listing above to create your first deal</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -344,10 +373,7 @@ export default function DealsPage() {
                         {editingId === deal.id ? (
                           <div className="flex items-center gap-1">
                             <input
-                              type="number"
-                              min="1"
-                              max="100"
-                              step="1"
+                              type="number" min="1" max="100" step="1"
                               value={editDiscount}
                               onChange={(e) => setEditDiscount(e.target.value)}
                               className="w-16 px-2 py-1 bg-stone-50 border border-teal-400 rounded-lg text-xs text-stone-900 focus:outline-none"
@@ -358,18 +384,10 @@ export default function DealsPage() {
                               <Loader2 className="w-4 h-4 animate-spin text-teal-600" />
                             ) : (
                               <>
-                                <button
-                                  onClick={() => saveEdit(deal.id)}
-                                  className="text-teal-600 hover:text-teal-700 transition"
-                                  title="Save"
-                                >
+                                <button onClick={() => saveEdit(deal.id)} className="text-teal-600 hover:text-teal-700 transition" title="Save">
                                   <Check className="w-4 h-4" />
                                 </button>
-                                <button
-                                  onClick={cancelEdit}
-                                  className="text-stone-400 hover:text-stone-600 transition"
-                                  title="Cancel"
-                                >
+                                <button onClick={cancelEdit} className="text-stone-400 hover:text-stone-600 transition" title="Cancel">
                                   <X className="w-4 h-4" />
                                 </button>
                               </>
@@ -405,11 +423,7 @@ export default function DealsPage() {
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
                           {editingId !== deal.id && (
-                            <button
-                              onClick={() => startEdit(deal)}
-                              className="text-stone-500 hover:text-teal-600 transition"
-                              title="Edit discount"
-                            >
+                            <button onClick={() => startEdit(deal)} className="text-stone-500 hover:text-teal-600 transition" title="Edit discount">
                               <Pencil className="w-4 h-4" />
                             </button>
                           )}
@@ -419,11 +433,7 @@ export default function DealsPage() {
                             className="text-red-600 hover:text-red-700 transition disabled:opacity-50"
                             title="Delete deal"
                           >
-                            {deletingId === deal.id ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                              <Trash2 className="w-4 h-4" />
-                            )}
+                            {deletingId === deal.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                           </button>
                         </div>
                       </td>
