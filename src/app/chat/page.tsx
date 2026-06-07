@@ -20,7 +20,7 @@ interface Conversation {
   last_message: string;
   last_message_at: string;
   unread_count: number;
-  other_user: { id: number; username: string };
+  other_user: { id: number; username: string; profile_picture?: string | null; is_online?: boolean };
 }
 
 export default function ChatListPage() {
@@ -127,9 +127,22 @@ export default function ChatListPage() {
                     }`}>
 
                     {/* Avatar */}
-                    <div className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg flex-shrink-0 shadow-sm"
-                      style={{ background: GRAD }}>
-                      {conv.other_user?.username?.[0]?.toUpperCase() || "?"}
+                    <div className="relative flex-shrink-0">
+                      {conv.other_user?.profile_picture ? (
+                        <img
+                          src={conv.other_user.profile_picture}
+                          alt={conv.other_user.username}
+                          className="w-12 h-12 rounded-full object-cover shadow-sm"
+                        />
+                      ) : (
+                        <div className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-sm"
+                          style={{ background: GRAD }}>
+                          {conv.other_user?.username?.[0]?.toUpperCase() || "?"}
+                        </div>
+                      )}
+                      {conv.other_user?.is_online && (
+                        <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-400 border-2 border-white rounded-full" />
+                      )}
                     </div>
 
                     {/* Content */}

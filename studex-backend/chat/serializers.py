@@ -62,9 +62,28 @@ class ConversationSerializer(serializers.ModelSerializer):
             other.last_seen is not None and
             timezone.now() - other.last_seen < timedelta(minutes=3)
         )
+        # Resolve profile picture URL
+        profile_picture = None
+        img = getattr(other, 'profile_image', None)
+        if img:
+            name = getattr(img, 'name', None)
+            if name and name != 'profiles/default.jpg':
+                if name.startswith('http'):
+                    profile_picture = name
+                else:
+                    try:
+                        url = img.url
+                        request_obj = self.context.get('request')
+                        profile_picture = url if url.startswith('http') else (
+                            request_obj.build_absolute_uri(url) if request_obj else url
+                        )
+                    except Exception:
+                        pass
+
         return {
             'id': other.id,
             'username': other.username,
+            'profile_picture': profile_picture,
             'last_seen': other.last_seen.isoformat() if other.last_seen else None,
             'is_online': is_online,
         }
