@@ -214,6 +214,6 @@ class Deal(models.Model):
 
     @property
     def discounted_price(self):
-        """Calculate discounted price"""
-        discount_amount = self.listing.price * (self.discount_percent / 100)
+        from decimal import Decimal
+        discount_amount = self.listing.price * Decimal(self.discount_percent) / 100
         return self.listing.price - discount_amount
