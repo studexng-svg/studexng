@@ -41,6 +41,8 @@ from accounts.admin_views import (
     AdminAIActionView,
     AdminAIChatHistoryView,
     AdminTestEmailView,
+    AdminDealsListView,
+    AdminDealDetailView,
 )
 
 app_name = 'admin_api'
@@ -122,6 +124,12 @@ urlpatterns += [
     path('ai-history/', AdminAIChatHistoryView.as_view(), name='ai-history-list'),
     path('ai-history/<int:session_id>/', AdminAIChatHistoryView.as_view(), name='ai-history-detail'),
     path('test-email/', AdminTestEmailView.as_view(), name='test-email'),
+]
+
+# Deals management
+urlpatterns += [
+    path('deals/', AdminDealsListView.as_view(), name='deals-list'),
+    path('deals/<int:deal_id>/', AdminDealDetailView.as_view(), name='deal-detail'),
 ]
 
 if AdminCartListView is not None:

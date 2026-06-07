@@ -189,3 +189,31 @@ class VendorOfTheMonth(models.Model):
     def __str__(self):
         vendor_name = self.vendor.username if self.vendor else "Unknown"
         return f"{vendor_name} — {self.month.strftime('%B %Y')}"
+
+
+class Deal(models.Model):
+    """Admin-controlled discount deals for listings"""
+    listing = models.OneToOneField(
+        Listing, on_delete=models.CASCADE, related_name='deal'
+    )
+    discount_percent = models.IntegerField(
+        help_text="Discount percentage (0-100)",
+        default=0
+    )
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = "Deal"
+        verbose_name_plural = "Deals"
+
+    def __str__(self):
+        return f"{self.listing.title} — {self.discount_percent}% off"
+
+    @property
+    def discounted_price(self):
+        """Calculate discounted price"""
+        discount_amount = self.listing.price * (self.discount_percent / 100)
+        return self.listing.price - discount_amount

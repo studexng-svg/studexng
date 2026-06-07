@@ -2830,3 +2830,104 @@ class AdminRewardsOverviewView(APIView):
             },
             'users': loyalty_users,
         })
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# DEALS MANAGEMENT
+# ═════════════════════════════════════════════════════════════════════════════
+
+class AdminDealsListView(APIView):
+    """
+    GET /api/admin/deals/ - List all deals with listing details
+    POST /api/admin/deals/ - Create a new deal
+    """
+    permission_classes = [IsAdminUser]
+
+    def get(self, request):
+        from services.models import Deal
+        from services.serializers import DealDetailSerializer
+
+        deals = Deal.objects.select_related('listing').order_by('-created_at')
+        serializer = DealDetailSerializer(deals, many=True)
+        return Response(serializer.data)
+
+    def post(self, request):
+        from services.models import Deal, Listing
+        from services.serializers import DealSerializer
+
+        listing_id = request.data.get('listing_id')
+        discount_percent = request.data.get('discount_percent')
+
+        if not listing_id or discount_percent is None:
+            return Response(
+                {'error': 'listing_id and discount_percent are required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if not (0 <= discount_percent <= 100):
+            return Response(
+                {'error': 'discount_percent must be between 0 and 100'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            listing = Listing.objects.get(id=listing_id)
+        except Listing.DoesNotExist:
+            return Response({'error': 'Listing not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        deal, created = Deal.objects.update_or_create(
+            listing=listing,
+            defaults={'discount_percent': discount_percent, 'is_active': True}
+        )
+
+        serializer = DealSerializer(deal)
+        return Response(
+            serializer.data,
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK
+        )
+
+
+class AdminDealDetailView(APIView):
+    """
+    PATCH /api/admin/deals/{id}/ - Update a deal
+    DELETE /api/admin/deals/{id}/ - Delete a deal
+    """
+    permission_classes = [IsAdminUser]
+
+    def patch(self, request, deal_id):
+        from services.models import Deal
+        from services.serializers import DealSerializer
+
+        try:
+            deal = Deal.objects.get(id=deal_id)
+        except Deal.DoesNotExist:
+            return Response({'error': 'Deal not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        discount_percent = request.data.get('discount_percent')
+        is_active = request.data.get('is_active')
+
+        if discount_percent is not None:
+            if not (0 <= discount_percent <= 100):
+                return Response(
+                    {'error': 'discount_percent must be between 0 and 100'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            deal.discount_percent = discount_percent
+
+        if is_active is not None:
+            deal.is_active = is_active
+
+        deal.save()
+        serializer = DealSerializer(deal)
+        return Response(serializer.data)
+
+    def delete(self, request, deal_id):
+        from services.models import Deal
+
+        try:
+            deal = Deal.objects.get(id=deal_id)
+        except Deal.DoesNotExist:
+            return Response({'error': 'Deal not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        deal.delete()
+        return Response({'message': 'Deal deleted'}, status=status.HTTP_204_NO_CONTENT)

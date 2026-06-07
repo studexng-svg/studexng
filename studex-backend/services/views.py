@@ -375,3 +375,15 @@ class VendorOfMonthHistoryView(APIView):
             import logging
             logging.getLogger(__name__).error(f"VendorOfMonthHistoryView error: {e}", exc_info=True)
             return Response([])
+
+
+class DealsListView(APIView):
+    """GET /api/services/deals/ - Get all active deals with listing details"""
+
+    def get(self, request):
+        from services.models import Deal
+        from services.serializers import DealDetailSerializer
+
+        deals = Deal.objects.filter(is_active=True).select_related('listing').order_by('-created_at')
+        serializer = DealDetailSerializer(deals, many=True)
+        return Response(serializer.data)

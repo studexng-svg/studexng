@@ -148,3 +148,29 @@ class TransactionSerializer(serializers.ModelSerializer):
             'buyer_name', 'service_name'
         ]
         read_only_fields = ['id', 'created_at', 'released_at', 'withdrawn_at']
+
+
+class DealSerializer(serializers.ModelSerializer):
+    listing_id = serializers.IntegerField()
+    discounted_price = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = Deal
+        fields = ['id', 'listing_id', 'discount_percent', 'discounted_price', 'is_active', 'created_at']
+        read_only_fields = ['id', 'created_at']
+
+    def get_discounted_price(self, obj):
+        return float(obj.discounted_price)
+
+
+class DealDetailSerializer(serializers.ModelSerializer):
+    listing = ListingDetailSerializer(read_only=True)
+    discounted_price = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = Deal
+        fields = ['id', 'listing', 'discount_percent', 'discounted_price', 'is_active', 'created_at']
+        read_only_fields = ['id', 'created_at']
+
+    def get_discounted_price(self, obj):
+        return float(obj.discounted_price)
