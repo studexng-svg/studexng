@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
   Search, ArrowRight, Heart, X, Sparkles, Star,
@@ -139,6 +139,13 @@ export default function HomePageClient({ initialVendors, initialListings, initia
   const [viewMode, setViewMode]         = useState<"grid" | "list">("grid");
   const [deals, setDeals]               = useState<any[]>(initialDeals);
 
+  const fetchDeals = useCallback(async (campus: string) => {
+    try {
+      const res = await fetch(`${API_URL}/api/services/deals/?campus=${campus}`);
+      if (res.ok) { const d = await res.json(); setDeals(Array.isArray(d) ? d : []); }
+    } catch {}
+  }, []);
+
   const [vendors, setVendors]           = useState<Vendor[]>(initialVendors);
   const [allListings, setAllListings]   = useState<any[]>(initialListings);
   const [categories, setCategories]     = useState<Category[]>(initialCategories);
@@ -214,12 +221,12 @@ export default function HomePageClient({ initialVendors, initialListings, initia
       if (l.ok) { const d = await l.json(); setAllListings(d.results || d || []); }
       if (v.ok) { const d = await v.json(); setVendors(d.results || d || []); }
       if (c.ok) { const d = await c.json(); setCategories(d.results || d || []); }
-    } catch {} finally { setCampusReady(true); }
+    } catch {} finally { setCampusReady(true); fetchDeals(campus); }
   };
 
   useEffect(() => {
     if (!isHydrated) return;
-    if (!isLoggedIn || !user) { setCampusReady(true); return; }
+    if (!isLoggedIn || !user) { setCampusReady(true); fetchDeals(currentCampus); return; }
     let school = ((user as any).school || "").toLowerCase();
     // Fallback: infer school from email domain if not set in profile
     if (!school && user.email) {
@@ -228,9 +235,9 @@ export default function HomePageClient({ initialVendors, initialListings, initia
       else if (emailLower.includes("@futo.edu.ng")) school = "futo";
       else if (emailLower.includes("@imsu.edu.ng")) school = "imsu";
     }
-    if (school !== "pau" && school !== "futo" && school !== "imsu") { setCampusReady(true); return; }
+    if (school !== "pau" && school !== "futo" && school !== "imsu") { setCampusReady(true); fetchDeals(currentCampus); return; }
     const cookie = document.cookie.split(";").find(c => c.trim().startsWith("studex_campus="))?.split("=")?.[1]?.toLowerCase() || "pau";
-    if (cookie === school) { setCampusReady(true); return; }
+    if (cookie === school) { setCampusReady(true); fetchDeals(school); return; }
     const https = typeof window !== "undefined" && window.location.protocol === "https:";
     document.cookie = `studex_campus=${school}; path=/; max-age=31536000; SameSite=Lax${https ? "; Secure" : ""}`;
     Promise.all([
@@ -241,8 +248,8 @@ export default function HomePageClient({ initialVendors, initialListings, initia
       if (l.ok) { const d = await l.json(); setAllListings(d.results || d || []); }
       if (v.ok) { const d = await v.json(); setVendors(d.results || d || []); }
       if (c.ok) { const d = await c.json(); setCategories(d.results || d || []); }
-    }).catch(() => {}).finally(() => setCampusReady(true));
-  }, [isHydrated, isLoggedIn, (user as any)?.school]);
+    }).catch(() => {}).finally(() => { setCampusReady(true); fetchDeals(school); });
+  }, [isHydrated, isLoggedIn, (user as any)?.school, fetchDeals]);
 
   useEffect(() => {
     if (!searchQuery.trim()) { setSearchResults([]); setShowResults(false); return; }
