@@ -379,6 +379,7 @@ class VendorOfMonthHistoryView(APIView):
 
 class DealsListView(APIView):
     """GET /api/services/deals/ - Get all active deals with listing details"""
+    permission_classes = [AllowAny]
 
     def get(self, request):
         from services.models import Deal
