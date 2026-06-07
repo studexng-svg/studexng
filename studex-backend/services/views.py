@@ -384,6 +384,6 @@ class DealsListView(APIView):
         from services.models import Deal
         from services.serializers import DealDetailSerializer
 
-        deals = Deal.objects.filter(is_active=True).select_related('listing').order_by('-created_at')
+        deals = Deal.objects.filter(is_active=True).select_related('listing__vendor__profile', 'listing__category').order_by('-created_at')
         serializer = DealDetailSerializer(deals, many=True)
         return Response(serializer.data)

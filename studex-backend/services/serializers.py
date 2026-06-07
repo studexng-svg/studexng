@@ -164,7 +164,7 @@ class DealSerializer(serializers.ModelSerializer):
 
 
 class DealDetailSerializer(serializers.ModelSerializer):
-    listing = ListingDetailSerializer(read_only=True)
+    listing = ListingSerializer(read_only=True)
     discounted_price = serializers.SerializerMethodField(read_only=True)
 
     class Meta:

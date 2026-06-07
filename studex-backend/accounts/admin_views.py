@@ -2847,7 +2847,7 @@ class AdminDealsListView(APIView):
         from services.models import Deal
         from services.serializers import DealDetailSerializer
 
-        deals = Deal.objects.select_related('listing').order_by('-created_at')
+        deals = Deal.objects.select_related('listing__vendor__profile', 'listing__category').order_by('-created_at')
         serializer = DealDetailSerializer(deals, many=True)
         return Response(serializer.data)
 
@@ -2864,9 +2864,9 @@ class AdminDealsListView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        if not (0 <= discount_percent <= 100):
+        if not (1 <= discount_percent <= 100):
             return Response(
-                {'error': 'discount_percent must be between 0 and 100'},
+                {'error': 'discount_percent must be between 1 and 100'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -2907,9 +2907,9 @@ class AdminDealDetailView(APIView):
         is_active = request.data.get('is_active')
 
         if discount_percent is not None:
-            if not (0 <= discount_percent <= 100):
+            if not (1 <= discount_percent <= 100):
                 return Response(
-                    {'error': 'discount_percent must be between 0 and 100'},
+                    {'error': 'discount_percent must be between 1 and 100'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
             deal.discount_percent = discount_percent
@@ -2930,4 +2930,4 @@ class AdminDealDetailView(APIView):
             return Response({'error': 'Deal not found'}, status=status.HTTP_404_NOT_FOUND)
 
         deal.delete()
-        return Response({'message': 'Deal deleted'}, status=status.HTTP_204_NO_CONTENT)
+        return Response(status=status.HTTP_204_NO_CONTENT)

@@ -85,7 +85,7 @@ def _deduct_loyalty_credits_idempotent(buyer, order_id, credits_applied: Decimal
         logger.warning(f"_deduct_loyalty_credits_idempotent failed: {e}")
 
 # ─────────────────────────────────────────
-# Dynamic service fee: 8% of the base amount, min ₦50, capped at ₦1,500.
+# Dynamic service fee: 8% of the base amount, min ₦100, capped at ₦3,500.
 # The 8% covers both the StudEx platform margin and Paystack's processing fee
 # (1.5% + ₦100), which StudEx absorbs so buyers see no hidden charges.
 # Full payment goes to StudEx balance (no subaccount split at charge time).
@@ -94,9 +94,25 @@ def _deduct_loyalty_credits_idempotent(buyer, order_id, credits_applied: Decimal
 # ─────────────────────────────────────────
 
 def calc_service_fee(base: Decimal) -> Decimal:
-    """StudEx fee: 8% of base amount, minimum ₦50, maximum ₦3,500."""
+    """StudEx fee: 8% of base amount, minimum ₦100, maximum ₦3,500."""
     fee = (base * Decimal("0.08")).quantize(Decimal("0.01"))
-    return max(Decimal("50"), min(fee, Decimal("3500")))
+    return max(Decimal("100"), min(fee, Decimal("3500")))
+
+
+def calc_paystack_charge_fee(checkout_amount: Decimal) -> Decimal:
+    """Paystack inbound processing fee StudEx absorbs: 1.5% + ₦100 flat if checkout ≥ ₦2,500, max ₦2,000."""
+    flat = Decimal("100") if checkout_amount >= Decimal("2500") else Decimal("0")
+    fee = (checkout_amount * Decimal("0.015") + flat).quantize(Decimal("0.01"))
+    return min(fee, Decimal("2000"))
+
+
+def calc_transfer_fee(vendor_amount: Decimal) -> Decimal:
+    """Paystack outbound transfer fee deducted from StudEx balance when paying vendor."""
+    if vendor_amount <= Decimal("5000"):
+        return Decimal("10")
+    elif vendor_amount <= Decimal("50000"):
+        return Decimal("25")
+    return Decimal("50")
 
 
 def _split_amounts(total_amount: Decimal):
@@ -728,6 +744,8 @@ def pay_with_credits(request):
         seller_amount=listing_price,
         platform_amount=service_fee,
         service_charge=service_fee,
+        paystack_charge_fee=Decimal("0"),  # buyer paid ₦0, no Paystack inbound charge
+        transfer_fee=calc_transfer_fee(listing_price),
         status="success",
         order_type="service",
         buyer_email=buyer.email,
@@ -832,7 +850,7 @@ def seller_earnings(request):
     return Response({
         "total_earned": float(total_earned),
         "total_orders": total_orders,
-        "service_fee_description": "8% (min ₦50, max ₦3,500)",
+        "service_fee_description": "8% (min ₦100, max ₦3,500)",
     })
 
 
@@ -1033,6 +1051,8 @@ def paystack_webhook(request):
                     "seller_amount": vendor_amount,
                     "platform_amount": platform_amount,
                     "service_charge": platform_amount,
+                    "paystack_charge_fee": calc_paystack_charge_fee(amount),
+                    "transfer_fee": calc_transfer_fee(vendor_amount),
                     "status": "success",
                     "order_type": order_type,
                     "buyer_email": customer_email,
@@ -1144,6 +1164,9 @@ def _create_order_from_paystack_data(paystack_data, buyer, listing_id, order_typ
 
     seller = _get_seller_from_listing(listing_id)
 
+    paystack_fee = calc_paystack_charge_fee(amount_paid)
+    t_fee = calc_transfer_fee(vendor_amount)
+
     txn, created = PaymentTransaction.objects.get_or_create(
         reference=ref_key,
         defaults={
@@ -1154,6 +1177,8 @@ def _create_order_from_paystack_data(paystack_data, buyer, listing_id, order_typ
             "seller_amount": vendor_amount,
             "platform_amount": platform_amount,
             "service_charge": platform_amount,
+            "paystack_charge_fee": paystack_fee,
+            "transfer_fee": t_fee,
             "status": "success",
             "order_type": order_type,
             "buyer_email": buyer_email,

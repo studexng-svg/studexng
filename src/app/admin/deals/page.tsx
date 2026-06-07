@@ -1,8 +1,8 @@
 "use client";
 
-import { Trash2, Plus, Loader2, Search, Tag } from "lucide-react";
+import { Trash2, Plus, Loader2, Search, Tag, Pencil, Check, X, ToggleLeft, ToggleRight } from "lucide-react";
 import AdminTopBar from "@/components/layout/AdminTopBar";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { fetchWithAuth } from "@/lib/authStore";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
@@ -18,7 +18,9 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 export default function DealsPage() {
   const [deals, setDeals] = useState<any[]>([]);
+  const [listings, setListings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingListings, setLoadingListings] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedListingId, setSelectedListingId] = useState<number | null>(null);
   const [discountPercent, setDiscountPercent] = useState("");
@@ -26,9 +28,19 @@ export default function DealsPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editDiscount, setEditDiscount] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [togglingId, setTogglingId] = useState<number | null>(null);
 
-  useEffect(() => {
-    loadDeals();
+  const showError = useCallback((msg: string) => {
+    setError(msg);
+    setTimeout(() => setError(""), 4000);
+  }, []);
+
+  const showSuccess = useCallback((msg: string) => {
+    setSuccess(msg);
+    setTimeout(() => setSuccess(""), 3000);
   }, []);
 
   const loadDeals = async () => {
@@ -38,37 +50,63 @@ export default function DealsPage() {
       if (res.ok) {
         const data = await res.json();
         setDeals(Array.isArray(data) ? data : []);
+      } else {
+        showError("Failed to load deals");
       }
-    } catch (e) {
-      setError("Failed to load deals");
+    } catch {
+      showError("Failed to load deals");
     } finally {
       setLoading(false);
     }
   };
 
+  const loadListings = async () => {
+    setLoadingListings(true);
+    try {
+      const res = await fetchWithAuth(`${API_URL}/api/admin/listings/`);
+      if (res.ok) {
+        const data = await res.json();
+        const items = Array.isArray(data) ? data : (data.results ?? []);
+        setListings(items);
+      }
+    } catch {
+      // non-critical, dropdown will just be empty
+    } finally {
+      setLoadingListings(false);
+    }
+  };
+
+  useEffect(() => {
+    loadDeals();
+    loadListings();
+  }, []);
+
+  // Listings not yet on any deal
+  const dealListingIds = new Set(deals.map((d) => d.listing?.id));
+  const availableListings = listings.filter((l) => !dealListingIds.has(l.id));
+
+  const validateDiscount = (value: string): number | null => {
+    if (!/^\d+$/.test(value.trim())) return null;
+    const n = parseInt(value, 10);
+    return n >= 1 && n <= 100 ? n : null;
+  };
+
   const saveDeal = async () => {
-    if (!selectedListingId || !discountPercent) {
-      setError("Please select a listing and enter a discount");
+    if (!selectedListingId) {
+      showError("Please select a listing");
       return;
     }
-
-    const percent = parseInt(discountPercent);
-    if (percent < 0 || percent > 100) {
-      setError("Discount must be between 0 and 100");
+    const percent = validateDiscount(discountPercent);
+    if (percent === null) {
+      showError("Discount must be a whole number between 1 and 100");
       return;
     }
 
     setSavingDeal(true);
-    setError("");
-    setSuccess("");
-
     try {
       const res = await fetchWithAuth(`${API_URL}/api/admin/deals/`, {
         method: "POST",
-        body: JSON.stringify({
-          listing_id: selectedListingId,
-          discount_percent: percent,
-        }),
+        body: JSON.stringify({ listing_id: selectedListingId, discount_percent: percent }),
       });
 
       if (!res.ok) {
@@ -77,18 +115,73 @@ export default function DealsPage() {
       }
 
       await loadDeals();
-      setSuccess("Deal saved successfully!");
+      showSuccess("Deal created!");
       setSelectedListingId(null);
       setDiscountPercent("");
-      setTimeout(() => setSuccess(""), 3000);
     } catch (e: any) {
-      setError(e.message || "Failed to save deal");
+      showError(e.message || "Failed to save deal");
     } finally {
       setSavingDeal(false);
     }
   };
 
-  const deleteDeal = async (dealId: number) {
+  const startEdit = (deal: any) => {
+    setEditingId(deal.id);
+    setEditDiscount(String(deal.discount_percent));
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditDiscount("");
+  };
+
+  const saveEdit = async (dealId: number) => {
+    const percent = validateDiscount(editDiscount);
+    if (percent === null) {
+      showError("Discount must be a whole number between 1 and 100");
+      return;
+    }
+
+    setSavingEdit(true);
+    try {
+      const res = await fetchWithAuth(`${API_URL}/api/admin/deals/${dealId}/`, {
+        method: "PATCH",
+        body: JSON.stringify({ discount_percent: percent }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to update deal");
+      }
+
+      await loadDeals();
+      showSuccess("Deal updated!");
+      cancelEdit();
+    } catch (e: any) {
+      showError(e.message || "Failed to update deal");
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const toggleActive = async (deal: any) => {
+    setTogglingId(deal.id);
+    try {
+      const res = await fetchWithAuth(`${API_URL}/api/admin/deals/${deal.id}/`, {
+        method: "PATCH",
+        body: JSON.stringify({ is_active: !deal.is_active }),
+      });
+
+      if (!res.ok) throw new Error("Failed to toggle deal");
+      await loadDeals();
+    } catch (e: any) {
+      showError(e.message || "Failed to toggle deal");
+    } finally {
+      setTogglingId(null);
+    }
+  };
+
+  const deleteDeal = async (dealId: number) => {
     if (!window.confirm("Delete this deal?")) return;
 
     setDeletingId(dealId);
@@ -99,18 +192,18 @@ export default function DealsPage() {
 
       if (!res.ok) throw new Error("Failed to delete");
       await loadDeals();
-      setSuccess("Deal deleted");
-      setTimeout(() => setSuccess(""), 3000);
+      showSuccess("Deal deleted");
     } catch (e: any) {
-      setError(e.message || "Failed to delete deal");
+      showError(e.message || "Failed to delete deal");
     } finally {
       setDeletingId(null);
     }
   };
 
-  const filteredDeals = deals.filter(deal =>
-    deal.listing?.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    deal.listing?.vendor?.username?.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredDeals = deals.filter(
+    (deal) =>
+      deal.listing?.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      deal.listing?.vendor?.username?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
@@ -144,29 +237,30 @@ export default function DealsPage() {
             <Field label="Select Listing">
               <select
                 value={selectedListingId || ""}
-                onChange={e => setSelectedListingId(e.target.value ? parseInt(e.target.value) : null)}
-                className="w-full px-3 py-2.5 bg-stone-50 border border-stone-200 rounded-xl text-sm text-stone-900 focus:outline-none focus:border-teal-400"
+                onChange={(e) => setSelectedListingId(e.target.value ? parseInt(e.target.value, 10) : null)}
+                disabled={loadingListings}
+                className="w-full px-3 py-2.5 bg-stone-50 border border-stone-200 rounded-xl text-sm text-stone-900 focus:outline-none focus:border-teal-400 disabled:opacity-60"
               >
-                <option value="">Choose a product or service...</option>
-                {deals.length > 0 && (
-                  <optgroup label="Already on deals">
-                    {deals.map(d => (
-                      <option key={d.listing?.id} value={d.listing?.id} disabled>
-                        {d.listing?.title} — {d.discount_percent}% off
-                      </option>
-                    ))}
-                  </optgroup>
-                )}
+                <option value="">
+                  {loadingListings ? "Loading listings..." : "Choose a product or service..."}
+                </option>
+                {availableListings.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.title} — ₦{parseFloat(l.price).toLocaleString()}
+                    {l.vendor?.username ? ` (@${l.vendor.username})` : ""}
+                  </option>
+                ))}
               </select>
             </Field>
 
-            <Field label="Discount %">
+            <Field label="Discount % (1–100)">
               <input
                 type="number"
-                min="0"
+                min="1"
                 max="100"
+                step="1"
                 value={discountPercent}
-                onChange={e => setDiscountPercent(e.target.value)}
+                onChange={(e) => setDiscountPercent(e.target.value)}
                 placeholder="e.g., 20"
                 className="w-full px-3 py-2.5 bg-stone-50 border border-stone-200 rounded-xl text-sm text-stone-900 placeholder:text-stone-400 focus:outline-none focus:border-teal-400"
               />
@@ -191,7 +285,7 @@ export default function DealsPage() {
               <input
                 type="text"
                 value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
+                onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search deals by product or vendor..."
                 className="w-full pl-10 pr-4 py-2 bg-stone-50 border border-stone-200 rounded-lg text-sm focus:outline-none focus:border-teal-400"
               />
@@ -219,11 +313,12 @@ export default function DealsPage() {
                     <th className="px-6 py-3 text-left text-xs font-semibold text-stone-600">Original Price</th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-stone-600">Discount</th>
                     <th className="px-6 py-3 text-left text-xs font-semibold text-stone-600">Discounted Price</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-stone-600">Action</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-stone-600">Active</th>
+                    <th className="px-6 py-3 text-left text-xs font-semibold text-stone-600">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-stone-100">
-                  {filteredDeals.map(deal => (
+                  {filteredDeals.map((deal) => (
                     <tr key={deal.id} className="hover:bg-stone-50 transition">
                       <td className="px-6 py-4">
                         <p className="font-medium text-stone-900 text-sm">{deal.listing?.title}</p>
@@ -232,28 +327,96 @@ export default function DealsPage() {
                         <p className="text-sm text-stone-600">@{deal.listing?.vendor?.username}</p>
                       </td>
                       <td className="px-6 py-4">
-                        <p className="text-sm font-medium text-stone-900">₦{parseFloat(deal.listing?.price).toLocaleString()}</p>
+                        <p className="text-sm font-medium text-stone-900">
+                          ₦{parseFloat(deal.listing?.price).toLocaleString()}
+                        </p>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="bg-red-50 text-red-700 px-3 py-1 rounded-full text-xs font-bold inline-block">
-                          -{deal.discount_percent}%
-                        </div>
+                        {editingId === deal.id ? (
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="number"
+                              min="1"
+                              max="100"
+                              step="1"
+                              value={editDiscount}
+                              onChange={(e) => setEditDiscount(e.target.value)}
+                              className="w-16 px-2 py-1 bg-stone-50 border border-teal-400 rounded-lg text-xs text-stone-900 focus:outline-none"
+                              autoFocus
+                            />
+                            <span className="text-xs text-stone-500">%</span>
+                            {savingEdit ? (
+                              <Loader2 className="w-4 h-4 animate-spin text-teal-600" />
+                            ) : (
+                              <>
+                                <button
+                                  onClick={() => saveEdit(deal.id)}
+                                  className="text-teal-600 hover:text-teal-700 transition"
+                                  title="Save"
+                                >
+                                  <Check className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={cancelEdit}
+                                  className="text-stone-400 hover:text-stone-600 transition"
+                                  title="Cancel"
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="bg-red-50 text-red-700 px-3 py-1 rounded-full text-xs font-bold inline-block">
+                            -{deal.discount_percent}%
+                          </div>
+                        )}
                       </td>
                       <td className="px-6 py-4">
-                        <p className="text-sm font-bold text-teal-600">₦{parseFloat(deal.discounted_price).toLocaleString()}</p>
+                        <p className="text-sm font-bold text-teal-600">
+                          ₦{parseFloat(deal.discounted_price).toLocaleString()}
+                        </p>
                       </td>
                       <td className="px-6 py-4">
                         <button
-                          onClick={() => deleteDeal(deal.id)}
-                          disabled={deletingId === deal.id}
-                          className="text-red-600 hover:text-red-700 transition disabled:opacity-50"
+                          onClick={() => toggleActive(deal)}
+                          disabled={togglingId === deal.id}
+                          className="transition disabled:opacity-50"
+                          title={deal.is_active ? "Deactivate" : "Activate"}
                         >
-                          {deletingId === deal.id ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
+                          {togglingId === deal.id ? (
+                            <Loader2 className="w-5 h-5 animate-spin text-stone-400" />
+                          ) : deal.is_active ? (
+                            <ToggleRight className="w-6 h-6 text-teal-600" />
                           ) : (
-                            <Trash2 className="w-4 h-4" />
+                            <ToggleLeft className="w-6 h-6 text-stone-400" />
                           )}
                         </button>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          {editingId !== deal.id && (
+                            <button
+                              onClick={() => startEdit(deal)}
+                              className="text-stone-500 hover:text-teal-600 transition"
+                              title="Edit discount"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => deleteDeal(deal.id)}
+                            disabled={deletingId === deal.id}
+                            className="text-red-600 hover:text-red-700 transition disabled:opacity-50"
+                            title="Delete deal"
+                          >
+                            {deletingId === deal.id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="w-4 h-4" />
+                            )}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}

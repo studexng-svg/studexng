@@ -26,7 +26,7 @@ class SellerBankAccountAdmin(admin.ModelAdmin):
 class PaymentTransactionAdmin(admin.ModelAdmin):
     list_display = [
         'reference', 'buyer', 'seller', 'amount_display',
-        'seller_amount_display', 'platform_amount_display',
+        'seller_amount_display', 'platform_amount_display', 'net_platform_display',
         'order_type', 'colored_status', 'transfer_status', 'transfer_reference', 'created_at'
     ]
     list_filter = ['status', 'transfer_status', 'order_type', 'created_at']
@@ -52,7 +52,13 @@ class PaymentTransactionAdmin(admin.ModelAdmin):
     def platform_amount_display(self, obj):
         amount = f"₦{float(obj.platform_amount):,.2f}"
         return format_html('<span style="color:purple;">{}</span>', amount)
-    platform_amount_display.short_description = 'Platform Fee'
+    platform_amount_display.short_description = 'Gross Fee'
+
+    def net_platform_display(self, obj):
+        net = float(obj.platform_amount) - float(obj.paystack_charge_fee) - float(obj.transfer_fee)
+        color = "green" if net >= 0 else "red"
+        return format_html('<span style="color:{};font-weight:bold;">₦{:,.2f}</span>', color, net)
+    net_platform_display.short_description = 'Net Profit'
 
     def colored_status(self, obj):
         colors = {'success': 'green', 'pending': 'orange', 'failed': 'red', 'refunded': 'blue'}
@@ -70,12 +76,21 @@ class PaymentTransactionAdmin(admin.ModelAdmin):
             volume=Sum('amount'),
             vendor=Sum('seller_amount'),
             platform=Sum('platform_amount'),
+            paystack_fees=Sum('paystack_charge_fee'),
+            transfer_fees=Sum('transfer_fee'),
         )
+        gross = float(totals['platform'] or 0)
+        paystack_fees = float(totals['paystack_fees'] or 0)
+        transfer_fees = float(totals['transfer_fees'] or 0)
+        net = gross - paystack_fees - transfer_fees
         extra_context = extra_context or {}
         extra_context['payment_totals'] = {
             'volume': f"₦{float(totals['volume'] or 0):,.2f}",
             'vendor': f"₦{float(totals['vendor'] or 0):,.2f}",
-            'platform': f"₦{float(totals['platform'] or 0):,.2f}",
+            'platform_gross': f"₦{gross:,.2f}",
+            'paystack_fees': f"₦{paystack_fees:,.2f}",
+            'transfer_fees': f"₦{transfer_fees:,.2f}",
+            'platform_net': f"₦{net:,.2f}",
         }
         return super().changelist_view(request, extra_context=extra_context)
 
@@ -114,13 +129,19 @@ class PaymentTransactionAdmin(admin.ModelAdmin):
         response = HttpResponse(content_type='text/csv')
         response['Content-Disposition'] = 'attachment; filename="transactions.csv"'
         writer = csv.writer(response)
-        writer.writerow(['Reference', 'Buyer', 'Seller', 'Amount', 'Vendor Amount', 'Platform Fee', 'Type', 'Status', 'Date'])
+        writer.writerow([
+            'Reference', 'Buyer', 'Seller', 'Amount Paid', 'Vendor Amount',
+            'Gross Platform Fee', 'Paystack Charge Fee', 'Transfer Fee', 'Net Platform Profit',
+            'Type', 'Status', 'Date',
+        ])
         for t in queryset:
+            net = float(t.platform_amount) - float(t.paystack_charge_fee) - float(t.transfer_fee)
             writer.writerow([
                 t.reference,
                 t.buyer.username if t.buyer else 'N/A',
                 t.seller.username if t.seller else 'N/A',
                 float(t.amount), float(t.seller_amount), float(t.platform_amount),
+                float(t.paystack_charge_fee), float(t.transfer_fee), net,
                 t.order_type, t.status,
                 t.created_at.strftime('%Y-%m-%d %H:%M:%S'),
             ])

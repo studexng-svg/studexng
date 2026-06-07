@@ -34,9 +34,12 @@ class PaymentTransaction(models.Model):
     vendor gets: listing_price (their full price, paid by StudEx manually)
     platform keeps: service_charge - discount_amount (min ₦0)
 
-    service_charge: 8% of listing price (covers platform margin + Paystack processing fee), minimum ₦50, maximum ₦3,500.
+    service_charge: 8% of listing price (covers platform margin + Paystack processing fee), minimum ₦100, maximum ₦3,500.
     discount_amount: profile-completion 5% discount applied to listing price.
                      Comes entirely from the platform fee — vendor is unaffected.
+    paystack_charge_fee: Paystack's inbound processing fee absorbed by StudEx (1.5% + ₦100 flat if checkout ≥ ₦2,500).
+    transfer_fee: Paystack's outbound transfer fee charged to StudEx when paying vendor (₦10/₦25/₦50 by tier).
+    net_platform_amount (computed): service_charge - discount_amount - paystack_charge_fee - transfer_fee = actual cash profit.
     """
     STATUS_CHOICES = [
         ("pending", "Pending"),
@@ -77,6 +80,12 @@ class PaymentTransaction(models.Model):
 
     # Net platform revenue = service_charge - discount_amount
     platform_amount = models.DecimalField(max_digits=12, decimal_places=2)
+
+    # Paystack inbound charge fee StudEx absorbed (1.5% + ₦100 flat if checkout ≥ ₦2,500, max ₦2,000)
+    paystack_charge_fee = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+
+    # Paystack outbound transfer fee deducted from StudEx balance when paying vendor (₦10/₦25/₦50)
+    transfer_fee = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
     order_type = models.CharField(max_length=20, choices=ORDER_TYPE_CHOICES, default="product")

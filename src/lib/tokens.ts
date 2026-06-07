@@ -23,9 +23,9 @@ export const SANS: CSSProperties = {
 export const toArray = (d: any): any[] =>
   Array.isArray(d) ? d : (d?.results ?? []);
 
-/** StudEx service fee: 8% of order, minimum ₦50, capped at ₦3,500 */
+/** StudEx service fee: 8% of order, minimum ₦100, capped at ₦3,500 */
 export function calcServiceFee(amount: number): number {
-  return Math.min(Math.max(amount * 0.08, 50), 3500);
+  return Math.min(Math.max(amount * 0.08, 100), 3500);
 }
 
 /**
