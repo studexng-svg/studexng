@@ -2844,12 +2844,45 @@ class AdminDealsListView(APIView):
     permission_classes = [IsAdminUser]
 
     def get(self, request):
-        from services.models import Deal
-        from services.serializers import DealDetailSerializer
+        from services.models import Deal, Listing
+        from services.serializers import DealDetailSerializer, ListingSerializer
+        from decimal import Decimal
 
-        deals = Deal.objects.select_related('listing__vendor__profile', 'listing__category').order_by('-created_at')
-        serializer = DealDetailSerializer(deals, many=True)
-        return Response(serializer.data)
+        # ── Admin-created deals ───────────────────────────────────────────────
+        admin_qs = Deal.objects.select_related(
+            'listing__vendor__profile', 'listing__category'
+        ).order_by('-created_at')
+        admin_data = DealDetailSerializer(admin_qs, many=True).data
+        admin_listing_ids = {d['listing']['id'] for d in admin_data}
+        for d in admin_data:
+            d['source'] = 'admin'
+
+        # ── Vendor-set discounts (listings not in an admin deal) ─────────────
+        vendor_qs = Listing.objects.filter(
+            discount_percent__gt=0
+        ).exclude(id__in=admin_listing_ids).select_related(
+            'vendor__profile', 'category'
+        ).order_by('-updated_at')
+
+        vendor_data = []
+        for listing in vendor_qs:
+            serialized = dict(ListingSerializer(listing).data)
+            discount = listing.discount_percent
+            discounted = float(listing.price - listing.price * Decimal(discount) / 100)
+            vendor_data.append({
+                'id': f'v_{listing.id}',
+                'listing': serialized,
+                'discount_percent': discount,
+                'discounted_price': round(discounted, 2),
+                'is_active': listing.is_available,
+                'created_at': listing.updated_at.isoformat() if listing.updated_at else None,
+                'source': 'vendor',
+                'vendor_username': listing.vendor.username,
+            })
+
+        all_deals = list(admin_data) + vendor_data
+        all_deals.sort(key=lambda x: x.get('created_at') or '', reverse=True)
+        return Response(all_deals)
 
     def post(self, request):
         from services.models import Deal, Listing

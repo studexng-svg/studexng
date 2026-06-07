@@ -391,7 +391,14 @@ def initialize_payment(request):
                                 listing_deal_discount = (item_price - effective).quantize(Decimal("0.01"))
                             item_price = effective
                     except Exception:
-                        pass
+                        # Fall back to vendor-set discount if no admin deal
+                        vd = getattr(item.listing, 'discount_percent', 0) or 0
+                        if vd > 0:
+                            effective = item_price - item_price * Decimal(vd) / 100
+                            deal_discount_total += (item_price - effective) * item.quantity
+                            if str(item.listing_id) == str(listing_id):
+                                listing_deal_discount = (item_price - effective).quantize(Decimal("0.01"))
+                            item_price = effective
                     server_total += item_price * item.quantity
                 client_amount = Decimal(str(cart_amount_raw))
                 if abs(client_amount - server_total) > Decimal("0.01"):
@@ -413,7 +420,12 @@ def initialize_payment(request):
                     deal_discount_total = listing_deal_discount
                     amount = effective
             except Exception:
-                pass
+                vd = getattr(listing, 'discount_percent', 0) or 0
+                if vd > 0:
+                    effective = amount - amount * Decimal(vd) / 100
+                    listing_deal_discount = (amount - effective).quantize(Decimal("0.01"))
+                    deal_discount_total = listing_deal_discount
+                    amount = effective
     except Exception:
         amount = Decimal(str(listing.price))
 
@@ -633,7 +645,9 @@ def verify_payment(request):
                 if _deal.is_active:
                     _base = Decimal(str(_deal.discounted_price))
             except Exception:
-                pass
+                _vd = getattr(_listing, 'discount_percent', 0) or 0
+                if _vd > 0:
+                    _base = _base - _base * Decimal(_vd) / 100
             _max_discount = (_base * Decimal("0.05")).quantize(Decimal("0.01"))
             _discounted = max(_base - _max_discount - credits_applied, Decimal("0"))
             _net = _discounted + calc_service_fee(_discounted)
@@ -732,7 +746,11 @@ def pay_with_credits(request):
             deal_discount_amount = listing_price - effective
             listing_price = effective
     except Exception:
-        pass
+        vd = getattr(listing, 'discount_percent', 0) or 0
+        if vd > 0:
+            effective = listing_price - listing_price * Decimal(vd) / 100
+            deal_discount_amount = listing_price - effective
+            listing_price = effective
 
     try:
         from loyalty.models import LoyaltyAccount, LoyaltyTransaction

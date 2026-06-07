@@ -378,18 +378,50 @@ class VendorOfMonthHistoryView(APIView):
 
 
 class DealsListView(APIView):
-    """GET /api/services/deals/ - Get all active deals with listing details"""
+    """GET /api/services/deals/ - Active admin deals + vendor-discounted listings merged."""
     permission_classes = [AllowAny]
 
     def get(self, request):
-        from services.models import Deal
-        from services.serializers import DealDetailSerializer
-
-        deals = Deal.objects.filter(is_active=True).select_related('listing__vendor__profile', 'listing__category').order_by('-created_at')
+        from services.models import Deal, Listing
+        from services.serializers import DealDetailSerializer, ListingSerializer
+        from decimal import Decimal
 
         campus = request.query_params.get('campus')
-        if campus:
-            deals = deals.filter(listing__campus__iexact=campus)
 
-        serializer = DealDetailSerializer(deals, many=True)
-        return Response(serializer.data)
+        # ── Admin-created deals ───────────────────────────────────────────────
+        admin_qs = Deal.objects.filter(is_active=True).select_related(
+            'listing__vendor__profile', 'listing__category'
+        ).order_by('-created_at')
+        if campus:
+            admin_qs = admin_qs.filter(listing__campus__iexact=campus)
+
+        admin_data = DealDetailSerializer(admin_qs, many=True).data
+        admin_listing_ids = {d['listing']['id'] for d in admin_data}
+        for d in admin_data:
+            d['source'] = 'admin'
+
+        # ── Vendor-set discounts (listings not already in an admin deal) ──────
+        vendor_qs = Listing.objects.filter(
+            discount_percent__gt=0, is_available=True
+        ).exclude(id__in=admin_listing_ids).select_related(
+            'vendor__profile', 'category'
+        )
+        if campus:
+            vendor_qs = vendor_qs.filter(campus__iexact=campus)
+
+        vendor_data = []
+        for listing in vendor_qs:
+            serialized = dict(ListingSerializer(listing).data)
+            discount = listing.discount_percent
+            discounted = float(listing.price - listing.price * Decimal(discount) / 100)
+            vendor_data.append({
+                'id': f'v_{listing.id}',
+                'listing': serialized,
+                'discount_percent': discount,
+                'discounted_price': round(discounted, 2),
+                'is_active': True,
+                'created_at': listing.updated_at.isoformat() if listing.updated_at else None,
+                'source': 'vendor',
+            })
+
+        return Response(list(admin_data) + vendor_data)

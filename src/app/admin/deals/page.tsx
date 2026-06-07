@@ -1,6 +1,6 @@
 "use client";
 
-import { Trash2, Plus, Loader2, Search, Tag, Pencil, Check, X, ToggleLeft, ToggleRight } from "lucide-react";
+import { Trash2, Plus, Loader2, Search, Tag, Pencil, Check, X, ToggleLeft, ToggleRight, Store, Clock } from "lucide-react";
 import AdminTopBar from "@/components/layout/AdminTopBar";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { fetchWithAuth } from "@/lib/authStore";
@@ -212,8 +212,17 @@ export default function DealsPage() {
   const filteredDeals = deals.filter(
     (deal) =>
       deal.listing?.title?.toLowerCase().includes(dealSearch.toLowerCase()) ||
-      deal.listing?.vendor?.username?.toLowerCase().includes(dealSearch.toLowerCase())
+      deal.listing?.vendor?.username?.toLowerCase().includes(dealSearch.toLowerCase()) ||
+      (deal.source === 'vendor' && 'vendor'.includes(dealSearch.toLowerCase()))
   );
+
+  const isVendorDeal = (deal: any) => deal.source === 'vendor';
+
+  const fmt = (iso: string | null) => {
+    if (!iso) return "—";
+    const d = new Date(iso);
+    return d.toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  };
 
   return (
     <div className="min-h-screen bg-stone-50">
@@ -346,11 +355,23 @@ export default function DealsPage() {
               {/* ── Mobile cards (hidden on md+) ── */}
               <div className="divide-y divide-stone-100 md:hidden">
                 {filteredDeals.map((deal) => (
-                  <div key={deal.id} className="p-4 space-y-3">
+                  <div key={deal.id} className={`p-4 space-y-3 ${isVendorDeal(deal) ? "bg-amber-50/40" : ""}`}>
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 mb-0.5">
+                          {isVendorDeal(deal) ? (
+                            <span className="flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                              <Store className="w-2.5 h-2.5" /> Vendor
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-teal-50 text-teal-700">Admin</span>
+                          )}
+                        </div>
                         <p className="font-semibold text-stone-900 text-sm truncate">{deal.listing?.title}</p>
                         <p className="text-xs text-stone-400 mt-0.5">@{deal.listing?.vendor?.username}</p>
+                        <p className="text-[10px] text-stone-400 mt-0.5 flex items-center gap-1">
+                          <Clock className="w-2.5 h-2.5" /> {fmt(deal.created_at)}
+                        </p>
                       </div>
                       <span className={`shrink-0 text-xs font-bold px-2 py-0.5 rounded-full ${deal.is_active ? "bg-teal-50 text-teal-700" : "bg-stone-100 text-stone-400"}`}>
                         {deal.is_active ? "Active" : "Inactive"}
@@ -365,7 +386,11 @@ export default function DealsPage() {
                       </div>
                     </div>
 
-                    {editingId === deal.id ? (
+                    {isVendorDeal(deal) ? (
+                      <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-1.5">
+                        Vendor-controlled discount — edit the listing to change or remove it.
+                      </p>
+                    ) : editingId === deal.id ? (
                       <div className="flex items-center gap-2">
                         <input
                           type="number" min="1" max="100" step="1"
@@ -418,16 +443,18 @@ export default function DealsPage() {
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-semibold text-stone-600">Product / Service</th>
                       <th className="px-6 py-3 text-left text-xs font-semibold text-stone-600">Vendor</th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-stone-600">Source</th>
                       <th className="px-6 py-3 text-left text-xs font-semibold text-stone-600">Original Price</th>
                       <th className="px-6 py-3 text-left text-xs font-semibold text-stone-600">Discount</th>
                       <th className="px-6 py-3 text-left text-xs font-semibold text-stone-600">Deal Price</th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-stone-600">Set On</th>
                       <th className="px-6 py-3 text-left text-xs font-semibold text-stone-600">Active</th>
                       <th className="px-6 py-3 text-left text-xs font-semibold text-stone-600">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-stone-100">
                     {filteredDeals.map((deal) => (
-                      <tr key={deal.id} className="hover:bg-stone-50 transition">
+                      <tr key={deal.id} className={`transition ${isVendorDeal(deal) ? "bg-amber-50/30 hover:bg-amber-50/60" : "hover:bg-stone-50"}`}>
                         <td className="px-6 py-4">
                           <p className="font-medium text-stone-900 text-sm">{deal.listing?.title}</p>
                         </td>
@@ -435,10 +462,19 @@ export default function DealsPage() {
                           <p className="text-sm text-stone-600">@{deal.listing?.vendor?.username}</p>
                         </td>
                         <td className="px-6 py-4">
+                          {isVendorDeal(deal) ? (
+                            <span className="flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 w-fit">
+                              <Store className="w-3 h-3" /> Vendor
+                            </span>
+                          ) : (
+                            <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-teal-50 text-teal-700">Admin</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4">
                           <p className="text-sm font-medium text-stone-900">₦{parseFloat(deal.listing?.price).toLocaleString()}</p>
                         </td>
                         <td className="px-6 py-4">
-                          {editingId === deal.id ? (
+                          {!isVendorDeal(deal) && editingId === deal.id ? (
                             <div className="flex items-center gap-1">
                               <input
                                 type="number" min="1" max="100" step="1"
@@ -467,19 +503,32 @@ export default function DealsPage() {
                           <p className="text-sm font-bold text-teal-600">₦{parseFloat(deal.discounted_price).toLocaleString()}</p>
                         </td>
                         <td className="px-6 py-4">
-                          <button onClick={() => toggleActive(deal)} disabled={togglingId === deal.id} className="transition disabled:opacity-50" title={deal.is_active ? "Deactivate" : "Activate"}>
-                            {togglingId === deal.id ? <Loader2 className="w-5 h-5 animate-spin text-stone-400" /> : deal.is_active ? <ToggleRight className="w-6 h-6 text-teal-600" /> : <ToggleLeft className="w-6 h-6 text-stone-400" />}
-                          </button>
+                          <p className="text-xs text-stone-400 whitespace-nowrap">{fmt(deal.created_at)}</p>
                         </td>
                         <td className="px-6 py-4">
-                          <div className="flex items-center gap-3">
-                            {editingId !== deal.id && (
-                              <button onClick={() => startEdit(deal)} className="text-stone-500 hover:text-teal-600 transition"><Pencil className="w-4 h-4" /></button>
-                            )}
-                            <button onClick={() => deleteDeal(deal.id)} disabled={deletingId === deal.id} className="text-red-600 hover:text-red-700 transition disabled:opacity-50">
-                              {deletingId === deal.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                          {isVendorDeal(deal) ? (
+                            <span className={`text-xs font-medium ${deal.is_active ? "text-teal-600" : "text-stone-400"}`}>
+                              {deal.is_active ? "Active" : "Inactive"}
+                            </span>
+                          ) : (
+                            <button onClick={() => toggleActive(deal)} disabled={togglingId === deal.id} className="transition disabled:opacity-50" title={deal.is_active ? "Deactivate" : "Activate"}>
+                              {togglingId === deal.id ? <Loader2 className="w-5 h-5 animate-spin text-stone-400" /> : deal.is_active ? <ToggleRight className="w-6 h-6 text-teal-600" /> : <ToggleLeft className="w-6 h-6 text-stone-400" />}
                             </button>
-                          </div>
+                          )}
+                        </td>
+                        <td className="px-6 py-4">
+                          {isVendorDeal(deal) ? (
+                            <span className="text-xs text-stone-400 italic">Vendor-set</span>
+                          ) : (
+                            <div className="flex items-center gap-3">
+                              {editingId !== deal.id && (
+                                <button onClick={() => startEdit(deal)} className="text-stone-500 hover:text-teal-600 transition"><Pencil className="w-4 h-4" /></button>
+                              )}
+                              <button onClick={() => deleteDeal(deal.id)} disabled={deletingId === deal.id} className="text-red-600 hover:text-red-700 transition disabled:opacity-50">
+                                {deletingId === deal.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                              </button>
+                            </div>
+                          )}
                         </td>
                       </tr>
                     ))}

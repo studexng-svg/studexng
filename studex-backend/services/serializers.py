@@ -64,11 +64,12 @@ class ListingSerializer(serializers.ModelSerializer):
     image_upload = serializers.CharField(required=False, allow_null=True, allow_blank=True, write_only=True, source='image')
     is_reserved = serializers.SerializerMethodField()
     campus = serializers.CharField(source='vendor.school', read_only=True, default='')
+    sale_price = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = Listing
         fields = [
-            'id', 'title', 'description', 'price',
+            'id', 'title', 'description', 'price', 'discount_percent', 'sale_price',
             'image', 'image2', 'image3', 'image4', 'image5', 'image_upload',
             'is_available', 'listing_type', 'track_inventory', 'stock_quantity',
             'is_reserved',
@@ -77,6 +78,17 @@ class ListingSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at'
         ]
         read_only_fields = ['vendor', 'vendor_is_verified', 'created_at', 'updated_at']
+
+    def get_sale_price(self, obj):
+        if obj.discount_percent and obj.discount_percent > 0:
+            from decimal import Decimal
+            return float(obj.price - obj.price * Decimal(obj.discount_percent) / 100)
+        return None
+
+    def validate_discount_percent(self, value):
+        if not (0 <= value <= 100):
+            raise serializers.ValidationError("Discount must be between 0 and 100.")
+        return value
 
     def to_representation(self, instance):
         data = super().to_representation(instance)

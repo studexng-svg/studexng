@@ -18,7 +18,7 @@ export default function ListingsPage() {
   const [form, setForm] = useState({
     title: "", description: "", price: "", category: "",
     listing_type: "service", track_inventory: false,
-    stock_quantity: 0, images: Array(5).fill(null) as (File | null)[],
+    stock_quantity: 0, discount_percent: 0, images: Array(5).fill(null) as (File | null)[],
   });
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState("");
@@ -51,13 +51,14 @@ export default function ListingsPage() {
       listing_type: listing.listing_type || "service",
       track_inventory: listing.track_inventory || false,
       stock_quantity: listing.stock_quantity || 0,
+      discount_percent: listing.discount_percent || 0,
       images: Array(5).fill(null),
     });
     setShowForm(true);
   };
 
   const resetForm = () => {
-    setForm({ title: "", description: "", price: "", category: "", listing_type: "service", track_inventory: false, stock_quantity: 0, images: Array(5).fill(null) });
+    setForm({ title: "", description: "", price: "", category: "", listing_type: "service", track_inventory: false, stock_quantity: 0, discount_percent: 0, images: Array(5).fill(null) });
     setEditing(null);
     setShowForm(false);
   };
@@ -77,6 +78,7 @@ export default function ListingsPage() {
       const isInventoryType = form.listing_type === "food" || form.listing_type === "product";
       fd.append("track_inventory", isInventoryType ? "true" : "false");
       fd.append("stock_quantity", isInventoryType ? form.stock_quantity.toString() : "0");
+      fd.append("discount_percent", form.discount_percent.toString());
       const slots = ['image', 'image2', 'image3', 'image4', 'image5'];
       form.images.forEach((file, i) => { if (file) fd.append(slots[i], file); });
 
@@ -143,6 +145,24 @@ export default function ListingsPage() {
                   <option key={cat.slug} value={cat.slug}>{cat.title}</option>
                 ))}
               </select>
+            </div>
+            {/* Discount */}
+            <div className="bg-stone-50 border border-stone-100 rounded-xl px-4 py-3 flex items-center gap-4">
+              <div className="flex-1">
+                <p className="text-stone-800 text-sm font-semibold">Discount % <span className="font-normal text-stone-400">(optional)</span></p>
+                <p className="text-stone-400 text-xs">
+                  {form.discount_percent > 0 && form.price
+                    ? `Sale price: ₦${(Number(form.price) * (1 - form.discount_percent / 100)).toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+                    : "Set a % to run a sale — shows in Hot Deals on the home page"}
+                </p>
+              </div>
+              <div className="flex items-center gap-1">
+                <input type="number" min="0" max="100" step="1" value={form.discount_percent || ""}
+                  onChange={e => setForm(f => ({ ...f, discount_percent: Math.min(100, Math.max(0, parseInt(e.target.value) || 0)) }))}
+                  placeholder="0"
+                  className="w-16 bg-white border border-stone-200 rounded-lg px-2 py-2 text-stone-900 text-sm text-center focus:outline-none focus:border-teal-500" />
+                <span className="text-stone-500 text-sm font-semibold">%</span>
+              </div>
             </div>
             <div>
               <p className="text-xs text-stone-400 mb-2">Photos · up to 5 · first is the main photo</p>
@@ -258,7 +278,19 @@ export default function ListingsPage() {
               <div className="p-4">
                 <div className="flex items-start justify-between gap-2 mb-1">
                   <h3 className="font-semibold text-stone-900 text-sm">{listing.title}</h3>
-                  <span className="font-bold text-teal-600 text-sm whitespace-nowrap">₦{Number(listing.price).toLocaleString()}</span>
+                  <div className="text-right">
+                    {listing.discount_percent > 0 ? (
+                      <>
+                        <span className="text-stone-400 text-xs line-through block">₦{Number(listing.price).toLocaleString()}</span>
+                        <span className="font-bold text-red-600 text-sm whitespace-nowrap">
+                          ₦{Math.round(Number(listing.price) * (1 - listing.discount_percent / 100)).toLocaleString()}
+                        </span>
+                        <span className="ml-1 text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full font-bold">-{listing.discount_percent}%</span>
+                      </>
+                    ) : (
+                      <span className="font-bold text-teal-600 text-sm whitespace-nowrap">₦{Number(listing.price).toLocaleString()}</span>
+                    )}
+                  </div>
                 </div>
                 <p className="text-stone-400 text-xs mb-2 line-clamp-2">{listing.description}</p>
                 {listing.track_inventory && (

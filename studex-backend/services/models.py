@@ -69,6 +69,11 @@ class Listing(models.Model):
         help_text="Current stock. Auto-marks unavailable when it reaches 0."
     )
 
+    discount_percent = models.IntegerField(
+        default=0,
+        help_text="Vendor-set discount percentage (0 = no discount, 1-100 for a sale)"
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

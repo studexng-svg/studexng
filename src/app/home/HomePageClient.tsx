@@ -354,9 +354,12 @@ export default function HomePageClient({ initialVendors, initialListings, initia
 
   const catSlug = (l: any) => (typeof l.category === "object" ? l.category?.slug : l.category) ?? "";
 
-  // Listings currently on an active deal are shown only in the Deals section above
-  const dealListingIds     = new Set(deals.map((d: any) => d.listing?.id).filter(Boolean));
-  const nonDealListings    = allListings.filter(l => !dealListingIds.has(l.id));
+  // Only admin-curated deals pull a listing out of its category section.
+  // Vendor-discounted listings stay in their category AND appear in Hot Deals.
+  const adminDealIds = new Set(
+    deals.filter((d: any) => d.source === 'admin').map((d: any) => d.listing?.id).filter(Boolean)
+  );
+  const nonDealListings = allListings.filter(l => !adminDealIds.has(l.id));
 
   const filteredListings   = applyPriceFilter(activeFilter === "All" ? nonDealListings : nonDealListings.filter(l => catSlug(l) === activeFilter));
   const SEVENTY_TWO_HOURS  = 72 * 60 * 60 * 1000;
@@ -378,6 +381,10 @@ export default function HomePageClient({ initialVendors, initialListings, initia
     const isOwn        = !!(user?.id && user.id === listing.vendor?.id);
     const isReserved   = !isService && !isOwn && !!listing.is_reserved;
     const inCart       = cart.some(ci => ci.id === listing.id);
+    const discountPct  = listing.discount_percent || 0;
+    const effectivePrice = discountPct > 0
+      ? Math.round(Number(listing.price) * (1 - discountPct / 100))
+      : Number(listing.price);
 
     return (
       <div key={listing.id} className="animate-fadeUp bg-white rounded-xl border border-stone-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow group"
@@ -393,15 +400,19 @@ export default function HomePageClient({ initialVendors, initialListings, initia
               </div>
             )}
 
-            {badge && badge !== "none" && (
+            {discountPct > 0 ? (
+              <div className="absolute top-2.5 left-2.5 z-10 bg-red-500 text-white px-2 py-0.5 rounded-md text-[10px] font-black">
+                -{discountPct}% OFF
+              </div>
+            ) : badge && badge !== "none" ? (
               <div className="absolute top-2.5 left-2.5 z-10 px-2 py-0.5 rounded-md text-[10px] font-bold text-white" style={{ background: GRAD }}>
                 {BADGE_LABELS[badge]}
               </div>
-            )}
+            ) : null}
 
             <motion.button onClick={e => {
               e.preventDefault(); e.stopPropagation();
-              const item = { id: listing.id, title: listing.title, price: listing.price, img: listing.image };
+              const item = { id: listing.id, title: listing.title, price: effectivePrice, img: listing.image };
               if (wishlisted) { removeFromWishlist(listing.id); showToast("Removed from Wishlist"); }
               else { addToWishlist(item); showToast("Added to Wishlist ❤️"); }
             }} whileTap={{ scale: 0.85 }}
@@ -430,7 +441,14 @@ export default function HomePageClient({ initialVendors, initialListings, initia
             )}
 
             <div className="mt-2 space-y-2">
-              <p className="font-bold text-stone-900 text-sm">₦{Number(listing.price).toLocaleString()}</p>
+              {discountPct > 0 ? (
+                <div className="flex items-center gap-1.5">
+                  <p className="font-bold text-stone-400 text-xs line-through">₦{Number(listing.price).toLocaleString()}</p>
+                  <p className="font-bold text-red-600 text-sm">₦{effectivePrice.toLocaleString()}</p>
+                </div>
+              ) : (
+                <p className="font-bold text-stone-900 text-sm">₦{Number(listing.price).toLocaleString()}</p>
+              )}
               {isReserved ? (
                 <span className="text-[10px] text-stone-400 font-semibold flex items-center gap-0.5">
                   <Clock className="w-3 h-3" /> Reserved
@@ -446,7 +464,13 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                       }
                       if (isService) return;
                       e.preventDefault(); e.stopPropagation();
-                      addToCart({ id: listing.id, title: listing.title, price: listing.price, img: listing.image || "" });
+                      addToCart({
+                        id: listing.id, title: listing.title,
+                        price: effectivePrice,
+                        original_price: discountPct > 0 ? Number(listing.price) : undefined,
+                        deal_discount_percent: discountPct > 0 ? discountPct : undefined,
+                        img: listing.image || "",
+                      });
                       showToast(inCart ? "Added again (+1)" : "Added to cart");
                     }}
                     className="flex-1 py-2 rounded-xl text-white text-xs font-bold flex items-center justify-center gap-1.5 hover:opacity-90 transition-opacity"
