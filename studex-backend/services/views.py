@@ -388,7 +388,7 @@ class DealsListView(APIView):
 
         campus = request.query_params.get('campus')
         if campus:
-            deals = deals.filter(listing__vendor__school__iexact=campus)
+            deals = deals.filter(listing__campus__iexact=campus)
 
         serializer = DealDetailSerializer(deals, many=True)
         return Response(serializer.data)
