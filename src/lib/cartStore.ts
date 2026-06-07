@@ -5,7 +5,9 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 export type CartItem = {
   id: number;       // listing_id
   title: string;
-  price: number;
+  price: number;           // effective (deal-adjusted) price
+  original_price?: number; // original listing price (set when a deal is active)
+  deal_discount_percent?: number;
   img: string;
   quantity: number;
   category?: string;
@@ -128,17 +130,28 @@ export const useCart = create<CartStore>()((set, get) => ({
         listing_id: number;
         title: string;
         price: string | number;
+        effective_price?: string | number;
+        deal_discount_percent?: number;
         img: string;
         quantity: number;
       }> = await res.json();
       set({
-        cart: data.map((item) => ({
-          id: item.listing_id,
-          title: item.title,
-          price: parseFloat(String(item.price)),
-          img: item.img || "",
-          quantity: item.quantity,
-        })),
+        cart: data.map((item) => {
+          const originalPrice = parseFloat(String(item.price));
+          const effectivePrice = item.effective_price != null
+            ? parseFloat(String(item.effective_price))
+            : originalPrice;
+          const hasDeal = effectivePrice < originalPrice;
+          return {
+            id: item.listing_id,
+            title: item.title,
+            price: effectivePrice,
+            ...(hasDeal ? { original_price: originalPrice } : {}),
+            deal_discount_percent: item.deal_discount_percent ?? 0,
+            img: item.img || "",
+            quantity: item.quantity,
+          };
+        }),
       });
     } catch {}
   },

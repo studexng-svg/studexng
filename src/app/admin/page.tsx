@@ -5,7 +5,7 @@ import {
   Users, Package, DollarSign, Store, FileText, Tag, TrendingUp,
   ChevronRight, AlertCircle, CheckCircle, Clock,
   CreditCard, Star, AlertTriangle, ArrowUpRight,
-  ShoppingCart, MessageCircle, Send, Radio, Bot, RefreshCw,
+  ShoppingCart, MessageCircle, Send, Radio, Bot, RefreshCw, Percent,
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -85,6 +85,7 @@ const QUICK_LINKS = [
   { label: "Bank Accounts",      href: "/admin/bank-accounts",    icon: CreditCard,   desc: "Vendor bank accounts & payout setup" },
   { label: "Reviews",             href: "/admin/reviews",          icon: Star,         desc: "Manage platform reviews" },
   { label: "Categories",          href: "/admin/categories",       icon: Tag,          desc: "Manage listing categories" },
+  { label: "Deals",               href: "/admin/deals",            icon: Percent,      desc: "Manage product discounts and deals" },
   { label: "Payout Transactions", href: "/admin/transactions",     icon: ArrowUpRight, desc: "Escrow and release tracking" },
   { label: "Analytics",          href: "/admin/analytics",         icon: TrendingUp,   desc: "Charts, trends, live stats" },
   { label: "Cart Overview",      href: "/admin/cart",             icon: ShoppingCart, desc: "View all user cart items" },

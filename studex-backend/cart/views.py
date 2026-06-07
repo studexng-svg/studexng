@@ -18,7 +18,7 @@ def _reservation_key(listing_id):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_cart(request):
-    items = CartItem.objects.filter(user=request.user).select_related('listing')
+    items = CartItem.objects.filter(user=request.user).select_related('listing__deal')
     return Response(CartItemSerializer(items, many=True).data)
 
 
@@ -94,7 +94,7 @@ def remove_from_cart(request, listing_id):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def clear_cart(request):
-    items = CartItem.objects.filter(user=request.user).select_related('listing')
+    items = CartItem.objects.filter(user=request.user).select_related('listing__deal')
     for item in items:
         if item.reserved_at:
             rkey = _reservation_key(item.listing_id)

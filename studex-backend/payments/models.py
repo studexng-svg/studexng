@@ -81,6 +81,9 @@ class PaymentTransaction(models.Model):
     # Net platform revenue = service_charge - discount_amount
     platform_amount = models.DecimalField(max_digits=12, decimal_places=2)
 
+    # Total deal discount applied at checkout (vendor absorbs this — they receive deal price, not full price)
+    deal_discount_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+
     # Paystack inbound charge fee StudEx absorbed (1.5% + ₦100 flat if checkout ≥ ₦2,500, max ₦2,000)
     paystack_charge_fee = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 

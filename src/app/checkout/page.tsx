@@ -33,6 +33,10 @@ export default function CheckoutPage() {
   const isFoodOrder = cart.length > 0;
 
   const foodTotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const dealSavings = cart.reduce((sum, item) => {
+    const orig = item.original_price ?? item.price;
+    return sum + Math.max(orig - item.price, 0) * item.quantity;
+  }, 0);
   const serviceTotal = booking?.total || 0;
   const baseTotal = isServiceBooking ? serviceTotal : foodTotal;
 
@@ -318,11 +322,25 @@ export default function CheckoutPage() {
                 className="flex justify-between items-center py-2.5 border-b border-stone-100 last:border-0">
                 <div>
                   <p className="font-medium text-stone-900 text-sm">{item.title}</p>
-                  <p className="text-xs text-stone-400 mt-0.5">× {item.quantity}</p>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <p className="text-xs text-stone-400">× {item.quantity}</p>
+                    {item.original_price && item.original_price > item.price && (
+                      <span className="text-xs bg-rose-100 text-rose-600 font-semibold px-1.5 py-0.5 rounded-full">
+                        -{item.deal_discount_percent}%
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <p className="font-semibold text-sm" style={GRAD_TEXT}>
-                  ₦{(item.price * item.quantity).toLocaleString()}
-                </p>
+                <div className="text-right">
+                  {item.original_price && item.original_price > item.price && (
+                    <p className="text-xs text-stone-400 line-through">
+                      ₦{(item.original_price * item.quantity).toLocaleString()}
+                    </p>
+                  )}
+                  <p className="font-semibold text-sm" style={GRAD_TEXT}>
+                    ₦{(item.price * item.quantity).toLocaleString()}
+                  </p>
+                </div>
               </motion.div>
             ))}
           </motion.div>
@@ -370,10 +388,27 @@ export default function CheckoutPage() {
               <span className="text-stone-500">
                 {isServiceBooking ? "Service price" : "Items total"}
               </span>
-              <span className={`font-medium ${discount?.hasDiscount ? "line-through text-stone-400" : "text-stone-700"}`}>
-                ₦{baseTotal.toLocaleString()}
-              </span>
+              <div className="text-right">
+                {dealSavings > 0 && (
+                  <p className="text-xs text-stone-400 line-through">
+                    ₦{(baseTotal + dealSavings).toLocaleString()}
+                  </p>
+                )}
+                <span className={`font-medium ${discount?.hasDiscount ? "line-through text-stone-400" : "text-stone-700"}`}>
+                  ₦{baseTotal.toLocaleString()}
+                </span>
+              </div>
             </div>
+            {dealSavings > 0 && (
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-rose-600 font-medium flex items-center gap-1">
+                  Deal savings
+                </span>
+                <span className="text-rose-600 font-semibold">
+                  -₦{dealSavings.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+            )}
             {discount?.hasDiscount && (
               <div className="flex justify-between items-center text-sm">
                 <span className="text-emerald-600 font-medium flex items-center gap-1">
@@ -464,7 +499,8 @@ export default function CheckoutPage() {
             <div>
               <p className="font-semibold text-teal-800 text-sm">Transparent Pricing</p>
               <p className="text-xs text-teal-600 mt-0.5 leading-relaxed">
-                Our <strong>8% service fee</strong> (min ₦100, max ₦3,500) covers both the StudEx platform and Paystack's payment processing cost so there are <strong>no hidden charges</strong> on top of what you see here. The vendor receives their full listed price.
+                Our <strong>8% service fee</strong> (min ₦100, max ₦3,500) covers both the StudEx platform and Paystack's payment processing cost so there are <strong>no hidden charges</strong> on top of what you see here.
+                {dealSavings > 0 && " Deal discounts are already reflected in your items total."}
                 {discount?.hasDiscount && " Your 5% profile completion bonus has been applied."}
               </p>
             </div>

@@ -372,15 +372,27 @@ def initialize_payment(request):
     # Compute cart total server-side — never trust client-supplied totals.
     # Validates against CartItem records to prevent underpayment via tampered cart_amount.
     cart_amount_raw = request.data.get("cart_amount")
+    deal_discount_total = Decimal("0")
+    listing_deal_discount = Decimal("0")
     try:
         if cart_amount_raw:
             from cart.models import CartItem
-            cart_items = CartItem.objects.filter(user=buyer).select_related('listing')
+            cart_items = CartItem.objects.filter(user=buyer).select_related('listing__deal')
             if cart_items.exists():
-                server_total = sum(
-                    Decimal(str(item.listing.price)) * item.quantity
-                    for item in cart_items
-                )
+                server_total = Decimal("0")
+                for item in cart_items:
+                    item_price = Decimal(str(item.listing.price))
+                    try:
+                        deal = item.listing.deal
+                        if deal.is_active:
+                            effective = Decimal(str(deal.discounted_price))
+                            deal_discount_total += (item_price - effective) * item.quantity
+                            if str(item.listing_id) == str(listing_id):
+                                listing_deal_discount = (item_price - effective).quantize(Decimal("0.01"))
+                            item_price = effective
+                    except Exception:
+                        pass
+                    server_total += item_price * item.quantity
                 client_amount = Decimal(str(cart_amount_raw))
                 if abs(client_amount - server_total) > Decimal("0.01"):
                     return Response(
@@ -391,7 +403,17 @@ def initialize_payment(request):
             else:
                 amount = Decimal(str(listing.price))
         else:
+            # Single listing — apply deal discount if active
             amount = Decimal(str(listing.price))
+            try:
+                deal = listing.deal
+                if deal.is_active:
+                    effective = Decimal(str(deal.discounted_price))
+                    listing_deal_discount = (amount - effective).quantize(Decimal("0.01"))
+                    deal_discount_total = listing_deal_discount
+                    amount = effective
+            except Exception:
+                pass
     except Exception:
         amount = Decimal(str(listing.price))
 
@@ -457,6 +479,8 @@ def initialize_payment(request):
             "buyer_id": buyer.id,
             "type": "service",
             "discount_amount": str(discount_amount),
+            "deal_discount_amount": str(deal_discount_total),
+            "listing_deal_discount": str(listing_deal_discount),
             "delivery_location": delivery_location,
             "credits_applied": str(credits_applied),
         },
@@ -598,12 +622,18 @@ def verify_payment(request):
 
     if min_kobo is None and actual_listing_id:
         # Cache miss (server restart / TTL expired) — recalculate from listing price.
-        # Assume max discount applied (5% profile bonus + any loyalty credits) so
-        # a legitimately discounted payment isn't rejected.
+        # Assume max discounts applied (active deal + 5% profile bonus + loyalty credits)
+        # so a legitimately discounted payment isn't rejected.
         try:
             from services.models import Listing
             _listing = Listing.objects.get(id=actual_listing_id)
             _base = Decimal(str(_listing.price))
+            try:
+                _deal = _listing.deal
+                if _deal.is_active:
+                    _base = Decimal(str(_deal.discounted_price))
+            except Exception:
+                pass
             _max_discount = (_base * Decimal("0.05")).quantize(Decimal("0.01"))
             _discounted = max(_base - _max_discount - credits_applied, Decimal("0"))
             _net = _discounted + calc_service_fee(_discounted)
@@ -694,6 +724,15 @@ def pay_with_credits(request):
 
     buyer = request.user
     listing_price = Decimal(str(listing.price))
+    deal_discount_amount = Decimal("0")
+    try:
+        deal = listing.deal
+        if deal.is_active:
+            effective = Decimal(str(deal.discounted_price))
+            deal_discount_amount = listing_price - effective
+            listing_price = effective
+    except Exception:
+        pass
 
     try:
         from loyalty.models import LoyaltyAccount, LoyaltyTransaction
@@ -746,6 +785,7 @@ def pay_with_credits(request):
         service_charge=service_fee,
         paystack_charge_fee=Decimal("0"),  # buyer paid ₦0, no Paystack inbound charge
         transfer_fee=calc_transfer_fee(listing_price),
+        deal_discount_amount=deal_discount_amount,
         status="success",
         order_type="service",
         buyer_email=buyer.email,
@@ -1157,10 +1197,15 @@ def _create_order_from_paystack_data(paystack_data, buyer, listing_id, order_typ
             pass
 
     if listing is not None:
-        vendor_amount = Decimal(str(listing.price))
+        meta = paystack_data.get("metadata") or {}
+        listing_deal_discount = Decimal(str(meta.get("listing_deal_discount", "0") or "0"))
+        deal_discount_amount = Decimal(str(meta.get("deal_discount_amount", "0") or "0"))
+        # Vendor receives listing price minus their deal discount (deal is the vendor's offer)
+        vendor_amount = max(Decimal(str(listing.price)) - listing_deal_discount, Decimal("0"))
         platform_amount = max(amount_paid - vendor_amount, Decimal("0"))
     else:
         vendor_amount, platform_amount = _split_amounts(amount_paid)
+        deal_discount_amount = Decimal("0")
 
     seller = _get_seller_from_listing(listing_id)
 
@@ -1177,6 +1222,7 @@ def _create_order_from_paystack_data(paystack_data, buyer, listing_id, order_typ
             "seller_amount": vendor_amount,
             "platform_amount": platform_amount,
             "service_charge": platform_amount,
+            "deal_discount_amount": deal_discount_amount,
             "paystack_charge_fee": paystack_fee,
             "transfer_fee": t_fee,
             "status": "success",
