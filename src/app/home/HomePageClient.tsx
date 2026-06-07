@@ -471,6 +471,124 @@ export default function HomePageClient({ initialVendors, initialListings, initia
     );
   };
 
+  const renderDealCard = (deal: any, i: number) => {
+    const listing     = deal.listing;
+    const badge        = listing.vendor?.profile?.vendor_badge;
+    const rating       = listing.vendor?.profile?.rating;
+    const totalReviews = listing.vendor?.profile?.total_reviews;
+    const wishlisted   = mounted && isInWishlist(listing.id);
+    const isService    = (listing.listing_type || "").toLowerCase() === "service";
+    const isOwn        = !!(user?.id && user.id === listing.vendor?.id);
+    const isReserved   = !isService && !isOwn && !!listing.is_reserved;
+    const inCart       = cart.some(ci => ci.id === listing.id);
+    const dealPrice    = Number(deal.discounted_price);
+
+    return (
+      <div key={listing.id} className="animate-fadeUp bg-white rounded-xl border border-stone-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow group relative"
+        style={{ animationDelay: `${Math.min(i * 0.04, 0.2)}s` }}>
+
+        {/* Discount badge */}
+        <div className="absolute top-2.5 left-2.5 z-20 bg-red-500 text-white px-2 py-0.5 rounded-md text-[10px] font-black">
+          -{deal.discount_percent}% OFF
+        </div>
+
+        <Link href={`/listing/${listing.id}`} className="block">
+          <div className="relative w-full aspect-square overflow-hidden bg-stone-50">
+            <SafeImage src={listing.image?.startsWith("http") ? listing.image : null} alt={listing.title} />
+
+            {!listing.is_available && (
+              <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                <span className="text-white font-bold bg-red-500 px-3 py-1 rounded-full text-xs">Unavailable</span>
+              </div>
+            )}
+
+            {badge && badge !== "none" && (
+              <div className="absolute top-2.5 left-2.5 z-10 px-2 py-0.5 rounded-md text-[10px] font-bold text-white mt-6" style={{ background: GRAD }}>
+                {BADGE_LABELS[badge]}
+              </div>
+            )}
+
+            <motion.button onClick={e => {
+              e.preventDefault(); e.stopPropagation();
+              const item = { id: listing.id, title: listing.title, price: dealPrice, img: listing.image };
+              if (wishlisted) { removeFromWishlist(listing.id); showToast("Removed from Wishlist"); }
+              else { addToWishlist(item); showToast("Added to Wishlist ❤️"); }
+            }} whileTap={{ scale: 0.85 }}
+              className="absolute top-2.5 right-2.5 z-10 w-7 h-7 bg-white rounded-full shadow-sm flex items-center justify-center">
+              <Heart className={`w-3.5 h-3.5 ${wishlisted ? "fill-red-500 text-red-500" : "text-stone-400"}`} />
+            </motion.button>
+          </div>
+
+          <div className="p-3">
+            <p className="font-bold text-stone-900 text-sm line-clamp-1">{listing.title}</p>
+            <p className="text-stone-400 text-xs mt-0.5 truncate">@{listing.vendor?.username || listing.vendor}</p>
+            {listing.vendor?.hostel && (
+              <div className="flex items-center gap-0.5 mt-0.5">
+                <MapPin className="w-3 h-3 text-teal-400 flex-shrink-0" />
+                <span className="text-xs text-stone-400 truncate">{listing.vendor.hostel}</span>
+              </div>
+            )}
+
+            {totalReviews > 0 && (
+              <div className="flex items-center gap-0.5 mt-1.5">
+                <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                <span className="text-xs text-stone-600 font-medium">{rating}</span>
+                <span className="text-xs text-stone-400">({totalReviews})</span>
+              </div>
+            )}
+
+            <div className="mt-2 space-y-2">
+              <div className="flex items-center gap-1.5">
+                <p className="font-bold text-stone-400 text-xs line-through">₦{Number(listing.price).toLocaleString()}</p>
+                <p className="font-bold text-red-600 text-sm">₦{dealPrice.toLocaleString()}</p>
+              </div>
+              {isReserved ? (
+                <span className="text-[10px] text-stone-400 font-semibold flex items-center gap-0.5">
+                  <Clock className="w-3 h-3" /> Reserved
+                </span>
+              ) : (
+                <div className="flex gap-1.5">
+                  <button
+                    onClick={e => {
+                      if (isOwn) {
+                        e.preventDefault(); e.stopPropagation();
+                        router.push('/vendor/dashboard/listings');
+                        return;
+                      }
+                      if (isService) return;
+                      e.preventDefault(); e.stopPropagation();
+                      addToCart({ id: listing.id, title: listing.title, price: dealPrice, img: listing.image || "" });
+                      showToast(inCart ? "Added again (+1)" : "Added to cart");
+                    }}
+                    className="flex-1 py-2 rounded-xl text-white text-xs font-bold flex items-center justify-center gap-1.5 hover:opacity-90 transition-opacity"
+                    style={{ background: "linear-gradient(135deg,#2DD4BF 0%,#0D9488 100%)" }}>
+                    <ShoppingCart className="w-3.5 h-3.5" />
+                    {isOwn ? "Manage" : isService ? "Book Now" : inCart ? "In Cart" : "Add to Cart"}
+                  </button>
+                  <button
+                    onClick={async e => {
+                      e.preventDefault(); e.stopPropagation();
+                      const url = `${window.location.origin}/listing/${listing.id}`;
+                      if (navigator.share) {
+                        await navigator.share({ title: listing.title, url }).catch(() => {});
+                      } else {
+                        await navigator.clipboard.writeText(url);
+                        showToast("Link copied!");
+                      }
+                    }}
+                    className="p-2 rounded-xl bg-stone-100 hover:bg-stone-200 transition flex items-center justify-center flex-shrink-0"
+                  >
+                    <Share2 className="w-3.5 h-3.5 text-stone-500" />
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </Link>
+      </div>
+    );
+  };
+
   const renderVendorCard = (vendor: Vendor, i: number) => {
     const src = vendor.username === (user as any)?.username && (user as any)?.profile_image ? (user as any).profile_image : vendor.profile_picture;
     const displaySrc = src?.startsWith("http") ? src : null;
@@ -923,124 +1041,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                   </div>
                 </div>
                 <div className={gridClass}>
-                  {deals.map((deal, i) => {
-                    const listing = deal.listing;
-                    const badge = listing.vendor?.profile?.vendor_badge;
-                    const rating = listing.vendor?.profile?.rating;
-                    const totalReviews = listing.vendor?.profile?.total_reviews;
-                    const wishlisted = mounted && isInWishlist(listing.id);
-                    const isService = (listing.listing_type || "").toLowerCase() === "service";
-                    const isOwn = !!(user?.id && user.id === listing.vendor?.id);
-                    const isReserved = !isService && !isOwn && !!listing.is_reserved;
-                    const inCart = cart.some(ci => ci.id === listing.id);
-
-                    return (
-                      <motion.div
-                        key={listing.id}
-                        initial={{ opacity: 0, y: 12 }}
-                        whileInView={{ opacity: 1, y: 0 }}
-                        viewport={{ once: true }}
-                        transition={{ delay: Math.min(i * 0.04, 0.2) }}
-                        className="bg-white rounded-xl border border-stone-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow group relative">
-
-                        {/* Discount Badge */}
-                        <div className="absolute top-2.5 right-2.5 z-20 bg-red-500 text-white px-2.5 py-1 rounded-full text-[11px] font-black">
-                          -{deal.discount_percent}% OFF
-                        </div>
-
-                        <Link href={`/listing/${listing.id}`} className="block">
-                          <div className="relative w-full aspect-square overflow-hidden bg-stone-50">
-                            <SafeImage src={listing.image?.startsWith("http") ? listing.image : null} alt={listing.title} />
-
-                            {!listing.is_available && (
-                              <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                                <span className="text-white font-bold bg-red-500 px-3 py-1 rounded-full text-xs">Unavailable</span>
-                              </div>
-                            )}
-
-                            {badge && badge !== "none" && (
-                              <div className="absolute top-2.5 left-2.5 z-10 px-2 py-0.5 rounded-md text-[10px] font-bold text-white" style={{ background: GRAD }}>
-                                {BADGE_LABELS[badge]}
-                              </div>
-                            )}
-
-                            <motion.button onClick={e => {
-                              e.preventDefault(); e.stopPropagation();
-                              const item = { id: listing.id, title: listing.title, price: listing.price, img: listing.image };
-                              if (wishlisted) { removeFromWishlist(listing.id); showToast("Removed from Wishlist"); }
-                              else { addToWishlist(item); showToast("Added to Wishlist ❤️"); }
-                            }} whileTap={{ scale: 0.85 }}
-                              className="absolute top-2.5 right-2.5 z-10 w-7 h-7 bg-white rounded-full shadow-sm flex items-center justify-center mt-7">
-                              <Heart className={`w-3.5 h-3.5 ${wishlisted ? "fill-red-500 text-red-500" : "text-stone-400"}`} />
-                            </motion.button>
-                          </div>
-
-                          <div className="p-3">
-                            <p className="font-bold text-stone-900 text-sm line-clamp-1">{listing.title}</p>
-                            <p className="text-stone-400 text-xs mt-0.5 truncate">@{listing.vendor?.username || listing.vendor}</p>
-                            {listing.vendor?.hostel && (
-                              <div className="flex items-center gap-0.5 mt-0.5">
-                                <MapPin className="w-3 h-3 text-teal-400 flex-shrink-0" />
-                                <span className="text-xs text-stone-400 truncate">{listing.vendor.hostel}</span>
-                              </div>
-                            )}
-
-                            {totalReviews > 0 && (
-                              <div className="flex items-center gap-0.5 mt-1.5">
-                                <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
-                                <span className="text-xs text-stone-600 font-medium">{rating}</span>
-                                <span className="text-xs text-stone-400">({totalReviews})</span>
-                              </div>
-                            )}
-
-                            <div className="mt-2 space-y-2">
-                              <div className="flex items-center gap-2">
-                                <p className="font-bold text-stone-400 text-xs line-through">₦{Number(listing.price).toLocaleString()}</p>
-                                <p className="font-bold text-red-600 text-sm">₦{Number(deal.discounted_price).toLocaleString()}</p>
-                              </div>
-                              {isReserved ? (
-                                <span className="text-[10px] text-stone-400 font-semibold flex items-center gap-0.5">
-                                  <Clock className="w-3 h-3" /> Reserved
-                                </span>
-                              ) : (
-                                <div className="flex gap-1.5">
-                                  <button
-                                    onClick={e => {
-                                      e.preventDefault(); e.stopPropagation();
-                                      if (isOwn) { router.push("/vendor/dashboard"); return; }
-                                      if (isService) { router.push(`/listing/${listing.id}`); return; }
-                                      if (!isLoggedIn) { router.push("/login"); return; }
-                                      addToCart({ id: listing.id, title: listing.title, price: Number(deal.discounted_price), img: listing.image || "" });
-                                      showToast("Added to cart 🛒");
-                                    }}
-                                    className="flex-1 flex items-center justify-center gap-1.5 text-[11px] font-bold text-white py-2 rounded-xl transition active:scale-95"
-                                    style={{ background: "linear-gradient(135deg,#2DD4BF 0%,#0D9488 100%)" }}>
-                                    <ShoppingCart className="w-3.5 h-3.5" />
-                                    {isOwn ? "Manage" : isService ? "Book Now" : inCart ? "In Cart" : "Add to Cart"}
-                                  </button>
-                                  <button
-                                    onClick={async e => {
-                                      e.preventDefault(); e.stopPropagation();
-                                      const url = `${window.location.origin}/listing/${listing.id}`;
-                                      if (navigator.share) {
-                                        await navigator.share({ title: listing.title, url }).catch(() => {});
-                                      } else {
-                                        await navigator.clipboard.writeText(url);
-                                        showToast("Link copied!");
-                                      }
-                                    }}
-                                    className="p-2 rounded-xl bg-stone-100 hover:bg-stone-200 transition flex items-center justify-center flex-shrink-0"
-                                  >
-                                    <Share2 className="w-3.5 h-3.5 text-stone-500" />
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </Link>
-                      </motion.div>
-                    );
-                  })}
+                  {deals.map((deal, i) => renderDealCard(deal, i))}
                 </div>
               </div>
             )}
