@@ -1,6 +1,6 @@
 # services/serializers.py
 from rest_framework import serializers
-from .models import Category, Listing, Transaction
+from .models import Category, Listing, Transaction, Deal
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
@@ -174,3 +174,5 @@ class DealDetailSerializer(serializers.ModelSerializer):
 
     def get_discounted_price(self, obj):
         return float(obj.discounted_price)
+
+
