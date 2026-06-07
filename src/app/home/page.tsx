@@ -42,7 +42,7 @@ export default async function HomePage() {
       fetch(`${API_URL}/api/auth/vendors/?campus=${campus}&page_size=100`, opts),
       fetch(`${API_URL}/api/services/listings/?campus=${campus}&page_size=100`, opts),
       fetch(`${API_URL}/api/services/categories/?campus=${campus}`, opts),
-      fetch(`${API_URL}/api/services/vendor-of-month/`, opts),
+      fetch(`${API_URL}/api/services/vendor-of-month/?campus=${campus}`, opts),
     ]);
     if (vRes.ok) { const d = await vRes.json(); initialVendors = d.results || d || []; }
     if (lRes.ok) { const d = await lRes.json(); initialListings = d.results || d || []; }

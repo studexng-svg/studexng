@@ -54,15 +54,17 @@ export default async function CategoryPage({ params }: { params: { slug: string 
   const cookieStore = await cookies();
   const campus = cookieStore.get('studex_campus')?.value || 'pau';
   let initialListings: Listing[] = [];
+  let nextPage: string | null = null;
   try {
-    const res = await fetch(`${API_URL}/api/services/listings/?category=${slug}&campus=${campus}`, {
+    const res = await fetch(`${API_URL}/api/services/listings/?category=${slug}&campus=${campus}&page_size=100`, {
       cache: 'no-store',
       headers: { "Content-Type": "application/json" },
     });
     if (res.ok) {
       const data = await res.json();
       initialListings = data.results || [];
+      nextPage = data.next || null;
     }
   } catch {}
-  return <CategoryPageClient slug={slug} initialListings={initialListings} />;
+  return <CategoryPageClient slug={slug} initialListings={initialListings} initialNextPage={nextPage} />;
 }

@@ -4,9 +4,9 @@ async function fetchFeaturedListings(): Promise<any[]> {
   const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
   try {
     const [pau, futo] = await Promise.all([
-      fetch(`${API_URL}/api/services/listings/?campus=pau`, { next: { revalidate: 300 } })
+      fetch(`${API_URL}/api/services/listings/?campus=pau&page_size=100`, { next: { revalidate: 300 } })
         .then(r => r.ok ? r.json() : null).catch(() => null),
-      fetch(`${API_URL}/api/services/listings/?campus=futo`, { next: { revalidate: 300 } })
+      fetch(`${API_URL}/api/services/listings/?campus=futo&page_size=100`, { next: { revalidate: 300 } })
         .then(r => r.ok ? r.json() : null).catch(() => null),
     ]);
     const shuffle = <T,>(arr: T[]) =>

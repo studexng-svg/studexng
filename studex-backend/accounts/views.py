@@ -406,7 +406,7 @@ def me(request):
         'business_name': user.business_name or '',
         'hostel': user.hostel or '',
         'matric_number': user.matric_number or '',
-        'school': user.school or '',
+        'school': user.school,
         'date_joined': user.date_joined.isoformat(),
         'unread_notifications': unread_notifications,
         'profile_bonus_eligible': profile_data.get('profile_bonus_eligible', False),

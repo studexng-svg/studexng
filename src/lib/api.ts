@@ -26,6 +26,7 @@ export interface UserProfile {
   email: string;
   phone: string;
   user_type: string;
+  school?: string;
   matric_number?: string;
   hostel?: string;
   business_name?: string;

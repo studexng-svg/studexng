@@ -218,7 +218,14 @@ export default function HomePageClient({ initialVendors, initialListings, initia
   useEffect(() => {
     if (!isHydrated) return;
     if (!isLoggedIn || !user) { setCampusReady(true); return; }
-    const school = ((user as any).school || "").toLowerCase();
+    let school = ((user as any).school || "").toLowerCase();
+    // Fallback: infer school from email domain if not set in profile
+    if (!school && user.email) {
+      const emailLower = user.email.toLowerCase();
+      if (emailLower.includes("@pau.edu.ng")) school = "pau";
+      else if (emailLower.includes("@futo.edu.ng")) school = "futo";
+      else if (emailLower.includes("@imsu.edu.ng")) school = "imsu";
+    }
     if (school !== "pau" && school !== "futo" && school !== "imsu") { setCampusReady(true); return; }
     const cookie = document.cookie.split(";").find(c => c.trim().startsWith("studex_campus="))?.split("=")?.[1]?.toLowerCase() || "pau";
     if (cookie === school) { setCampusReady(true); return; }
@@ -240,7 +247,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
     const t = setTimeout(async () => {
       setSearching(true);
       try {
-        const url = `${API_URL}/api/services/listings/?search=${encodeURIComponent(searchQuery)}`;
+        const url = `${API_URL}/api/services/listings/?search=${encodeURIComponent(searchQuery)}&page_size=20`;
         const res = isLoggedIn ? await fetchWithAuth(url) : await fetch(url);
         const data = await res.json();
         setSearchResults(data.results || data || []); setShowResults(true);
@@ -800,16 +807,18 @@ export default function HomePageClient({ initialVendors, initialListings, initia
               </button>
             ))}
           </div>
-          {mounted && (!isLoggedIn || !(user as any)?.school) && (
-            <div className="flex items-center gap-2 mt-3">
+          {mounted && (!isLoggedIn || (!user?.email || !["@pau.edu.ng", "@futo.edu.ng", "@imsu.edu.ng"].some(domain => user.email?.toLowerCase().includes(domain)))) && (!isLoggedIn || !(user as any)?.school) && (
+            <div className="flex items-center gap-3 mt-3">
               <span className="text-[11px] text-stone-400 font-medium">Campus:</span>
-              {(["pau", "futo", "imsu"] as const).map(c => (
-                <button key={c} onClick={() => switchCampus(c)}
-                  className={`px-3 py-1 rounded-full text-xs font-bold uppercase transition ${currentCampus === c ? "text-white" : "bg-white text-stone-500 border border-stone-200"}`}
-                  style={currentCampus === c ? { background: GRAD } : {}}>
-                  {c}
-                </button>
-              ))}
+              <select
+                value={currentCampus}
+                onChange={(e) => switchCampus(e.target.value as "pau" | "futo" | "imsu")}
+                className="px-3 py-1.5 rounded-lg text-xs font-bold uppercase bg-white border border-stone-200 text-stone-700 hover:border-stone-300 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-400 transition-all cursor-pointer"
+              >
+                <option value="pau">PAU</option>
+                <option value="futo">FUTO</option>
+                <option value="imsu">IMSU</option>
+              </select>
             </div>
           )}
 

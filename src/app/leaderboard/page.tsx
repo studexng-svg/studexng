@@ -23,7 +23,7 @@ export default async function LeaderboardPage() {
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d) vendors = d.results || d || []; })
       .catch(() => {}),
-    fetch(`${API_URL}/api/services/vendor-of-month/`, { cache: 'no-store' })
+    fetch(`${API_URL}/api/services/vendor-of-month/?campus=${campus}`, { cache: 'no-store' })
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d) currentVotm = d; })
       .catch(() => {}),

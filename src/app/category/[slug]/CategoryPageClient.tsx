@@ -52,6 +52,7 @@ interface ActiveChat {
 interface Props {
   slug: string;
   initialListings: Listing[];
+  initialNextPage?: string | null;
 }
 
 const BADGE_LABELS: Record<string, string> = {
@@ -107,7 +108,7 @@ function ListingSkeletons() {
   );
 }
 
-export default function CategoryPageClient({ slug, initialListings }: Props) {
+export default function CategoryPageClient({ slug, initialListings, initialNextPage }: Props) {
   const router = useRouter();
   const { fetchCart } = useCartStore();
   const { isLoggedIn, user, isHydrated } = useAuth();
@@ -121,6 +122,8 @@ export default function CategoryPageClient({ slug, initialListings }: Props) {
   const [toast, setToast] = useState("");
   const [activeChat, setActiveChat] = useState<ActiveChat | null>(null);
   const [lightboxImage, setLightboxImage] = useState<{ src: string; title: string } | null>(null);
+  const [nextPage, setNextPage] = useState<string | null>(initialNextPage || null);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   const categoryName = slug.split('-').map(w => w[0].toUpperCase() + w.slice(1)).join(' ');
 
@@ -166,14 +169,15 @@ export default function CategoryPageClient({ slug, initialListings }: Props) {
     const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
     const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
     document.cookie = `studex_campus=${userSchool}; path=/; max-age=31536000; SameSite=Lax${isHttps ? '; Secure' : ''}`;
-    fetchWithAuth(`${API_URL}/api/services/listings/?category=${slug}&campus=${userSchool}`)
+    fetchWithAuth(`${API_URL}/api/services/listings/?category=${slug}&campus=${userSchool}&page_size=100`)
       .then(async (res) => {
         if (res.ok) {
           const data = await res.json();
-          setListings(data.results || data || []);
+          setListings(Array.isArray(data.results) ? data.results : data || []);
+          setNextPage(data.next || null);
         }
       })
-      .catch(() => {})
+      .catch(() => { setListings([]); setNextPage(null); })
       .finally(() => setCampusReady(true));
   }, [isHydrated, isLoggedIn, (user as any)?.school, slug]);
 
@@ -181,6 +185,42 @@ export default function CategoryPageClient({ slug, initialListings }: Props) {
     setToast(msg);
     setTimeout(() => setToast(""), 2000);
   };
+
+  const loadMoreListings = async () => {
+    if (!nextPage || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const res = isLoggedIn ? await fetchWithAuth(nextPage) : await fetch(nextPage);
+      if (res.ok) {
+        const data = await res.json();
+        setListings(prev => [...prev, ...(data.results || [])]);
+        setNextPage(data.next || null);
+      }
+    } catch {
+      // silently fail, user can try again
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  // Intersection observer for infinite scroll
+  useEffect(() => {
+    if (!mounted || !nextPage) return;
+    const sentinel = document.getElementById('listings-sentinel');
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries[0].isIntersecting && !loadingMore) {
+          loadMoreListings();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [nextPage, loadingMore, mounted, isLoggedIn]);
 
   const API_URL_LOCAL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -371,8 +411,9 @@ export default function CategoryPageClient({ slug, initialListings }: Props) {
                 </Link>
               </motion.div>
             ) : (
-              <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4">
-                {sortedListings.map((listing, i) => {
+              <>
+                <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4">
+                  {sortedListings.map((listing, i) => {
                   const badge = listing.vendor.profile?.vendor_badge;
                   const rating = listing.vendor.profile?.rating;
                   const totalReviews = listing.vendor.profile?.total_reviews;
@@ -458,7 +499,20 @@ export default function CategoryPageClient({ slug, initialListings }: Props) {
                     </motion.div>
                   );
                 })}
-              </div>
+                </div>
+                {nextPage && (
+                  <div id="listings-sentinel" className="flex justify-center py-8">
+                    {loadingMore ? (
+                      <div className="flex items-center gap-2 text-stone-400">
+                        <div className="w-4 h-4 rounded-full border-2 border-stone-200 border-t-teal-500 animate-spin" />
+                        <span className="text-sm">Loading more...</span>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-stone-300">Scroll for more</span>
+                    )}
+                  </div>
+                )}
+              </>
             )}
           </div>
 
