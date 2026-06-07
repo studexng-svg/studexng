@@ -147,12 +147,24 @@ export default function ChatRoomPage() {
 
   const formatLastSeen = (lastSeen: string | null): string => {
     if (!lastSeen) return '';
-    const diff = Math.floor((Date.now() - new Date(lastSeen).getTime()) / 60000);
-    if (diff < 1) return 'Active just now';
-    if (diff < 60) return `Last seen ${diff}m ago`;
-    const hrs = Math.floor(diff / 60);
-    if (hrs < 24) return `Last seen ${hrs}h ago`;
-    return `Last seen ${Math.floor(hrs / 24)}d ago`;
+    const date = new Date(lastSeen);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    if (diffMins < 1) return 'Active just now';
+    if (diffMins < 60) return `Last seen ${diffMins}m ago`;
+    const time = date.toLocaleTimeString('en-NG', { hour: '2-digit', minute: '2-digit', hour12: false });
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterdayStart = new Date(todayStart.getTime() - 86400000);
+    if (date >= todayStart) return `Last seen today at ${time}`;
+    if (date >= yesterdayStart) return `Last seen yesterday at ${time}`;
+    const diffDays = Math.floor((todayStart.getTime() - date.getTime()) / 86400000) + 1;
+    if (diffDays < 7) {
+      const day = date.toLocaleDateString('en-NG', { weekday: 'long' });
+      return `Last seen ${day} at ${time}`;
+    }
+    const dateStr = date.toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' });
+    return `Last seen ${dateStr} at ${time}`;
   };
 
   const loadAll = async () => {
