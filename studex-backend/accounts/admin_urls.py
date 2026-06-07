@@ -33,6 +33,7 @@ from accounts.admin_views import (
     AdminConversationListView,
     AdminConversationDetailView,
     AdminBroadcastMessageView,
+    AdminBroadcastPreviewView,
     AdminBroadcastCountsView,
     AdminGroqNotifyView,
     AdminPlatformSettingsView,
@@ -112,6 +113,7 @@ if AdminCategoryListView is not None:
 # Broadcast messaging
 urlpatterns += [
     path('notify-all/', AdminBroadcastMessageView.as_view(), name='notify-all'),
+    path('broadcast-preview/', AdminBroadcastPreviewView.as_view(), name='broadcast-preview'),
     path('broadcast-counts/', AdminBroadcastCountsView.as_view(), name='broadcast-counts'),
     path('groq-notify/', AdminGroqNotifyView.as_view(), name='groq-notify'),
     path('platform-settings/', AdminPlatformSettingsView.as_view(), name='platform-settings'),

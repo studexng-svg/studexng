@@ -212,6 +212,10 @@ function BroadcastCompose() {
   const [confirmed, setConfirmed] = useState(false);
   const [counts, setCounts] = useState<BroadcastCounts>({});
   const [countsLoading, setCountsLoading] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const [previews, setPreviews] = useState<any[]>([]);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [showVariables, setShowVariables] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -224,6 +228,30 @@ function BroadcastCompose() {
       .finally(() => { if (!cancelled) setCountsLoading(false); });
     return () => { cancelled = true; };
   }, [school]);
+
+  const preview = async () => {
+    if (!title.trim() || !message.trim()) return;
+    setPreviewLoading(true);
+    try {
+      const res = await fetchWithAuth(`${API_URL}/api/admin/broadcast-preview/`, {
+        method: "POST",
+        body: JSON.stringify({
+          title: title.trim(),
+          message: message.trim(),
+          school: school || undefined,
+          user_type: userType || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to load preview");
+      setPreviews(data.samples || []);
+      setShowPreview(true);
+    } catch (e: any) {
+      setError(e.message || "Failed to load preview");
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
 
   const send = async () => {
     if (!confirmed) { setConfirmed(true); return; }
@@ -302,25 +330,61 @@ function BroadcastCompose() {
         </Field>
       </div>
 
-      <Field label="Title">
-        <input
-          value={title}
-          onChange={e => setTitle(e.target.value)}
-          maxLength={200}
-          placeholder="Broadcast title…"
-          className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl text-sm text-stone-900 placeholder:text-stone-400 focus:outline-none focus:border-teal-400"
-        />
-      </Field>
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <Field label="Title">
+            <input
+              value={title}
+              onChange={e => setTitle(e.target.value)}
+              maxLength={200}
+              placeholder="e.g., Hey {{username}}, check this out!"
+              className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl text-sm text-stone-900 placeholder:text-stone-400 focus:outline-none focus:border-teal-400"
+            />
+          </Field>
+          <button
+            onClick={() => setShowVariables(!showVariables)}
+            className="text-xs text-teal-600 font-semibold hover:text-teal-700 mt-6"
+          >
+            {showVariables ? "Hide" : "Show"} variables
+          </button>
+        </div>
+        {showVariables && (
+          <div className="bg-teal-50 border border-teal-200 rounded-xl px-3 py-2.5 text-xs text-teal-800">
+            <p className="font-semibold mb-1.5">Available variables:</p>
+            <div className="grid grid-cols-2 gap-1.5">
+              <code className="bg-white px-2 py-1 rounded border border-teal-100">{{username}}</code>
+              <code className="bg-white px-2 py-1 rounded border border-teal-100">{{email}}</code>
+              <code className="bg-white px-2 py-1 rounded border border-teal-100">{{business_name}}</code>
+              <code className="bg-white px-2 py-1 rounded border border-teal-100">{{first_name}}</code>
+              <code className="bg-white px-2 py-1 rounded border border-teal-100">{{school}}</code>
+              <code className="bg-white px-2 py-1 rounded border border-teal-100">{{user_type}}</code>
+            </div>
+          </div>
+        )}
+      </div>
 
       <Field label="Message">
         <textarea
           value={message}
           onChange={e => setMessage(e.target.value)}
           rows={4}
-          placeholder="Write your broadcast message…"
+          placeholder="e.g., Hi {{username}}, thanks for using StudEx! Check out these new {{business_name}} listings..."
           className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl text-sm text-stone-900 placeholder:text-stone-400 focus:outline-none focus:border-teal-400 resize-none"
         />
       </Field>
+
+      {showPreview && previews.length > 0 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-3">
+          <p className="text-sm font-semibold text-blue-900">Preview for sample users:</p>
+          {previews.map((p, i) => (
+            <div key={i} className="bg-white rounded-lg border border-blue-100 p-3 space-y-1.5">
+              <p className="text-xs text-blue-600 font-semibold">{p.business_name} (@{p.username})</p>
+              <p className="text-xs font-bold text-stone-900">{p.title}</p>
+              <p className="text-xs text-stone-600">{p.message}</p>
+            </div>
+          ))}
+        </div>
+      )}
 
       {confirmed && !sending && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800 font-medium">
@@ -329,16 +393,26 @@ function BroadcastCompose() {
         </div>
       )}
 
-      <button
-        onClick={send}
-        disabled={!title.trim() || !message.trim() || sending}
-        className={`w-full py-3.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition disabled:opacity-40 ${
-          confirmed ? "bg-amber-500 hover:bg-amber-600 text-white" : "bg-purple-600 hover:bg-purple-700 text-white"
-        }`}
-      >
-        {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-        {sending ? "Sending…" : confirmed ? "Confirm Broadcast" : "Broadcast"}
-      </button>
+      <div className="flex gap-2">
+        <button
+          onClick={preview}
+          disabled={!title.trim() || !message.trim() || previewLoading}
+          className="flex-1 py-2.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition disabled:opacity-40 bg-stone-100 hover:bg-stone-200 text-stone-700"
+        >
+          {previewLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+          {previewLoading ? "Loading…" : "Preview"}
+        </button>
+        <button
+          onClick={send}
+          disabled={!title.trim() || !message.trim() || sending}
+          className={`flex-1 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition disabled:opacity-40 ${
+            confirmed ? "bg-amber-500 hover:bg-amber-600 text-white" : "bg-purple-600 hover:bg-purple-700 text-white"
+          }`}
+        >
+          {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+          {sending ? "Sending…" : confirmed ? "Confirm Broadcast" : "Broadcast"}
+        </button>
+      </div>
     </div>
   );
 }

@@ -2536,6 +2536,29 @@ def _apply_user_type_filter(qs, user_type: str):
     return qs, False
 
 
+def _personalize_message(template: str, user) -> str:
+    """Replace template variables like {{username}} with user data."""
+    import re
+
+    # Map of available variables
+    variables = {
+        'username': user.username or '',
+        'email': user.email or '',
+        'first_name': user.first_name or '',
+        'last_name': user.last_name or '',
+        'business_name': user.business_name or '',
+        'school': user.school or '',
+        'user_type': user.user_type or '',
+    }
+
+    # Replace {{variable}} with actual values
+    def replace_var(match):
+        var_name = match.group(1)
+        return str(variables.get(var_name, match.group(0)))
+
+    return re.sub(r'\{\{(\w+)\}\}', replace_var, template)
+
+
 class AdminBroadcastCountsView(APIView):
     """
     GET /api/admin/broadcast-counts/?school=
@@ -2568,6 +2591,46 @@ class AdminBroadcastCountsView(APIView):
         return Response(counts)
 
 
+class AdminBroadcastPreviewView(APIView):
+    """
+    POST /api/admin/broadcast-preview/
+    Preview how a message template will look for sample users.
+    Body: { title, message, school?, user_type? }
+    Returns: { samples: [{ username, title, message }, ...] }
+    """
+    permission_classes = [IsAdminUser]
+
+    def post(self, request):
+        title   = (request.data.get('title')   or '').strip()
+        message = (request.data.get('message') or '').strip()
+        school     = (request.data.get('school')     or '').strip().lower()
+        user_type  = (request.data.get('user_type')  or '').strip().lower()
+
+        if not title or not message:
+            return Response(
+                {'error': 'title and message are required'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        recipients = _broadcast_base_qs(school)
+        if user_type:
+            recipients, _ = _apply_user_type_filter(recipients, user_type)
+
+        # Get up to 3 sample users
+        samples = []
+        for user in recipients[:3]:
+            personalized_title = _personalize_message(title, user)
+            personalized_message = _personalize_message(message, user)
+            samples.append({
+                'username': user.username,
+                'business_name': user.business_name or user.username,
+                'title': personalized_title,
+                'message': personalized_message,
+            })
+
+        return Response({'samples': samples})
+
+
 class AdminBroadcastMessageView(APIView):
     """
     POST /api/admin/notify-all/
@@ -2597,11 +2660,13 @@ class AdminBroadcastMessageView(APIView):
         sent = 0
         for user in recipients.iterator():
             try:
+                personalized_title = _personalize_message(title, user)
+                personalized_message = _personalize_message(message, user)
                 send_notification(
                     recipient=user,
                     notification_type='admin_message',
-                    title=title,
-                    message=message,
+                    title=personalized_title,
+                    message=personalized_message,
                     action_url='',
                 )
                 sent += 1
