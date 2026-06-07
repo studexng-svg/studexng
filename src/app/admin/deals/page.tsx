@@ -237,7 +237,7 @@ export default function DealsPage() {
             <Plus className="w-5 h-5 text-teal-600" /> Add New Deal
           </h2>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Search Listing">
               <div className="relative" ref={dropdownRef}>
                 <div className="relative">
@@ -342,106 +342,152 @@ export default function DealsPage() {
               <p className="text-xs mt-1">Search for a listing above to create your first deal</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="border-b border-stone-200 bg-stone-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-stone-600">Product / Service</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-stone-600">Vendor</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-stone-600">Original Price</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-stone-600">Discount</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-stone-600">Discounted Price</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-stone-600">Active</th>
-                    <th className="px-6 py-3 text-left text-xs font-semibold text-stone-600">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-stone-100">
-                  {filteredDeals.map((deal) => (
-                    <tr key={deal.id} className="hover:bg-stone-50 transition">
-                      <td className="px-6 py-4">
-                        <p className="font-medium text-stone-900 text-sm">{deal.listing?.title}</p>
-                      </td>
-                      <td className="px-6 py-4">
-                        <p className="text-sm text-stone-600">@{deal.listing?.vendor?.username}</p>
-                      </td>
-                      <td className="px-6 py-4">
-                        <p className="text-sm font-medium text-stone-900">
-                          ₦{parseFloat(deal.listing?.price).toLocaleString()}
-                        </p>
-                      </td>
-                      <td className="px-6 py-4">
-                        {editingId === deal.id ? (
-                          <div className="flex items-center gap-1">
-                            <input
-                              type="number" min="1" max="100" step="1"
-                              value={editDiscount}
-                              onChange={(e) => setEditDiscount(e.target.value)}
-                              className="w-16 px-2 py-1 bg-stone-50 border border-teal-400 rounded-lg text-xs text-stone-900 focus:outline-none"
-                              autoFocus
-                            />
-                            <span className="text-xs text-stone-500">%</span>
-                            {savingEdit ? (
-                              <Loader2 className="w-4 h-4 animate-spin text-teal-600" />
-                            ) : (
-                              <>
-                                <button onClick={() => saveEdit(deal.id)} className="text-teal-600 hover:text-teal-700 transition" title="Save">
-                                  <Check className="w-4 h-4" />
-                                </button>
-                                <button onClick={cancelEdit} className="text-stone-400 hover:text-stone-600 transition" title="Cancel">
-                                  <X className="w-4 h-4" />
-                                </button>
-                              </>
-                            )}
-                          </div>
+            <>
+              {/* ── Mobile cards (hidden on md+) ── */}
+              <div className="divide-y divide-stone-100 md:hidden">
+                {filteredDeals.map((deal) => (
+                  <div key={deal.id} className="p-4 space-y-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="font-semibold text-stone-900 text-sm truncate">{deal.listing?.title}</p>
+                        <p className="text-xs text-stone-400 mt-0.5">@{deal.listing?.vendor?.username}</p>
+                      </div>
+                      <span className={`shrink-0 text-xs font-bold px-2 py-0.5 rounded-full ${deal.is_active ? "bg-teal-50 text-teal-700" : "bg-stone-100 text-stone-400"}`}>
+                        {deal.is_active ? "Active" : "Inactive"}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <p className="text-xs text-stone-400 line-through">₦{parseFloat(deal.listing?.price).toLocaleString()}</p>
+                      <p className="text-sm font-bold text-teal-600">₦{parseFloat(deal.discounted_price).toLocaleString()}</p>
+                      <div className="bg-red-50 text-red-700 px-2 py-0.5 rounded-full text-xs font-bold">
+                        -{deal.discount_percent}%
+                      </div>
+                    </div>
+
+                    {editingId === deal.id ? (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number" min="1" max="100" step="1"
+                          value={editDiscount}
+                          onChange={(e) => setEditDiscount(e.target.value)}
+                          className="w-20 px-2 py-1.5 bg-stone-50 border border-teal-400 rounded-lg text-sm text-stone-900 focus:outline-none"
+                          autoFocus
+                        />
+                        <span className="text-xs text-stone-500">%</span>
+                        {savingEdit ? (
+                          <Loader2 className="w-4 h-4 animate-spin text-teal-600" />
                         ) : (
-                          <div className="bg-red-50 text-red-700 px-3 py-1 rounded-full text-xs font-bold inline-block">
-                            -{deal.discount_percent}%
-                          </div>
+                          <>
+                            <button onClick={() => saveEdit(deal.id)} className="text-teal-600 hover:text-teal-700"><Check className="w-4 h-4" /></button>
+                            <button onClick={cancelEdit} className="text-stone-400 hover:text-stone-600"><X className="w-4 h-4" /></button>
+                          </>
                         )}
-                      </td>
-                      <td className="px-6 py-4">
-                        <p className="text-sm font-bold text-teal-600">
-                          ₦{parseFloat(deal.discounted_price).toLocaleString()}
-                        </p>
-                      </td>
-                      <td className="px-6 py-4">
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-3 pt-1">
                         <button
                           onClick={() => toggleActive(deal)}
                           disabled={togglingId === deal.id}
-                          className="transition disabled:opacity-50"
-                          title={deal.is_active ? "Deactivate" : "Activate"}
+                          className="flex items-center gap-1.5 text-xs font-medium text-stone-500 hover:text-teal-600 transition disabled:opacity-50"
                         >
-                          {togglingId === deal.id ? (
-                            <Loader2 className="w-5 h-5 animate-spin text-stone-400" />
-                          ) : deal.is_active ? (
-                            <ToggleRight className="w-6 h-6 text-teal-600" />
-                          ) : (
-                            <ToggleLeft className="w-6 h-6 text-stone-400" />
-                          )}
+                          {togglingId === deal.id ? <Loader2 className="w-4 h-4 animate-spin" /> : deal.is_active ? <ToggleRight className="w-5 h-5 text-teal-600" /> : <ToggleLeft className="w-5 h-5 text-stone-400" />}
+                          {deal.is_active ? "Deactivate" : "Activate"}
                         </button>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          {editingId !== deal.id && (
-                            <button onClick={() => startEdit(deal)} className="text-stone-500 hover:text-teal-600 transition" title="Edit discount">
-                              <Pencil className="w-4 h-4" />
-                            </button>
-                          )}
-                          <button
-                            onClick={() => deleteDeal(deal.id)}
-                            disabled={deletingId === deal.id}
-                            className="text-red-600 hover:text-red-700 transition disabled:opacity-50"
-                            title="Delete deal"
-                          >
-                            {deletingId === deal.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                          </button>
-                        </div>
-                      </td>
+                        <button onClick={() => startEdit(deal)} className="flex items-center gap-1.5 text-xs font-medium text-stone-500 hover:text-teal-600 transition">
+                          <Pencil className="w-4 h-4" /> Edit %
+                        </button>
+                        <button
+                          onClick={() => deleteDeal(deal.id)}
+                          disabled={deletingId === deal.id}
+                          className="flex items-center gap-1.5 text-xs font-medium text-red-500 hover:text-red-700 transition disabled:opacity-50 ml-auto"
+                        >
+                          {deletingId === deal.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                          Delete
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* ── Desktop table (hidden below md) ── */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full">
+                  <thead className="border-b border-stone-200 bg-stone-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-stone-600">Product / Service</th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-stone-600">Vendor</th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-stone-600">Original Price</th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-stone-600">Discount</th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-stone-600">Deal Price</th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-stone-600">Active</th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-stone-600">Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y divide-stone-100">
+                    {filteredDeals.map((deal) => (
+                      <tr key={deal.id} className="hover:bg-stone-50 transition">
+                        <td className="px-6 py-4">
+                          <p className="font-medium text-stone-900 text-sm">{deal.listing?.title}</p>
+                        </td>
+                        <td className="px-6 py-4">
+                          <p className="text-sm text-stone-600">@{deal.listing?.vendor?.username}</p>
+                        </td>
+                        <td className="px-6 py-4">
+                          <p className="text-sm font-medium text-stone-900">₦{parseFloat(deal.listing?.price).toLocaleString()}</p>
+                        </td>
+                        <td className="px-6 py-4">
+                          {editingId === deal.id ? (
+                            <div className="flex items-center gap-1">
+                              <input
+                                type="number" min="1" max="100" step="1"
+                                value={editDiscount}
+                                onChange={(e) => setEditDiscount(e.target.value)}
+                                className="w-16 px-2 py-1 bg-stone-50 border border-teal-400 rounded-lg text-xs text-stone-900 focus:outline-none"
+                                autoFocus
+                              />
+                              <span className="text-xs text-stone-500">%</span>
+                              {savingEdit ? (
+                                <Loader2 className="w-4 h-4 animate-spin text-teal-600" />
+                              ) : (
+                                <>
+                                  <button onClick={() => saveEdit(deal.id)} className="text-teal-600 hover:text-teal-700 transition"><Check className="w-4 h-4" /></button>
+                                  <button onClick={cancelEdit} className="text-stone-400 hover:text-stone-600 transition"><X className="w-4 h-4" /></button>
+                                </>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="bg-red-50 text-red-700 px-3 py-1 rounded-full text-xs font-bold inline-block">
+                              -{deal.discount_percent}%
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-6 py-4">
+                          <p className="text-sm font-bold text-teal-600">₦{parseFloat(deal.discounted_price).toLocaleString()}</p>
+                        </td>
+                        <td className="px-6 py-4">
+                          <button onClick={() => toggleActive(deal)} disabled={togglingId === deal.id} className="transition disabled:opacity-50" title={deal.is_active ? "Deactivate" : "Activate"}>
+                            {togglingId === deal.id ? <Loader2 className="w-5 h-5 animate-spin text-stone-400" /> : deal.is_active ? <ToggleRight className="w-6 h-6 text-teal-600" /> : <ToggleLeft className="w-6 h-6 text-stone-400" />}
+                          </button>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            {editingId !== deal.id && (
+                              <button onClick={() => startEdit(deal)} className="text-stone-500 hover:text-teal-600 transition"><Pencil className="w-4 h-4" /></button>
+                            )}
+                            <button onClick={() => deleteDeal(deal.id)} disabled={deletingId === deal.id} className="text-red-600 hover:text-red-700 transition disabled:opacity-50">
+                              {deletingId === deal.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+
           )}
         </div>
       </div>
