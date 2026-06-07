@@ -149,21 +149,23 @@ export default function ChatRoomPage() {
     if (!lastSeen) return '';
     const date = new Date(lastSeen);
     const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
+    const diffMins = Math.floor((now.getTime() - date.getTime()) / 60000);
     if (diffMins < 1) return 'Active just now';
-    if (diffMins < 60) return `Last seen ${diffMins}m ago`;
-    const time = date.toLocaleTimeString('en-NG', { hour: '2-digit', minute: '2-digit', hour12: false });
+    const h = date.getHours();
+    const m = date.getMinutes().toString().padStart(2, '0');
+    const ampm = h >= 12 ? 'pm' : 'am';
+    const hour12 = h % 12 || 12;
+    const time = `${hour12}:${m}${ampm}`;
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const yesterdayStart = new Date(todayStart.getTime() - 86400000);
     if (date >= todayStart) return `Last seen today at ${time}`;
     if (date >= yesterdayStart) return `Last seen yesterday at ${time}`;
     const diffDays = Math.floor((todayStart.getTime() - date.getTime()) / 86400000) + 1;
     if (diffDays < 7) {
-      const day = date.toLocaleDateString('en-NG', { weekday: 'long' });
+      const day = date.toLocaleDateString('en-US', { weekday: 'long' });
       return `Last seen ${day} at ${time}`;
     }
-    const dateStr = date.toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' });
+    const dateStr = date.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
     return `Last seen ${dateStr} at ${time}`;
   };
 
