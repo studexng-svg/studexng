@@ -67,6 +67,7 @@ export default function ChatRoomPage() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [otherUser, setOtherUser] = useState("");
+  const [otherUserPicture, setOtherUserPicture] = useState<string | null>(null);
   const [listingTitle, setListingTitle] = useState("");
   const [otherUserLastSeen, setOtherUserLastSeen] = useState<string | null>(null);
   const [otherUserOnline, setOtherUserOnline] = useState(false);
@@ -137,6 +138,7 @@ export default function ChatRoomPage() {
         const res = await fetchWithAuth(`${API_URL}/api/chat/conversations/${conversationId}/`);
         if (res.ok) {
           const conv = await res.json();
+          setOtherUserPicture(conv.other_user?.profile_picture || null);
           setOtherUserLastSeen(conv.other_user?.last_seen || null);
           setOtherUserOnline(conv.other_user?.is_online || false);
         }
@@ -188,6 +190,7 @@ export default function ChatRoomPage() {
 
       if (convData) {
         setOtherUser(convData.other_user?.username || convData.buyer_username || convData.seller_username || "");
+        setOtherUserPicture(convData.other_user?.profile_picture || null);
         setListingTitle(convData.listing_title || "");
         setOtherUserLastSeen(convData.other_user?.last_seen || null);
         setOtherUserOnline(convData.other_user?.is_online || false);
@@ -438,10 +441,14 @@ export default function ChatRoomPage() {
         >
           <ChevronLeft className="w-5 h-5 text-stone-600" />
         </button>
-        <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-base flex-shrink-0 shadow-sm"
-          style={{ background: GRAD }}>
-          {otherUser?.[0]?.toUpperCase() || "?"}
-        </div>
+        {otherUserPicture ? (
+          <img src={otherUserPicture} alt={otherUser} className="w-10 h-10 rounded-full object-cover flex-shrink-0 shadow-sm" />
+        ) : (
+          <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-base flex-shrink-0 shadow-sm"
+            style={{ background: GRAD }}>
+            {otherUser?.[0]?.toUpperCase() || "?"}
+          </div>
+        )}
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-stone-900">@{otherUser}</p>
           {otherUserOnline ? (
