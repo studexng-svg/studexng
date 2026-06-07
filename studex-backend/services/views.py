@@ -385,5 +385,10 @@ class DealsListView(APIView):
         from services.serializers import DealDetailSerializer
 
         deals = Deal.objects.filter(is_active=True).select_related('listing__vendor__profile', 'listing__category').order_by('-created_at')
+
+        campus = request.query_params.get('campus')
+        if campus:
+            deals = deals.filter(listing__vendor__school__iexact=campus)
+
         serializer = DealDetailSerializer(deals, many=True)
         return Response(serializer.data)
