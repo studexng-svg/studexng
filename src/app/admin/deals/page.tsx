@@ -63,12 +63,21 @@ export default function DealsPage() {
   const loadListings = async () => {
     setLoadingListings(true);
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/admin/listings/`);
-      if (res.ok) {
+      const allItems: any[] = [];
+      let url: string | null = `${API_URL}/api/admin/listings/?page_size=100`;
+      while (url) {
+        const res = await fetchWithAuth(url);
+        if (!res.ok) break;
         const data = await res.json();
-        const items = Array.isArray(data) ? data : (data.results ?? []);
-        setListings(items);
+        if (Array.isArray(data)) {
+          allItems.push(...data);
+          url = null;
+        } else {
+          allItems.push(...(data.results ?? []));
+          url = data.next ?? null;
+        }
       }
+      setListings(allItems);
     } catch {
       // non-critical, dropdown will just be empty
     } finally {
