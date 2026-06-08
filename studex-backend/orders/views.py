@@ -207,7 +207,7 @@ class OrderViewSet(viewsets.ModelViewSet):
         if order.status == 'completed':
             return Response({"message": "Order already confirmed.", "order": self.get_serializer(order).data})
 
-        if order.status not in ['paid', 'seller_completed']:
+        if order.status not in ['seller_completed']:
             return Response({"detail": f"Cannot confirm an order with status: '{order.status}'."}, status=400)
 
         order.status = 'completed'

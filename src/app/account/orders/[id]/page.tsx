@@ -64,6 +64,13 @@ export default function OrderDetailPage() {
   const [canReview, setCanReview] = useState(false);
   const [loyaltyReward, setLoyaltyReward] = useState<string | null>(null);
   const [loyalty, setLoyalty] = useState<LoyaltyStatus | null>(null);
+  const [justConfirmed, setJustConfirmed] = useState(false);
+  const [showDisputeModal, setShowDisputeModal] = useState(false);
+  const [disputeReason, setDisputeReason] = useState("service_not_completed");
+  const [disputeComplaint, setDisputeComplaint] = useState("");
+  const [disputeEvidence, setDisputeEvidence] = useState("");
+  const [disputing, setDisputing] = useState(false);
+  const [disputeError, setDisputeError] = useState("");
   const elapsed = useElapsed(order?.paid_at || order?.created_at);
 
   const fetchLoyalty = async () => {
@@ -113,12 +120,39 @@ export default function OrderDetailPage() {
         const data = await res.json();
         setOrder(prev => prev ? { ...prev, status: "completed" } : null);
         setCanReview(true);
+        setJustConfirmed(true);
         if (data.loyalty_reward?.awarded) setLoyaltyReward(data.loyalty_reward.message);
         setShowModal(false);
         fetchLoyalty();
       } else { alert("Failed to confirm. Please try again."); }
     } catch { alert("Network error."); }
     finally { setConfirming(false); }
+  };
+
+  const handleDisputeSubmit = async () => {
+    if (!order || !disputeComplaint.trim()) return;
+    setDisputing(true);
+    setDisputeError("");
+    try {
+      const res = await fetchWithAuth(`${API_URL}/api/orders/disputes/`, {
+        method: "POST",
+        body: JSON.stringify({
+          order: order.id,
+          reason: disputeReason,
+          complaint: disputeComplaint.trim(),
+          evidence: disputeEvidence.trim(),
+        }),
+      });
+      if (res.ok) {
+        setOrder(prev => prev ? { ...prev, status: "disputed" } : null);
+        setShowDisputeModal(false);
+      } else {
+        const data = await res.json();
+        const msg = data.non_field_errors?.[0] || data.detail || "Failed to submit dispute.";
+        setDisputeError(msg);
+      }
+    } catch { setDisputeError("Network error. Please try again."); }
+    finally { setDisputing(false); }
   };
 
   const handleOpenChat = async () => {
@@ -170,7 +204,8 @@ export default function OrderDetailPage() {
     </div>
   );
 
-  const canConfirm = order.status === "paid" || order.status === "seller_completed";
+  const canConfirm = order.status === "seller_completed";
+  const awaitingVendor = order.status === "paid";
   const isCompleted = order.status === "completed";
   const isCancelled = order.status === "cancelled" || order.current_status === "cancelled";
 
@@ -240,6 +275,21 @@ export default function OrderDetailPage() {
           </div>
         )}
 
+        {/* DISPUTED NOTICE */}
+        {order.status === "disputed" && (
+          <div className="bg-red-50 border border-red-200 rounded-2xl p-4 animate-fadeUp">
+            <div className="flex gap-3">
+              <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="font-semibold text-red-900 text-sm">Dispute Filed</p>
+                <p className="text-xs text-red-700 mt-1">
+                  Your dispute is under review. Our team will reach out with a resolution.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* COMPLETED NOTICE */}
         {isCompleted && (
           <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 animate-fadeUp">
@@ -248,7 +298,9 @@ export default function OrderDetailPage() {
               <div>
                 <p className="font-semibold text-emerald-900 text-sm">Order Completed ✓</p>
                 <p className="text-xs text-emerald-700 mt-1">
-                  The vendor will receive their payment shortly.
+                  {justConfirmed
+                    ? `Payment has been released to ${order.listing?.vendor?.username}. Thank you!`
+                    : `Payment has been released to ${order.listing?.vendor?.username}.`}
                 </p>
               </div>
             </div>
@@ -314,16 +366,25 @@ export default function OrderDetailPage() {
         )}
 
         {/* CONFIRM BUTTON */}
-        {canConfirm && (
+        {(canConfirm || awaitingVendor) && (
           <div className="space-y-3 animate-fadeUp">
+            {awaitingVendor ? (
+              <div className="w-full py-4 bg-stone-100 text-stone-400 rounded-full font-semibold text-base flex items-center justify-center gap-2 cursor-not-allowed select-none">
+                <Clock className="w-5 h-5" /> Waiting for vendor to confirm delivery
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowModal(true)}
+                className="w-full py-4 text-white rounded-full font-semibold text-base shadow-lg flex items-center justify-center gap-2 active:scale-[0.98] transition-all"
+                style={{ background: GRAD }}
+              >
+                <CheckCircle className="w-5 h-5" /> Confirm Service Received
+              </button>
+            )}
             <button
-              onClick={() => setShowModal(true)}
-              className="w-full py-4 text-white rounded-full font-semibold text-base shadow-lg flex items-center justify-center gap-2 active:scale-[0.98] transition-all"
-              style={{ background: GRAD }}
+              onClick={() => setShowDisputeModal(true)}
+              className="w-full py-3 bg-red-50 text-red-600 rounded-full font-semibold text-sm border border-red-100 active:scale-[0.98] transition-all"
             >
-              <CheckCircle className="w-5 h-5" /> Confirm Service Received
-            </button>
-            <button className="w-full py-3 bg-red-50 text-red-600 rounded-full font-semibold text-sm border border-red-100">
               Report an Issue
             </button>
           </div>
@@ -336,6 +397,97 @@ export default function OrderDetailPage() {
           </div>
         )}
       </div>
+
+      {/* DISPUTE MODAL */}
+      {showDisputeModal && (
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4 animate-fadeIn"
+          onClick={() => !disputing && setShowDisputeModal(false)}
+        >
+          <div
+            className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl border border-stone-100 mb-20 sm:mb-0 animate-fadeUp"
+            onClick={e => e.stopPropagation()}
+          >
+            <h3 className="text-xl font-bold text-stone-900 mb-1">Report an Issue</h3>
+            <p className="text-stone-500 text-sm mb-5">
+              Describe the problem with your order. Our team will review and follow up.
+            </p>
+
+            {disputeError && (
+              <div className="mb-4 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-600 font-medium">
+                {disputeError}
+              </div>
+            )}
+
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-semibold text-stone-500 mb-1.5 block">Reason</label>
+                <select
+                  value={disputeReason}
+                  onChange={e => setDisputeReason(e.target.value)}
+                  disabled={disputing}
+                  className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400 transition appearance-none disabled:opacity-50"
+                >
+                  <option value="service_not_completed">Service Not Completed</option>
+                  <option value="quality_issue">Quality Issue</option>
+                  <option value="provider_no_show">Provider No-Show</option>
+                  <option value="late_delivery">Late Delivery</option>
+                  <option value="wrong_service">Wrong Service Delivered</option>
+                  <option value="payment_issue">Payment Issue</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-stone-500 mb-1.5 block">
+                  Describe the issue <span className="text-red-400">*</span>
+                </label>
+                <textarea
+                  value={disputeComplaint}
+                  onChange={e => setDisputeComplaint(e.target.value)}
+                  disabled={disputing}
+                  rows={4}
+                  placeholder="What happened? Be as specific as possible..."
+                  className="w-full px-4 py-3 rounded-xl border border-stone-200 text-stone-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 bg-white placeholder:text-stone-400 resize-none transition disabled:opacity-50"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-stone-500 mb-1.5 block">
+                  Evidence <span className="text-stone-300">(optional)</span>
+                </label>
+                <textarea
+                  value={disputeEvidence}
+                  onChange={e => setDisputeEvidence(e.target.value)}
+                  disabled={disputing}
+                  rows={2}
+                  placeholder="Describe any evidence (screenshots, chat messages, etc.)..."
+                  className="w-full px-4 py-3 rounded-xl border border-stone-200 text-stone-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 bg-white placeholder:text-stone-400 resize-none transition disabled:opacity-50"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-5">
+              <button
+                onClick={() => setShowDisputeModal(false)}
+                disabled={disputing}
+                className="flex-1 py-3 bg-stone-100 text-stone-700 rounded-full font-semibold disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDisputeSubmit}
+                disabled={disputing || !disputeComplaint.trim()}
+                className="flex-1 py-3 bg-red-500 text-white rounded-full font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {disputing
+                  ? <div className="animate-spin"><Clock className="w-5 h-5" /></div>
+                  : <><AlertCircle className="w-5 h-5" /> Submit Dispute</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* CONFIRM MODAL */}
       {showModal && (
