@@ -463,11 +463,11 @@ export default function ChatWindow({
                   </p>
                 </button>
                 {pinnedMessages.length > 1 && (
-                  <button onClick={() => scrollToPinned((pinnedIndex + 1) % pinnedMessages.length)} className="p-1 text-teal-400 hover:text-teal-600">
+                  <button onClick={() => scrollToPinned((pinnedIndex + 1) % pinnedMessages.length)} aria-label="Next pinned message" className="p-2 text-teal-400 hover:text-teal-600">
                     <ChevronDown className="w-4 h-4" />
                   </button>
                 )}
-                <button onClick={() => setShowPinnedBanner(false)} className="p-1 text-stone-400 hover:text-stone-600">
+                <button onClick={() => setShowPinnedBanner(false)} aria-label="Hide pinned message" className="p-2 text-stone-400 hover:text-stone-600">
                   <X className="w-3.5 h-3.5" />
                 </button>
               </div>
@@ -489,7 +489,7 @@ export default function ChatWindow({
               <Loader className="w-7 h-7 text-teal-500 animate-spin" />
             </div>
           ) : messages.length === 0 ? (
-            <p className="text-center text-stone-400 text-sm mt-10">
+            <p className="text-center text-stone-600 text-sm mt-10">
               No messages yet. Say hello! 👋
             </p>
           ) : (
@@ -547,10 +547,10 @@ export default function ChatWindow({
                             }}
                             className="flex-1 bg-white/20 text-white placeholder-white/60 rounded-lg px-2 py-1 text-sm outline-none border border-white/40"
                           />
-                          <button onClick={() => submitEdit(msg.id)} className="p-1 bg-white/20 rounded-lg hover:bg-white/30">
+                          <button onClick={() => submitEdit(msg.id)} aria-label="Save edit" className="p-2 bg-white/20 rounded-lg hover:bg-white/30">
                             <Check className="w-4 h-4 text-white" />
                           </button>
-                          <button onClick={() => { setEditingId(null); setEditContent(""); }} className="p-1 bg-white/10 rounded-lg">
+                          <button onClick={() => { setEditingId(null); setEditContent(""); }} aria-label="Cancel edit" className="p-2 bg-white/10 rounded-lg">
                             <X className="w-4 h-4 text-white/70" />
                           </button>
                         </div>
@@ -559,7 +559,7 @@ export default function ChatWindow({
                           <a href={msg.image_url} target="_blank" rel="noopener noreferrer">
                             <img
                               src={msg.image_url}
-                              alt="shared"
+                              alt="Shared image"
                               className="rounded-xl max-w-[200px] max-h-[200px] object-cover mb-1 cursor-pointer hover:opacity-90 transition"
                             />
                           </a>

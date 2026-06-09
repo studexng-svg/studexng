@@ -75,7 +75,7 @@ export default function BottomNav() {
                   />
                   {isChat && unreadCount > 0 && (
                     <div className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 bg-red-500 rounded-full flex items-center justify-center px-1">
-                      <span className="text-white text-[9px] font-black leading-none">
+                      <span className="text-white text-xs font-black leading-none">
                         {unreadCount > 9 ? "9+" : unreadCount}
                       </span>
                     </div>

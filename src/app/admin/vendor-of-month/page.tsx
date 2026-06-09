@@ -215,7 +215,7 @@ export default function AdminVendorOfMonthPage() {
               <div className="text-right flex-shrink-0 space-y-2">
                 <div>
                   <p className="text-2xl font-black text-stone-900">{current.score.toFixed(0)}</p>
-                  <p className="text-[10px] text-stone-400 uppercase tracking-wide">Score</p>
+                  <p className="text-xs text-stone-400 uppercase tracking-wide">Score</p>
                 </div>
                 <button
                   onClick={removeCurrent}
@@ -329,10 +329,10 @@ export default function AdminVendorOfMonthPage() {
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
                     {r.is_manual_override && (
-                      <span className="text-[10px] bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded-full font-semibold">Manual</span>
+                      <span className="text-xs bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded-full font-semibold">Manual</span>
                     )}
                     {i === 0 && (
-                      <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-semibold">Current</span>
+                      <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-semibold">Current</span>
                     )}
                   </div>
                 </div>

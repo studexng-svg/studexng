@@ -525,7 +525,7 @@ export default function ProfilePage() {
                   <div className="flex items-center gap-2 mb-1">
                     <p className="text-xs font-semibold text-stone-500 uppercase tracking-wide">{label}</p>
                     {!editable && (
-                      <span className="text-[10px] bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded-full font-semibold">
+                      <span className="text-xs bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded-full font-semibold">
                         locked
                       </span>
                     )}

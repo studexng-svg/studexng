@@ -84,7 +84,7 @@ export default function HistoryPage() {
     <div className="pb-4 space-y-5">
       {/* Header */}
       <div>
-        <p className="text-teal-600 text-[10px] tracking-[0.25em] uppercase font-bold mb-0.5">Record</p>
+        <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-bold mb-0.5">Record</p>
         <h2 className="font-black text-stone-900 text-xl tracking-tight" style={HEADING_FONT}>History</h2>
       </div>
 

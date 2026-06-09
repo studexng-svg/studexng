@@ -482,11 +482,11 @@ export default function ChatRoomPage() {
                 </p>
               </button>
               {pinnedMessages.length > 1 && (
-                <button onClick={() => scrollToPinned((pinnedIndex + 1) % pinnedMessages.length)} className="p-1 text-teal-400 hover:text-teal-600">
+                <button onClick={() => scrollToPinned((pinnedIndex + 1) % pinnedMessages.length)} aria-label="Next pinned message" className="p-2 text-teal-400 hover:text-teal-600">
                   <ChevronDown className="w-4 h-4" />
                 </button>
               )}
-              <button onClick={() => setShowPinnedBanner(false)} className="p-1 text-stone-400 hover:text-stone-600">
+              <button onClick={() => setShowPinnedBanner(false)} aria-label="Hide pinned message" className="p-2 text-stone-400 hover:text-stone-600">
                 <X className="w-3.5 h-3.5" />
               </button>
             </div>
@@ -504,7 +504,7 @@ export default function ChatRoomPage() {
       {/* MESSAGES */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-1">
         {messages.length === 0 && (
-          <p className="text-center text-stone-400 text-sm py-10">No messages yet. Say hello! 👋</p>
+          <p className="text-center text-stone-600 text-sm py-10">No messages yet. Say hello! 👋</p>
         )}
 
         {messages.map((msg, idx) => {
@@ -562,17 +562,17 @@ export default function ChatRoomPage() {
                       }}
                       className="flex-1 bg-white/20 text-white placeholder-white/60 rounded-lg px-2 py-1 text-sm outline-none border border-white/40"
                     />
-                    <button onClick={() => submitEdit(msg.id)} className="p-1 bg-white/20 rounded-lg hover:bg-white/30">
+                    <button onClick={() => submitEdit(msg.id)} aria-label="Save edit" className="p-2 bg-white/20 rounded-lg hover:bg-white/30">
                       <Check className="w-4 h-4 text-white" />
                     </button>
-                    <button onClick={() => { setEditingId(null); setEditContent(""); }} className="p-1 bg-white/10 rounded-lg">
+                    <button onClick={() => { setEditingId(null); setEditContent(""); }} aria-label="Cancel edit" className="p-2 bg-white/10 rounded-lg">
                       <X className="w-4 h-4 text-white/70" />
                     </button>
                   </div>
                 ) : msg.image_url ? (
                   <div>
                     <a href={msg.image_url} target="_blank" rel="noopener noreferrer">
-                      <img src={msg.image_url} alt="shared" className="rounded-xl max-w-[220px] max-h-[220px] object-cover mb-1 cursor-pointer hover:opacity-90 transition" />
+                      <img src={msg.image_url} alt="Shared image" className="rounded-xl max-w-[220px] max-h-[220px] object-cover mb-1 cursor-pointer hover:opacity-90 transition" />
                     </a>
                     {msg.content && msg.content !== "📷 Image" && <p className="text-sm mt-1 break-words">{msg.content}</p>}
                   </div>
@@ -582,7 +582,7 @@ export default function ChatRoomPage() {
                     <>
                       {quoted && (
                         <div className={`mb-2 pl-2 border-l-2 rounded-sm py-0.5 ${msg.is_mine ? 'border-white/50 bg-white/10' : 'border-teal-400 bg-teal-50/60'}`}>
-                          <p className={`text-[10px] font-semibold ${msg.is_mine ? 'text-white/70' : 'text-teal-600'}`}>↩ @{quoted.sender}</p>
+                          <p className={`text-xs font-semibold ${msg.is_mine ? 'text-white/70' : 'text-teal-600'}`}>↩ @{quoted.sender}</p>
                           <p className={`text-xs truncate ${msg.is_mine ? 'text-white/60' : 'text-stone-500'}`}>{quoted.text}</p>
                         </div>
                       )}
@@ -766,10 +766,10 @@ export default function ChatRoomPage() {
           <div className="px-4 pt-2.5 pb-2 flex items-center gap-2 border-b border-stone-100 bg-teal-50/60">
             <div className="w-0.5 self-stretch bg-teal-500 rounded-full flex-shrink-0" />
             <div className="flex-1 min-w-0 pl-1">
-              <p className="text-[11px] font-semibold text-teal-600">↩ @{replyingTo.sender_username}</p>
+              <p className="text-xs font-semibold text-teal-600">↩ @{replyingTo.sender_username}</p>
               <p className="text-xs text-stone-400 truncate">{parseQuoted(replyingTo.content || '').main || '📷 Image'}</p>
             </div>
-            <button onClick={() => setReplyingTo(null)} className="p-1 text-stone-400 hover:text-stone-600 flex-shrink-0">
+            <button onClick={() => setReplyingTo(null)} aria-label="Cancel reply" className="p-2 text-stone-400 hover:text-stone-600 flex-shrink-0">
               <X className="w-4 h-4" />
             </button>
           </div>

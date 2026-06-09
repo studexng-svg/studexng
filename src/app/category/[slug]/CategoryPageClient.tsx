@@ -444,7 +444,7 @@ export default function CategoryPageClient({ slug, initialListings, initialNextP
                           )}
 
                           {badge && badge !== "none" && (
-                            <div className="absolute top-2.5 left-2.5 z-10 px-2 py-0.5 rounded-md text-[10px] font-bold text-white" style={{ background: GRAD }}>
+                            <div className="absolute top-2.5 left-2.5 z-10 px-2 py-0.5 rounded-md text-xs font-bold text-white" style={{ background: GRAD }}>
                               {BADGE_LABELS[badge]}
                             </div>
                           )}
@@ -477,7 +477,7 @@ export default function CategoryPageClient({ slug, initialListings, initialNextP
                           <div className="mt-2 space-y-2">
                             <p className="font-bold text-stone-900 text-sm">₦{Number(listing.price).toLocaleString()}</p>
                             {isReserved ? (
-                              <span className="text-[10px] text-stone-400 font-semibold flex items-center gap-0.5">
+                              <span className="text-xs text-stone-400 font-semibold flex items-center gap-0.5">
                                 <Clock className="w-3 h-3" /> Reserved
                               </span>
                             ) : (

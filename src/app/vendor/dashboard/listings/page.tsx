@@ -113,7 +113,7 @@ export default function ListingsPage() {
 
       <div className="flex items-center justify-between mb-5">
         <div>
-          <p className="text-teal-600 text-[10px] tracking-[0.25em] uppercase font-bold mb-0.5">Manage</p>
+          <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-bold mb-0.5">Manage</p>
           <h2 className="font-black text-stone-900 text-xl tracking-tight" style={HEADING_FONT}>My Listings</h2>
           <p className="text-stone-400 text-xs mt-0.5">{listings.length} {listings.length === 1 ? "service" : "services"}</p>
         </div>
@@ -187,19 +187,19 @@ export default function ListingsPage() {
                         <div className="relative w-full h-full group">
                           <img src={existingUrl} alt="" className="w-full h-full object-cover rounded-xl border border-stone-200" />
                           <label className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 rounded-xl cursor-pointer transition">
-                            <span className="text-white text-[10px] font-semibold">Replace</span>
+                            <span className="text-white text-xs font-semibold">Replace</span>
                             <input type="file" accept="image/*" className="hidden" onChange={e => {
                               const f = e.target.files?.[0]; if (!f) return;
                               const imgs = [...form.images]; imgs[i] = f;
                               setForm(prev => ({ ...prev, images: imgs }));
                             }} />
                           </label>
-                          {i === 0 && <span className="absolute bottom-1 left-1 text-[9px] bg-teal-600 text-white px-1.5 py-0.5 rounded-full font-semibold">Main</span>}
+                          {i === 0 && <span className="absolute bottom-1 left-1 text-xs bg-teal-600 text-white px-1.5 py-0.5 rounded-full font-semibold">Main</span>}
                         </div>
                       ) : (
                         <label className="w-full h-full border-2 border-dashed border-stone-200 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-teal-400 hover:bg-teal-50/30 transition">
                           <Plus className="w-4 h-4 text-stone-300" />
-                          <span className="text-[9px] text-stone-300 mt-0.5">{i === 0 ? 'Main' : `Photo ${i+1}`}</span>
+                          <span className="text-xs text-stone-300 mt-0.5">{i === 0 ? 'Main' : `Photo ${i+1}`}</span>
                           <input type="file" accept="image/*" className="hidden" onChange={e => {
                             const f = e.target.files?.[0]; if (!f) return;
                             const imgs = [...form.images]; imgs[i] = f;
@@ -285,7 +285,7 @@ export default function ListingsPage() {
                         <span className="font-bold text-red-600 text-sm whitespace-nowrap">
                           ₦{Math.round(Number(listing.price) * (1 - listing.discount_percent / 100)).toLocaleString()}
                         </span>
-                        <span className="ml-1 text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full font-bold">-{listing.discount_percent}%</span>
+                        <span className="ml-1 text-xs bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full font-bold">-{listing.discount_percent}%</span>
                       </>
                     ) : (
                       <span className="font-bold text-teal-600 text-sm whitespace-nowrap">₦{Number(listing.price).toLocaleString()}</span>

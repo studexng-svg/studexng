@@ -69,13 +69,13 @@ function PodiumCard({ vendor, rank, isVotm }: { vendor: Vendor; rank: 1 | 2 | 3;
             ring={RING[rank]}
           />
           <div
-            className="absolute -bottom-2 left-1/2 -translate-x-1/2 min-w-[22px] h-[22px] px-1 rounded-full flex items-center justify-center text-[10px] font-black text-white shadow border-2 border-white"
+            className="absolute -bottom-2 left-1/2 -translate-x-1/2 min-w-[22px] h-[22px] px-1 rounded-full flex items-center justify-center text-xs font-black text-white shadow border-2 border-white"
             style={{ background: BADGE_BG[rank] }}
           >
             {rank}
           </div>
           {isVotm && (
-            <div className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-amber-400 flex items-center justify-center text-[11px] shadow border-2 border-white">
+            <div className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-amber-400 flex items-center justify-center text-xs shadow border-2 border-white">
               🏆
             </div>
           )}
@@ -93,7 +93,7 @@ function PodiumCard({ vendor, rank, isVotm }: { vendor: Vendor; rank: 1 | 2 | 3;
         </div>
 
         {hasBadge && (
-          <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full mt-2 ${BADGE_STYLES[vendor.vendor_badge]}`}>
+          <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full mt-2 ${BADGE_STYLES[vendor.vendor_badge]}`}>
             {BADGE_LABELS[vendor.vendor_badge]}
           </span>
         )}
@@ -137,7 +137,7 @@ export default function LeaderboardClient({ initialVendors, initialCampus, curre
               Top vendors at <span className="font-bold text-stone-600 uppercase">{initialCampus}</span> · ranked by completed orders
             </p>
           </div>
-          <Link href="/vendor-of-month" className="text-[11px] font-bold text-teal-600 hover:underline whitespace-nowrap mt-1">
+          <Link href="/vendor-of-month" className="text-xs font-bold text-teal-600 hover:underline whitespace-nowrap mt-1">
             🏆 Hall of Fame
           </Link>
         </div>
@@ -150,7 +150,7 @@ export default function LeaderboardClient({ initialVendors, initialCampus, curre
               <p className="text-xs font-bold text-amber-800">Vendor of the Month · {currentVotm.month}</p>
               <p className="text-sm font-black text-amber-900 truncate">{currentVotm.business_name}</p>
             </div>
-            <Link href={`/vendor/${currentVotm.username}`} className="ml-auto flex-shrink-0 text-[11px] font-bold text-amber-700 hover:underline">
+            <Link href={`/vendor/${currentVotm.username}`} className="ml-auto flex-shrink-0 text-xs font-bold text-amber-700 hover:underline">
               Shop →
             </Link>
           </div>
@@ -184,7 +184,7 @@ export default function LeaderboardClient({ initialVendors, initialCampus, curre
             {/* ── DIVIDER ── */}
             <div className="flex items-center gap-3 mb-4">
               <div className="flex-1 h-px bg-stone-200" />
-              <span className="text-[10px] font-bold text-stone-400 uppercase tracking-[0.2em]">Top Rankings</span>
+              <span className="text-xs font-bold text-stone-400 uppercase tracking-[0.2em]">Top Rankings</span>
               <div className="flex-1 h-px bg-stone-200" />
             </div>
 
@@ -212,12 +212,12 @@ export default function LeaderboardClient({ initialVendors, initialCampus, curre
                           {isVotm && <span className="text-sm leading-none">🏆</span>}
                         </div>
                         <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                          <span className="text-emerald-500 font-black text-[10px]">▲</span>
+                          <span className="text-emerald-500 font-black text-xs">▲</span>
                           <span className="text-xs font-semibold text-stone-600">
                             {(vendor.completed_order_count || 0).toLocaleString()} orders
                           </span>
                           {hasBadge && (
-                            <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${BADGE_STYLES[vendor.vendor_badge]}`}>
+                            <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full ${BADGE_STYLES[vendor.vendor_badge]}`}>
                               {BADGE_LABELS[vendor.vendor_badge]}
                             </span>
                           )}

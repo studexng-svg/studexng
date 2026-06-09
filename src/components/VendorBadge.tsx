@@ -27,7 +27,7 @@ const BADGE_CONFIG: Record<BadgeType, { label: string; emoji: string; className:
 };
 
 const SIZE_CLASS: Record<string, string> = {
-  sm: "text-[10px] px-1.5 py-0.5",
+  sm: "text-xs px-1.5 py-0.5",
   md: "text-xs px-2 py-1",
   lg: "text-sm px-3 py-1.5",
 };

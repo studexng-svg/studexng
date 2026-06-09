@@ -72,7 +72,7 @@ export default function TopNav({ showBack = false, backHref, activeNav }: TopNav
               <Link href="/cart" className="p-2 rounded-xl hover:bg-stone-50 transition text-stone-500 hover:text-teal-600 relative">
                 <ShoppingCart className="w-5 h-5" />
                 {cart.length > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 w-4 h-4 text-[9px] font-bold text-white rounded-full flex items-center justify-center" style={{ background: GRAD }}>
+                  <span className="absolute -top-0.5 -right-0.5 w-4 h-4 text-xs font-bold text-white rounded-full flex items-center justify-center" style={{ background: GRAD }}>
                     {cart.length}
                   </span>
                 )}

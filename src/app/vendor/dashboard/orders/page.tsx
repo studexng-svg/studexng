@@ -43,7 +43,7 @@ export default function OrdersPage() {
   return (
     <div className="pb-4">
       <div className="mb-5">
-        <p className="text-teal-600 text-[10px] tracking-[0.25em] uppercase font-bold mb-0.5">Track</p>
+        <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-bold mb-0.5">Track</p>
         <h2 className="font-black text-stone-900 text-xl tracking-tight" style={HEADING_FONT}>Active Orders</h2>
         <p className="text-stone-400 text-xs mt-0.5">{activeOrders.length} active</p>
       </div>

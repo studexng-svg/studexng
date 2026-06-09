@@ -78,7 +78,7 @@ export default function CategoriesClient({ categories }: { categories: Category[
 
                     {/* Live badge on hover */}
                     <div className="absolute top-2.5 right-2.5 px-2 py-0.5 bg-white/90 backdrop-blur-sm rounded-full shadow-sm opacity-0 group-hover:opacity-100 transition-opacity">
-                      <span className="text-[10px] font-bold" style={GRAD_TEXT}>LIVE</span>
+                      <span className="text-xs font-bold" style={GRAD_TEXT}>LIVE</span>
                     </div>
 
                   </div>

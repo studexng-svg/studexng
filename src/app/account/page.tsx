@@ -428,7 +428,7 @@ export default function AccountPage() {
                   className="relative w-9 h-9 bg-stone-100 hover:bg-stone-200 rounded-full flex items-center justify-center transition-colors">
                   <Bell className="w-4 h-4 text-stone-600" />
                   {unreadNotifications > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-1">
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-1">
                       {unreadNotifications > 99 ? "99+" : unreadNotifications}
                     </span>
                   )}

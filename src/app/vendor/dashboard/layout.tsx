@@ -75,7 +75,7 @@ export default function VendorDashboardLayout({ children }: { children: React.Re
                 <ArrowLeft className="w-4 h-4 text-white" />
               </button>
               <div>
-                <p className="text-white/50 text-[10px] tracking-[0.25em] uppercase font-bold leading-none mb-0.5">Vendor Hub</p>
+                <p className="text-white/50 text-xs tracking-[0.25em] uppercase font-bold leading-none mb-0.5">Vendor Hub</p>
                 <h1 className="text-white font-black text-base tracking-tight leading-none">
                   {user?.username || "Dashboard"}
                 </h1>
@@ -83,7 +83,7 @@ export default function VendorDashboardLayout({ children }: { children: React.Re
             </div>
             <div className="flex items-center gap-2">
               {user?.profile?.vendor_badge && user.profile.vendor_badge !== "none" && (
-                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full"
+                <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full"
                   style={{ background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.25)", color: "white" }}>
                   {user.profile.vendor_badge === "top" ? "🏆 Top" : user.profile.vendor_badge === "trusted" ? "✅ Trusted" : "⭐ Rising"}
                 </span>
@@ -119,7 +119,7 @@ export default function VendorDashboardLayout({ children }: { children: React.Re
                   <div className="relative">
                     <Icon className="w-4 h-4" />
                     {badge > 0 && (
-                      <span className="absolute -top-2 -right-2 min-w-[16px] h-4 bg-red-500 rounded-full flex items-center justify-center px-1 text-white text-[9px] font-bold leading-none">
+                      <span className="absolute -top-2 -right-2 min-w-[16px] h-4 bg-red-500 rounded-full flex items-center justify-center px-1 text-white text-xs font-bold leading-none">
                         {badge > 9 ? "9+" : badge}
                       </span>
                     )}

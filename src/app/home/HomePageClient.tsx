@@ -300,7 +300,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
             <SafeImage src={listing.image?.startsWith("http") ? listing.image : null} alt={listing.title} />
             {!listing.is_available && (
               <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                <span className="text-white text-[10px] font-bold">Unavailable</span>
+                <span className="text-white text-xs font-bold">Unavailable</span>
               </div>
             )}
           </div>
@@ -401,11 +401,11 @@ export default function HomePageClient({ initialVendors, initialListings, initia
             )}
 
             {discountPct > 0 ? (
-              <div className="absolute top-2.5 left-2.5 z-10 bg-red-500 text-white px-2 py-0.5 rounded-md text-[10px] font-black">
+              <div className="absolute top-2.5 left-2.5 z-10 bg-red-500 text-white px-2 py-0.5 rounded-md text-xs font-black">
                 -{discountPct}% OFF
               </div>
             ) : badge && badge !== "none" ? (
-              <div className="absolute top-2.5 left-2.5 z-10 px-2 py-0.5 rounded-md text-[10px] font-bold text-white" style={{ background: GRAD }}>
+              <div className="absolute top-2.5 left-2.5 z-10 px-2 py-0.5 rounded-md text-xs font-bold text-white" style={{ background: GRAD }}>
                 {BADGE_LABELS[badge]}
               </div>
             ) : null}
@@ -450,7 +450,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                 <p className="font-bold text-stone-900 text-sm">₦{Number(listing.price).toLocaleString()}</p>
               )}
               {isReserved ? (
-                <span className="text-[10px] text-stone-400 font-semibold flex items-center gap-0.5">
+                <span className="text-xs text-stone-400 font-semibold flex items-center gap-0.5">
                   <Clock className="w-3 h-3" /> Reserved
                 </span>
               ) : (
@@ -519,7 +519,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
         style={{ animationDelay: `${Math.min(i * 0.04, 0.2)}s` }}>
 
         {/* Discount badge */}
-        <div className="absolute top-2.5 left-2.5 z-20 bg-red-500 text-white px-2 py-0.5 rounded-md text-[10px] font-black">
+        <div className="absolute top-2.5 left-2.5 z-20 bg-red-500 text-white px-2 py-0.5 rounded-md text-xs font-black">
           -{deal.discount_percent}% OFF
         </div>
 
@@ -534,7 +534,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
             )}
 
             {badge && badge !== "none" && (
-              <div className="absolute top-2.5 left-2.5 z-10 px-2 py-0.5 rounded-md text-[10px] font-bold text-white mt-6" style={{ background: GRAD }}>
+              <div className="absolute top-2.5 left-2.5 z-10 px-2 py-0.5 rounded-md text-xs font-bold text-white mt-6" style={{ background: GRAD }}>
                 {BADGE_LABELS[badge]}
               </div>
             )}
@@ -574,7 +574,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                 <p className="font-bold text-red-600 text-sm">₦{dealPrice.toLocaleString()}</p>
               </div>
               {isReserved ? (
-                <span className="text-[10px] text-stone-400 font-semibold flex items-center gap-0.5">
+                <span className="text-xs text-stone-400 font-semibold flex items-center gap-0.5">
                   <Clock className="w-3 h-3" /> Reserved
                 </span>
               ) : (
@@ -636,12 +636,12 @@ export default function HomePageClient({ initialVendors, initialListings, initia
               {vendor.is_online && (
                 <div className="absolute top-2.5 right-2.5 flex items-center gap-1 bg-white/90 px-2 py-0.5 rounded-full shadow-sm">
                   <div className="w-1.5 h-1.5 rounded-full bg-green-400" />
-                  <span className="text-[10px] font-semibold text-stone-700">Online</span>
+                  <span className="text-xs font-semibold text-stone-700">Online</span>
                 </div>
               )}
               {vendor.vendor_badge && vendor.vendor_badge !== "none" && (
                 <div className="absolute bottom-2.5 left-2.5">
-                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${BADGE_STYLES[vendor.vendor_badge]}`}>{BADGE_LABELS[vendor.vendor_badge]}</span>
+                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${BADGE_STYLES[vendor.vendor_badge]}`}>{BADGE_LABELS[vendor.vendor_badge]}</span>
                 </div>
               )}
             </div>
@@ -652,7 +652,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                   <p className="text-stone-400 text-xs truncate">@{vendor.username}</p>
                 </div>
                 {vendor.vendor_badge && vendor.vendor_badge !== "none" && (
-                  <span className={`flex-shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full ${BADGE_STYLES[vendor.vendor_badge]}`}>
+                  <span className={`flex-shrink-0 text-xs font-bold px-2 py-0.5 rounded-full ${BADGE_STYLES[vendor.vendor_badge]}`}>
                     {vendor.vendor_badge === "top" ? "🏆" : vendor.vendor_badge === "trusted" ? "✅" : "⭐"} {BADGE_LABELS[vendor.vendor_badge]}
                   </span>
                 )}
@@ -758,18 +758,18 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                 <>
                   <Link href="/wishlist" className="hidden lg:flex flex-col items-center gap-0.5 text-stone-500 hover:text-teal-600 transition cursor-pointer">
                     <Heart className="w-5 h-5" />
-                    <span className="text-[10px] font-medium">Wishlist</span>
+                    <span className="text-xs font-medium">Wishlist</span>
                   </Link>
                   <Link href="/cart" className="hidden lg:flex flex-col items-center gap-0.5 text-stone-500 hover:text-teal-600 transition cursor-pointer relative">
                     <div className="relative">
                       <ShoppingCart className="w-5 h-5" />
                       {cart.length > 0 && (
-                        <span className="absolute -top-1.5 -right-1.5 w-4 h-4 text-[9px] font-bold text-white rounded-full flex items-center justify-center" style={{ background: GRAD }}>
+                        <span className="absolute -top-1.5 -right-1.5 w-4 h-4 text-xs font-bold text-white rounded-full flex items-center justify-center" style={{ background: GRAD }}>
                           {cart.length}
                         </span>
                       )}
                     </div>
-                    <span className="text-[10px] font-medium">Cart</span>
+                    <span className="text-xs font-medium">Cart</span>
                   </Link>
                   <Link href="/account/address" className="flex items-center gap-1.5 text-sm text-stone-600 hover:text-teal-600 transition cursor-pointer">
                     <User className="w-4 h-4 text-stone-400" />
@@ -846,32 +846,32 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                     <>
                       <div className="flex items-center gap-1 bg-amber-400 w-fit px-2 py-0.5 sm:px-3 sm:py-1 rounded-full mb-2 sm:mb-3">
                         <Trophy className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-amber-900" />
-                        <span className="text-amber-900 text-[10px] sm:text-xs font-bold">Vendor of the Month · {vendorOfMonth.month}</span>
+                        <span className="text-amber-900 text-xs sm:text-xs font-bold">Vendor of the Month · {vendorOfMonth.month}</span>
                       </div>
                       <h1 className="text-lg sm:text-3xl lg:text-5xl font-black text-white leading-[1.1]"
                         style={{ fontFamily: "var(--font-jakarta),'Plus Jakarta Sans',sans-serif" }}>
                         {vendorOfMonth.business_name}
                       </h1>
-                      <p className="text-white/50 text-[10px] sm:text-sm mt-0.5 mb-2 sm:mb-3">@{vendorOfMonth.username}</p>
+                      <p className="text-white/50 text-xs sm:text-sm mt-0.5 mb-2 sm:mb-3">@{vendorOfMonth.username}</p>
 
                       {/* Stats row */}
                       <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mb-3 sm:mb-4">
-                        <span className="flex items-center gap-1 bg-white/15 rounded-full px-2 py-0.5 sm:px-3 sm:py-1 text-[10px] sm:text-xs text-white font-semibold">
+                        <span className="flex items-center gap-1 bg-white/15 rounded-full px-2 py-0.5 sm:px-3 sm:py-1 text-xs sm:text-xs text-white font-semibold">
                           🛒 {vendorOfMonth.total_orders} orders
                         </span>
                         {vendorOfMonth.rating > 0 && (
-                          <span className="flex items-center gap-1 bg-white/15 rounded-full px-2 py-0.5 sm:px-3 sm:py-1 text-[10px] sm:text-xs text-white font-semibold">
+                          <span className="flex items-center gap-1 bg-white/15 rounded-full px-2 py-0.5 sm:px-3 sm:py-1 text-xs sm:text-xs text-white font-semibold">
                             ⭐ {vendorOfMonth.rating.toFixed(1)}
                             {vendorOfMonth.total_reviews > 0 && <span className="text-white/60">({vendorOfMonth.total_reviews})</span>}
                           </span>
                         )}
                         {vendorOfMonth.completion_rate > 0 && (
-                          <span className="flex items-center gap-1 bg-white/15 rounded-full px-2 py-0.5 sm:px-3 sm:py-1 text-[10px] sm:text-xs text-white font-semibold">
+                          <span className="flex items-center gap-1 bg-white/15 rounded-full px-2 py-0.5 sm:px-3 sm:py-1 text-xs sm:text-xs text-white font-semibold">
                             ✅ {Math.round(vendorOfMonth.completion_rate)}% completion
                           </span>
                         )}
                         {vendorOfMonth.vendor_badge && vendorOfMonth.vendor_badge !== "none" && (
-                          <span className="flex items-center gap-1 bg-amber-400/90 rounded-full px-2 py-0.5 sm:px-3 sm:py-1 text-[10px] sm:text-xs text-amber-900 font-bold">
+                          <span className="flex items-center gap-1 bg-amber-400/90 rounded-full px-2 py-0.5 sm:px-3 sm:py-1 text-xs sm:text-xs text-amber-900 font-bold">
                             {vendorOfMonth.vendor_badge === "top" ? "🏆 Top Vendor" : vendorOfMonth.vendor_badge === "trusted" ? "✅ Trusted" : "⭐ Rising"}
                           </span>
                         )}
@@ -880,11 +880,11 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                       <div className="flex items-center gap-3">
                         <Link href={`/vendor/${vendorOfMonth.username}`}>
                           <motion.button whileTap={{ scale: 0.97 }}
-                            className="bg-white text-stone-900 font-bold px-3 py-1.5 sm:px-6 sm:py-2.5 rounded-full text-[11px] sm:text-sm inline-flex items-center gap-1.5 sm:gap-2 shadow-lg">
+                            className="bg-white text-stone-900 font-bold px-3 py-1.5 sm:px-6 sm:py-2.5 rounded-full text-xs sm:text-sm inline-flex items-center gap-1.5 sm:gap-2 shadow-lg">
                             Shop Now <ArrowRight className="w-3 h-3 sm:w-4 sm:h-4" />
                           </motion.button>
                         </Link>
-                        <Link href="/vendor-of-month" className="text-white/70 text-[10px] sm:text-xs font-semibold hover:text-white transition-colors">
+                        <Link href="/vendor-of-month" className="text-white/70 text-xs sm:text-xs font-semibold hover:text-white transition-colors">
                           🏆 Hall of Fame
                         </Link>
                       </div>
@@ -895,18 +895,18 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                         style={{ fontFamily: "var(--font-jakarta),'Plus Jakarta Sans',sans-serif" }}>
                         Shop Smart.<br className="sm:hidden" /> Live Campus.
                       </h1>
-                      <p className="text-white/80 text-[11px] sm:text-sm lg:text-base mb-3 sm:mb-4 leading-relaxed line-clamp-2 sm:line-clamp-none">
+                      <p className="text-white/80 text-xs sm:text-sm lg:text-base mb-3 sm:mb-4 leading-relaxed line-clamp-2 sm:line-clamp-none">
                         Explore hundreds of services from verified vendors on your campus, every day.
                       </p>
                       <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
                         <Link href="/categories">
                           <motion.button whileTap={{ scale: 0.97 }}
-                            className="bg-white text-stone-900 font-bold px-3 py-1.5 sm:px-6 sm:py-2.5 rounded-full text-[11px] sm:text-sm inline-flex items-center gap-1 sm:gap-2 shadow-lg">
+                            className="bg-white text-stone-900 font-bold px-3 py-1.5 sm:px-6 sm:py-2.5 rounded-full text-xs sm:text-sm inline-flex items-center gap-1 sm:gap-2 shadow-lg">
                             Shop Now <ArrowRight className="w-3 h-3 sm:w-4 sm:h-4" />
                           </motion.button>
                         </Link>
                         <button onClick={() => { setActiveTab("vendors"); setTimeout(() => featuredRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); }}
-                          className="bg-white/20 border border-white/30 text-white font-semibold px-3 py-1.5 sm:px-6 sm:py-2.5 rounded-full text-[11px] sm:text-sm inline-flex items-center gap-1 sm:gap-1.5 backdrop-blur-sm hover:bg-white/30 transition">
+                          className="bg-white/20 border border-white/30 text-white font-semibold px-3 py-1.5 sm:px-6 sm:py-2.5 rounded-full text-xs sm:text-sm inline-flex items-center gap-1 sm:gap-1.5 backdrop-blur-sm hover:bg-white/30 transition">
                           View Vendors
                         </button>
                       </div>
@@ -965,7 +965,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
           </div>
           {mounted && (!isLoggedIn || (!user?.email || !["@pau.edu.ng", "@futo.edu.ng", "@imsu.edu.ng"].some(domain => user.email?.toLowerCase().includes(domain)))) && (!isLoggedIn || !(user as any)?.school) && (
             <div className="flex items-center gap-3 mt-3">
-              <span className="text-[11px] text-stone-400 font-medium">Campus:</span>
+              <span className="text-xs text-stone-400 font-medium">Campus:</span>
               <select
                 value={currentCampus}
                 onChange={(e) => switchCampus(e.target.value as "pau" | "futo" | "imsu")}
@@ -981,7 +981,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
           {/* ── PRICE FILTER ── */}
           {activeTab === "listings" && (
             <div className="flex items-center gap-2 mt-3 flex-wrap">
-              <span className="text-[11px] text-stone-400 font-medium">Price:</span>
+              <span className="text-xs text-stone-400 font-medium">Price:</span>
               <input
                 type="number" placeholder="Min ₦" value={minPrice}
                 onChange={e => setMinPrice(e.target.value)}

@@ -270,7 +270,7 @@ export default function AdminListingsPage() {
           >
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-base font-bold text-stone-900">Change Category</h3>
-              <button onClick={() => !applying && setShowModal(false)} className="p-1 rounded-full hover:bg-stone-100">
+              <button onClick={() => !applying && setShowModal(false)} aria-label="Close modal" className="p-2 rounded-full hover:bg-stone-100">
                 <X className="w-4 h-4 text-stone-500" />
               </button>
             </div>

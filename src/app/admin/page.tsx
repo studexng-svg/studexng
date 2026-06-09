@@ -124,7 +124,7 @@ function LiveActivity() {
           <div className="relative w-9 h-9 bg-teal-50 rounded-xl flex items-center justify-center flex-shrink-0">
             <Radio className="w-4 h-4 text-teal-600" />
             {count > 0 && (
-              <span className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full flex items-center justify-center text-white text-[9px] font-bold leading-none">
+              <span className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full flex items-center justify-center text-white text-xs font-bold leading-none">
                 {count > 99 ? "99+" : count}
               </span>
             )}
@@ -155,7 +155,7 @@ function LiveActivity() {
                 <span className="text-sm text-stone-800 font-medium truncate flex-1">
                   {u.business_name || u.username}
                 </span>
-                <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold flex-shrink-0 ${
+                <span className={`px-1.5 py-0.5 rounded-full text-xs font-bold flex-shrink-0 ${
                   u.user_type === "vendor" ? "bg-teal-100 text-teal-700" : "bg-stone-100 text-stone-600"
                 }`}>
                   {u.user_type === "vendor" ? "V" : "S"}

@@ -150,7 +150,7 @@ function ActionCard({ action, status, result, onConfirm, onDismiss }: {
       {/* Audience editor for send_notification */}
       {action.type === "send_notification" && (
         <div className="space-y-1.5">
-          <p className="text-[10px] font-semibold text-stone-500 uppercase tracking-wide">Send to</p>
+          <p className="text-xs font-semibold text-stone-500 uppercase tracking-wide">Send to</p>
           <div className="flex gap-1 flex-wrap">
             {AUDIENCE_OPTS.map(o => (
               <button key={o.val}
@@ -244,7 +244,7 @@ function HistoryPanel({
               >
                 <button className="flex-1 text-left" onClick={() => onLoad(s.id)}>
                   <p className="text-xs font-semibold text-stone-800 leading-snug line-clamp-1">{s.title}</p>
-                  <p className="text-[10px] text-stone-400 mt-0.5">
+                  <p className="text-xs text-stone-400 mt-0.5">
                     {new Date(s.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
                   </p>
                 </button>

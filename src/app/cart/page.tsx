@@ -180,7 +180,7 @@ export default function CartPage() {
 
               {/* Unavailable badge */}
               {isUnavailable && (
-                <div className="absolute top-3 right-3 bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                <div className="absolute top-3 right-3 bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
                   <AlertCircle className="w-3 h-3" /> Unavailable
                 </div>
               )}

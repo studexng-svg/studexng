@@ -261,7 +261,7 @@ export default function NotificationsPage() {
                     </div>
                   </div>
                   <p className="text-xs text-stone-500 mt-0.5 line-clamp-2 leading-relaxed">{n.message}</p>
-                  <p className="text-[11px] text-stone-400 mt-1.5">{timeAgo(n.created_at)}</p>
+                  <p className="text-xs text-stone-500 mt-1.5">{timeAgo(n.created_at)}</p>
                 </div>
               </motion.button>
             ))

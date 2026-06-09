@@ -93,7 +93,7 @@ function RelatedCard({ item }: { item: any }) {
         <p className="text-xs font-semibold text-stone-800 truncate leading-snug">{item.title}</p>
         <p className="text-sm font-bold text-teal-600 mt-0.5">₦{Number(item.price).toLocaleString()}</p>
         <button
-          className="mt-2 w-full py-1.5 text-white text-[10px] font-bold rounded-lg"
+          className="mt-2 w-full py-1.5 text-white text-xs font-bold rounded-lg"
           style={{
             background: "linear-gradient(135deg, #2DD4BF 0%, #0D9488 55%, #0f766e 100%)",
             boxShadow: "0 4px 12px rgba(13,148,136,0.35), inset 0 1px 0 rgba(255,255,255,0.25)",
@@ -867,7 +867,7 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
                 <div className="flex items-center gap-2 mb-3">
                   <p className="font-bold text-stone-900 text-sm">Similar Items</p>
                   {listing.category?.title && (
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold text-teal-700 bg-teal-50 border border-teal-100">
+                    <span className="px-2 py-0.5 rounded-full text-xs font-bold text-teal-700 bg-teal-50 border border-teal-100">
                       {listing.category.title}
                     </span>
                   )}

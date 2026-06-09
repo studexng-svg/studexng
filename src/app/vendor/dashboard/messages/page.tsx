@@ -171,7 +171,7 @@ export default function MessagesPage() {
       {/* Conversations list */}
       <div className="w-full lg:w-60 lg:flex-shrink-0 bg-white border border-stone-200 rounded-2xl overflow-hidden shadow-sm">
         <div className="px-4 py-3 border-b border-stone-100">
-          <p className="text-teal-600 text-[10px] tracking-[0.25em] uppercase font-bold mb-0.5">Messages</p>
+          <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-bold mb-0.5">Messages</p>
           <h2 className="font-black text-stone-900 text-base tracking-tight">Conversations</h2>
           <p className="text-xs text-stone-400 mt-0.5">{conversations.length} chats</p>
         </div>

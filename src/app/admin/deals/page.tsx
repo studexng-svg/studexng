@@ -360,16 +360,16 @@ export default function DealsPage() {
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5 mb-0.5">
                           {isVendorDeal(deal) ? (
-                            <span className="flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                            <span className="flex items-center gap-1 text-xs font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700">
                               <Store className="w-2.5 h-2.5" /> Vendor
                             </span>
                           ) : (
-                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-teal-50 text-teal-700">Admin</span>
+                            <span className="text-xs font-bold px-1.5 py-0.5 rounded-full bg-teal-50 text-teal-700">Admin</span>
                           )}
                         </div>
                         <p className="font-semibold text-stone-900 text-sm truncate">{deal.listing?.title}</p>
                         <p className="text-xs text-stone-400 mt-0.5">@{deal.listing?.vendor?.username}</p>
-                        <p className="text-[10px] text-stone-400 mt-0.5 flex items-center gap-1">
+                        <p className="text-xs text-stone-400 mt-0.5 flex items-center gap-1">
                           <Clock className="w-2.5 h-2.5" /> {fmt(deal.created_at)}
                         </p>
                       </div>

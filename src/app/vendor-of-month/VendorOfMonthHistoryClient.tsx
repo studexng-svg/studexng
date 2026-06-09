@@ -68,7 +68,7 @@ export default function VendorOfMonthHistoryClient({ history }: { history: VotmE
                   />
                   {i === 0 && (
                     <div
-                      className="absolute -top-2 -right-2 w-6 h-6 rounded-full text-white text-[10px] font-black flex items-center justify-center shadow"
+                      className="absolute -top-2 -right-2 w-6 h-6 rounded-full text-white text-xs font-black flex items-center justify-center shadow"
                       style={{ background: GRAD }}
                     >
                       ★
@@ -83,7 +83,7 @@ export default function VendorOfMonthHistoryClient({ history }: { history: VotmE
                       <p className="text-xs text-gray-400 truncate">@{entry.username}</p>
                     </div>
                     <span
-                      className="flex-shrink-0 text-[10px] font-bold px-2.5 py-1 rounded-full text-white whitespace-nowrap"
+                      className="flex-shrink-0 text-xs font-bold px-2.5 py-1 rounded-full text-white whitespace-nowrap"
                       style={{ background: GRAD }}
                     >
                       {entry.month}
@@ -104,7 +104,7 @@ export default function VendorOfMonthHistoryClient({ history }: { history: VotmE
                       <span>✅ {Math.round(entry.completion_rate)}%</span>
                     )}
                     {entry.vendor_badge && entry.vendor_badge !== "none" && (
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${BADGE_STYLES[entry.vendor_badge] || ""}`}>
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${BADGE_STYLES[entry.vendor_badge] || ""}`}>
                         {BADGE_LABELS[entry.vendor_badge] || entry.vendor_badge}
                       </span>
                     )}

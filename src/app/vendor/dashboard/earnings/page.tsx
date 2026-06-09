@@ -59,7 +59,7 @@ export default function EarningsPage() {
   return (
     <div className="space-y-5 pb-4">
       <div>
-        <p className="text-teal-600 text-[10px] tracking-[0.25em] uppercase font-bold mb-0.5">Overview</p>
+        <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-bold mb-0.5">Overview</p>
         <h2 className="font-black text-stone-900 text-xl tracking-tight" style={HEADING_FONT}>Your Earnings</h2>
       </div>
 
@@ -75,7 +75,7 @@ export default function EarningsPage() {
 
       <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm">
         <div className="mb-4">
-          <p className="text-teal-600 text-[10px] tracking-[0.25em] uppercase font-bold mb-0.5">Payouts</p>
+          <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-bold mb-0.5">Payouts</p>
           <h3 className="font-black text-stone-900 text-base tracking-tight" style={HEADING_FONT}>How You Get Paid</h3>
         </div>
         <div className="space-y-2 text-sm text-stone-500 leading-relaxed">
@@ -94,7 +94,7 @@ export default function EarningsPage() {
 
       <div className="bg-white border border-stone-200 rounded-2xl overflow-hidden shadow-sm">
         <div className="px-5 py-4 border-b border-stone-100">
-          <p className="text-teal-600 text-[10px] tracking-[0.25em] uppercase font-bold mb-0.5">History</p>
+          <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-bold mb-0.5">History</p>
           <h3 className="font-black text-stone-900 text-base tracking-tight" style={HEADING_FONT}>Transactions</h3>
         </div>
         {transactions.length === 0 ? (

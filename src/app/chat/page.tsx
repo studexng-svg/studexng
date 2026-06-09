@@ -152,7 +152,7 @@ export default function ChatListPage() {
                           {conv.other_user?.username}
                         </p>
                         {conv.last_message_at && (
-                          <p className="text-xs text-stone-400 flex-shrink-0">
+                          <p className="text-xs text-stone-500 flex-shrink-0">
                             {new Date(conv.last_message_at).toLocaleDateString("en-NG", {
                               day: "numeric", month: "short"
                             })}
@@ -177,7 +177,7 @@ export default function ChatListPage() {
                     {conv.unread_count > 0 && (
                       <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
                         style={{ background: GRAD }}>
-                        <span className="text-white text-[10px] font-bold">
+                        <span className="text-white text-xs font-bold">
                           {conv.unread_count > 9 ? "9+" : conv.unread_count}
                         </span>
                       </div>

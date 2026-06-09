@@ -109,18 +109,18 @@ export default function VendorOfMonthModal({ vendor }: { vendor: VendorOfMonth |
               <div className="grid grid-cols-3 gap-3 text-center">
                 <div className="bg-stone-50 rounded-2xl p-3">
                   <p className="text-lg font-black text-stone-900">{vendor.total_orders}</p>
-                  <p className="text-[10px] text-stone-400 font-medium mt-0.5">Orders</p>
+                  <p className="text-xs text-stone-400 font-medium mt-0.5">Orders</p>
                 </div>
                 <div className="bg-stone-50 rounded-2xl p-3">
                   <div className="flex items-center justify-center gap-1">
                     <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
                     <p className="text-lg font-black text-stone-900">{vendor.rating.toFixed(1)}</p>
                   </div>
-                  <p className="text-[10px] text-stone-400 font-medium mt-0.5">Rating</p>
+                  <p className="text-xs text-stone-400 font-medium mt-0.5">Rating</p>
                 </div>
                 <div className="bg-stone-50 rounded-2xl p-3">
                   <p className="text-lg font-black text-stone-900">{Math.round(vendor.completion_rate)}%</p>
-                  <p className="text-[10px] text-stone-400 font-medium mt-0.5">Completion</p>
+                  <p className="text-xs text-stone-400 font-medium mt-0.5">Completion</p>
                 </div>
               </div>
 

@@ -155,7 +155,7 @@ export default function AdminConversationDetail() {
                           <>
                             {quoted && (
                               <div className={`mb-2 pl-2 border-l-2 rounded-sm py-0.5 ${isBuyer ? 'border-teal-400 bg-teal-50/60' : 'border-white/50 bg-white/10'}`}>
-                                <p className={`text-[10px] font-semibold ${isBuyer ? 'text-teal-600' : 'text-white/70'}`}>↩ @{quoted.sender}</p>
+                                <p className={`text-xs font-semibold ${isBuyer ? 'text-teal-600' : 'text-white/70'}`}>↩ @{quoted.sender}</p>
                                 <p className={`text-xs truncate ${isBuyer ? 'text-stone-500' : 'text-white/60'}`}>{quoted.text}</p>
                               </div>
                             )}

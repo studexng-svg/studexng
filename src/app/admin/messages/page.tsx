@@ -636,13 +636,13 @@ function GroqBroadcast() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="font-semibold text-stone-900 text-sm truncate">{log.title}</p>
-                    <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold flex-shrink-0 ${
+                    <span className={`px-1.5 py-0.5 rounded-full text-xs font-bold flex-shrink-0 ${
                       log.audience === "vendors" ? "bg-purple-100 text-purple-700"
                       : log.audience === "all" ? "bg-stone-100 text-stone-600"
                       : "bg-teal-100 text-teal-700"
                     }`}>{log.audience}</span>
                     {log.school && (
-                      <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-orange-100 text-orange-700 flex-shrink-0">
+                      <span className="px-1.5 py-0.5 rounded-full text-xs font-bold bg-orange-100 text-orange-700 flex-shrink-0">
                         {log.school.toUpperCase()}
                       </span>
                     )}

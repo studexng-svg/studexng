@@ -125,7 +125,7 @@ export function NotificationBell({
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
               exit={{ scale: 0 }}
-              className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-black rounded-full flex items-center justify-center px-1 leading-none"
+              className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-red-500 text-white text-xs font-black rounded-full flex items-center justify-center px-1 leading-none"
             >
               {unreadCount > 99 ? "99+" : unreadCount}
             </motion.span>
@@ -155,8 +155,8 @@ export function NotificationBell({
                     <Check className="w-3 h-3" /> Mark all read
                   </button>
                 )}
-                <button onClick={() => setOpen(false)} className="p-1 hover:bg-gray-100 rounded-full">
-                  <X className="w-3.5 h-3.5 text-gray-400" />
+                <button onClick={() => setOpen(false)} aria-label="Close notifications" className="p-2 hover:bg-gray-100 rounded-full">
+                  <X className="w-3.5 h-3.5 text-gray-500" />
                 </button>
               </div>
             </div>
@@ -170,7 +170,7 @@ export function NotificationBell({
               ) : notifications.length === 0 ? (
                 <div className="py-10 text-center">
                   <Bell className="w-10 h-10 text-gray-200 mx-auto mb-2" />
-                  <p className="text-gray-400 text-sm">No notifications yet</p>
+                  <p className="text-gray-500 text-sm">No notifications yet</p>
                 </div>
               ) : (
                 notifications.map(n => {
@@ -193,7 +193,7 @@ export function NotificationBell({
                           {n.title}
                         </p>
                         <p className="text-xs text-gray-500 mt-0.5 line-clamp-2 leading-relaxed">{n.message}</p>
-                        <p className="text-[10px] text-gray-400 mt-1">{timeAgo(n.created_at)}</p>
+                        <p className="text-xs text-gray-400 mt-1">{timeAgo(n.created_at)}</p>
                       </div>
                       {!n.is_read && (
                         <span className="flex-shrink-0 w-2 h-2 rounded-full bg-purple-500 mt-2" />

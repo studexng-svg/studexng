@@ -29,7 +29,7 @@ export default function ReviewsPage() {
   return (
     <div className="pb-4 space-y-3">
       <div className="mb-1">
-        <p className="text-teal-600 text-[10px] tracking-[0.25em] uppercase font-bold mb-0.5">Feedback</p>
+        <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-bold mb-0.5">Feedback</p>
         <h2 className="font-black text-stone-900 text-xl tracking-tight" style={HEADING_FONT}>Reviews</h2>
       </div>
 
