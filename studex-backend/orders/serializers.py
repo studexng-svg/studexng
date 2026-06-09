@@ -26,11 +26,13 @@ class OrderSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'reference', 'listing', 'listing_id', 'buyer', 'buyer_id',
             'amount', 'status', 'current_status', 'estimated_time',
-            'delivery_location', 'created_at', 'paid_at',
+            'delivery_location', 'created_at', 'paid_at', 'seller_completed_at',
+            'delivery_proof_1', 'delivery_proof_2',
         ]
         read_only_fields = [
             'reference', 'amount', 'status', 'current_status', 'estimated_time',
-            'created_at', 'paid_at',
+            'created_at', 'paid_at', 'seller_completed_at',
+            'delivery_proof_1', 'delivery_proof_2',
         ]
 
     def create(self, validated_data):

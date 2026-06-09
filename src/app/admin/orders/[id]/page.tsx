@@ -128,6 +128,21 @@ export default function AdminOrderDetail() {
           <Row label="Date"             value={order.created_at ? new Date(order.created_at).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" }) : undefined} />
         </div>
 
+        {/* Delivery Proof */}
+        {(order.delivery_proof_1 || order.delivery_proof_2) && (
+          <div className="bg-white border border-stone-200 rounded-2xl p-4 shadow-sm">
+            <p className="text-teal-600 text-xs tracking-[0.2em] uppercase font-semibold mb-3">Delivery Proof</p>
+            <div className="flex gap-3">
+              {[order.delivery_proof_1, order.delivery_proof_2].filter(Boolean).map((url: string, i: number) => (
+                <a key={i} href={url} target="_blank" rel="noopener noreferrer"
+                  className="flex-1 max-w-[160px] aspect-square rounded-xl overflow-hidden border border-stone-200 block hover:opacity-90 transition">
+                  <img src={url} alt={`Proof ${i + 1}`} className="w-full h-full object-cover" />
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Admin Actions */}
         {(order.status === "pending" || order.status === "paid" || order.status === "seller_completed") && (
           <div className="bg-white border border-stone-200 rounded-2xl p-4 shadow-sm space-y-2">

@@ -728,12 +728,89 @@ try:
                 for field in allowed:
                     if field in request.data:
                         setattr(dispute, field, request.data[field])
-                if 'status' in request.data and request.data['status'] == 'resolved':
+
+                new_status = request.data.get('status')
+                resolution = dispute.resolution  # may have just been set above
+
+                if new_status == 'resolved':
                     from django.utils import timezone as tz
                     dispute.resolved_at = tz.now()
                     dispute.resolved_by = request.user
+
+                    order = dispute.order
+
+                    def _dn(recipient, ntype, title, message, url=""):
+                        try:
+                            from accounts.utils import send_notification
+                            send_notification(recipient=recipient, notification_type=ntype,
+                                              title=title, message=message, action_url=url)
+                        except Exception:
+                            pass
+
+                    if resolution == 'release_to_provider':
+                        try:
+                            from payments.models import PaymentTransaction
+                            from payments.views import _transfer_to_vendor
+                            txn = PaymentTransaction.objects.filter(
+                                reference=order.reference, status='success'
+                            ).first()
+                            if txn and not txn.transfer_reference:
+                                _transfer_to_vendor(txn, order.listing.title)
+                        except Exception as pe:
+                            import logging as _log
+                            _log.getLogger(__name__).warning(
+                                f"Dispute payout failed for order {order.id}: {pe}")
+                        order.status = 'completed'
+                        order.save()
+                        _dn(order.listing.vendor, 'order_confirmed',
+                            f'✅ Dispute Resolved — {order.listing.title}',
+                            f'The dispute for "{order.listing.title}" was resolved in your favour. Your payment is being processed.',
+                            '/vendor/dashboard')
+                        _dn(order.buyer, 'order_update',
+                            f'Dispute Resolved — {order.listing.title}',
+                            f'The dispute for "{order.listing.title}" has been reviewed. Payment has been released to the vendor.',
+                            f'/account/orders/{order.id}')
+
+                    elif resolution == 'refund_customer':
+                        try:
+                            from payments.views import _refund_paystack_transaction
+                            from payments.models import PaymentTransaction
+                            txn = PaymentTransaction.objects.filter(
+                                reference=order.reference, status='success'
+                            ).first()
+                            if txn:
+                                amount_kobo = int(txn.amount * 100)
+                                ok = _refund_paystack_transaction(order.reference, amount_kobo)
+                                if ok:
+                                    txn.status = 'refunded'
+                                    txn.save()
+                        except Exception as pe:
+                            import logging as _log
+                            _log.getLogger(__name__).warning(
+                                f"Dispute refund failed for order {order.id}: {pe}")
+                        order.status = 'cancelled'
+                        order.save()
+                        _dn(order.buyer, 'order_update',
+                            '✅ Dispute Resolved — Refund Initiated',
+                            f'Your dispute for "{order.listing.title}" was resolved in your favour. A refund has been initiated to your original payment method.',
+                            f'/account/orders/{order.id}')
+                        _dn(order.listing.vendor, 'order_update',
+                            f'Dispute Resolved — {order.listing.title}',
+                            f'The dispute for "{order.listing.title}" has been resolved. The buyer has been refunded.',
+                            '/vendor/dashboard')
+
+                    else:
+                        _dn(order.buyer, 'order_update',
+                            f'Dispute Update — {order.listing.title}',
+                            f'Your dispute for "{order.listing.title}" has been reviewed. Our team will follow up shortly.',
+                            f'/account/orders/{order.id}')
+
                 dispute.save()
-                return Response(DisputeSerializer(dispute).data)
+                data = DisputeSerializer(dispute).data
+                data['order_buyer'] = dispute.order.buyer.username if dispute.order else None
+                data['order_seller'] = dispute.order.listing.vendor.username if (dispute.order and dispute.order.listing) else None
+                data['order_amount'] = str(dispute.order.amount) if dispute.order else None
+                return Response(data)
             except Dispute.DoesNotExist:
                 return Response({'error': 'Dispute not found'}, status=status.HTTP_404_NOT_FOUND)
 

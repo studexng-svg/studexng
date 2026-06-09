@@ -31,7 +31,7 @@ function ActivityStatus({ lastSeen }: { lastSeen?: string | null }) {
 }
 import AdminTopBar from "@/components/layout/AdminTopBar";
 import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { fetchAllPages } from "@/lib/authStore";
 import { GRAD } from "@/lib/tokens";
 import { CampusPills, type Campus } from "@/components/admin/CampusPills";
@@ -40,8 +40,9 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 export default function AdminSellers() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [search, setSearch] = useState("");
-  const [campus, setCampus] = useState<Campus>("");
+  const [campus, setCampus] = useState<Campus>((searchParams.get("campus") || "") as Campus);
   const [sellers, setSellers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -58,7 +59,13 @@ export default function AdminSellers() {
 
   useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleCampus = (c: Campus) => { setCampus(c); load(search, c); };
+  const handleCampus = (c: Campus) => {
+    setCampus(c);
+    const params = new URLSearchParams(searchParams.toString());
+    if (c) params.set("campus", c); else params.delete("campus");
+    router.replace(`/admin/sellers?${params.toString()}`);
+    load(search, c);
+  };
   const handleSearch = (s: string) => { setSearch(s); load(s, campus); };
 
   const verified = sellers.filter(s => s.profile?.is_verified_vendor).length;

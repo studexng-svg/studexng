@@ -130,7 +130,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
   const router = useRouter();
 
   const [mounted, setMounted]           = useState(false);
-  const [campusReady, setCampusReady]   = useState(false);
+  const [campusReady, setCampusReady]   = useState(initialDeals.length > 0 || initialListings.length > 0);
   const [toast, setToast]               = useState("");
   const [activeTab, setActiveTab]       = useState<"listings" | "vendors">("listings");
   const [minPrice, setMinPrice]         = useState<string>("");

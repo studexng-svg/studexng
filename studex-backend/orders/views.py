@@ -89,6 +89,27 @@ class OrderViewSet(viewsets.ModelViewSet):
                 status=400,
             )
 
+        # Delivery proof required for physical/food orders only.
+        listing_type = order.listing.listing_type
+        if listing_type in ['product', 'food']:
+            proof_1 = request.FILES.get('proof_1')
+            if not proof_1:
+                return Response(
+                    {"detail": "At least one delivery proof photo is required for product/food orders."},
+                    status=400,
+                )
+            from services.views import upload_to_cloudinary
+            url_1 = upload_to_cloudinary(proof_1, folder='studex/delivery_proofs')
+            if not url_1:
+                return Response({"detail": "Failed to upload proof image. Please try again."}, status=500)
+            order.delivery_proof_1 = url_1
+
+            proof_2 = request.FILES.get('proof_2')
+            if proof_2:
+                url_2 = upload_to_cloudinary(proof_2, folder='studex/delivery_proofs')
+                if url_2:
+                    order.delivery_proof_2 = url_2
+
         order.status = 'seller_completed'
         order.seller_completed_at = timezone.now()
         order.save()

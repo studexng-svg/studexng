@@ -42,6 +42,8 @@ interface Order {
   status: "pending" | "paid" | "seller_completed" | "completed" | "disputed" | "cancelled";
   current_status: string;
   delivery_location?: string;
+  delivery_proof_1?: string | null;
+  delivery_proof_2?: string | null;
 }
 
 interface LoyaltyStatus {
@@ -338,6 +340,23 @@ export default function OrderDetailPage() {
             </div>
           </div>
         </div>
+
+        {/* DELIVERY PROOF */}
+        {(order.delivery_proof_1 || order.delivery_proof_2) && (
+          <div className="bg-white rounded-2xl p-5 shadow-sm border border-stone-200 animate-fadeUp">
+            <h3 className="font-semibold text-stone-800 mb-3 flex items-center gap-2 text-sm">
+              <Package className="w-4 h-4 text-teal-600" /> Delivery Proof
+            </h3>
+            <div className="flex gap-3">
+              {[order.delivery_proof_1, order.delivery_proof_2].filter(Boolean).map((url, i) => (
+                <a key={i} href={url!} target="_blank" rel="noopener noreferrer"
+                  className="flex-1 max-w-[140px] aspect-square rounded-xl overflow-hidden border border-stone-200 block">
+                  <img src={url!} alt={`Delivery proof ${i + 1}`} className="w-full h-full object-cover" />
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* LOYALTY PROGRESS */}
         {loyalty && (
