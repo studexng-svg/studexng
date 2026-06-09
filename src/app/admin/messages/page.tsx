@@ -352,12 +352,12 @@ function BroadcastCompose() {
           <div className="bg-teal-50 border border-teal-200 rounded-xl px-3 py-2.5 text-xs text-teal-800">
             <p className="font-semibold mb-1.5">Available variables:</p>
             <div className="grid grid-cols-2 gap-1.5">
-              <code className="bg-white px-2 py-1 rounded border border-teal-100">{{username}}</code>
-              <code className="bg-white px-2 py-1 rounded border border-teal-100">{{email}}</code>
-              <code className="bg-white px-2 py-1 rounded border border-teal-100">{{business_name}}</code>
-              <code className="bg-white px-2 py-1 rounded border border-teal-100">{{first_name}}</code>
-              <code className="bg-white px-2 py-1 rounded border border-teal-100">{{school}}</code>
-              <code className="bg-white px-2 py-1 rounded border border-teal-100">{{user_type}}</code>
+              <code className="bg-white px-2 py-1 rounded border border-teal-100">{"{{username}}"}</code>
+              <code className="bg-white px-2 py-1 rounded border border-teal-100">{"{{email}}"}</code>
+              <code className="bg-white px-2 py-1 rounded border border-teal-100">{"{{business_name}}"}</code>
+              <code className="bg-white px-2 py-1 rounded border border-teal-100">{"{{first_name}}"}</code>
+              <code className="bg-white px-2 py-1 rounded border border-teal-100">{"{{school}}"}</code>
+              <code className="bg-white px-2 py-1 rounded border border-teal-100">{"{{user_type}}"}</code>
             </div>
           </div>
         )}
