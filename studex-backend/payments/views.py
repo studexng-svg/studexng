@@ -374,6 +374,7 @@ def initialize_payment(request):
     cart_amount_raw = request.data.get("cart_amount")
     deal_discount_total = Decimal("0")
     listing_deal_discount = Decimal("0")
+    listing_vendor_discount = Decimal("0")  # only vendor's own discount_percent
     try:
         if cart_amount_raw:
             from cart.models import CartItem
@@ -385,19 +386,22 @@ def initialize_payment(request):
                     try:
                         deal = item.listing.deal
                         if deal.is_active:
+                            # Admin deal — vendor gets full price; StudEx absorbs the gap
                             effective = Decimal(str(deal.discounted_price))
                             deal_discount_total += (item_price - effective) * item.quantity
                             if str(item.listing_id) == str(listing_id):
                                 listing_deal_discount = (item_price - effective).quantize(Decimal("0.01"))
+                                # listing_vendor_discount stays 0 — admin covers this
                             item_price = effective
                     except Exception:
-                        # Fall back to vendor-set discount if no admin deal
+                        # Vendor-set discount — vendor bears the cost
                         vd = getattr(item.listing, 'discount_percent', 0) or 0
                         if vd > 0:
                             effective = item_price - item_price * Decimal(vd) / 100
                             deal_discount_total += (item_price - effective) * item.quantity
                             if str(item.listing_id) == str(listing_id):
                                 listing_deal_discount = (item_price - effective).quantize(Decimal("0.01"))
+                                listing_vendor_discount = listing_deal_discount
                             item_price = effective
                     server_total += item_price * item.quantity
                 client_amount = Decimal(str(cart_amount_raw))
@@ -415,15 +419,19 @@ def initialize_payment(request):
             try:
                 deal = listing.deal
                 if deal.is_active:
+                    # Admin deal — vendor gets full price; StudEx absorbs the gap
                     effective = Decimal(str(deal.discounted_price))
                     listing_deal_discount = (amount - effective).quantize(Decimal("0.01"))
                     deal_discount_total = listing_deal_discount
+                    # listing_vendor_discount stays 0
                     amount = effective
             except Exception:
+                # Vendor-set discount — vendor bears the cost
                 vd = getattr(listing, 'discount_percent', 0) or 0
                 if vd > 0:
                     effective = amount - amount * Decimal(vd) / 100
                     listing_deal_discount = (amount - effective).quantize(Decimal("0.01"))
+                    listing_vendor_discount = listing_deal_discount
                     deal_discount_total = listing_deal_discount
                     amount = effective
     except Exception:
@@ -493,6 +501,7 @@ def initialize_payment(request):
             "discount_amount": str(discount_amount),
             "deal_discount_amount": str(deal_discount_total),
             "listing_deal_discount": str(listing_deal_discount),
+            "listing_vendor_discount": str(listing_vendor_discount),
             "delivery_location": delivery_location,
             "credits_applied": str(credits_applied),
         },
@@ -1217,9 +1226,10 @@ def _create_order_from_paystack_data(paystack_data, buyer, listing_id, order_typ
     if listing is not None:
         meta = paystack_data.get("metadata") or {}
         listing_deal_discount = Decimal(str(meta.get("listing_deal_discount", "0") or "0"))
+        listing_vendor_discount = Decimal(str(meta.get("listing_vendor_discount", listing_deal_discount) or "0"))
         deal_discount_amount = Decimal(str(meta.get("deal_discount_amount", "0") or "0"))
-        # Vendor receives listing price minus their deal discount (deal is the vendor's offer)
-        vendor_amount = max(Decimal(str(listing.price)) - listing_deal_discount, Decimal("0"))
+        # Vendor bears only their own discount; admin deal discount is absorbed by platform
+        vendor_amount = max(Decimal(str(listing.price)) - listing_vendor_discount, Decimal("0"))
         platform_amount = max(amount_paid - vendor_amount, Decimal("0"))
     else:
         vendor_amount, platform_amount = _split_amounts(amount_paid)
