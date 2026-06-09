@@ -228,7 +228,8 @@ export default function HomePageClient({ initialVendors, initialListings, initia
 
   useEffect(() => {
     if (!isHydrated) return;
-    if (!isLoggedIn || !user) { setCampusReady(true); fetchDeals(currentCampus); return; }
+    const cookieCampus = document.cookie.split(";").find(c => c.trim().startsWith("studex_campus="))?.split("=")?.[1]?.toLowerCase() || "pau";
+    if (!isLoggedIn || !user) { setCampusReady(true); fetchDeals(cookieCampus); return; }
     let school = ((user as any).school || "").toLowerCase();
     // Fallback: infer school from email domain if not set in profile
     if (!school && user.email) {
@@ -237,8 +238,8 @@ export default function HomePageClient({ initialVendors, initialListings, initia
       else if (emailLower.includes("@futo.edu.ng")) school = "futo";
       else if (emailLower.includes("@imsu.edu.ng")) school = "imsu";
     }
-    if (school !== "pau" && school !== "futo" && school !== "imsu") { setCampusReady(true); fetchDeals(currentCampus); return; }
-    const cookie = document.cookie.split(";").find(c => c.trim().startsWith("studex_campus="))?.split("=")?.[1]?.toLowerCase() || "pau";
+    if (school !== "pau" && school !== "futo" && school !== "imsu") { setCampusReady(true); fetchDeals(cookieCampus); return; }
+    const cookie = cookieCampus;
     if (cookie === school) { setCampusReady(true); fetchDeals(school); return; }
     const https = typeof window !== "undefined" && window.location.protocol === "https:";
     document.cookie = `studex_campus=${school}; path=/; max-age=31536000; SameSite=Lax${https ? "; Secure" : ""}`;
