@@ -130,20 +130,22 @@ export default function HomePageClient({ initialVendors, initialListings, initia
   const router = useRouter();
 
   const [mounted, setMounted]           = useState(false);
-  const [campusReady, setCampusReady]   = useState(initialDeals.length > 0 || initialListings.length > 0);
+  const [campusReady, setCampusReady]   = useState(initialListings.length > 0);
+  const [dealsReady, setDealsReady]     = useState(false);
   const [toast, setToast]               = useState("");
   const [activeTab, setActiveTab]       = useState<"listings" | "vendors">("listings");
   const [minPrice, setMinPrice]         = useState<string>("");
   const [maxPrice, setMaxPrice]         = useState<string>("");
   const [heroIndex, setHeroIndex]       = useState(0);
   const [viewMode, setViewMode]         = useState<"grid" | "list">("grid");
-  const [deals, setDeals]               = useState<any[]>(initialDeals);
+  const [deals, setDeals]               = useState<any[]>([]);
 
   const fetchDeals = useCallback(async (campus: string) => {
     try {
       const res = await fetch(`${API_URL}/api/services/deals/?campus=${campus}`);
       if (res.ok) { const d = await res.json(); setDeals(Array.isArray(d) ? d : []); }
     } catch {}
+    finally { setDealsReady(true); }
   }, []);
 
   const [vendors, setVendors]           = useState<Vendor[]>(initialVendors);
@@ -1063,7 +1065,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
             </div>
 
             {/* Deals Section — always visible above the category filter */}
-            {activeTab === "listings" && deals.length > 0 && campusReady && (
+            {activeTab === "listings" && deals.length > 0 && dealsReady && (
               <div className="mb-6">
                 <div className="flex items-center justify-between mb-4">
                   <div>
