@@ -196,7 +196,8 @@ export default function LandingClient({ initialListings }: { initialListings: an
   const [heroIndex, setHeroIndex] = useState(0);
   const [listingIndex, setListingIndex] = useState(0);
   const listingCount = 53;
-  const vendorCount = 38;
+  const totalListings = 320;
+  const vendorCount = 70;
 
   useEffect(() => {
     const t = setInterval(() => {
@@ -305,6 +306,11 @@ export default function LandingClient({ initialListings }: { initialListings: an
                   <div>
                     <p className="text-3xl font-black text-white">{vendorCount}+</p>
                     <p className="text-xs text-white/40 font-bold uppercase tracking-wider mt-0.5">Vendors</p>
+                  </div>
+                  <div className="w-px h-10 bg-white/10" />
+                  <div>
+                    <p className="text-3xl font-black text-white">{totalListings}+</p>
+                    <p className="text-xs text-white/40 font-bold uppercase tracking-wider mt-0.5">Listings</p>
                   </div>
                   <div className="w-px h-10 bg-white/10" />
                   <div>
