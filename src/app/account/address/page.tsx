@@ -29,6 +29,7 @@ const FUTO_HOSTELS = [
   "Umuchima", "PG Hostel", "Eziobodo", "Ihiagwa", "Off-Campus",
 ];
 
+
 const NON_STUDENT_LOCATIONS = [
   "Umuchima", "Eziobodo", "Ihiagwa", "Off-Campus",
 ];
@@ -109,7 +110,7 @@ export default function ProfilePage() {
     const extras = storageKey ? localStorage.getItem(storageKey) : null;
     const parsed = extras ? JSON.parse(extras) : {};
     const getSchool = (email?: string) =>
-      email?.endsWith('@pau.edu.ng') ? 'PAU' : email?.endsWith('@futo.edu.ng') ? 'FUTO' : '';
+      email?.endsWith('@pau.edu.ng') ? 'PAU' : email?.endsWith('@futo.edu.ng') ? 'FUTO' : email?.endsWith('@imsu.edu.ng') ? 'IMSU' : '';
     try {
       const res = await fetchWithAuth(`${API_URL}/api/auth/me/`);
       if (res.ok) {
@@ -499,7 +500,7 @@ export default function ProfilePage() {
             {profile.name || "Student"}
           </h2>
           <p className="text-sm text-stone-500 flex items-center justify-center gap-1 mt-1">
-            {profile.school === "PAU" ? "Verified PAU Student" : profile.school === "FUTO" ? "Verified FUTO Student" : "StudEx Member"} <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+            {profile.school === "PAU" ? "Verified PAU Student" : profile.school === "FUTO" ? "Verified FUTO Student" : profile.school === "IMSU" ? "Verified IMSU Student" : "StudEx Member"} <CheckCircle2 className="w-4 h-4 text-emerald-500" />
           </p>
         </div>
 
@@ -597,6 +598,10 @@ export default function ProfilePage() {
                   <span className="px-3 py-1 rounded-full text-xs font-bold bg-purple-100 text-purple-700">
                     Federal University of Technology Owerri
                   </span>
+                ) : profile.school === "IMSU" ? (
+                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-orange-100 text-orange-700">
+                    Imo State University, Owerri
+                  </span>
                 ) : (
                   <span className="px-3 py-1 rounded-full text-xs font-bold bg-stone-100 text-stone-600">
                     Non-Student
@@ -650,29 +655,38 @@ export default function ProfilePage() {
             </div>
             <div className="flex-1">
               <p className="text-xs font-semibold text-stone-500 uppercase tracking-wide mb-1.5">
-                {profile.school === "FUTO" ? "Hostel / Hall" : profile.school === "PAU" ? "Hostel / Location" : "Location"}
+                {profile.school === "FUTO" ? "Hostel / Hall" : profile.school === "PAU" ? "Hostel / Location" : "Location / Area"}
               </p>
-              <select
-                value={profile.campus}
-                onChange={e => {
-                  setProfile(prev => ({ ...prev, campus: e.target.value }));
-                  setHostelSaved(false);
-                  setHostelError("");
-                }}
-                className="w-full px-4 py-3 rounded-xl border-2 border-teal-400 bg-white text-stone-900 font-medium focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-200 transition text-sm appearance-none"
-              >
-                <option value="">
-                  {profile.school === "FUTO" ? "Select your hostel" : profile.school === "PAU" ? "Select your hostel" : "Select your area"}
-                </option>
-                {(profile.school === "FUTO"
-                  ? FUTO_HOSTELS
-                  : profile.school === "PAU"
-                  ? PAU_HOSTELS
-                  : NON_STUDENT_LOCATIONS
-                ).map(h => (
-                  <option key={h} value={h}>{h}</option>
-                ))}
-              </select>
+              {(profile.school === "PAU" || profile.school === "FUTO") ? (
+                <select
+                  value={profile.campus}
+                  onChange={e => {
+                    setProfile(prev => ({ ...prev, campus: e.target.value }));
+                    setHostelSaved(false);
+                    setHostelError("");
+                  }}
+                  className="w-full px-4 py-3 rounded-xl border-2 border-teal-400 bg-white text-stone-900 font-medium focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-200 transition text-sm appearance-none"
+                >
+                  <option value="">
+                    {profile.school === "FUTO" ? "Select your hostel" : "Select your hostel"}
+                  </option>
+                  {(profile.school === "FUTO" ? FUTO_HOSTELS : PAU_HOSTELS).map(h => (
+                    <option key={h} value={h}>{h}</option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  value={profile.campus}
+                  onChange={e => {
+                    setProfile(prev => ({ ...prev, campus: e.target.value }));
+                    setHostelSaved(false);
+                    setHostelError("");
+                  }}
+                  placeholder="e.g. Orji, World Bank, Aladinma…"
+                  className="w-full px-4 py-3 rounded-xl border-2 border-teal-400 bg-white text-stone-900 font-medium focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-200 transition text-sm"
+                />
+              )}
 
               {hostelSaved && (
                 <p className="text-xs text-teal-600 font-semibold mt-2 flex items-center gap-1">

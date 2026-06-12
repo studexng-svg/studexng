@@ -42,6 +42,9 @@ interface Listing {
   title: string;
   description: string;
   price: number;
+  discount_percent?: number;
+  sale_price?: number | null;
+  deal?: { discount_percent: number; discounted_price: number } | null;
   image: string;
   is_available: boolean;
   is_reserved: boolean;
@@ -533,13 +536,34 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
                   </h2>
                 </div>
                 <div className="flex flex-col items-end gap-2">
-                  <p className="text-2xl font-bold whitespace-nowrap" style={GRAD_TEXT}>
-                    ₦{Number(listing.price).toLocaleString()}
-                  </p>
+                  {(() => {
+                    // Admin deal takes priority, then vendor discount
+                    const effectivePrice = listing.deal?.discounted_price ?? listing.sale_price ?? null;
+                    const discountPct = listing.deal?.discount_percent ?? listing.discount_percent ?? 0;
+                    if (effectivePrice !== null && effectivePrice < listing.price) {
+                      return (
+                        <div className="flex flex-col items-end gap-0.5">
+                          <span className="text-xs text-stone-400 line-through">₦{Number(listing.price).toLocaleString()}</span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs font-bold text-red-500 bg-red-50 px-1.5 py-0.5 rounded-full">-{discountPct}%</span>
+                            <p className="text-2xl font-bold whitespace-nowrap text-red-600">
+                              ₦{Number(effectivePrice).toLocaleString()}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    }
+                    return (
+                      <p className="text-2xl font-bold whitespace-nowrap" style={GRAD_TEXT}>
+                        ₦{Number(listing.price).toLocaleString()}
+                      </p>
+                    );
+                  })()}
                   <button
                     onClick={async () => {
                       const url = window.location.href;
-                      const price = `₦${Number(listing.price).toLocaleString()}`;
+                      const effectivePrice = listing.deal?.discounted_price ?? listing.sale_price ?? listing.price;
+                      const price = `₦${Number(effectivePrice).toLocaleString()}`;
                       if (navigator.share) {
                         await navigator.share({ title: `${listing.title} — ${price}`, url }).catch(() => {});
                       } else {

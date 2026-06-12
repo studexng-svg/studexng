@@ -313,7 +313,7 @@ export default function LandingClient({ initialListings }: { initialListings: an
                   </div>
                   <div className="w-px h-10 bg-white/10" />
                   <div>
-                    <p className="text-3xl font-black text-white">2</p>
+                    <p className="text-3xl font-black text-white">3</p>
                     <p className="text-xs text-white/40 font-bold uppercase tracking-wider mt-0.5">Campuses</p>
                   </div>
                 </div>

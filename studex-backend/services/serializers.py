@@ -97,6 +97,18 @@ class ListingSerializer(serializers.ModelSerializer):
         cat = instance.category
         if cat:
             data['category'] = {'id': cat.id, 'title': cat.title, 'slug': cat.slug}
+        # Include active admin deal so the frontend can show slashed prices.
+        try:
+            deal = instance.deal
+            if deal.is_active:
+                data['deal'] = {
+                    'discount_percent': deal.discount_percent,
+                    'discounted_price': float(deal.discounted_price),
+                }
+            else:
+                data['deal'] = None
+        except Exception:
+            data['deal'] = None
         return data
 
     def get_is_reserved(self, obj):

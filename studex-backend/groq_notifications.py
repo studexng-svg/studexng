@@ -59,6 +59,7 @@ _PROMPTS = {
 _SCHOOL_NAMES = {
     'pau':  'Pan-Atlantic University (PAU) in Lagos',
     'futo': 'Federal University of Technology Owerri (FUTO)',
+    'imsu': 'Imo State University, Owerri (IMSU)',
 }
 
 

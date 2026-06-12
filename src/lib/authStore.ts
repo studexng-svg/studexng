@@ -62,7 +62,7 @@ export const useAuth = create<AuthState>()(
         // Persist campus to cookie so SSR fetches the right campus on next page load
         if (typeof document !== 'undefined') {
           const school = ((userData as any).school || '').toLowerCase();
-          if (school === 'pau' || school === 'futo') {
+          if (school === 'pau' || school === 'futo' || school === 'imsu') {
             const isHttps = window.location.protocol === 'https:';
             const extra = isHttps ? '; Secure; SameSite=Lax' : '; SameSite=Lax';
             document.cookie = `studex_campus=${school}; path=/; max-age=31536000${extra}`;
