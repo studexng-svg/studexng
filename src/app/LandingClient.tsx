@@ -559,6 +559,15 @@ export default function LandingClient({ initialListings }: { initialListings: an
                 <p className="text-stone-400 text-xs mt-0.5">Owerri, Imo State</p>
               </div>
             </div>
+            <div className="flex flex-col items-center gap-4">
+              <div className="w-28 h-28 rounded-2xl bg-white border border-stone-200 flex items-center justify-center p-3 shadow-md overflow-hidden">
+                <img src="/images/imsu-logo.png" alt="Imo State University Owerri" className="w-full h-full object-contain" />
+              </div>
+              <div>
+                <p className="text-stone-900 font-bold text-sm">Imo State University, Owerri</p>
+                <p className="text-stone-400 text-xs mt-0.5">Owerri, Imo State</p>
+              </div>
+            </div>
           </div>
         </div>
       </section>
