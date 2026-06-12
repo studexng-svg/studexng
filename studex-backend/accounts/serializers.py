@@ -110,12 +110,18 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             if not matric or not re.match(r'^\d{11}$', matric):
                 raise serializers.ValidationError({"matric_number": "FUTO matric number must be exactly 11 digits."})
         elif school == 'imsu':
-            matric = (data.get('matric_number') or '').strip()
+            matric = (data.get('matric_number') or '').strip().upper()
             if not matric:
                 raise serializers.ValidationError({"matric_number": "Matric number or JAMB reg number is required for IMSU students."})
-            # Accept 11-digit matric or alphanumeric JAMB reg (8–13 chars)
-            if not (re.match(r'^\d{11}$', matric) or re.match(r'^[a-zA-Z0-9]{8,13}$', matric)):
-                raise serializers.ValidationError({"matric_number": "Enter a valid matric number (11 digits) or JAMB reg number."})
+            # IMSU matric: IMSU/YYYY/NNNN  |  JAMB reg: 12 digits + 2 letters (e.g. 202441088345RC)
+            valid_imsu = bool(re.match(r'^IMSU/\d{4}/\d{3,6}$', matric))
+            valid_jamb = bool(re.match(r'^\d{12}[A-Z]{2}$', matric))
+            if not (valid_imsu or valid_jamb):
+                raise serializers.ValidationError({
+                    "matric_number": "Enter a valid IMSU matric (IMSU/2024/0987) or JAMB reg number (202441088345RC)."
+                })
+            # Normalise to uppercase before saving
+            data['matric_number'] = matric
 
         return data
 
