@@ -94,10 +94,21 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
 
         return value
 
-    # ✅ MATCH PASSWORDS
+    # ✅ MATCH PASSWORDS + school-specific identity fields
     def validate(self, data):
         if data['password'] != data['password2']:
             raise serializers.ValidationError({"password": "Passwords do not match"})
+
+        user_type = data.get('user_type', 'student')
+        school = (data.get('school') or '').lower()
+
+        if user_type != 'student':
+            if not data.get('nin'):
+                raise serializers.ValidationError({"nin": "NIN is required for non-student accounts."})
+        elif school in ('futo', 'imsu'):
+            if not data.get('matric_number'):
+                raise serializers.ValidationError({"matric_number": "Matric number is required for FUTO and IMSU students."})
+
         return data
 
     def validate_matric_number(self, value):
