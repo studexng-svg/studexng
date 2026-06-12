@@ -219,10 +219,11 @@ export default function AuthPage() {
   const matricVal = validateMatric(signupForm.matric_number || "");
   const ninVal = validateNIN(signupForm.nin || "");
   const isFUTO = signupForm.school === "FUTO";
+  const isIMSU = signupForm.school === "IMSU";
   const schoolOk = !!signupForm.school;
   const step1Valid = usernameVal.ok && usernameAvailable !== false && emailVal.ok &&
     phoneVal.ok && hostelOk && passwordVal.ok && schoolOk &&
-    (isNonStudent ? ninVal.ok : isFUTO ? matricVal.ok : true);
+    (isNonStudent ? ninVal.ok : (isFUTO || isIMSU) ? matricVal.ok : true);
 
   const handleSignupChange = (e: any) => {
     const { name, value } = e.target;
@@ -638,7 +639,7 @@ export default function AuthPage() {
                       {touched.email && signupForm.email && <FieldFeedback ok={emailVal.ok} msg={emailVal.msg} />}
                       {!touched.email && (
                         <p className="text-xs text-stone-400 mt-1">
-                          {isNonStudent ? "Use your Gmail or any valid email address" : isFUTO ? "Use your @futo.edu.ng or Gmail address" : signupForm.school === "PAU" ? "Must be your @pau.edu.ng email" : "Select your school above first"}
+                          {isNonStudent ? "Use your Gmail or any valid email address" : isFUTO ? "Use your @futo.edu.ng or Gmail address" : isIMSU ? "Use your @imsu.edu.ng or Gmail address" : signupForm.school === "PAU" ? "Must be your @pau.edu.ng email" : "Select your school above first"}
                         </p>
                       )}
                     </div>
@@ -655,8 +656,8 @@ export default function AuthPage() {
                       {!touched.phone && <p className="text-xs text-stone-400 mt-1">11-digit Nigerian number</p>}
                     </div>
 
-                    {/* MATRIC — FUTO students only */}
-                    {!isNonStudent && isFUTO && (
+                    {/* MATRIC — FUTO and IMSU students */}
+                    {!isNonStudent && (isFUTO || isIMSU) && (
                       <div>
                         <label className="text-sm font-medium text-stone-700 flex items-center gap-1.5 mb-1.5">
                           <Hash className="w-4 h-4" /> Matric Number
