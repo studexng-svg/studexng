@@ -12,7 +12,7 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   metadataBase: new URL("https://www.studex.com.ng"),
   title: {
-    default: "StudEx — Campus Marketplace for Students in Nigeria",
+    default: "StudEx — Campus Marketplace",
     template: "%s | StudEx",
   },
   description:
@@ -45,7 +45,7 @@ export const metadata: Metadata = {
     locale: "en_NG",
     url: "https://www.studex.com.ng",
     siteName: "StudEx",
-    title: "StudEx — Campus Marketplace for Students in Nigeria",
+    title: "StudEx — Campus Marketplace",
     description:
       "Nigeria's #1 student campus marketplace. Order food, beauty, laundry, photography and more from verified vendors on campus.",
     images: [
@@ -60,7 +60,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     site: "@studexng",
-    title: "StudEx — Campus Marketplace for Students in Nigeria",
+    title: "StudEx — Campus Marketplace",
     description: "Nigeria's #1 student campus marketplace for food, beauty, laundry & more.",
     images: ["/images/og-image.jpg"],
   },
