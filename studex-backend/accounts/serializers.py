@@ -105,16 +105,24 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         if user_type != 'student':
             if not data.get('nin'):
                 raise serializers.ValidationError({"nin": "NIN is required for non-student accounts."})
-        elif school in ('futo', 'imsu'):
-            if not data.get('matric_number'):
-                raise serializers.ValidationError({"matric_number": "Matric number is required for FUTO and IMSU students."})
+        elif school == 'futo':
+            matric = data.get('matric_number', '')
+            if not matric or not re.match(r'^\d{11}$', matric):
+                raise serializers.ValidationError({"matric_number": "FUTO matric number must be exactly 11 digits."})
+        elif school == 'imsu':
+            matric = (data.get('matric_number') or '').strip()
+            if not matric:
+                raise serializers.ValidationError({"matric_number": "Matric number or JAMB reg number is required for IMSU students."})
+            # Accept 11-digit matric or alphanumeric JAMB reg (8–13 chars)
+            if not (re.match(r'^\d{11}$', matric) or re.match(r'^[a-zA-Z0-9]{8,13}$', matric)):
+                raise serializers.ValidationError({"matric_number": "Enter a valid matric number (11 digits) or JAMB reg number."})
 
         return data
 
     def validate_matric_number(self, value):
         if value:
-            if User.objects.filter(matric_number=value).exists():
-                raise serializers.ValidationError("This matriculation number is already registered")
+            if User.objects.filter(matric_number__iexact=value).exists():
+                raise serializers.ValidationError("This matric/JAMB number is already registered")
         return value
 
     def validate_nin(self, value):
