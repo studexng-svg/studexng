@@ -70,16 +70,12 @@ const validateMatric = (v: string) => {
 
 const validateIMSUId = (v: string) => {
   if (!v) return { ok: false, msg: "" };
-  const trimmed = v.trim();
-  // Accept 11-digit matric or JAMB reg number (alphanumeric, 8–13 chars)
-  if (/^\d{11}$/.test(trimmed)) {
-    const year = parseInt(trimmed.substring(0, 4));
-    const currentYear = new Date().getFullYear();
-    if (year < 2015 || year > currentYear) return { ok: false, msg: "Enter a valid admission year" };
-    return { ok: true, msg: "Valid matric number ✓" };
-  }
-  if (/^[a-zA-Z0-9]{8,13}$/.test(trimmed)) return { ok: true, msg: "Valid JAMB reg number ✓" };
-  return { ok: false, msg: "Enter a valid matric number (11 digits) or JAMB reg number" };
+  const trimmed = v.trim().toUpperCase();
+  // IMSU matric format: IMSU/YYYY/NNNN
+  if (/^IMSU\/\d{4}\/\d{3,6}$/.test(trimmed)) return { ok: true, msg: "Valid IMSU matric ✓" };
+  // JAMB reg format: 12 digits + 2 letters, e.g. 202441088345RC
+  if (/^\d{12}[A-Z]{2}$/.test(trimmed)) return { ok: true, msg: "Valid JAMB reg number ✓" };
+  return { ok: false, msg: "Enter IMSU matric (IMSU/2024/0987) or JAMB reg (202441088345RC)" };
 };
 
 const validateNIN = (v: string) => {
@@ -706,8 +702,8 @@ export default function AuthPage() {
                           name="matric_number"
                           value={signupForm.matric_number || ""}
                           onChange={handleSignupChange}
-                          placeholder="e.g. 20241430493 or 10290371HD"
-                          maxLength={13}
+                          placeholder="e.g. IMSU/2024/0987 or 202441088345RC"
+                          maxLength={14}
                           inputMode="text"
                           autoCapitalize="characters"
                           className="w-full px-4 py-2.5 rounded-xl border border-stone-200 focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 transition-all text-sm bg-white text-stone-900 placeholder:text-stone-400"
@@ -715,7 +711,7 @@ export default function AuthPage() {
                         />
                         {signupForm.matric_number
                           ? <FieldFeedback ok={imsuIdVal.ok} msg={imsuIdVal.msg} />
-                          : <p className="text-xs text-stone-400 mt-1">Enter your matric number or JAMB registration number</p>
+                          : <p className="text-xs text-stone-400 mt-1">IMSU matric (IMSU/2024/0987) or JAMB reg (202441088345RC)</p>
                         }
                       </div>
                     )}
