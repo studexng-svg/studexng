@@ -1,5 +1,5 @@
 export const metadata = {
-  title: "StudEx — Under Maintenance",
+  title: "StudEx - Under Maintenance",
   robots: { index: false, follow: false },
 };
 

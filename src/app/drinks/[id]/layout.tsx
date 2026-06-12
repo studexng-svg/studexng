@@ -16,7 +16,7 @@ export async function generateMetadata({
       const data = await res.json();
       const name = data.business_name || data.username || "a student vendor";
       return {
-        title: `${name} — Drinks`,
+        title: `${name} - Drinks`,
         description: `Order drinks from ${name} on StudEx campus marketplace. Fast delivery for PAU students.`,
         openGraph: {
           title: `${name} | Drinks on StudEx`,

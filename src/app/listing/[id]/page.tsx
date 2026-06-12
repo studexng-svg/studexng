@@ -21,7 +21,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
         ? listing.description.slice(0, 120) + (listing.description.length > 120 ? "…" : "")
         : "";
       const ogTitle = price
-        ? `${listing.title} — ${price} | StudEx`
+        ? `${listing.title} - ${price} | StudEx`
         : `${listing.title} | StudEx`;
       const ogDesc = [
         price ? `${price} · Sold by @${vendorName}` : `Sold by @${vendorName}`,
