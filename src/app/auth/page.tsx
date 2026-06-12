@@ -68,6 +68,20 @@ const validateMatric = (v: string) => {
   return { ok: true, msg: "Valid matric number ✓" };
 };
 
+const validateIMSUId = (v: string) => {
+  if (!v) return { ok: false, msg: "" };
+  const trimmed = v.trim();
+  // Accept 11-digit matric or JAMB reg number (alphanumeric, 8–13 chars)
+  if (/^\d{11}$/.test(trimmed)) {
+    const year = parseInt(trimmed.substring(0, 4));
+    const currentYear = new Date().getFullYear();
+    if (year < 2015 || year > currentYear) return { ok: false, msg: "Enter a valid admission year" };
+    return { ok: true, msg: "Valid matric number ✓" };
+  }
+  if (/^[a-zA-Z0-9]{8,13}$/.test(trimmed)) return { ok: true, msg: "Valid JAMB reg number ✓" };
+  return { ok: false, msg: "Enter a valid matric number (11 digits) or JAMB reg number" };
+};
+
 const validateNIN = (v: string) => {
   if (!v) return { ok: false, msg: "" };
   if (!/^\d{11}$/.test(v)) return { ok: false, msg: "NIN must be exactly 11 digits" };
@@ -217,13 +231,14 @@ export default function AuthPage() {
   const passwordVal = validatePassword(signupForm.password);
   const hostelOk = !!signupForm.hostel;
   const matricVal = validateMatric(signupForm.matric_number || "");
+  const imsuIdVal = validateIMSUId(signupForm.matric_number || "");
   const ninVal = validateNIN(signupForm.nin || "");
   const isFUTO = signupForm.school === "FUTO";
   const isIMSU = signupForm.school === "IMSU";
   const schoolOk = !!signupForm.school;
   const step1Valid = usernameVal.ok && usernameAvailable !== false && emailVal.ok &&
     phoneVal.ok && hostelOk && passwordVal.ok && schoolOk &&
-    (isNonStudent ? ninVal.ok : (isFUTO || isIMSU) ? matricVal.ok : true);
+    (isNonStudent ? ninVal.ok : isFUTO ? matricVal.ok : isIMSU ? imsuIdVal.ok : true);
 
   const handleSignupChange = (e: any) => {
     const { name, value } = e.target;
@@ -656,8 +671,8 @@ export default function AuthPage() {
                       {!touched.phone && <p className="text-xs text-stone-400 mt-1">11-digit Nigerian number</p>}
                     </div>
 
-                    {/* MATRIC — FUTO and IMSU students */}
-                    {!isNonStudent && (isFUTO || isIMSU) && (
+                    {/* MATRIC — FUTO students */}
+                    {!isNonStudent && isFUTO && (
                       <div>
                         <label className="text-sm font-medium text-stone-700 flex items-center gap-1.5 mb-1.5">
                           <Hash className="w-4 h-4" /> Matric Number
@@ -676,6 +691,31 @@ export default function AuthPage() {
                         {signupForm.matric_number
                           ? <FieldFeedback ok={matricVal.ok} msg={matricVal.msg} />
                           : <p className="text-xs text-stone-400 mt-1">Your 11-digit matriculation number</p>
+                        }
+                      </div>
+                    )}
+
+                    {/* MATRIC / JAMB REG — IMSU students */}
+                    {!isNonStudent && isIMSU && (
+                      <div>
+                        <label className="text-sm font-medium text-stone-700 flex items-center gap-1.5 mb-1.5">
+                          <Hash className="w-4 h-4" /> Matric Number / JAMB Reg Number
+                        </label>
+                        <input
+                          type="text"
+                          name="matric_number"
+                          value={signupForm.matric_number || ""}
+                          onChange={handleSignupChange}
+                          placeholder="e.g. 20241430493 or 10290371HD"
+                          maxLength={13}
+                          inputMode="text"
+                          autoCapitalize="characters"
+                          className="w-full px-4 py-2.5 rounded-xl border border-stone-200 focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 transition-all text-sm bg-white text-stone-900 placeholder:text-stone-400"
+                          disabled={isLoading}
+                        />
+                        {signupForm.matric_number
+                          ? <FieldFeedback ok={imsuIdVal.ok} msg={imsuIdVal.msg} />
+                          : <p className="text-xs text-stone-400 mt-1">Enter your matric number or JAMB registration number</p>
                         }
                       </div>
                     )}
