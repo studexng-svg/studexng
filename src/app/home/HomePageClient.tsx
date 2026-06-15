@@ -19,6 +19,7 @@ import { useWishlistStore } from "@/lib/wishlistStore";
 import { useCart } from "@/lib/cartStore";
 import { GRAD, GRAD_TEXT, SERIF } from "@/lib/tokens";
 import VendorOfMonthModal from "@/components/VendorOfMonthModal";
+import WhatsAppGroupModal from "@/components/WhatsAppGroupModal";
 
 
 interface Vendor {
@@ -675,6 +676,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
   return (
     <>
       <VendorOfMonthModal vendor={vendorOfMonth} />
+      <WhatsAppGroupModal />
 
       {toast && (
         <motion.div initial={{ y: -50, opacity: 0 }} animate={{ y: 60, opacity: 1 }}
