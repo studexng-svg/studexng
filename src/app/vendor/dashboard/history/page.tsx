@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { GRAD, toArray } from "@/lib/tokens";
 import { History, TrendingUp, Download, Calendar, User, Package } from "lucide-react";
 import { EmptyState, LoadingSpinner, HEADING_FONT } from "../_shared";
@@ -9,31 +10,33 @@ import { api } from "@/lib/api";
 type DateFilter = "all" | "week" | "month";
 
 export default function HistoryPage() {
-  const [orders, setOrders] = useState<any[]>([]);
-  const [bookings, setBookings] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [dateFilter, setDateFilter] = useState<DateFilter>("all");
   const [tab, setTab] = useState<"orders" | "bookings">("orders");
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const [ordersRes, bookingsRes] = await Promise.all([
-          api.orders.list(),
-          api.orders.bookings(),
-        ]);
-        if (ordersRes.ok) {
-          const data = toArray(await ordersRes.json());
-          setOrders(data.filter((o: any) => ["paid", "seller_completed", "completed"].includes(o.status)));
-        }
-        if (bookingsRes.ok) {
-          const data = toArray(await bookingsRes.json());
-          setBookings(data.filter((b: any) => b.status === "completed" || b.status === "cancelled"));
-        }
-      } catch {} finally { setLoading(false); }
-    };
-    load();
-  }, []);
+  const { data: ordersData, isPending: ordersLoading } = useQuery({
+    queryKey: ["vendor-orders"],
+    queryFn: async () => {
+      const res = await api.orders.list();
+      const data = await res.json();
+      return toArray(data);
+    },
+    staleTime: 30_000,
+  });
+
+  const { data: bookingsData, isPending: bookingsLoading } = useQuery({
+    queryKey: ["vendor-bookings"],
+    queryFn: async () => {
+      const res = await api.orders.bookings();
+      const data = await res.json();
+      return toArray(data);
+    },
+    staleTime: 30_000,
+  });
+
+  if (ordersLoading || bookingsLoading) return <LoadingSpinner />;
+
+  const allOrders: any[] = (ordersData ?? []).filter((o: any) => ["paid", "seller_completed", "completed"].includes(o.status));
+  const allBookings: any[] = (bookingsData ?? []).filter((b: any) => b.status === "completed" || b.status === "cancelled");
 
   const applyDateFilter = (list: any[], dateKey = "created_at") => {
     if (dateFilter === "all") return list;
@@ -44,8 +47,8 @@ export default function HistoryPage() {
     return list.filter(item => new Date(item[dateKey]).getTime() >= cutoff);
   };
 
-  const filteredOrders = applyDateFilter(orders);
-  const filteredBookings = applyDateFilter(bookings, "scheduled_date");
+  const filteredOrders = applyDateFilter(allOrders);
+  const filteredBookings = applyDateFilter(allBookings, "scheduled_date");
   const totalRevenue = filteredOrders.reduce((s, o) => s + parseFloat(String(o.listing?.price ?? o.amount ?? 0)), 0);
 
   const handleDownloadCSV = () => {
@@ -75,8 +78,6 @@ export default function HistoryPage() {
     a.click();
     URL.revokeObjectURL(url);
   };
-
-  if (loading) return <LoadingSpinner />;
 
   return (
     <div className="pb-4 space-y-5">

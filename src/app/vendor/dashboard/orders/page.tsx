@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { GRAD, toArray } from "@/lib/tokens";
 import { ShoppingBag, MapPin, Camera, X, ImagePlus } from "lucide-react";
 import { StatusBadge, EmptyState, LoadingSpinner, HEADING_FONT } from "../_shared";
@@ -114,22 +115,22 @@ function ProofModal({ order, onSuccess, onClose }: {
 }
 
 export default function OrdersPage() {
-  const [orders, setOrders] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [marking, setMarking] = useState<number | null>(null);
   const [error, setError] = useState("");
   const [proofOrder, setProofOrder] = useState<any | null>(null);
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const res = await api.orders.list();
-        const data = await res.json();
-        setOrders(toArray(data));
-      } catch {} finally { setLoading(false); }
-    };
-    load();
-  }, []);
+  const { data: ordersData, isPending: loading } = useQuery({
+    queryKey: ["vendor-orders"],
+    queryFn: async () => {
+      const res = await api.orders.list();
+      const data = await res.json();
+      return toArray(data);
+    },
+    staleTime: 30_000,
+  });
+
+  const orders: any[] = ordersData ?? [];
 
   const markComplete = async (orderId: number) => {
     setMarking(orderId); setError("");
@@ -137,7 +138,9 @@ export default function OrdersPage() {
       const res = await api.orders.markComplete(orderId);
       const data = await res.json();
       if (!res.ok) { setError(data.detail || data.error || "Could not mark complete."); return; }
-      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: "seller_completed" } : o));
+      queryClient.setQueryData<any[]>(["vendor-orders"], prev =>
+        prev ? prev.map(o => o.id === orderId ? { ...o, status: "seller_completed" } : o) : prev
+      );
     } catch { setError("Network error. Please try again."); }
     finally { setMarking(null); }
   };
@@ -161,7 +164,9 @@ export default function OrdersPage() {
         <ProofModal
           order={proofOrder}
           onSuccess={id => {
-            setOrders(prev => prev.map(o => o.id === id ? { ...o, status: "seller_completed" } : o));
+            queryClient.setQueryData<any[]>(["vendor-orders"], prev =>
+              prev ? prev.map(o => o.id === id ? { ...o, status: "seller_completed" } : o) : prev
+            );
             setProofOrder(null);
           }}
           onClose={() => setProofOrder(null)}

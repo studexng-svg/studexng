@@ -1,34 +1,35 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { GRAD, toArray } from "@/lib/tokens";
-import { TrendingUp, DollarSign } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { LoadingSpinner, HEADING_FONT } from "../_shared";
 import { api } from "@/lib/api";
 
 export default function EarningsPage() {
-  const [data, setData] = useState<any>(null);
-  const [transactions, setTransactions] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: earningsData, isPending: earningsLoading } = useQuery({
+    queryKey: ["vendor-earnings"],
+    queryFn: async () => {
+      const res = await api.payments.earnings();
+      if (!res.ok) return null;
+      return res.json();
+    },
+    staleTime: 60_000,
+  });
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const [earningsRes, txRes] = await Promise.all([
-          api.payments.earnings(),
-          api.payments.transactions(),
-        ]);
-        if (earningsRes.ok) setData(await earningsRes.json());
-        if (txRes.ok) {
-          const tx = await txRes.json();
-          setTransactions(Array.isArray(tx) ? tx : (tx.results || []));
-        }
-      } catch {} finally { setLoading(false); }
-    };
-    load();
-  }, []);
+  const { data: transactionsData, isPending: txLoading } = useQuery({
+    queryKey: ["vendor-transactions"],
+    queryFn: async () => {
+      const res = await api.payments.transactions();
+      if (!res.ok) return [];
+      const tx = await res.json();
+      return Array.isArray(tx) ? tx : (tx.results || []);
+    },
+    staleTime: 60_000,
+  });
 
-  if (loading) return <LoadingSpinner />;
+  const data = earningsData;
+  const transactions: any[] = transactionsData ?? [];
+
+  if (earningsLoading || txLoading) return <LoadingSpinner />;
 
   const stats = [
     {

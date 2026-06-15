@@ -8,7 +8,8 @@ import {
   ShoppingCart, MessageCircle, Send, Radio, Bot, RefreshCw, Percent,
 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import AdminTopBar from "@/components/layout/AdminTopBar";
 import { api } from "@/lib/api";
 import { GRAD, SERIF } from "@/lib/tokens";
@@ -95,20 +96,19 @@ const QUICK_LINKS = [
 ];
 
 function LiveActivity() {
-  const [activity, setActivity] = useState<ActivityData | null>(null);
   const [expanded, setExpanded] = useState(false);
 
-  useEffect(() => {
-    const fetch_ = () => {
-      api.admin.activity()
-        .then(r => r.ok ? r.json() : Promise.reject())
-        .then(d => setActivity(d))
-        .catch(() => {});
-    };
-    fetch_();
-    const id = setInterval(() => { if (document.visibilityState !== 'hidden') fetch_(); }, 60_000);
-    return () => clearInterval(id);
-  }, []);
+  const { data: activity } = useQuery<ActivityData>({
+    queryKey: ["admin-activity"],
+    queryFn: async () => {
+      const r = await api.admin.activity();
+      if (!r.ok) throw new Error("failed");
+      return r.json();
+    },
+    refetchInterval: query =>
+      document.visibilityState === "hidden" ? false : 60_000,
+    staleTime: 30_000,
+  });
 
   const count = activity?.online_count ?? 0;
 
@@ -168,23 +168,19 @@ function LiveActivity() {
 }
 
 export default function AdminDashboard() {
-  const [stats, setStats] = useState<DashStats | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const load = (manual = false) => {
-    if (manual) setRefreshing(true);
-    return api.admin.dashboard()
-      .then(r => r.ok ? r.json() : Promise.reject())
-      .then(d => setStats(d))
-      .catch(() => {})
-      .finally(() => { setLoading(false); setRefreshing(false); });
-  };
+  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    load();
-    const id = setInterval(() => { if (document.visibilityState !== 'hidden') load(); }, 60_000);
-    return () => clearInterval(id);
-  }, []);
+  const { data: stats, isPending: loading, isFetching: refreshing } = useQuery<DashStats>({
+    queryKey: ["admin-dashboard"],
+    queryFn: async () => {
+      const r = await api.admin.dashboard();
+      if (!r.ok) throw new Error("failed");
+      return r.json();
+    },
+    refetchInterval: query =>
+      document.visibilityState === "hidden" ? false : 60_000,
+    staleTime: 30_000,
+  });
 
   return (
     <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
@@ -220,7 +216,7 @@ export default function AdminDashboard() {
                 <div className="flex items-center justify-between">
                   <p className="text-teal-600 text-xs tracking-[0.2em] uppercase font-semibold">Financials</p>
                   <button
-                    onClick={() => load(true)}
+                    onClick={() => queryClient.refetchQueries({ queryKey: ["admin-dashboard"] })}
                     disabled={refreshing}
                     className="flex items-center gap-1.5 text-xs text-stone-400 hover:text-teal-600 transition-colors"
                   >

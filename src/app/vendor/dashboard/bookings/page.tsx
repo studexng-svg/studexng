@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/authStore";
 import { GRAD, toArray } from "@/lib/tokens";
 import { Calendar, Check, X, Loader } from "lucide-react";
@@ -9,27 +10,29 @@ import { api } from "@/lib/api";
 
 export default function BookingsPage() {
   const { user } = useAuth();
-  const [bookings, setBookings] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [filter, setFilter] = useState<"pending" | "confirmed" | "all">("pending");
   const [actionLoading, setActionLoading] = useState<number | null>(null);
 
-  useEffect(() => { loadBookings(); }, []);
-
-  const loadBookings = async () => {
-    try {
+  const { data: bookingsData, isPending: loading } = useQuery({
+    queryKey: ["vendor-bookings"],
+    queryFn: async () => {
       const res = await api.orders.bookings();
       const data = await res.json();
       const list = toArray(data);
-      setBookings(list.filter((b: any) => b.vendor_username === user?.username));
-    } catch {} finally { setLoading(false); }
-  };
+      return list.filter((b: any) => b.vendor_username === user?.username);
+    },
+    enabled: !!user,
+    staleTime: 30_000,
+  });
+
+  const bookings: any[] = bookingsData ?? [];
 
   const handleAction = async (id: number, action: "confirm" | "cancel") => {
     setActionLoading(id);
     try {
       await api.orders.bookingAction(id, action);
-      loadBookings();
+      queryClient.invalidateQueries({ queryKey: ["vendor-bookings"] });
     } catch {} finally { setActionLoading(null); }
   };
 

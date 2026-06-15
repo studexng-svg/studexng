@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/authStore";
 import { GRAD, toArray } from "@/lib/tokens";
 import { Plus, Edit2, Trash2, Loader, ToggleLeft, ToggleRight, X } from "lucide-react";
@@ -9,11 +10,9 @@ import { api } from "@/lib/api";
 
 export default function ListingsPage() {
   const { user } = useAuth();
-  const [listings, setListings] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<any>(null);
-  const [categories, setCategories] = useState<any[]>([]);
   const [form, setForm] = useState({
     title: "", description: "", price: "", category: "",
     listing_type: "service", track_inventory: false,
@@ -24,23 +23,28 @@ export default function ListingsPage() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  useEffect(() => { loadListings(); loadCategories(); }, [user]);
-
-  const loadListings = async () => {
-    if (!user?.username) return;
-    try {
-      const res = await api.services.listingsAuth({ vendor_username: user.username });
+  const { data: listingsData, isPending: loading } = useQuery({
+    queryKey: ["vendor-listings"],
+    queryFn: async () => {
+      const res = await api.services.listingsAuth({ vendor_username: user!.username });
       const data = await res.json();
-      setListings(toArray(data));
-    } catch {} finally { setLoading(false); }
-  };
+      return toArray(data);
+    },
+    enabled: !!user?.username,
+    staleTime: 30_000,
+  });
 
-  const loadCategories = async () => {
-    try {
+  const { data: categoriesData } = useQuery({
+    queryKey: ["vendor-categories"],
+    queryFn: async () => {
       const res = await api.services.categoriesAuth();
-      setCategories(toArray(await res.json()));
-    } catch {}
-  };
+      return toArray(await res.json());
+    },
+    staleTime: 300_000,
+  });
+
+  const listings: any[] = listingsData ?? [];
+  const categories: any[] = categoriesData ?? [];
 
   const openEdit = (listing: any) => {
     setEditing(listing);
@@ -84,7 +88,7 @@ export default function ListingsPage() {
       const res = editing
         ? await api.services.updateListing(editing.id, fd)
         : await api.services.createListing(fd);
-      if (res.ok) { showToast(editing ? "Updated!" : "Created!"); resetForm(); loadListings(); }
+      if (res.ok) { showToast(editing ? "Updated!" : "Created!"); resetForm(); queryClient.invalidateQueries({ queryKey: ["vendor-listings"] }); }
       else showToast("Failed to save.");
     } catch { showToast("Error."); } finally { setSaving(false); }
   };
@@ -93,7 +97,7 @@ export default function ListingsPage() {
     setDeleting(true);
     try {
       const res = await api.services.deleteListing(id);
-      if (res.ok || res.status === 204) { showToast("Listing deleted."); loadListings(); }
+      if (res.ok || res.status === 204) { showToast("Listing deleted."); queryClient.invalidateQueries({ queryKey: ["vendor-listings"] }); }
       else showToast("Could not delete. Try again.");
     } catch { showToast("Error deleting listing."); }
     finally { setDeleting(false); setConfirmDeleteId(null); }

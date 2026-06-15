@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/authStore";
 import { Star } from "lucide-react";
 import { EmptyState, LoadingSpinner, HEADING_FONT } from "../_shared";
@@ -8,17 +8,20 @@ import { api } from "@/lib/api";
 
 export default function ReviewsPage() {
   const { user } = useAuth();
-  const [reviews, setReviews] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (!user) return;
-    api.pub.reviews({ vendor: String(user.id) })
-      .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d) setReviews(Array.isArray(d) ? d : (d.results || [])); })
-      .finally(() => setLoading(false));
-  }, [user]);
+  const { data, isPending: loading } = useQuery({
+    queryKey: ["vendor-reviews", user?.id],
+    queryFn: async () => {
+      const res = await api.pub.reviews({ vendor: String(user!.id) });
+      if (!res.ok) return [];
+      const d = await res.json();
+      return Array.isArray(d) ? d : (d.results || []);
+    },
+    enabled: !!user,
+    staleTime: 30_000,
+  });
 
+  const reviews: any[] = data ?? [];
   const avg = reviews.length
     ? (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)
     : null;
