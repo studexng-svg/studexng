@@ -1212,67 +1212,71 @@ def _order_payout_status(order_status):
     return 'in_escrow'  # paid, seller_completed
 
 
-class AdminServiceTransactionListView(generics.ListAPIView):
+class AdminServiceTransactionListView(APIView):
     """GET /api/admin/service-transactions/ — per-order vendor payout records."""
     permission_classes = [IsAdminUser]
 
-    def list(self, request, *args, **kwargs):
-        from orders.models import Order
-        from django.db.models import F
+    def get(self, request):
+        try:
+            from orders.models import Order
 
-        PAID_STATUSES = ['paid', 'seller_completed', 'completed', 'cancelled']
+            PAID_STATUSES = ['paid', 'seller_completed', 'completed', 'cancelled']
 
-        qs = (
-            Order.objects
-            .filter(status__in=PAID_STATUSES)
-            .select_related('listing__vendor', 'listing')
-            .order_by('-created_at')
-        )
-
-        # Map UI tab → order status filter
-        tx_status = request.query_params.get('status', '')
-        if tx_status == 'released':
-            qs = qs.filter(status='completed')
-        elif tx_status == 'withdrawn':
-            qs = qs.filter(status='cancelled')
-        elif tx_status == 'in_escrow':
-            qs = qs.filter(status__in=['paid', 'seller_completed'])
-
-        search = request.query_params.get('search', '')
-        if search:
-            qs = qs.filter(
-                Q(listing__vendor__username__icontains=search) |
-                Q(listing__vendor__business_name__icontains=search) |
-                Q(reference__icontains=search)
+            qs = (
+                Order.objects
+                .filter(status__in=PAID_STATUSES)
+                .select_related('listing__vendor', 'listing')
+                .order_by('-created_at')
             )
 
-        campus = request.query_params.get('campus', '')
-        if campus:
-            campus = campus.lower()
-            if campus == 'pau':
-                qs = qs.filter(
-                    Q(listing__campus__iexact='pau') | Q(listing__campus='') | Q(listing__campus__isnull=True)
-                )
-            else:
-                qs = qs.filter(listing__campus__iexact=campus)
+            # Map UI tab → order status filter
+            tx_status = request.query_params.get('status', '')
+            if tx_status == 'released':
+                qs = qs.filter(status='completed')
+            elif tx_status == 'withdrawn':
+                qs = qs.filter(status='cancelled')
+            elif tx_status == 'in_escrow':
+                qs = qs.filter(status__in=['paid', 'seller_completed'])
 
-        data = []
-        for o in qs:
-            vendor = o.listing.vendor if o.listing else None
-            data.append({
-                'id': o.id,
-                'vendor_id': vendor.id if vendor else None,
-                'vendor': vendor.username if vendor else '[Deleted]',
-                'business_name': getattr(vendor, 'business_name', None) if vendor else None,
-                'order_id': o.id,
-                'order_reference': o.reference,
-                'amount': str(o.listing.price) if o.listing else '0',
-                'status': _order_payout_status(o.status),
-                'created_at': o.created_at.isoformat(),
-                'released_at': o.buyer_confirmed_at.isoformat() if getattr(o, 'buyer_confirmed_at', None) else None,
-                'withdrawn_at': None,
-            })
-        return Response(data)
+            search = request.query_params.get('search', '')
+            if search:
+                qs = qs.filter(
+                    Q(listing__vendor__username__icontains=search) |
+                    Q(listing__vendor__business_name__icontains=search) |
+                    Q(reference__icontains=search)
+                )
+
+            campus = request.query_params.get('campus', '')
+            if campus:
+                campus = campus.lower()
+                if campus == 'pau':
+                    qs = qs.filter(
+                        Q(listing__campus__iexact='pau') | Q(listing__campus='') | Q(listing__campus__isnull=True)
+                    )
+                else:
+                    qs = qs.filter(listing__campus__iexact=campus)
+
+            data = []
+            for o in qs:
+                vendor = o.listing.vendor if o.listing else None
+                data.append({
+                    'id': o.id,
+                    'vendor_id': vendor.id if vendor else None,
+                    'vendor': vendor.username if vendor else '[Deleted]',
+                    'business_name': getattr(vendor, 'business_name', None) if vendor else None,
+                    'order_id': o.id,
+                    'order_reference': o.reference,
+                    'amount': str(o.listing.price) if o.listing else '0',
+                    'status': _order_payout_status(o.status),
+                    'created_at': o.created_at.isoformat(),
+                    'released_at': o.buyer_confirmed_at.isoformat() if getattr(o, 'buyer_confirmed_at', None) else None,
+                    'withdrawn_at': None,
+                })
+            return Response(data)
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"AdminServiceTransactionListView error: {e}", exc_info=True)
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class AdminServiceTransactionDetailView(APIView):
