@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
@@ -86,38 +87,35 @@ export default function NotificationsPage() {
   const router = useRouter();
   const { isLoggedIn, isHydrated } = useAuth();
 
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Notification | null>(null);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     if (isHydrated && !isLoggedIn) router.push("/auth");
   }, [isHydrated, isLoggedIn, router]);
 
-  const fetchNotifications = useCallback(async () => {
-    try {
+  const { data, isPending } = useQuery({
+    queryKey: ["notifications-list"],
+    queryFn: async (): Promise<{ notifications: Notification[]; unread_count: number }> => {
       const res = await api.notifications.list();
-      if (!res.ok) return;
-      const data = await res.json();
-      setNotifications(data.notifications || []);
-      setUnreadCount(data.unread_count || 0);
-    } catch {}
-    finally { setLoading(false); }
-  }, []);
+      if (!res.ok) throw new Error("fetch failed");
+      return res.json();
+    },
+    enabled: isHydrated && isLoggedIn,
+    refetchInterval: 15_000,
+    staleTime: 5_000,
+  });
 
-  useEffect(() => {
-    if (!isHydrated || !isLoggedIn) return;
-    fetchNotifications();
-    const interval = setInterval(fetchNotifications, 15000);
-    return () => clearInterval(interval);
-  }, [isHydrated, isLoggedIn, fetchNotifications]);
+  const notifications = data?.notifications ?? [];
+  const unreadCount = data?.unread_count ?? 0;
 
   const markAllRead = async () => {
     try {
       await api.notifications.markAllRead();
-      setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
-      setUnreadCount(0);
+      queryClient.setQueryData<{ notifications: Notification[]; unread_count: number }>(
+        ["notifications-list"],
+        old => old ? { ...old, notifications: old.notifications.map(n => ({ ...n, is_read: true })), unread_count: 0 } : old
+      );
     } catch {}
   };
 
@@ -125,8 +123,14 @@ export default function NotificationsPage() {
     if (!n.is_read) {
       try {
         await api.notifications.markRead(n.id);
-        setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, is_read: true } : x));
-        setUnreadCount(prev => Math.max(0, prev - 1));
+        queryClient.setQueryData<{ notifications: Notification[]; unread_count: number }>(
+          ["notifications-list"],
+          old => old ? {
+            ...old,
+            notifications: old.notifications.map(x => x.id === n.id ? { ...x, is_read: true } : x),
+            unread_count: Math.max(0, old.unread_count - 1),
+          } : old
+        );
       } catch {}
     }
     setSelected({ ...n, is_read: true });
@@ -134,7 +138,7 @@ export default function NotificationsPage() {
 
   const closeDetail = () => setSelected(null);
 
-  if (!isHydrated || loading) {
+  if (!isHydrated || isPending) {
     return (
       <div className="min-h-screen bg-[#F5F5F5] flex items-center justify-center">
         <div className="w-10 h-10 border-4 border-stone-200 border-t-teal-500 rounded-full animate-spin" />

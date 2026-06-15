@@ -6,6 +6,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { usePathname } from "next/navigation";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { useEffect, useState } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useNotifications } from "@/hooks/useNotifications";
 import { NotificationToastContainer } from "@/components/NotificationToast";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
@@ -27,6 +28,7 @@ function NotificationProvider({ children }: { children: React.ReactNode }) {
 export default function LayoutClient({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [mounted, setMounted] = useState(false);
+  const [queryClient] = useState(() => new QueryClient({ defaultOptions: { queries: { staleTime: 60_000 } } }));
 
   useEffect(() => {
     setMounted(true);
@@ -73,28 +75,30 @@ export default function LayoutClient({ children }: { children: React.ReactNode }
   }
 
   return (
-    <ThemeProvider>
-      <NotificationProvider>
-        <main
-          className={
-            hideNav
-              ? "min-h-screen bg-[#FFF8F0] dark:bg-gray-950"
-              : "min-h-screen bg-[#FFF8F0] dark:bg-gray-950 pb-28"
-          }
-        >
-          {children}
-        </main>
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider>
+        <NotificationProvider>
+          <main
+            className={
+              hideNav
+                ? "min-h-screen bg-[#FFF8F0] dark:bg-gray-950"
+                : "min-h-screen bg-[#FFF8F0] dark:bg-gray-950 pb-28"
+            }
+          >
+            {children}
+          </main>
 
-        {!hideNav && (
-          <div className="fixed inset-x-0 bottom-0 z-50">
-            <BottomNav />
-          </div>
-        )}
+          {!hideNav && (
+            <div className="fixed inset-x-0 bottom-0 z-50">
+              <BottomNav />
+            </div>
+          )}
 
-        <DraggableAdminShield />
-        <CookieConsent />
-        <Toaster position="top-center" richColors closeButton />
-      </NotificationProvider>
-    </ThemeProvider>
+          <DraggableAdminShield />
+          <CookieConsent />
+          <Toaster position="top-center" richColors closeButton />
+        </NotificationProvider>
+      </ThemeProvider>
+    </QueryClientProvider>
   );
 }

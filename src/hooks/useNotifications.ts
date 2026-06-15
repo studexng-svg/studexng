@@ -18,7 +18,8 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { useAuth, getToken } from "@/lib/authStore";
+import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/lib/authStore";
 import { api } from "@/lib/api";
 
 const POLL_INTERVAL = 60_000;
@@ -42,8 +43,6 @@ export function useNotifications() {
   const { isLoggedIn, accessToken } = useAuth();
   const [unreadCount, setUnreadCount] = useState(0);
   const [toasts, setToasts] = useState<ToastItem[]>([]);
-  const pollTimer = useRef<NodeJS.Timeout | null>(null);
-  const mountedRef = useRef(true);
   const lastSeenIds = useRef<Set<number>>(new Set());
 
   const dismissToast = useCallback((toastId: string) => {
@@ -63,7 +62,6 @@ export function useNotifications() {
   }, [dismissToast]);
 
   const markRead = useCallback(async (notificationId: number) => {
-    if (!getToken()) return;
     try {
       await api.notifications.markRead(notificationId);
       setUnreadCount(c => Math.max(0, c - 1));
@@ -71,56 +69,38 @@ export function useNotifications() {
   }, []);
 
   const markAllRead = useCallback(async () => {
-    if (!getToken()) return;
     try {
       await api.notifications.markAllRead();
       setUnreadCount(0);
     } catch {}
   }, []);
 
-  // ── Poll /api/notifications/status/ instead of SSE ──────────────────────
-  const poll = useCallback(async () => {
-    if (!getToken() || !mountedRef.current) return;
-
-    try {
+  const { data } = useQuery({
+    queryKey: ["notifications-status"],
+    queryFn: async () => {
       const res = await api.notifications.status();
-      if (!res.ok || !mountedRef.current) return;
-
-      const data = await res.json();
-      const notifications: NotificationPayload[] = data.notifications || [];
-      const unread = data.unread_notifications || 0;
-
-      setUnreadCount(unread);
-
-      // Show toasts for notifications we haven't seen before
-      const isFirstPoll = lastSeenIds.current.size === 0;
-      notifications.forEach(n => {
-        if (!n.is_read && !lastSeenIds.current.has(n.id)) {
-          if (!isFirstPoll) {
-            // Only toast on subsequent polls, not on page load
-            addToast(n);
-          }
-          lastSeenIds.current.add(n.id);
-        }
-      });
-      // Also track read ones so we don't re-toast if they get marked unread somehow
-      notifications.forEach(n => lastSeenIds.current.add(n.id));
-
-    } catch {}
-  }, [addToast]);
+      if (!res.ok) throw new Error("status fetch failed");
+      return res.json();
+    },
+    enabled: isLoggedIn && !!accessToken,
+    refetchInterval: POLL_INTERVAL,
+    staleTime: 30_000,
+  });
 
   useEffect(() => {
-    mountedRef.current = true;
-    if (!isLoggedIn || !accessToken) return;
-
-    poll(); // initial fetch
-    pollTimer.current = setInterval(poll, POLL_INTERVAL);
-
-    return () => {
-      mountedRef.current = false;
-      if (pollTimer.current) clearInterval(pollTimer.current);
-    };
-  }, [isLoggedIn, accessToken, poll]);
+    if (!data) return;
+    const notifications: NotificationPayload[] = data.notifications || [];
+    const unread: number = data.unread_notifications || 0;
+    setUnreadCount(unread);
+    const isFirstPoll = lastSeenIds.current.size === 0;
+    notifications.forEach(n => {
+      if (!n.is_read && !lastSeenIds.current.has(n.id)) {
+        if (!isFirstPoll) addToast(n);
+        lastSeenIds.current.add(n.id);
+      }
+    });
+    notifications.forEach(n => lastSeenIds.current.add(n.id));
+  }, [data, addToast]);
 
   return { unreadCount, toasts, dismissToast, markRead, markAllRead };
 }
