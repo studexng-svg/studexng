@@ -1199,49 +1199,50 @@ class AdminPlatformEarningsView(APIView):
 
 # ============================================
 # SERVICE TRANSACTIONS (ESCROW / PAYOUTS)
-# Backed by PaymentTransaction — the only model the order flow actually writes to.
-# services.models.Transaction is a dead table; nothing creates records there.
+# Backed by Order — the authoritative source. PaymentTransaction is sparsely
+# populated (only created when Paystack webhook fires); Order always exists.
+# Status mapping: paid/seller_completed → in_escrow, completed → released.
 # ============================================
 
-def _txn_display_status(txn):
-    """Map PaymentTransaction transfer_status → UI status for the payout panel."""
-    ts = (txn.transfer_status or '').lower()
-    if ts == 'success':
+def _order_payout_status(order_status):
+    if order_status == 'completed':
         return 'released'
-    if ts in ('failed', 'reversed'):
+    if order_status == 'cancelled':
         return 'withdrawn'
-    return 'in_escrow'
+    return 'in_escrow'  # paid, seller_completed
 
 
 class AdminServiceTransactionListView(generics.ListAPIView):
-    """GET /api/admin/service-transactions/ — vendor payout records from PaymentTransaction."""
+    """GET /api/admin/service-transactions/ — per-order vendor payout records."""
     permission_classes = [IsAdminUser]
 
     def list(self, request, *args, **kwargs):
-        from payments.models import PaymentTransaction
+        from orders.models import Order
+        from django.db.models import F
+
+        PAID_STATUSES = ['paid', 'seller_completed', 'completed', 'cancelled']
+
         qs = (
-            PaymentTransaction.objects
-            .filter(status='success')
-            .select_related('seller')
+            Order.objects
+            .filter(status__in=PAID_STATUSES)
+            .select_related('listing__vendor', 'listing')
             .order_by('-created_at')
         )
 
-        # Map UI tab value → PaymentTransaction filter
+        # Map UI tab → order status filter
         tx_status = request.query_params.get('status', '')
         if tx_status == 'released':
-            qs = qs.filter(transfer_status='success')
+            qs = qs.filter(status='completed')
         elif tx_status == 'withdrawn':
-            qs = qs.filter(transfer_status__in=['failed', 'reversed'])
+            qs = qs.filter(status='cancelled')
         elif tx_status == 'in_escrow':
-            qs = qs.filter(
-                Q(transfer_status__isnull=True) | Q(transfer_status='') | Q(transfer_status='pending')
-            )
+            qs = qs.filter(status__in=['paid', 'seller_completed'])
 
         search = request.query_params.get('search', '')
         if search:
             qs = qs.filter(
-                Q(seller__username__icontains=search) |
-                Q(seller__business_name__icontains=search) |
+                Q(listing__vendor__username__icontains=search) |
+                Q(listing__vendor__business_name__icontains=search) |
                 Q(reference__icontains=search)
             )
 
@@ -1250,65 +1251,49 @@ class AdminServiceTransactionListView(generics.ListAPIView):
             campus = campus.lower()
             if campus == 'pau':
                 qs = qs.filter(
-                    Q(seller__school__iexact='pau') | Q(seller__school='') | Q(seller__school__isnull=True)
+                    Q(listing__campus__iexact='pau') | Q(listing__campus='') | Q(listing__campus__isnull=True)
                 )
             else:
-                qs = qs.filter(seller__school__iexact=campus)
+                qs = qs.filter(listing__campus__iexact=campus)
 
         data = []
-        for t in qs:
-            seller = t.seller
+        for o in qs:
+            vendor = o.listing.vendor if o.listing else None
             data.append({
-                'id': t.id,
-                'vendor_id': seller.id if seller else None,
-                'vendor': seller.username if seller else '[Deleted]',
-                'business_name': getattr(seller, 'business_name', None) if seller else None,
-                'order_id': t.order_id,
-                'order_reference': t.reference,
-                'amount': str(t.seller_amount),
-                'status': _txn_display_status(t),
-                'transfer_status': t.transfer_status or 'pending',
-                'transfer_reference': t.transfer_reference,
-                'created_at': t.created_at.isoformat(),
-                'released_at': None,
+                'id': o.id,
+                'vendor_id': vendor.id if vendor else None,
+                'vendor': vendor.username if vendor else '[Deleted]',
+                'business_name': getattr(vendor, 'business_name', None) if vendor else None,
+                'order_id': o.id,
+                'order_reference': o.reference,
+                'amount': str(o.listing.price) if o.listing else '0',
+                'status': _order_payout_status(o.status),
+                'created_at': o.created_at.isoformat(),
+                'released_at': o.buyer_confirmed_at.isoformat() if getattr(o, 'buyer_confirmed_at', None) else None,
                 'withdrawn_at': None,
             })
         return Response(data)
 
 
 class AdminServiceTransactionDetailView(APIView):
-    """PATCH /api/admin/service-transactions/{id}/ — retry payout or mark resolved."""
+    """PATCH /api/admin/service-transactions/{id}/ — release or mark an order payout."""
     permission_classes = [IsAdminUser]
 
     def patch(self, request, tx_id):
-        from payments.models import PaymentTransaction
-        from payments.views import _transfer_to_vendor
+        from orders.models import Order
+        PAID_STATUSES = ['paid', 'seller_completed', 'completed', 'cancelled']
         try:
-            txn = PaymentTransaction.objects.select_related('seller').get(id=tx_id, status='success')
-        except PaymentTransaction.DoesNotExist:
+            order = Order.objects.select_related('listing__vendor').get(id=tx_id, status__in=PAID_STATUSES)
+        except Order.DoesNotExist:
             return Response({'error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
 
         new_status = request.data.get('status')
 
-        if new_status == 'released':
-            # Attempt (or retry) the Paystack transfer to vendor
-            if not txn.transfer_reference:
-                listing_title = ''
-                try:
-                    from orders.models import Order
-                    order = Order.objects.select_related('listing').get(id=txn.order_id)
-                    listing_title = order.listing.title
-                except Exception:
-                    pass
-                _transfer_to_vendor(txn, listing_title)
-                txn.refresh_from_db(fields=['transfer_status', 'transfer_reference'])
+        if new_status == 'released' and order.status in ('paid', 'seller_completed'):
+            order.status = 'completed'
+            order.save(update_fields=['status'])
 
-        elif new_status == 'withdrawn':
-            # Manually mark a stuck transfer as resolved
-            txn.transfer_status = 'success'
-            txn.save(update_fields=['transfer_status'])
-
-        return Response({'id': txn.id, 'status': _txn_display_status(txn)})
+        return Response({'id': order.id, 'status': _order_payout_status(order.status)})
 
 
 # ============================================
