@@ -379,7 +379,7 @@ class ListingAdmin(admin.ModelAdmin):
 @admin.register(Transaction)
 class TransactionAdmin(admin.ModelAdmin):
     list_display = (
-        'id', 'vendor', 'amount_display', 'colored_status',
+        'id', 'vendor', 'order_reference', 'amount_display', 'colored_status',
         'created_at', 'released_at', 'withdrawn_at'
     )
     list_filter = ('status', 'created_at', 'released_at')
@@ -408,6 +408,11 @@ class TransactionAdmin(admin.ModelAdmin):
             '{:,.2f}'.format(float(obj.amount))
         )
     amount_display.short_description = 'Amount'
+
+    def order_reference(self, obj):
+        return obj.order.reference if obj.order_id else '—'
+    order_reference.short_description = 'Order Ref'
+    order_reference.admin_order_field = 'order__reference'
 
     def colored_status(self, obj):
         colors = {'in_escrow': 'orange', 'released': 'green', 'withdrawn': 'blue'}
