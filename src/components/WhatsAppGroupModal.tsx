@@ -99,7 +99,7 @@ export default function WhatsAppGroupModal() {
                 onClick={dismiss}
                 className="w-full text-stone-400 text-xs py-1 text-center hover:text-stone-600 transition"
               >
-                No thanks, maybe later
+                I've already joined ✓
               </button>
             </div>
           </motion.div>
