@@ -68,6 +68,7 @@ export default function AdminOrders() {
     ? orders.filter(o => {
         const q = search.toLowerCase();
         return String(o.id).includes(q) ||
+          o.reference?.toLowerCase().includes(q) ||
           o.buyer?.username?.toLowerCase().includes(q) ||
           o.listing?.title?.toLowerCase().includes(q);
       })
