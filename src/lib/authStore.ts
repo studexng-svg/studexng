@@ -68,17 +68,6 @@ export const useAuth = create<AuthState>()(
             document.cookie = `studex_campus=${school}; path=/; max-age=31536000${extra}`;
           }
         }
-        // Sync cart and wishlist from backend on login
-        try {
-          // eslint-disable-next-line @typescript-eslint/no-require-imports
-          const { useCart } = require("@/lib/cartStore");
-          useCart.getState().loadCartForUser(userData.id);
-        } catch {}
-        try {
-          // eslint-disable-next-line @typescript-eslint/no-require-imports
-          const { useWishlistStore } = require("@/lib/wishlistStore");
-          useWishlistStore.getState().loadWishlistForUser(userData.id);
-        } catch {}
       },
 
       logout: () => {
@@ -155,16 +144,6 @@ export const useAuth = create<AuthState>()(
             // otherwise DRF sees an anonymous request and returns 403 instead of 401.
             await refreshAccessToken();
             useAuth.getState().refreshProfile();
-            try {
-              // eslint-disable-next-line @typescript-eslint/no-require-imports
-              const { useCart } = require("@/lib/cartStore");
-              useCart.getState().loadCartForUser(state.user!.id);
-            } catch {}
-            try {
-              // eslint-disable-next-line @typescript-eslint/no-require-imports
-              const { useWishlistStore } = require("@/lib/wishlistStore");
-              useWishlistStore.getState().loadWishlistForUser(state.user!.id);
-            } catch {}
           }, 0);
         }
       },

@@ -6,12 +6,84 @@ import { Toaster } from "@/components/ui/sonner";
 import { usePathname } from "next/navigation";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { useEffect, useState } from "react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
+import { useCart } from "@/lib/cartStore";
+import { useWishlistStore } from "@/lib/wishlistStore";
+import { api } from "@/lib/api";
+import { useAuth } from "@/lib/authStore";
 import { useNotifications } from "@/hooks/useNotifications";
 import { NotificationToastContainer } from "@/components/NotificationToast";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import DraggableAdminShield from "@/components/admin/DraggableAdminShield";
 import { useHeartbeat } from "@/hooks/useHeartbeat";
+
+function CartWishlistSync() {
+  const { isLoggedIn, accessToken } = useAuth();
+
+  const { data: cartData } = useQuery({
+    queryKey: ["cart"],
+    queryFn: async () => {
+      const res = await api.cart.get();
+      if (!res.ok) throw new Error("cart fetch failed");
+      return res.json() as Promise<Array<{
+        listing_id: number; title: string; price: string | number;
+        effective_price?: string | number; deal_discount_percent?: number;
+        img: string; quantity: number;
+      }>>;
+    },
+    enabled: isLoggedIn && !!accessToken,
+    staleTime: 0,
+  });
+
+  const { data: wishlistData } = useQuery({
+    queryKey: ["wishlist"],
+    queryFn: async () => {
+      const res = await api.wishlist.get();
+      if (!res.ok) throw new Error("wishlist fetch failed");
+      return res.json() as Promise<Array<{
+        listing_id: number; title: string; price: string | number; img: string;
+      }>>;
+    },
+    enabled: isLoggedIn && !!accessToken,
+    staleTime: 0,
+  });
+
+  useEffect(() => {
+    if (!cartData) return;
+    useCart.setState({
+      cart: cartData.map(item => {
+        const originalPrice = parseFloat(String(item.price));
+        const effectivePrice = item.effective_price != null
+          ? parseFloat(String(item.effective_price))
+          : originalPrice;
+        const hasDeal = effectivePrice < originalPrice;
+        return {
+          id: item.listing_id,
+          title: item.title,
+          price: effectivePrice,
+          ...(hasDeal ? { original_price: originalPrice } : {}),
+          deal_discount_percent: item.deal_discount_percent ?? 0,
+          img: item.img || "",
+          quantity: item.quantity,
+        };
+      }),
+    });
+  }, [cartData]);
+
+  useEffect(() => {
+    if (!wishlistData) return;
+    useWishlistStore.setState({
+      wishlist: wishlistData.map(item => ({
+        id: item.listing_id,
+        title: item.title,
+        price: parseFloat(String(item.price)),
+        img: item.img || "",
+      })),
+    });
+  }, [wishlistData]);
+
+  return null;
+}
 
 function NotificationProvider({ children }: { children: React.ReactNode }) {
   const { toasts, dismissToast } = useNotifications();
@@ -78,6 +150,7 @@ export default function LayoutClient({ children }: { children: React.ReactNode }
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <NotificationProvider>
+          <CartWishlistSync />
           <main
             className={
               hideNav

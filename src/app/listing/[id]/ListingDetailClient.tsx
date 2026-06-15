@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import TopNav from "@/components/layout/TopNav";
 import { useAuth } from "@/lib/authStore";
-import { useCartStore } from "@/lib/cartStore";
+import { useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { GRAD, GRAD_TEXT, SERIF } from "@/lib/tokens";
 import VendorBadge from "@/components/VendorBadge";
@@ -127,7 +127,7 @@ interface Props {
 export default function ListingDetailClient({ id, initialListing, initialReviews }: Props) {
   const router = useRouter();
   const { isLoggedIn } = useAuth();
-  const { fetchCart } = useCartStore();
+  const queryClient = useQueryClient();
   const { isAdmin } = useAdminMode();
   const [adminLoading, setAdminLoading] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -231,7 +231,7 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
       const isSingleStock = listing.track_inventory && listing.stock_quantity === 1;
       showToast(isSingleStock ? "Item reserved for 10 minutes!" : "Added to cart!");
       try { sessionStorage.setItem("cart-referrer", window.location.pathname); } catch {}
-      await fetchCart();
+      queryClient.invalidateQueries({ queryKey: ["cart"] });
     } catch {
       showToast("Could not add to cart. Please try again.");
     }

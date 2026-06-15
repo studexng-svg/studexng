@@ -9,8 +9,8 @@ import {
 } from "lucide-react";
 import TopNav from "@/components/layout/TopNav";
 import { useState, useEffect } from "react";
-import { useCartStore } from "@/lib/cartStore";
 import { useAuth } from "@/lib/authStore";
+import { useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useWishlistStore } from "@/lib/wishlistStore";
 import ChatWindow from "@/components/ChatWindow";
@@ -111,7 +111,7 @@ function ListingSkeletons() {
 
 export default function CategoryPageClient({ slug, initialListings, initialNextPage }: Props) {
   const router = useRouter();
-  const { fetchCart } = useCartStore();
+  const queryClient = useQueryClient();
   const { isLoggedIn, user, isHydrated } = useAuth();
   const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlistStore();
 
@@ -243,7 +243,7 @@ export default function CategoryPageClient({ slug, initialListings, initialNextP
       const isSingleStock = listing.track_inventory && listing.stock_quantity === 1;
       showToast(isSingleStock ? "Item reserved for 10 minutes!" : "Added to cart!");
       try { sessionStorage.setItem("cart-referrer", window.location.pathname); } catch {}
-      await fetchCart();
+      queryClient.invalidateQueries({ queryKey: ["cart"] });
     } catch {
       showToast("Could not add to cart. Please try again.");
     }
