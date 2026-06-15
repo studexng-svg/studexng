@@ -57,7 +57,7 @@ class PaymentTransactionAdmin(admin.ModelAdmin):
     def net_platform_display(self, obj):
         net = float(obj.platform_amount) - float(obj.paystack_charge_fee) - float(obj.transfer_fee)
         color = "green" if net >= 0 else "red"
-        return format_html('<span style="color:{};font-weight:bold;">₦{:,.2f}</span>', color, net)
+        return format_html('<span style="color:{};font-weight:bold;">₦{}</span>', color, f'{net:,.2f}')
     net_platform_display.short_description = 'Net Profit'
 
     def colored_status(self, obj):
