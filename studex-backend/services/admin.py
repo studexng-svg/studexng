@@ -388,6 +388,7 @@ class TransactionAdmin(admin.ModelAdmin):
     raw_id_fields = ('vendor',)
     date_hierarchy = 'created_at'
     list_per_page = 50
+    ordering = ('-order__created_at',)
 
     fieldsets = (
         ('Transaction Info', {
