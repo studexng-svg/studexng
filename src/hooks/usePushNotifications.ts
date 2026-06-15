@@ -1,19 +1,53 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useAuth, getToken as getAuthToken } from "@/lib/authStore";
 import { api } from "@/lib/api";
 import { getFirebaseMessaging } from "@/lib/firebase";
 
 const VAPID_KEY = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
+const STORED_TOKEN_KEY = "fcm_token";
 
 export function usePushNotifications() {
   const { isLoggedIn } = useAuth();
+  const unsubMessageRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     if (!isLoggedIn || !VAPID_KEY) return;
     if (typeof window === "undefined" || !("Notification" in window)) return;
 
+    let swReg: ServiceWorkerRegistration | null = null;
+
+    // Sends the current FCM token to the backend if it changed since last sync.
+    const syncToken = async () => {
+      try {
+        if (Notification.permission !== "granted") return;
+        const messaging = await getFirebaseMessaging();
+        if (!messaging || !swReg) return;
+
+        const { getToken } = await import("firebase/messaging");
+        const fcmToken = await getToken(messaging, {
+          vapidKey: VAPID_KEY,
+          serviceWorkerRegistration: swReg,
+        });
+
+        if (!fcmToken || !getAuthToken()) return;
+
+        const stored = localStorage.getItem(STORED_TOKEN_KEY);
+        if (fcmToken === stored) return;
+
+        const res = await api.notifications.registerToken(fcmToken);
+        if (res.ok) {
+          localStorage.setItem(STORED_TOKEN_KEY, fcmToken);
+        } else {
+          console.warn("[FCM] Token refresh save failed:", res.status);
+        }
+      } catch (err) {
+        console.warn("[FCM] Token sync failed:", err);
+      }
+    };
+
+    // Full setup: request permission, register SW, get token, subscribe to foreground messages.
     const register = async () => {
       try {
         const permission = await Notification.requestPermission();
@@ -24,8 +58,7 @@ export function usePushNotifications() {
 
         const { getToken, onMessage } = await import("firebase/messaging");
 
-        // Register SW and wait until it is active before asking for a token
-        const swReg = await navigator.serviceWorker.register("/firebase-messaging-sw.js");
+        swReg = await navigator.serviceWorker.register("/firebase-messaging-sw.js");
         await navigator.serviceWorker.ready;
 
         const fcmToken = await getToken(messaging, {
@@ -37,20 +70,24 @@ export function usePushNotifications() {
           console.warn("[FCM] No token returned — check VAPID key and SW registration");
           return;
         }
-
         if (!getAuthToken()) return;
 
-        const res = await api.notifications.registerToken(fcmToken);
-
-        if (!res.ok) {
-          console.warn("[FCM] Token save failed:", res.status);
+        const stored = localStorage.getItem(STORED_TOKEN_KEY);
+        if (fcmToken !== stored) {
+          const res = await api.notifications.registerToken(fcmToken);
+          if (res.ok) {
+            localStorage.setItem(STORED_TOKEN_KEY, fcmToken);
+          } else {
+            console.warn("[FCM] Token save failed:", res.status);
+          }
         }
 
-        // Show notifications while the app is in the foreground too
-        onMessage(messaging, (payload) => {
+        // Only one foreground listener at a time
+        unsubMessageRef.current?.();
+        unsubMessageRef.current = onMessage(messaging, (payload) => {
           const title = payload.notification?.title || "StudEx";
           const body = payload.notification?.body || "";
-          if (Notification.permission === "granted") {
+          if (Notification.permission === "granted" && swReg) {
             swReg.showNotification(title, {
               body,
               icon: "/images/logo-1.jpg",
@@ -65,5 +102,12 @@ export function usePushNotifications() {
     };
 
     register();
+    window.addEventListener("focus", syncToken);
+
+    return () => {
+      window.removeEventListener("focus", syncToken);
+      unsubMessageRef.current?.();
+      unsubMessageRef.current = null;
+    };
   }, [isLoggedIn]);
 }
