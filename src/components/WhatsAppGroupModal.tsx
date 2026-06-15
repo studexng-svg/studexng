@@ -78,7 +78,7 @@ export default function WhatsAppGroupModal() {
             {/* Body */}
             <div className="px-5 pt-5 pb-6 space-y-4">
               <p className="text-stone-500 text-sm text-center leading-relaxed">
-                Get exclusive deals, campus updates, and be the first to know about new vendors and offers on StudEx — all in one group.
+                Get exclusive deals, campus updates, and be the first to know about new vendors and offers on StudEx, all in one group.
               </p>
 
               <motion.button
