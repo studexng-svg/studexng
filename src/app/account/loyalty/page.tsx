@@ -1,12 +1,13 @@
 // src/app/account/loyalty/page.tsx
 "use client";
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Gift, Star, Loader } from "lucide-react";
 import TopNav from "@/components/layout/TopNav";
 import { useAuth } from "@/lib/authStore";
 import { GRAD, SERIF } from "@/lib/tokens";
 import { api } from "@/lib/api";
+import { useQuery } from "@tanstack/react-query";
 
 const MILESTONE = 10;
 const REWARD    = 200;
@@ -22,17 +23,21 @@ interface LoyaltyData {
 export default function LoyaltyPage() {
   const { isLoggedIn, isHydrated } = useAuth();
   const router = useRouter();
-  const [data, setData] = useState<LoyaltyData | null>(null);
-  const [loading, setLoading] = useState(true);
+
+  const { data, isPending } = useQuery({
+    queryKey: ["loyalty-status"],
+    queryFn: async (): Promise<LoyaltyData> => {
+      const r = await api.loyalty.status();
+      if (!r.ok) throw new Error("Failed to fetch loyalty status");
+      return r.json();
+    },
+    enabled: isHydrated && isLoggedIn,
+    staleTime: 30_000,
+  });
 
   useEffect(() => {
-    if (isHydrated && !isLoggedIn) { router.push("/auth"); return; }
-    if (!isHydrated || !isLoggedIn) return;
-    api.loyalty.status()
-      .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d) setData(d); })
-      .finally(() => setLoading(false));
-  }, [isHydrated, isLoggedIn]);
+    if (isHydrated && !isLoggedIn) router.push("/auth");
+  }, [isHydrated, isLoggedIn, router]);
 
   const completedInCycle = data ? MILESTONE - data.orders_until_next_reward : 0;
   const progress = data ? Math.round((completedInCycle / MILESTONE) * 100) : 0;
@@ -42,7 +47,7 @@ export default function LoyaltyPage() {
       <TopNav showBack />
 
       <div className="pb-24 p-4 space-y-4 max-w-2xl mx-auto">
-        {loading ? (
+        {isPending ? (
           <div className="flex justify-center pt-20">
             <Loader className="w-10 h-10 text-teal-600 animate-spin" />
           </div>

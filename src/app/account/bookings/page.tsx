@@ -13,6 +13,7 @@ import TopNav from "@/components/layout/TopNav";
 import { useAuth } from "@/lib/authStore";
 import { api } from "@/lib/api";
 import { GRAD, SERIF, toArray, calcServiceFee } from "@/lib/tokens";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 
 
@@ -28,6 +29,10 @@ interface Booking {
   note: string;
   status: "pending" | "confirmed" | "cancelled" | "paid";
   created_at: string;
+}
+
+interface LoyaltyStatus {
+  credit_balance: string;
 }
 
 const STATUS = {
@@ -68,17 +73,14 @@ const STATUS = {
 export default function BuyerBookingsPage() {
   const router = useRouter();
   const { user, isLoggedIn, isHydrated } = useAuth();
-  const [bookings, setBookings] = useState<Booking[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const queryClient = useQueryClient();
+
   const [payingId, setPayingId] = useState<number | null>(null);
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
   const [filter, setFilter] = useState<"all" | "pending" | "confirmed" | "cancelled" | "paid">("all");
   const [useCredits, setUseCredits] = useState(false);
-  const [loyaltyBalance, setLoyaltyBalance] = useState(0);
   const [paystackReady, setPaystackReady] = useState(false);
   const [verifying, setVerifying] = useState(false);
-
 
   // Load Paystack script on mount
   useEffect(() => {
@@ -96,37 +98,34 @@ export default function BuyerBookingsPage() {
 
   useEffect(() => {
     if (isHydrated && !isLoggedIn) router.push("/auth");
-  }, [isHydrated, isLoggedIn]);
+  }, [isHydrated, isLoggedIn, router]);
 
-  useEffect(() => {
-    if (!isHydrated || !isLoggedIn) return;
-    loadBookings();
-  }, [isHydrated, isLoggedIn]);
-
-  useEffect(() => {
-    if (!isLoggedIn) return;
-    api.loyalty.status()
-      .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d) setLoyaltyBalance(parseFloat(d.credit_balance) || 0); })
-      .catch(() => {});
-  }, [isLoggedIn]);
-
-
-  const loadBookings = async () => {
-    setLoading(true);
-    setError("");
-    try {
+  const { data: bookingsData, isPending: isBookingsPending, isError } = useQuery<Booking[]>({
+    queryKey: ["bookings"],
+    queryFn: async () => {
       const res = await api.orders.bookings();
       if (!res.ok) throw new Error("Failed to load bookings");
       const data = await res.json();
       const all: Booking[] = toArray(data);
-      setBookings(all.filter(b => b.buyer_username === user?.username));
-    } catch {
-      setError("Could not load bookings. Pull to refresh.");
-    } finally {
-      setLoading(false);
-    }
-  };
+      return all.filter(b => b.buyer_username === user?.username);
+    },
+    enabled: isHydrated && isLoggedIn && !!user,
+    staleTime: 30_000,
+  });
+
+  const { data: loyaltyData } = useQuery<LoyaltyStatus>({
+    queryKey: ["loyalty-status"],
+    queryFn: async () => {
+      const r = await api.loyalty.status();
+      if (!r.ok) throw new Error("loyalty fetch failed");
+      return r.json();
+    },
+    enabled: isHydrated && isLoggedIn,
+    staleTime: 30_000,
+  });
+
+  const bookings = bookingsData ?? [];
+  const loyaltyBalance = loyaltyData ? (parseFloat(loyaltyData.credit_balance) || 0) : 0;
 
   const showToast = (msg: string, ok = true) => {
     setToast({ msg, ok });
@@ -137,8 +136,12 @@ export default function BuyerBookingsPage() {
     if (!confirm("Are you sure you want to cancel this booking?")) return;
     try {
       const res = await api.orders.bookingAction(id, "cancel");
-      if (res.ok) { showToast("Booking cancelled."); loadBookings(); }
-      else showToast("Could not cancel. Try again.", false);
+      if (res.ok) {
+        showToast("Booking cancelled.");
+        queryClient.invalidateQueries({ queryKey: ["bookings"] });
+      } else {
+        showToast("Could not cancel. Try again.", false);
+      }
     } catch { showToast("Error cancelling booking.", false); }
   };
 
@@ -163,9 +166,9 @@ export default function BuyerBookingsPage() {
         const data = await res.json();
         if (res.ok && data.order_id) {
           setVerifying(false);
-          setLoyaltyBalance(prev => Math.max(0, prev - creditsToApply));
           showToast("Order placed with loyalty credits!");
-          await loadBookings();
+          queryClient.invalidateQueries({ queryKey: ["bookings"] });
+          queryClient.invalidateQueries({ queryKey: ["loyalty-status"] });
           router.push(`/order-confirmation/${data.order_id}`);
         } else {
           setVerifying(false);
@@ -234,17 +237,17 @@ export default function BuyerBookingsPage() {
             });
             const data = await res.json();
             if (res.ok && data.order_id) {
-              await loadBookings();
+              queryClient.invalidateQueries({ queryKey: ["bookings"] });
               router.push(`/order-confirmation/${data.order_id}`);
             } else {
               setVerifying(false);
               showToast(data.error || `Payment received. Save this reference: ${response.reference}`, true);
-              loadBookings();
+              queryClient.invalidateQueries({ queryKey: ["bookings"] });
             }
           } catch {
             setVerifying(false);
             showToast(`Payment received. Save this reference: ${response.reference}`, true);
-            loadBookings();
+            queryClient.invalidateQueries({ queryKey: ["bookings"] });
           }
         } else {
           // Payment was not completed (e.g. card declined) — stop loading
@@ -270,7 +273,7 @@ export default function BuyerBookingsPage() {
     paid: bookings.filter(b => b.status === "paid").length,
   };
 
-  if (!isHydrated || loading) {
+  if (!isHydrated || isBookingsPending) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F5F5F5]">
         <Loader className="w-10 h-10 text-teal-600 animate-spin" />
@@ -418,14 +421,14 @@ export default function BuyerBookingsPage() {
           ))}
         </div>
 
-        {error && (
+        {isError && (
           <div className="bg-red-50 border border-red-200 rounded-2xl p-4 flex items-center gap-3">
             <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
-            <p className="text-sm text-red-700 font-medium">{error}</p>
+            <p className="text-sm text-red-700 font-medium">Could not load bookings. Pull to refresh.</p>
           </div>
         )}
 
-        {filtered.length === 0 && !error && (
+        {filtered.length === 0 && !isError && (
           <div className="text-center py-20">
             <Calendar className="w-14 h-14 text-stone-300 mx-auto mb-4" />
             <p className="font-semibold text-stone-500 text-lg">No {filter === "all" ? "" : filter} bookings</p>
@@ -439,8 +442,8 @@ export default function BuyerBookingsPage() {
           {filtered.map(booking => {
             const cfg = STATUS[booking.status as keyof typeof STATUS];
             const Icon = cfg.icon;
-            const isConfirmed = booking.status === "confirmed";
-            const isPending = booking.status === "pending";
+            const isBookingConfirmed = booking.status === "confirmed";
+            const isBookingPending = booking.status === "pending";
 
             return (
               <motion.div key={booking.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
@@ -479,14 +482,14 @@ export default function BuyerBookingsPage() {
                 )}
 
                 <div className="flex gap-2">
-                  {isConfirmed && (
+                  {isBookingConfirmed && (
                     <button onClick={() => handlePay(booking.id)}
                       className="flex-1 py-3 text-white rounded-xl font-semibold text-sm flex items-center justify-center gap-2 shadow-md active:scale-95 transition-transform"
                       style={{ background: GRAD }}>
                       <CreditCard className="w-4 h-4" /> Pay ₦{(Number(booking.listing_price) + calcServiceFee(Number(booking.listing_price))).toLocaleString()}
                     </button>
                   )}
-                  {isPending && (
+                  {isBookingPending && (
                     <button onClick={() => cancelBooking(booking.id)}
                       className="flex-shrink-0 py-3 px-4 bg-white border border-red-200 text-red-500 rounded-xl font-semibold text-sm flex items-center gap-1.5">
                       <Ban className="w-4 h-4" /> Cancel

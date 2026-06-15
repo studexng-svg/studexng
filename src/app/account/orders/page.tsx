@@ -4,12 +4,13 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Package, CheckCircle, Clock, AlertCircle, ChevronLeft } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { useAuth } from "@/lib/authStore";
 import { GRAD, SERIF } from "@/lib/tokens";
 import TopNav from "@/components/layout/TopNav";
 import { useScrollRestoration } from "@/hooks/useScrollRestoration";
 import { api } from "@/lib/api";
+import { useQuery } from "@tanstack/react-query";
 
 interface Order {
   id: number;
@@ -27,47 +28,37 @@ export default function OrdersPage() {
   useScrollRestoration("account-orders", ["/account/orders/"]);
   const router = useRouter();
   const { isLoggedIn, isHydrated } = useAuth();
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+
+  const { data, isPending, isError, error } = useQuery<Order[], Error>({
+    queryKey: ["orders-buyer"],
+    queryFn: async () => {
+      const res = await api.orders.list("buyer");
+      if (res.status === 401) throw new Error("unauthorized");
+      if (!res.ok) throw new Error(`Failed to load orders: ${res.status}`);
+      const data = await res.json();
+      return Array.isArray(data) ? data : data.results || [];
+    },
+    enabled: isHydrated && isLoggedIn,
+    refetchInterval: 15_000,
+    staleTime: 10_000,
+    retry: (_, err) => err.message !== "unauthorized",
+  });
+
+  const orders = data ?? [];
 
   useEffect(() => {
-    if (isHydrated && !isLoggedIn) {
-      router.push("/auth");
-      return;
-    }
-    if (!isHydrated || !isLoggedIn) return;
-
-    const fetchOrders = async (silent = false) => {
-      if (!silent) setLoading(true);
-      try {
-        const res = await api.orders.list("buyer");
-        if (!res.ok) {
-          if (res.status === 401) {
-            setError("Session expired. Please log in again.");
-            setTimeout(() => router.push("/auth"), 2000);
-            return;
-          }
-          if (!silent) throw new Error(`Failed to load orders: ${res.status}`);
-          return;
-        }
-        const data = await res.json();
-        const ordersList = Array.isArray(data) ? data : data.results || [];
-        setOrders(ordersList);
-      } catch (err) {
-        if (!silent) {
-          console.error("Orders fetch error:", err);
-          setError("Failed to load orders. Please try again.");
-        }
-      } finally {
-        if (!silent) setLoading(false);
-      }
-    };
-
-    fetchOrders();
-    const interval = setInterval(() => fetchOrders(true), 15000);
-    return () => clearInterval(interval);
+    if (isHydrated && !isLoggedIn) router.push("/auth");
   }, [isHydrated, isLoggedIn, router]);
+
+  useEffect(() => {
+    if (error?.message === "unauthorized") {
+      setTimeout(() => router.push("/auth"), 2000);
+    }
+  }, [error, router]);
+
+  const errorMsg = error?.message === "unauthorized"
+    ? "Session expired. Please log in again."
+    : isError ? "Failed to load orders. Please try again." : "";
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -101,7 +92,7 @@ export default function OrdersPage() {
     }
   };
 
-  if (!isHydrated || loading) {
+  if (!isHydrated || isPending) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F5F5F5]">
         <div className="animate-spin">
@@ -116,13 +107,13 @@ export default function OrdersPage() {
       <TopNav showBack />
 
       <div className="px-4 pt-6 pb-32 space-y-4 max-w-4xl mx-auto">
-        {error && (
+        {errorMsg && (
           <div className="text-center text-red-600 font-medium bg-red-50 p-4 rounded-xl border border-red-200 animate-fadeIn">
-            {error}
+            {errorMsg}
           </div>
         )}
 
-        {orders.length === 0 && !error ? (
+        {orders.length === 0 && !errorMsg ? (
           <div className="text-center py-20 animate-fadeIn">
             <Package className="w-20 h-20 text-stone-300 mx-auto mb-4" />
             <p className="text-stone-500 font-medium">No orders yet</p>
@@ -137,7 +128,7 @@ export default function OrdersPage() {
             </Link>
           </div>
         ) : (
-          orders.map((order, index) => (
+          orders.map((order) => (
             <div key={order.id} className="bg-white rounded-2xl border border-stone-200 shadow-sm overflow-hidden hover:border-teal-300 hover:shadow-md transition-all animate-fadeUp">
               <Link href={`/account/orders/${order.id}`}>
                 <div className="cursor-pointer">

@@ -10,6 +10,7 @@ import { GRAD, SERIF } from "@/lib/tokens";
 import ReviewForm from "@/components/ReviewForm";
 import TopNav from "@/components/layout/TopNav";
 import { api } from "@/lib/api";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 function useElapsed(isoDate?: string | null) {
   const [elapsed, setElapsed] = useState("");
@@ -55,16 +56,12 @@ export default function OrderDetailPage() {
   const params = useParams();
   const router = useRouter();
   const { isLoggedIn, isHydrated } = useAuth();
+  const queryClient = useQueryClient();
   const orderId = params.id as string;
 
-  const [order, setOrder] = useState<Order | null>(null);
-  const [loading, setLoading] = useState(true);
   const [confirming, setConfirming] = useState(false);
   const [showModal, setShowModal] = useState(false);
-  const [error, setError] = useState("");
-  const [canReview, setCanReview] = useState(false);
   const [loyaltyReward, setLoyaltyReward] = useState<string | null>(null);
-  const [loyalty, setLoyalty] = useState<LoyaltyStatus | null>(null);
   const [justConfirmed, setJustConfirmed] = useState(false);
   const [showDisputeModal, setShowDisputeModal] = useState(false);
   const [disputeReason, setDisputeReason] = useState("service_not_completed");
@@ -72,45 +69,49 @@ export default function OrderDetailPage() {
   const [disputeEvidence, setDisputeEvidence] = useState("");
   const [disputing, setDisputing] = useState(false);
   const [disputeError, setDisputeError] = useState("");
-  const elapsed = useElapsed(order?.paid_at || order?.created_at);
-
-  const fetchLoyalty = async () => {
-    try {
-      const r = await api.loyalty.status();
-      if (r.ok) setLoyalty(await r.json());
-    } catch {}
-  };
 
   useEffect(() => {
-    if (isHydrated && !isLoggedIn) { router.push("/auth"); return; }
-    if (!isHydrated || !isLoggedIn) return;
+    if (isHydrated && !isLoggedIn) router.push("/auth");
+  }, [isHydrated, isLoggedIn, router]);
 
-    fetchLoyalty();
+  const { data: order, isPending, isError, error } = useQuery<Order, Error>({
+    queryKey: ["order", orderId],
+    queryFn: async () => {
+      const res = await api.orders.get(orderId);
+      if (res.status === 404) throw new Error("not_found");
+      if (!res.ok) throw new Error("failed");
+      return res.json();
+    },
+    enabled: isHydrated && isLoggedIn && !!orderId,
+    refetchInterval: 15_000,
+    staleTime: 10_000,
+    retry: (_, err) => err.message !== "not_found",
+  });
 
-    const load = async () => {
-      try {
-        const orderRes = await api.orders.get(orderId);
-        if (orderRes.status === 404) { setError("not_found"); return; }
-        if (!orderRes.ok) throw new Error();
-        const data = await orderRes.json();
-        setOrder(data);
-        if (data.status === "completed") {
-          const rv = await api.reviews.canReview(orderId);
-          if (rv.ok) { const d = await rv.json(); setCanReview(d.can_review); }
-        }
-      } catch { setError("failed"); }
-      finally { setLoading(false); }
-    };
-    load();
+  const { data: loyalty } = useQuery<LoyaltyStatus>({
+    queryKey: ["loyalty-status"],
+    queryFn: async () => {
+      const r = await api.loyalty.status();
+      if (!r.ok) throw new Error("loyalty fetch failed");
+      return r.json();
+    },
+    enabled: isHydrated && isLoggedIn,
+    staleTime: 30_000,
+  });
 
-    const interval = setInterval(async () => {
-      try {
-        const res = await api.orders.get(orderId);
-        if (res.ok) setOrder(await res.json());
-      } catch {}
-    }, 15000);
-    return () => clearInterval(interval);
-  }, [isHydrated, isLoggedIn, orderId, router]);
+  const { data: canReviewData } = useQuery<{ can_review: boolean }>({
+    queryKey: ["can-review", orderId],
+    queryFn: async () => {
+      const rv = await api.reviews.canReview(orderId);
+      if (!rv.ok) return { can_review: false };
+      return rv.json();
+    },
+    enabled: isHydrated && isLoggedIn && !!order && order.status === "completed",
+    staleTime: 60_000,
+  });
+
+  const canReview = canReviewData?.can_review ?? false;
+  const elapsed = useElapsed(order?.paid_at || order?.created_at);
 
   const handleConfirm = async () => {
     if (!order) return;
@@ -119,12 +120,14 @@ export default function OrderDetailPage() {
       const res = await api.orders.confirm(orderId);
       if (res.ok) {
         const data = await res.json();
-        setOrder(prev => prev ? { ...prev, status: "completed" } : null);
-        setCanReview(true);
+        queryClient.setQueryData<Order>(["order", orderId], prev =>
+          prev ? { ...prev, status: "completed" } : prev
+        );
+        queryClient.setQueryData(["can-review", orderId], { can_review: true });
         setJustConfirmed(true);
         if (data.loyalty_reward?.awarded) setLoyaltyReward(data.loyalty_reward.message);
         setShowModal(false);
-        fetchLoyalty();
+        queryClient.invalidateQueries({ queryKey: ["loyalty-status"] });
       } else { alert("Failed to confirm. Please try again."); }
     } catch { alert("Network error."); }
     finally { setConfirming(false); }
@@ -142,7 +145,9 @@ export default function OrderDetailPage() {
         evidence: disputeEvidence.trim(),
       });
       if (res.ok) {
-        setOrder(prev => prev ? { ...prev, status: "disputed" } : null);
+        queryClient.setQueryData<Order>(["order", orderId], prev =>
+          prev ? { ...prev, status: "disputed" } : prev
+        );
         setShowDisputeModal(false);
       } else {
         const data = await res.json();
@@ -179,13 +184,13 @@ export default function OrderDetailPage() {
     cancelled: "Cancelled",
   }[s] || s);
 
-  if (!isHydrated || loading) return (
+  if (!isHydrated || isPending) return (
     <div className="min-h-screen flex items-center justify-center bg-[#F5F5F5]">
       <div className="animate-spin"><Clock className="w-10 h-10 text-teal-600" /></div>
     </div>
   );
 
-  if (error === "not_found" || !order) return (
+  if (isError || !order) return (
     <div className="min-h-screen bg-[#F5F5F5] flex items-center justify-center p-6">
       <div className="text-center bg-white rounded-2xl p-8 shadow-sm border border-stone-200">
         <AlertCircle className="w-14 h-14 text-red-500 mx-auto mb-3" />
@@ -405,7 +410,11 @@ export default function OrderDetailPage() {
         {/* REVIEW FORM */}
         {isCompleted && canReview && (
           <div className="animate-fadeUp">
-            <ReviewForm orderId={order.id} vendorName={order.listing?.vendor?.username} onSuccess={() => setCanReview(false)} />
+            <ReviewForm
+              orderId={order.id}
+              vendorName={order.listing?.vendor?.username}
+              onSuccess={() => queryClient.setQueryData(["can-review", orderId], { can_review: false })}
+            />
           </div>
         )}
       </div>

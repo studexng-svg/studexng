@@ -9,8 +9,38 @@ import { Banknote, Loader, Check, AlertCircle, Search } from "lucide-react";
 import TopNav from "@/components/layout/TopNav";
 import Link from "next/link";
 import { api } from "@/lib/api";
+import { useQuery } from "@tanstack/react-query";
 
 interface Bank { name: string; code: string; }
+
+// Fallback in case Paystack API is unavailable
+const FALLBACK_BANKS: Bank[] = [
+  { name: "Access Bank", code: "044" },
+  { name: "Citibank", code: "023" },
+  { name: "Ecobank Nigeria", code: "050" },
+  { name: "Fidelity Bank", code: "070" },
+  { name: "First Bank of Nigeria", code: "011" },
+  { name: "First City Monument Bank (FCMB)", code: "214" },
+  { name: "Globus Bank", code: "00103" },
+  { name: "Guaranty Trust Bank", code: "058" },
+  { name: "Heritage Bank", code: "030" },
+  { name: "Keystone Bank", code: "082" },
+  { name: "Kuda Bank", code: "999992" },
+  { name: "Moniepoint MFB", code: "090405" },
+  { name: "OPay", code: "526" },
+  { name: "PalmPay", code: "999991" },
+  { name: "Polaris Bank", code: "076" },
+  { name: "Providus Bank", code: "101" },
+  { name: "Stanbic IBTC Bank", code: "221" },
+  { name: "Standard Chartered", code: "068" },
+  { name: "Sterling Bank", code: "232" },
+  { name: "Union Bank", code: "032" },
+  { name: "United Bank for Africa (UBA)", code: "033" },
+  { name: "Unity Bank", code: "215" },
+  { name: "VFD Microfinance Bank", code: "090110" },
+  { name: "Wema Bank", code: "035" },
+  { name: "Zenith Bank", code: "057" },
+];
 
 function getVerificationError(error: any): string {
   const msg = (error?.message || error?.error || "").toLowerCase();
@@ -36,8 +66,6 @@ export default function BankAccountPage() {
   const { isLoggedIn, isHydrated } = useAuth();
   const router = useRouter();
 
-  const [banks, setBanks] = useState<Bank[]>([]);
-  const [banksLoading, setBanksLoading] = useState(true);
   const [bankSearch, setBankSearch] = useState("");
   const [showBankList, setShowBankList] = useState(false);
 
@@ -48,63 +76,58 @@ export default function BankAccountPage() {
   const [verifying, setVerifying] = useState(false);
   const [verifyError, setVerifyError] = useState("");
 
-  const [pageLoading, setPageLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
 
   useEffect(() => {
     if (isHydrated && !isLoggedIn) router.push("/auth");
-  }, [isHydrated, isLoggedIn]);
+  }, [isHydrated, isLoggedIn, router]);
 
-  // Load banks from Paystack API
-  useEffect(() => {
-    const loadBanks = async () => {
-      try {
-        const res = await api.pub.paystackBanks();
-        if (res.ok) {
-          const data = await res.json();
-          const raw: Bank[] = data.data?.map((b: any) => ({ name: b.name, code: b.code })) || [];
-          const seen = new Set<string>();
-          const unique = raw.filter(b => {
-            if (seen.has(b.code)) return false;
-            seen.add(b.code);
-            return true;
-          });
-          setBanks(unique.length > 0 ? unique : FALLBACK_BANKS);
-        } else {
-          setBanks(FALLBACK_BANKS);
-        }
-      } catch {
-        setBanks(FALLBACK_BANKS);
-      } finally {
-        setBanksLoading(false);
-      }
-    };
-    loadBanks();
-  }, []);
+  // Load banks from Paystack API — cached for 1 hour, no auth needed
+  const { data: banksData, isPending: banksLoading } = useQuery({
+    queryKey: ["paystack-banks"],
+    queryFn: async (): Promise<Bank[]> => {
+      const res = await api.pub.paystackBanks();
+      if (!res.ok) return FALLBACK_BANKS;
+      const data = await res.json();
+      const raw: Bank[] = data.data?.map((b: any) => ({ name: b.name, code: b.code })) || [];
+      const seen = new Set<string>();
+      const unique = raw.filter(b => {
+        if (seen.has(b.code)) return false;
+        seen.add(b.code);
+        return true;
+      });
+      return unique.length > 0 ? unique : FALLBACK_BANKS;
+    },
+    staleTime: 3_600_000,
+    retry: false,
+  });
 
-  // Load existing saved bank account
+  const banks = banksData ?? FALLBACK_BANKS;
+
+  // Load existing saved bank account — populate form fields when loaded
+  const { data: savedAccount, isPending: pageLoading } = useQuery({
+    queryKey: ["bank-account"],
+    queryFn: async () => {
+      const res = await api.payments.bankAccount();
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data?.account_number ? data : null;
+    },
+    enabled: isHydrated && isLoggedIn,
+    staleTime: 300_000,
+  });
+
   useEffect(() => {
-    if (!isHydrated || !isLoggedIn) return;
-    const load = async () => {
-      try {
-        const res = await api.payments.bankAccount();
-        if (res.ok) {
-          const data = await res.json();
-          if (data?.account_number) {
-            setAccountNumber(data.account_number);
-            setAccountName(data.account_name || "");
-            if (data.bank_code) {
-              setSelectedBank({ name: data.bank_name || data.bank_code, code: data.bank_code });
-              setBankSearch(data.bank_name || data.bank_code);
-            }
-          }
-        }
-      } catch {} finally { setPageLoading(false); }
-    };
-    load();
-  }, [isHydrated, isLoggedIn]);
+    if (!savedAccount) return;
+    setAccountNumber(savedAccount.account_number);
+    setAccountName(savedAccount.account_name || "");
+    if (savedAccount.bank_code) {
+      setSelectedBank({ name: savedAccount.bank_name || savedAccount.bank_code, code: savedAccount.bank_code });
+      setBankSearch(savedAccount.bank_name || savedAccount.bank_code);
+    }
+  }, [savedAccount]);
 
   // Auto-verify account name when account_number has 10 digits and bank is selected
   const verifyAccount = useCallback(async (accNum: string, bankCode: string) => {
@@ -323,32 +346,3 @@ export default function BankAccountPage() {
     </div>
   );
 }
-
-// Fallback in case Paystack API is unavailable
-const FALLBACK_BANKS: Bank[] = [
-  { name: "Access Bank", code: "044" },
-  { name: "Citibank", code: "023" },
-  { name: "Ecobank Nigeria", code: "050" },
-  { name: "Fidelity Bank", code: "070" },
-  { name: "First Bank of Nigeria", code: "011" },
-  { name: "First City Monument Bank (FCMB)", code: "214" },
-  { name: "Globus Bank", code: "00103" },
-  { name: "Guaranty Trust Bank", code: "058" },
-  { name: "Heritage Bank", code: "030" },
-  { name: "Keystone Bank", code: "082" },
-  { name: "Kuda Bank", code: "999992" },
-  { name: "Moniepoint MFB", code: "090405" },
-  { name: "OPay", code: "526" },
-  { name: "PalmPay", code: "999991" },
-  { name: "Polaris Bank", code: "076" },
-  { name: "Providus Bank", code: "101" },
-  { name: "Stanbic IBTC Bank", code: "221" },
-  { name: "Standard Chartered", code: "068" },
-  { name: "Sterling Bank", code: "232" },
-  { name: "Union Bank", code: "032" },
-  { name: "United Bank for Africa (UBA)", code: "033" },
-  { name: "Unity Bank", code: "215" },
-  { name: "VFD Microfinance Bank", code: "090110" },
-  { name: "Wema Bank", code: "035" },
-  { name: "Zenith Bank", code: "057" },
-];
