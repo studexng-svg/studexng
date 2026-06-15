@@ -1,10 +1,8 @@
 "use client";
 import { useState } from "react";
 import { Star } from "lucide-react";
-import { fetchWithAuth } from "@/lib/authStore";
 import { GRAD, SERIF } from "@/lib/tokens";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+import { api } from "@/lib/api";
 
 export default function ReviewForm({ orderId, vendorName, onSuccess }: {
   orderId: number; vendorName: string; onSuccess?: () => void;
@@ -20,10 +18,7 @@ export default function ReviewForm({ orderId, vendorName, onSuccess }: {
     if (!rating) { setError("Please select a rating."); return; }
     setSubmitting(true); setError("");
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/reviews/reviews/`, {
-        method: "POST",
-        body: JSON.stringify({ order: orderId, rating, comment }),
-      });
+      const res = await api.reviews.submit({ order: orderId, rating, comment });
       if (res.ok) { setSubmitted(true); onSuccess?.(); }
       else {
         const d = await res.json();

@@ -1,11 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useAuth, fetchWithAuth } from "@/lib/authStore";
+import { useAuth } from "@/lib/authStore";
 import { Star } from "lucide-react";
 import { EmptyState, LoadingSpinner, HEADING_FONT } from "../_shared";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+import { api } from "@/lib/api";
 
 export default function ReviewsPage() {
   const { user } = useAuth();
@@ -14,7 +13,7 @@ export default function ReviewsPage() {
 
   useEffect(() => {
     if (!user) return;
-    fetchWithAuth(`${API_URL}/api/reviews/reviews/?vendor=${user.id}`)
+    api.pub.reviews({ vendor: String(user.id) })
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d) setReviews(Array.isArray(d) ? d : (d.results || [])); })
       .finally(() => setLoading(false));

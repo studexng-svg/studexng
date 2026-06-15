@@ -3,13 +3,12 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth, fetchWithAuth } from "@/lib/authStore";
+import { useAuth } from "@/lib/authStore";
 import { GRAD, SERIF } from "@/lib/tokens";
 import { Banknote, Loader, Check, AlertCircle, Search } from "lucide-react";
 import TopNav from "@/components/layout/TopNav";
 import Link from "next/link";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+import { api } from "@/lib/api";
 
 interface Bank { name: string; code: string; }
 
@@ -62,7 +61,7 @@ export default function BankAccountPage() {
   useEffect(() => {
     const loadBanks = async () => {
       try {
-        const res = await fetch("https://api.paystack.co/bank?country=nigeria&perPage=200&use_cursor=false");
+        const res = await api.pub.paystackBanks();
         if (res.ok) {
           const data = await res.json();
           const raw: Bank[] = data.data?.map((b: any) => ({ name: b.name, code: b.code })) || [];
@@ -90,7 +89,7 @@ export default function BankAccountPage() {
     if (!isHydrated || !isLoggedIn) return;
     const load = async () => {
       try {
-        const res = await fetchWithAuth(`${API_URL}/api/payments/seller/bank-account/`);
+        const res = await api.payments.bankAccount();
         if (res.ok) {
           const data = await res.json();
           if (data?.account_number) {
@@ -113,10 +112,7 @@ export default function BankAccountPage() {
     setVerifying(true);
     setVerifyError("");
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/payments/verify-bank-account/`, {
-        method: "POST",
-        body: JSON.stringify({ account_number: accNum, bank_code: bankCode }),
-      });
+      const res = await api.payments.verifyBankAccount({ account_number: accNum, bank_code: bankCode });
       if (res.ok) {
         const data = await res.json();
         if (data.account_name) {
@@ -168,14 +164,11 @@ export default function BankAccountPage() {
     setSaving(true);
     setStatus("idle");
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/payments/seller/bank-account/`, {
-        method: "POST",
-        body: JSON.stringify({
-          bank_code: selectedBank.code,
-          bank_name: selectedBank.name,
-          account_number: accountNumber,
-          account_name: accountName,
-        }),
+      const res = await api.payments.saveBankAccount({
+        bank_code: selectedBank.code,
+        bank_name: selectedBank.name,
+        account_number: accountNumber,
+        account_name: accountName,
       });
       if (res.ok) {
         setStatus("success");

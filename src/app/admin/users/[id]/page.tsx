@@ -9,10 +9,8 @@ import {
 import AdminTopBar from "@/components/layout/AdminTopBar";
 import { useParams, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
-import { fetchWithAuth } from "@/lib/authStore";
+import { api } from "@/lib/api";
 import { GRAD } from "@/lib/tokens";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 function relativeTime(dateStr: string | null | undefined): string {
   if (!dateStr) return "Never";
@@ -68,7 +66,7 @@ export default function AdminUserDetail() {
 
   useEffect(() => {
     if (!id) return;
-    fetchWithAuth(`${API_URL}/api/admin/users/${id}/`)
+    api.admin.user(id as string)
       .then(r => r.ok ? r.json() : Promise.reject())
       .then(d => setUser(d))
       .catch(() => setUser(null))
@@ -79,10 +77,7 @@ export default function AdminUserDetail() {
     setActionLoading(true);
     setError("");
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/admin/users/${id}/`, {
-        method: "PATCH",
-        body: JSON.stringify(body),
-      });
+      const res = await api.admin.updateUser(id as string, body as Record<string, unknown>);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed");
       setUser(data);

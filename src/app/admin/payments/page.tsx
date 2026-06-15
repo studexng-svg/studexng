@@ -5,10 +5,8 @@ import { DollarSign, Search } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import AdminTopBar from "@/components/layout/AdminTopBar";
-import { fetchAllPages } from "@/lib/authStore";
+import { fetchAllPages, BASE_URL } from "@/lib/api";
 import { CampusPills, type Campus } from "@/components/admin/CampusPills";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 const STATUS_STYLE: Record<string, string> = {
   success:  "bg-teal-100 text-teal-700",
@@ -36,7 +34,7 @@ export default function AdminPaymentsPage() {
 
   const load = (s = search, st = tab, c = campus, silent = false) => {
     if (!silent) setLoading(true);
-    let url = `${API_URL}/api/admin/payments/?`;
+    let url = `${BASE_URL}/api/admin/payments/?`;
     if (st) url += `status=${st}&`;
     if (s) url += `search=${encodeURIComponent(s)}&`;
     if (c) url += `campus=${c}`;

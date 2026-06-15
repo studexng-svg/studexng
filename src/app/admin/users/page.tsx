@@ -32,11 +32,9 @@ function ActivityStatus({ lastSeen }: { lastSeen?: string | null }) {
 import AdminTopBar from "@/components/layout/AdminTopBar";
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { fetchAllPages } from "@/lib/authStore";
+import { fetchAllPages, BASE_URL } from "@/lib/api";
 import { GRAD } from "@/lib/tokens";
 import { CampusPills, type Campus } from "@/components/admin/CampusPills";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 export default function AdminUsers() {
   const router = useRouter();
@@ -47,7 +45,7 @@ export default function AdminUsers() {
 
   const load = useCallback((s = search, c = campus) => {
     setLoading(true);
-    let url = `${API_URL}/api/admin/users/?`;
+    let url = `${BASE_URL}/api/admin/users/?`;
     if (s) url += `search=${encodeURIComponent(s)}&`;
     if (c) url += `school=${c}`;
     fetchAllPages(url)

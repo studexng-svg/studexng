@@ -4,10 +4,8 @@
 import { ShoppingCart, Search, Package } from "lucide-react";
 import AdminTopBar from "@/components/layout/AdminTopBar";
 import { useState, useEffect, useCallback } from "react";
-import { fetchAllPages } from "@/lib/authStore";
+import { fetchAllPages, BASE_URL } from "@/lib/api";
 import { CampusPills, type Campus } from "@/components/admin/CampusPills";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 export default function AdminCartPage() {
   const [items, setItems] = useState<any[]>([]);
@@ -17,7 +15,7 @@ export default function AdminCartPage() {
 
   const load = useCallback((s = search, c = campus) => {
     setLoading(true);
-    let url = `${API_URL}/api/admin/cart/?`;
+    let url = `${BASE_URL}/api/admin/cart/?`;
     if (s) url += `search=${encodeURIComponent(s)}&`;
     if (c) url += `campus=${c}`;
     fetchAllPages(url)

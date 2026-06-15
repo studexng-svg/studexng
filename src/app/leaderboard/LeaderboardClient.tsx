@@ -6,7 +6,7 @@ import TopNav from "@/components/layout/TopNav";
 import VendorAvatar from "@/components/VendorAvatar";
 import { BADGE_STYLES, BADGE_LABELS } from "@/lib/vendor-badges";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+import { api } from "@/lib/api";
 
 const RING: Record<number, string> = {
   1: "linear-gradient(135deg, #F59E0B 0%, #FDE68A 100%)",
@@ -108,7 +108,7 @@ export default function LeaderboardClient({ initialVendors, initialCampus, curre
 
   useEffect(() => {
     setLoading(true);
-    fetch(`${API_URL}/api/auth/vendors/?campus=${initialCampus}&page_size=50`)
+    api.pub.vendors({ campus: initialCampus, page_size: "50" })
       .then(r => r.ok ? r.json() : Promise.reject())
       .then(d => setVendors(d.results || d || []))
       .catch(() => {})

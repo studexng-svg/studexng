@@ -1,7 +1,5 @@
 import { create } from "zustand";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
-
 export type CartItem = {
   id: number;       // listing_id
   title: string;
@@ -25,12 +23,9 @@ type CartStore = {
   loadCartForUser: (userId: number | null) => void;
 };
 
-// Dynamic require avoids circular-module issues (authStore ↔ cartStore)
-const authFetch = (url: string, options: RequestInit = {}) => {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { fetchWithAuth } = require("@/lib/authStore");
-  return fetchWithAuth(url, options) as Promise<Response>;
-};
+// Dynamic require avoids circular-module issues (api → authStore ↔ cartStore)
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const cartApi = (): typeof import("@/lib/api").api["cart"] => require("@/lib/api").api.cart;
 
 const userIsLoggedIn = (): boolean => {
   try {
@@ -77,10 +72,7 @@ export const useCart = create<CartStore>()((set, get) => ({
     });
 
     if (userIsLoggedIn()) {
-      authFetch(`${API_URL}/api/cart/add/`, {
-        method: "POST",
-        body: JSON.stringify({ listing_id: item.id, quantity: 1 }),
-      }).catch(() => {});
+      cartApi().add({ listing_id: item.id, quantity: 1 }).catch(() => {});
     } else {
       saveGuestCart(get().cart);
     }
@@ -90,7 +82,7 @@ export const useCart = create<CartStore>()((set, get) => ({
     set((state) => ({ cart: state.cart.filter((i) => i.id !== id) }));
 
     if (userIsLoggedIn()) {
-      authFetch(`${API_URL}/api/cart/remove/${id}/`, { method: "DELETE" }).catch(() => {});
+      cartApi().remove(id).catch(() => {});
     } else {
       saveGuestCart(get().cart);
     }
@@ -103,10 +95,7 @@ export const useCart = create<CartStore>()((set, get) => ({
     }));
 
     if (userIsLoggedIn()) {
-      authFetch(`${API_URL}/api/cart/update/${id}/`, {
-        method: "PATCH",
-        body: JSON.stringify({ quantity: qty }),
-      }).catch(() => {});
+      cartApi().update(id, { quantity: qty }).catch(() => {});
     } else {
       saveGuestCart(get().cart);
     }
@@ -116,7 +105,7 @@ export const useCart = create<CartStore>()((set, get) => ({
     set({ cart: [] });
 
     if (userIsLoggedIn()) {
-      authFetch(`${API_URL}/api/cart/clear/`, { method: "POST" }).catch(() => {});
+      cartApi().clear().catch(() => {});
     } else {
       saveGuestCart([]);
     }
@@ -124,7 +113,7 @@ export const useCart = create<CartStore>()((set, get) => ({
 
   fetchCart: async () => {
     try {
-      const res = await authFetch(`${API_URL}/api/cart/`);
+      const res = await cartApi().get();
       if (!res.ok) return;
       const data: Array<{
         listing_id: number;

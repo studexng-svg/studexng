@@ -8,8 +8,6 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/lib/authStore";
 import { GRAD, SERIF } from "@/lib/tokens";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
-
 const PAU_HOSTELS = [
   "Cedar", "Trezadel", "Trinity", "Pearl", "Redwood",
   "Cooperative Queens", "Queen Mary", "Aster Hall",
@@ -197,10 +195,7 @@ export default function AuthPage() {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 8000);
       try {
-        const res = await fetch(
-          `${API_URL}/api/auth/check-username/?username=${encodeURIComponent(signupForm.username)}`,
-          { signal: controller.signal }
-        );
+        const res = await api.pub.checkUsername(signupForm.username, controller.signal);
         clearTimeout(timeoutId);
         const data = await res.json();
         setUsernameAvailable(data.available ?? null);
@@ -288,11 +283,7 @@ export default function AuthPage() {
       if (!step1Valid) { setMessage("Please fix all errors before continuing."); return; }
       setIsLoading(true);
       try {
-        const res = await fetch(`${API_URL}/api/auth/send-otp/`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: signupForm.email }),
-        });
+        const res = await api.pub.sendOtp(signupForm.email);
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Failed to send OTP");
         setMessage(`Verification code sent to ${signupForm.email}`);
@@ -306,11 +297,7 @@ export default function AuthPage() {
       if (otp.length !== 6) { setMessage("Enter the full 6-digit code."); return; }
       setIsLoading(true);
       try {
-        const verifyRes = await fetch(`${API_URL}/api/auth/verify-otp/`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: signupForm.email, otp }),
-        });
+        const verifyRes = await api.pub.verifyOtp(signupForm.email, otp);
         const verifyData = await verifyRes.json();
         if (!verifyRes.ok) throw new Error(verifyData.error || "Invalid code");
 
@@ -844,11 +831,7 @@ export default function AuthPage() {
                     <button type="button" onClick={async () => {
                       setOtp(""); setMessage(""); setIsLoading(true);
                       try {
-                        await fetch(`${API_URL}/api/auth/send-otp/`, {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ email: signupForm.email }),
-                        });
+                        await api.pub.sendOtp(signupForm.email);
                         setMessage("New code sent!");
                       } catch {
                         setMessage("Failed to resend. Try again.");

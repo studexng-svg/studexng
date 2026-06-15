@@ -5,11 +5,10 @@ import { CreditCard, Clock, Check, X, ChevronRight, RefreshCw, Users } from "luc
 import AdminTopBar from "@/components/layout/AdminTopBar";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { fetchWithAuth } from "@/lib/authStore";
+import { api } from "@/lib/api";
 import { GRAD } from "@/lib/tokens";
 import { CampusPills, type Campus } from "@/components/admin/CampusPills";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 interface Application {
   id: number;
@@ -39,9 +38,7 @@ export default function AdminSellerApprovals() {
   const fetchApplications = useCallback(async (c = campus, silent = false) => {
     if (!silent) { setLoading(true); setError(""); }
     try {
-      let url = `${API_URL}/api/auth/seller/applications/`;
-      if (c) url += `?school=${c}`;
-      const res = await fetchWithAuth(url);
+      const res = await api.admin.sellerApprovals(c || undefined);
       if (!res.ok) { if (!silent) throw new Error("Failed to fetch applications"); return; }
       const data = await res.json();
       setApplications(Array.isArray(data) ? data : data.results || []);

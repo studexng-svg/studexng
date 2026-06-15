@@ -56,6 +56,7 @@ def send_notification(
             title=title,
             message=message,
             action_url=action_url,
+            is_admin_notification=bool(getattr(recipient, 'is_staff', False)),
         )
 
         # ── SSE real-time push ───────────────────────────────────────────────

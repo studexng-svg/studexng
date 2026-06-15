@@ -7,12 +7,11 @@ import {
   CalendarCheck, Clock, ChevronRight, Shield,
   Bell, CheckCircle2, XCircle, Loader, CreditCard,
 } from "lucide-react";
-import { useAuth, fetchWithAuth } from "@/lib/authStore";
+import { useAuth } from "@/lib/authStore";
 import { useBookingStore } from "@/lib/bookingStore";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+import { api } from "@/lib/api";
 
 interface ApiBooking {
   id: number;
@@ -74,7 +73,7 @@ export default function MyBookingsPage() {
 
   const fetchBookings = async () => {
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/orders/bookings/`);
+      const res = await api.orders.bookings();
       if (!res.ok) throw new Error("Failed to load bookings");
       const data = await res.json();
       const list: ApiBooking[] = Array.isArray(data) ? data : (data.results || []);
@@ -112,10 +111,7 @@ export default function MyBookingsPage() {
   const handleCancel = async (bookingId: number) => {
     if (!confirm("Are you sure you want to cancel this booking?")) return;
     try {
-      const res = await fetchWithAuth(
-        `${API_URL}/api/orders/bookings/${bookingId}/cancel/`,
-        { method: "POST" }
-      );
+      const res = await api.orders.bookingAction(bookingId, "cancel");
       if (res.ok) {
         setBookings((prev) => prev.map((b) => b.id === bookingId ? { ...b, status: "cancelled" } : b));
       }

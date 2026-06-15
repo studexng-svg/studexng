@@ -5,12 +5,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Package, CheckCircle, Clock, AlertCircle, ChevronLeft } from "lucide-react";
 import { useState, useEffect } from "react";
-import { useAuth, fetchWithAuth } from "@/lib/authStore";
+import { useAuth } from "@/lib/authStore";
 import { GRAD, SERIF } from "@/lib/tokens";
 import TopNav from "@/components/layout/TopNav";
 import { useScrollRestoration } from "@/hooks/useScrollRestoration";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+import { api } from "@/lib/api";
 
 interface Order {
   id: number;
@@ -42,7 +41,7 @@ export default function OrdersPage() {
     const fetchOrders = async (silent = false) => {
       if (!silent) setLoading(true);
       try {
-        const res = await fetchWithAuth(`${API_URL}/api/orders/orders/?role=buyer`);
+        const res = await api.orders.list("buyer");
         if (!res.ok) {
           if (res.status === 401) {
             setError("Session expired. Please log in again.");

@@ -3,7 +3,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { fetchWithAuth } from "@/lib/authStore";
+import { api } from "@/lib/api";
 import { Lock, Save, Eye, EyeOff, CheckCircle, XCircle } from "lucide-react";
 import TopNav from "@/components/layout/TopNav";
 import { GRAD, SERIF } from "@/lib/tokens";
@@ -60,16 +60,10 @@ export default function ChangePasswordPage() {
     }
 
     try {
-      const res = await fetchWithAuth(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/auth/change-password/`,
-        {
-          method: "POST",
-          body: JSON.stringify({
-            old_password: passwords.oldPassword,
-            new_password: passwords.newPassword,
-          }),
-        }
-      );
+      const res = await api.auth.changePassword({
+        old_password: passwords.oldPassword,
+        new_password: passwords.newPassword,
+      });
 
       const data = await res.json().catch(() => ({}));
 

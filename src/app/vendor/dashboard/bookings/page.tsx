@@ -1,12 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useAuth, fetchWithAuth } from "@/lib/authStore";
+import { useAuth } from "@/lib/authStore";
 import { GRAD, toArray } from "@/lib/tokens";
 import { Calendar, Check, X, Loader } from "lucide-react";
 import { StatusBadge, EmptyState, LoadingSpinner, HEADING_FONT } from "../_shared";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+import { api } from "@/lib/api";
 
 export default function BookingsPage() {
   const { user } = useAuth();
@@ -19,7 +18,7 @@ export default function BookingsPage() {
 
   const loadBookings = async () => {
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/orders/bookings/`);
+      const res = await api.orders.bookings();
       const data = await res.json();
       const list = toArray(data);
       setBookings(list.filter((b: any) => b.vendor_username === user?.username));
@@ -29,7 +28,7 @@ export default function BookingsPage() {
   const handleAction = async (id: number, action: "confirm" | "cancel") => {
     setActionLoading(id);
     try {
-      await fetchWithAuth(`${API_URL}/api/orders/bookings/${id}/${action}/`, { method: "POST" });
+      await api.orders.bookingAction(id, action);
       loadBookings();
     } catch {} finally { setActionLoading(null); }
   };

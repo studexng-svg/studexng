@@ -5,11 +5,9 @@ import { Package, Search, ChevronRight } from "lucide-react";
 import { useRouter } from "next/navigation";
 import AdminTopBar from "@/components/layout/AdminTopBar";
 import { useState, useEffect, useRef } from "react";
-import { fetchAllPages } from "@/lib/authStore";
+import { fetchAllPages, BASE_URL } from "@/lib/api";
 import { GRAD } from "@/lib/tokens";
 import { CampusPills, type Campus } from "@/components/admin/CampusPills";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 const STATUS_LABELS: Record<string, string> = {
   pending:          "Pending",
@@ -42,7 +40,7 @@ export default function AdminOrders() {
 
   const load = (s?: string, st?: string, c?: Campus, silent = false) => {
     if (!silent) setLoading(true);
-    let url = `${API_URL}/api/admin/orders/?`;
+    let url = `${BASE_URL}/api/admin/orders/?`;
     if (st) url += `status=${st}&`;
     if (c) url += `campus=${c}&`;
     fetchAllPages(url)

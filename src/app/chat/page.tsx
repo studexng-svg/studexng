@@ -6,11 +6,10 @@ import { useRouter } from "next/navigation";
 import { MessageCircle, Search, X } from "lucide-react";
 import TopNav from "@/components/layout/TopNav";
 import { useState, useEffect } from "react";
-import { useAuth, fetchWithAuth } from "@/lib/authStore";
+import { useAuth } from "@/lib/authStore";
 import { GRAD, SERIF } from "@/lib/tokens";
 import { useScrollRestoration } from "@/hooks/useScrollRestoration";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+import { api } from "@/lib/api";
 
 interface Conversation {
   id: number;
@@ -36,7 +35,7 @@ export default function ChatListPage() {
     if (!isHydrated || !isLoggedIn) return;
 
     const load = () =>
-      fetchWithAuth(`${API_URL}/api/chat/conversations/`)
+      api.chat.conversations()
         .then(r => r.json())
         .then(data => setConversations(data.results || data))
         .catch(() => {});

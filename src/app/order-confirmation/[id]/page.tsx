@@ -15,11 +15,9 @@ import {
   Shield,
 } from "lucide-react";
 
-import { fetchWithAuth } from "@/lib/authStore";
 import { GRAD, SERIF } from "@/lib/tokens";
 import TopNav from "@/components/layout/TopNav";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+import { api } from "@/lib/api";
 
 interface Order {
   id: number;
@@ -57,10 +55,7 @@ export default function OrderConfirmationPage() {
     if (!feedbackRating) { setFeedbackError("Please select a rating."); return; }
     setFeedbackSubmitting(true); setFeedbackError("");
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/reviews/submit-app-feedback/`, {
-        method: "POST",
-        body: JSON.stringify({ feedback_type: "buyer", rating: feedbackRating, comment: feedbackComment }),
-      });
+      const res = await api.reviews.submitFeedback({ feedback_type: "buyer", rating: feedbackRating, comment: feedbackComment });
       if (res.ok) { setFeedbackSubmitted(true); }
       else {
         const d = await res.json();
@@ -74,7 +69,7 @@ export default function OrderConfirmationPage() {
     const fetchOrder = async () => {
       try {
         setLoading(true);
-        const res = await fetchWithAuth(`${API_URL}/api/orders/orders/${orderId}/`);
+        const res = await api.orders.get(orderId);
         if (!res.ok) throw new Error("Failed to fetch order");
         const data = await res.json();
         setOrder(data);

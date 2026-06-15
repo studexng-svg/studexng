@@ -10,12 +10,11 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useAuth, fetchWithAuth } from "@/lib/authStore";
+import { useAuth } from "@/lib/authStore";
 import { useWishlistStore } from "@/lib/wishlistStore";
 import { GRAD, SERIF } from "@/lib/tokens";
 import TopNav from "@/components/layout/TopNav";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+import { api } from "@/lib/api";
 
 const PAU_HOSTELS = [
   "Cedar", "Trezadel", "Trinity", "Pearl", "Redwood",
@@ -112,7 +111,7 @@ export default function ProfilePage() {
     const getSchool = (email?: string) =>
       email?.endsWith('@pau.edu.ng') ? 'PAU' : email?.endsWith('@futo.edu.ng') ? 'FUTO' : email?.endsWith('@imsu.edu.ng') ? 'IMSU' : '';
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/auth/me/`);
+      const res = await api.auth.me();
       if (res.ok) {
         const djangoUser = await res.json();
         const schoolFromEmail = getSchool(djangoUser.email);
@@ -183,7 +182,7 @@ export default function ProfilePage() {
     if (!user) return;
     const loadStats = async () => {
       try {
-        const res = await fetchWithAuth(`${API_URL}/api/orders/orders/`);
+        const res = await api.orders.list();
         if (!res.ok) return;
         const data = await res.json();
         const orders = Array.isArray(data) ? data : (data.results || []);
@@ -274,20 +273,16 @@ export default function ProfilePage() {
     localStorage.setItem(storageKey, JSON.stringify(localExtras));
 
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/auth/profile/update/`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          username: username,
-          phone: profile.phone,
-          bio: profile.bio,
-          whatsapp: profile.whatsapp,
-          hostel: profile.campus,
-          date_of_birth: profile.dob || null,
-          gender: profile.gender || null,
-          department: profile.department || null,
-          level: profile.level || null,
-        }),
+      const res = await api.auth.updateProfile({
+        username: username,
+        phone: profile.phone,
+        bio: profile.bio,
+        whatsapp: profile.whatsapp,
+        hostel: profile.campus,
+        date_of_birth: profile.dob || null,
+        gender: profile.gender || null,
+        department: profile.department || null,
+        level: profile.level || null,
       });
 
       if (!res.ok) {
@@ -316,7 +311,7 @@ export default function ProfilePage() {
     const nowComplete = completionFields.every(f => !!profile[f.key as keyof Profile]);
     if (nowComplete && !bonusGranted) {
       try {
-        const res = await fetchWithAuth(`${API_URL}/api/auth/profile/check-completion/`, { method: "POST" });
+        const res = await api.auth.checkCompletion();
         if (res.ok) {
           const data = await res.json();
           if (data.bonus) setBonusGranted(true);
@@ -340,14 +335,10 @@ export default function ProfilePage() {
     setHoursSaved(false);
     setHoursError("");
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/auth/profile/update/`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          available_days: activeDays,
-          opening_time: openingTime || null,
-          closing_time: closingTime || null,
-        }),
+      const res = await api.auth.updateProfile({
+        available_days: activeDays,
+        opening_time: openingTime || null,
+        closing_time: closingTime || null,
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok) {
@@ -373,11 +364,7 @@ export default function ProfilePage() {
     setHostelError("");
     setHostelSaved(false);
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/auth/profile/update/`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ hostel: profile.campus }),
-      });
+      const res = await api.auth.updateProfile({ hostel: profile.campus });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         setHostelError(err.detail || "Failed to update hostel.");

@@ -5,10 +5,8 @@ import { Package, Clock } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import AdminTopBar from "@/components/layout/AdminTopBar";
-import { fetchWithAuth } from "@/lib/authStore";
+import { api } from "@/lib/api";
 import { GRAD } from "@/lib/tokens";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 const STATUS_STYLE: Record<string, string> = {
   pending:          "bg-amber-100 text-amber-700",
@@ -64,7 +62,7 @@ export default function AdminOrderDetail() {
     const load = async () => {
       setLoading(true);
       try {
-        const orderRes = await fetchWithAuth(`${API_URL}/api/admin/orders/${id}/`);
+        const orderRes = await api.admin.order(id as string);
         if (orderRes.ok) setOrder(await orderRes.json());
       } catch {}
       finally { setLoading(false); }
@@ -76,10 +74,7 @@ export default function AdminOrderDetail() {
     if (!order) return;
     setUpdating(true);
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/admin/orders/${id}/`, {
-        method: "PATCH",
-        body: JSON.stringify({ status: newStatus }),
-      });
+      const res = await api.admin.updateOrder(id as string, { status: newStatus });
       if (res.ok) setOrder(await res.json());
     } catch {}
     finally { setUpdating(false); }

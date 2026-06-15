@@ -5,9 +5,7 @@ import { MessageCircle, AlertTriangle, Image as ImageIcon, DollarSign, Pin } fro
 import AdminTopBar from "@/components/layout/AdminTopBar";
 import { useParams, useRouter } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
-import { fetchWithAuth } from "@/lib/authStore";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+import { api } from "@/lib/api";
 
 function fmt(iso: string) {
   return new Date(iso).toLocaleString("en-NG", {
@@ -36,7 +34,7 @@ export default function AdminConversationDetail() {
 
   useEffect(() => {
     if (!id) return;
-    fetchWithAuth(`${API_URL}/api/admin/conversations/${id}/`)
+    api.admin.conversation(id as string)
       .then(r => r.ok ? r.json() : Promise.reject())
       .then(d => setData(d))
       .catch(() => setData(null))

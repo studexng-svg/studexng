@@ -5,11 +5,9 @@ import { Package, Search, CheckCircle, XCircle, Tag, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import AdminTopBar from "@/components/layout/AdminTopBar";
-import { fetchAllPages, fetchWithAuth } from "@/lib/authStore";
+import { api, fetchAllPages, BASE_URL } from "@/lib/api";
 import { CampusPills, type Campus } from "@/components/admin/CampusPills";
 import { toast } from "sonner";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 const TYPE_COLOR: Record<string, string> = {
   service: "bg-blue-100 text-blue-700",
@@ -45,7 +43,7 @@ export default function AdminListingsPage() {
 
   const load = (q = search, av = tab, c = campus, cat = categoryFilter, silent = false) => {
     if (!silent) { setLoading(true); setSelected(new Set()); }
-    let url = `${API_URL}/api/admin/listings/?`;
+    let url = `${BASE_URL}/api/admin/listings/?`;
     if (q) url += `search=${encodeURIComponent(q)}&`;
     if (av !== "") url += `is_available=${av}&`;
     if (c) url += `campus=${c}&`;
@@ -58,7 +56,7 @@ export default function AdminListingsPage() {
 
   useEffect(() => {
     load();
-    fetchWithAuth(`${API_URL}/api/admin/categories/`)
+    api.admin.categories()
       .then(r => r.ok ? r.json() : [])
       .then(d => setCategories(Array.isArray(d) ? d : []))
       .catch(() => {});
@@ -97,10 +95,7 @@ export default function AdminListingsPage() {
     if (!bulkCategory) { toast.error("Select a category first."); return; }
     setApplying(true);
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/admin/listings/bulk-update-category/`, {
-        method: "PATCH",
-        body: JSON.stringify({ listing_ids: Array.from(selected), category_id: Number(bulkCategory) }),
-      });
+      const res = await api.admin.bulkUpdateCategory({ listing_ids: Array.from(selected), category_id: Number(bulkCategory) });
       if (res.ok) {
         const data = await res.json();
         toast.success(`${data.updated} listing(s) moved to "${data.category_name}".`);

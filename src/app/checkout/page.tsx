@@ -10,12 +10,11 @@ import {
 import { useCartStore } from "@/lib/cartStore";
 import { useBookingStore } from "@/lib/bookingStore";
 import { useRouter } from "next/navigation";
-import { useAuth, fetchWithAuth } from "@/lib/authStore";
+import { useAuth } from "@/lib/authStore";
 import Script from "next/script";
 import { GRAD, GRAD_TEXT, SERIF, calcServiceFee } from "@/lib/tokens";
 import TopNav from "@/components/layout/TopNav";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+import { api } from "@/lib/api";
 
 declare global {
   interface Window {
@@ -62,10 +61,7 @@ export default function CheckoutPage() {
 
   useEffect(() => {
     if (!isLoggedIn || !isHydrated || baseTotal <= 0) return;
-    fetchWithAuth(`${API_URL}/api/payments/preview-price/`, {
-      method: "POST",
-      body: JSON.stringify({ amount: baseTotal }),
-    })
+    api.payments.previewPrice({ amount: baseTotal })
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (data) {
@@ -81,7 +77,7 @@ export default function CheckoutPage() {
 
   useEffect(() => {
     if (!isLoggedIn) return;
-    fetchWithAuth(`${API_URL}/api/loyalty/status/`)
+    api.loyalty.status()
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d) setLoyaltyBalance(parseFloat(d.credit_balance) || 0); })
       .catch(() => {});
@@ -111,32 +107,26 @@ export default function CheckoutPage() {
 
   const createOrder = async (txRef: string, transactionId: string, appliedCredits = 0) => {
     if (isServiceBooking && booking) {
-      const res = await fetchWithAuth(`${API_URL}/api/payments/verify/`, {
-        method: "POST",
-        body: JSON.stringify({
-          reference: txRef,
-          transaction_id: transactionId,
-          listing_id: booking.providerId,
-          order_type: "service",
-          use_credits: appliedCredits > 0,
-          credits_applied: appliedCredits,
-        }),
+      const res = await api.payments.verify({
+        reference: txRef,
+        transaction_id: transactionId,
+        listing_id: booking.providerId,
+        order_type: "service",
+        use_credits: appliedCredits > 0,
+        credits_applied: appliedCredits,
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Order creation failed");
       return data.order_id;
     }
-    const res = await fetchWithAuth(`${API_URL}/api/payments/verify/`, {
-      method: "POST",
-      body: JSON.stringify({
-        reference: txRef,
-        transaction_id: transactionId,
-        items: cart.map(item => ({ listing_id: item.id, quantity: item.quantity })),
-        order_type: "product",
-        delivery_location: deliveryLocation.trim(),
-        use_credits: appliedCredits > 0,
-        credits_applied: appliedCredits,
-      }),
+    const res = await api.payments.verify({
+      reference: txRef,
+      transaction_id: transactionId,
+      items: cart.map(item => ({ listing_id: item.id, quantity: item.quantity })),
+      order_type: "product",
+      delivery_location: deliveryLocation.trim(),
+      use_credits: appliedCredits > 0,
+      credits_applied: appliedCredits,
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Order creation failed");
@@ -166,10 +156,7 @@ export default function CheckoutPage() {
     // Full credits coverage — skip Paystack, StudEx pays vendor directly
     if (isFullyCoveredByCredits) {
       try {
-        const res = await fetchWithAuth(`${API_URL}/api/payments/pay-with-credits/`, {
-          method: "POST",
-          body: JSON.stringify({ listing_id: listingId }),
-        });
+        const res = await api.payments.payWithCredits({ listing_id: listingId });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Payment failed");
         if (isFoodOrder) clearCart();
@@ -183,14 +170,11 @@ export default function CheckoutPage() {
     }
 
     try {
-      const initRes = await fetchWithAuth(`${API_URL}/api/payments/initialize/`, {
-        method: "POST",
-        body: JSON.stringify({
-          listing_id: listingId,
-          ...(isFoodOrder ? { cart_amount: foodTotal } : {}),
-          ...(isFoodOrder && deliveryLocation.trim() ? { delivery_location: deliveryLocation.trim() } : {}),
-          ...(useCredits && creditsToApply > 0 ? { use_credits: true } : {}),
-        }),
+      const initRes = await api.payments.initialize({
+        listing_id: listingId,
+        ...(isFoodOrder ? { cart_amount: foodTotal } : {}),
+        ...(isFoodOrder && deliveryLocation.trim() ? { delivery_location: deliveryLocation.trim() } : {}),
+        ...(useCredits && creditsToApply > 0 ? { use_credits: true } : {}),
       });
       const initData = await initRes.json();
       if (!initRes.ok) throw new Error(initData.error || "Failed to initialize payment");

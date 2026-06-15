@@ -1,5 +1,22 @@
 // src/lib/api.ts
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+// Central HTTP layer — every backend call goes through here.
+// Authenticated methods use fetchWithAuth (auto token refresh + cookie support).
+// Most methods return Response so each call site handles errors in its own context.
+
+import { fetchWithAuth, fetchAllPages } from "@/lib/authStore";
+
+export const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+export { fetchAllPages };
+
+const BASE = BASE_URL;
+
+/** Build an absolute URL from a backend path. */
+const u = (path: string) => `${BASE}${path}`;
+
+/** JSON.stringify shorthand. fetchWithAuth auto-sets Content-Type when body is a string. */
+const s = (body: unknown) => JSON.stringify(body);
+
+// ─── Types (used by auth/page.tsx) ───────────────────────────────────────────
 
 export interface RegisterData {
   username: string;
@@ -54,166 +71,551 @@ export interface AuthResponse {
   };
 }
 
-function readAuthStorage() {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = localStorage.getItem("auth-storage");
-    if (!raw) return null;
-    return JSON.parse(raw)?.state || null;
-  } catch {
-    return null;
-  }
-}
+// ─── Error parsing for register/login (throws on non-ok) ─────────────────────
 
-function getAccessToken(): string | null {
-  return readAuthStorage()?.accessToken || null;
-}
-
-function getRefreshToken(): string | null {
-  return readAuthStorage()?.refreshToken || null;
-}
-
-class API {
-  private baseURL: string;
-
-  constructor(baseURL: string) {
-    this.baseURL = baseURL;
-  }
-
-  private async request(endpoint: string, options: RequestInit = {}): Promise<any> {
-    const token = getAccessToken();
-    const headers = new Headers(options.headers || {});
-    headers.set("Content-Type", "application/json");
-    if (token) headers.set("Authorization", `Bearer ${token}`);
-
-    const attemptFetch = async (): Promise<Response> => {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 25_000);
-      try {
-        return await fetch(`${this.baseURL}${endpoint}`, {
-          ...options,
-          headers,
-          credentials: "include",
-          signal: controller.signal,
+async function parseOrThrow(response: Response): Promise<any> {
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    let msg =
+      data.error ||
+      data.detail ||
+      data.message ||
+      (data.non_field_errors && data.non_field_errors[0]);
+    if (!msg) {
+      const reserved = ["error", "detail", "message", "non_field_errors", "status_code"];
+      const fieldErrors = Object.entries(data)
+        .filter(([key]) => !reserved.includes(key))
+        .map(([field, errs]) => {
+          const errText = Array.isArray(errs) ? errs[0] : String(errs);
+          const label =
+            field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, " ");
+          return `${label}: ${errText}`;
         });
-      } catch (err: any) {
-        if (err?.name === "AbortError") throw new Error("__timeout__");
-        throw new Error("Network error — check your connection and try again.");
-      } finally {
-        clearTimeout(timeoutId);
-      }
-    };
-
-    let response: Response;
-    try {
-      response = await attemptFetch();
-    } catch (err: any) {
-      if (err?.message === "__timeout__") {
-        // One silent retry before surfacing the error
-        try {
-          response = await attemptFetch();
-        } catch (retryErr: any) {
-          throw new Error("Request timed out — please check your connection and try again.");
-        }
-      } else {
-        throw err;
-      }
+      msg = fieldErrors.length > 0 ? fieldErrors.join(" • ") : "Request failed";
     }
-
-    const data = await response.json().catch(() => ({}));
-
-    if (!response.ok) {
-      // 1. Try the simple top-level error fields first
-      let msg = data.error || data.detail || data.message ||
-        (data.non_field_errors && data.non_field_errors[0]);
-
-      // 2. If none of those exist, Django returned field-level validation errors
-      //    e.g. { "username": ["A user with that username already exists."],
-      //           "email": ["user with this email already exists."] }
-      //    Extract them all and join into a readable message.
-      if (!msg) {
-        const reserved = ["error", "detail", "message", "non_field_errors", "status_code"];
-        const fieldErrors = Object.entries(data)
-          .filter(([key]) => !reserved.includes(key))
-          .map(([field, errs]) => {
-            const errText = Array.isArray(errs) ? errs[0] : String(errs);
-            // Capitalise field name for readability
-            const label = field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, " ");
-            return `${label}: ${errText}`;
-          });
-        msg = fieldErrors.length > 0 ? fieldErrors.join(" • ") : "Request failed";
-      }
-
-      const err: any = new Error(msg);
-      err.disabled = data.disabled || false;
-      err.status = response.status;
-      err.fieldErrors = data; // attach raw errors in case caller wants them
-      throw err;
-    }
-
-    return data;
+    const err: any = new Error(msg);
+    err.disabled = data.disabled || false;
+    err.status = response.status;
+    err.fieldErrors = data;
+    throw err;
   }
+  return data;
+}
 
-  register(data: RegisterData) {
-    return this.request("/api/auth/register/", {
-      method: "POST",
-      body: JSON.stringify(data),
-    });
-  }
+export const api = {
+  // ─── register / login / forgotPassword ───────────────────────────────────
+  // These three return parsed JSON and throw on error (used by auth/page.tsx).
 
-  login(data: LoginData) {
-    return this.request("/api/auth/login/", {
-      method: "POST",
-      body: JSON.stringify(data),
-    });
-  }
-
-  logout() {}
-
-  async forgotPassword(email: string): Promise<{ detail: string }> {
-    const response = await fetch("/api/forgot-password", {
+  async register(data: RegisterData): Promise<AuthResponse> {
+    const res = await fetch(u("/api/auth/register/"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email }),
+      body: s(data),
+      credentials: "include",
     });
-    if (!response.ok) {
-      const error = await response.json();
+    return parseOrThrow(res);
+  },
+
+  async login(data: LoginData): Promise<AuthResponse> {
+    const res = await fetch(u("/api/auth/login/"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: s(data),
+      credentials: "include",
+    });
+    return parseOrThrow(res);
+  },
+
+  async forgotPassword(email: string): Promise<{ detail: string }> {
+    const res = await fetch("/api/forgot-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: s({ email }),
+    });
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({}));
       throw new Error(error.detail || "Failed to send reset link");
     }
-    return response.json();
-  }
+    return res.json();
+  },
 
-  getProfile() {
-    return this.request("/api/auth/profile/");
-  }
+  // ─── Public (no auth required) ───────────────────────────────────────────
 
-  updateProfile(data: Partial<UserProfile>) {
-    return this.request("/api/auth/profile/update/", {
-      method: "PATCH",
-      body: JSON.stringify(data),
-    });
-  }
+  pub: {
+    checkUsername: (username: string, signal?: AbortSignal) =>
+      fetch(u(`/api/auth/check-username/?username=${encodeURIComponent(username)}`), signal ? { signal } : {}),
 
-  async getListings(params?: { category?: string; search?: string }) {
-    const url = new URL(`${this.baseURL}/api/services/listings/`);
-    if (params?.category) url.searchParams.append("category", params.category);
-    if (params?.search) url.searchParams.append("search", params.search);
-    const response = await fetch(url.toString());
-    if (!response.ok) throw new Error("Failed to fetch listings");
-    const result = await response.json();
-    return result.results || result;
-  }
+    sendOtp: (email: string) =>
+      fetch(u("/api/auth/send-otp/"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: s({ email }),
+      }),
 
-  async getCategories() {
-    const response = await fetch(`${this.baseURL}/api/services/categories/`);
-    if (!response.ok) throw new Error("Failed to fetch categories");
-    const result = await response.json();
-    return result.results || result;
-  }
+    verifyOtp: (email: string, otp: string) =>
+      fetch(u("/api/auth/verify-otp/"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: s({ email, otp }),
+      }),
 
-  isAuthenticated(): boolean {
-    return !!getAccessToken();
-  }
-}
+    vendor: (username: string) => fetch(u(`/api/auth/vendors/${username}/`)),
 
-export const api = new API(API_BASE_URL);
+    vendors: (params?: Record<string, string>) => {
+      const qs = params ? "?" + new URLSearchParams(params) : "";
+      return fetch(u(`/api/auth/vendors/${qs}`));
+    },
+
+    listing: (id: number | string) => fetch(u(`/api/services/listings/${id}/`)),
+
+    listings: (params?: Record<string, string>) => {
+      const qs = params ? "?" + new URLSearchParams(params) : "";
+      return fetch(u(`/api/services/listings/${qs}`));
+    },
+
+    categories: (params?: Record<string, string>) => {
+      const qs = params ? "?" + new URLSearchParams(params) : "";
+      return fetch(u(`/api/services/categories/${qs}`));
+    },
+
+    deals: (campus?: string) =>
+      fetch(u(`/api/services/deals/${campus ? "?campus=" + campus : ""}`)),
+
+    reviews: (params?: Record<string, string>) => {
+      const qs = params ? "?" + new URLSearchParams(params) : "";
+      return fetch(u(`/api/reviews/reviews/${qs}`));
+    },
+
+    paystackBanks: () =>
+      fetch("https://api.paystack.co/bank?country=nigeria&perPage=200&use_cursor=false"),
+  },
+
+  // ─── Auth (authenticated) ─────────────────────────────────────────────────
+
+  auth: {
+    me: () => fetchWithAuth(u("/api/auth/me/")),
+
+    profile: () => fetchWithAuth(u("/api/auth/profile/")),
+
+    updateProfile: (body: FormData | Record<string, unknown>) =>
+      fetchWithAuth(u("/api/auth/profile/update/"), {
+        method: "PATCH",
+        body: body instanceof FormData ? body : s(body),
+      }),
+
+    checkCompletion: () =>
+      fetchWithAuth(u("/api/auth/profile/check-completion/"), { method: "POST" }),
+
+    logout: () => fetchWithAuth(u("/api/auth/logout/"), { method: "POST" }),
+
+    heartbeat: () => fetchWithAuth(u("/api/auth/heartbeat/"), { method: "POST" }),
+
+    changePassword: (body: Record<string, string>) =>
+      fetchWithAuth(u("/api/auth/change-password/"), { method: "POST", body: s(body) }),
+
+    applyVendor: (formData: FormData) =>
+      fetchWithAuth(u("/api/auth/seller/applications/"), { method: "POST", body: formData }),
+
+    sellerApplication: (id: number | string) =>
+      fetchWithAuth(u(`/api/auth/seller/applications/${id}/`)),
+
+    sellerApplicationAction: (
+      id: number | string,
+      action: string,
+      body?: Record<string, unknown>
+    ) =>
+      fetchWithAuth(u(`/api/auth/seller/applications/${id}/${action}/`), {
+        method: "POST",
+        body: body ? s(body) : undefined,
+      }),
+  },
+
+  // ─── Services / Listings ──────────────────────────────────────────────────
+
+  services: {
+    listingsAuth: (params?: Record<string, string>) => {
+      const qs = params ? "?" + new URLSearchParams(params) : "";
+      return fetchWithAuth(u(`/api/services/listings/${qs}`));
+    },
+
+    categoriesAuth: () => fetchWithAuth(u("/api/services/categories/")),
+
+    createListing: (fd: FormData) =>
+      fetchWithAuth(u("/api/services/listings/"), { method: "POST", body: fd }),
+
+    updateListing: (id: number | string, fd: FormData) =>
+      fetchWithAuth(u(`/api/services/listings/${id}/`), { method: "PATCH", body: fd }),
+
+    deleteListing: (id: number | string) =>
+      fetchWithAuth(u(`/api/services/listings/${id}/`), { method: "DELETE" }),
+
+    adminToggle: (id: number | string, body: Record<string, unknown>) =>
+      fetchWithAuth(u(`/api/admin/listings/${id}/`), { method: "PATCH", body: s(body) }),
+
+    adminDelete: (id: number | string) =>
+      fetchWithAuth(u(`/api/admin/listings/${id}/`), { method: "DELETE" }),
+  },
+
+  // ─── Orders ───────────────────────────────────────────────────────────────
+
+  orders: {
+    list: (role?: "buyer" | "seller") =>
+      fetchWithAuth(u(`/api/orders/orders/${role ? "?role=" + role : ""}`)),
+
+    get: (id: number | string) => fetchWithAuth(u(`/api/orders/orders/${id}/`)),
+
+    confirm: (id: number | string) =>
+      fetchWithAuth(u(`/api/orders/orders/${id}/confirm/`), { method: "POST" }),
+
+    markComplete: (id: number | string, body?: FormData | Record<string, unknown>) =>
+      fetchWithAuth(u(`/api/orders/orders/${id}/mark-complete/`), {
+        method: "PATCH",
+        body: body instanceof FormData ? body : body ? s(body) : undefined,
+      }),
+
+    bookings: () => fetchWithAuth(u("/api/orders/bookings/")),
+
+    createBooking: (body: Record<string, unknown>) =>
+      fetchWithAuth(u("/api/orders/bookings/"), { method: "POST", body: s(body) }),
+
+    bookingAction: (id: number | string, action: string) =>
+      fetchWithAuth(u(`/api/orders/bookings/${id}/${action}/`), { method: "POST" }),
+
+    createDispute: (body: Record<string, unknown>) =>
+      fetchWithAuth(u("/api/orders/disputes/"), { method: "POST", body: s(body) }),
+  },
+
+  // ─── Payments ─────────────────────────────────────────────────────────────
+
+  payments: {
+    initialize: (body: Record<string, unknown>) =>
+      fetchWithAuth(u("/api/payments/initialize/"), { method: "POST", body: s(body) }),
+
+    verify: (body: Record<string, unknown>) =>
+      fetchWithAuth(u("/api/payments/verify/"), { method: "POST", body: s(body) }),
+
+    previewPrice: (body: Record<string, unknown>) =>
+      fetchWithAuth(u("/api/payments/preview-price/"), { method: "POST", body: s(body) }),
+
+    payWithCredits: (body: Record<string, unknown>) =>
+      fetchWithAuth(u("/api/payments/pay-with-credits/"), { method: "POST", body: s(body) }),
+
+    bankAccount: () => fetchWithAuth(u("/api/payments/seller/bank-account/")),
+
+    saveBankAccount: (body: Record<string, unknown>) =>
+      fetchWithAuth(u("/api/payments/seller/bank-account/"), { method: "POST", body: s(body) }),
+
+    verifyBankAccount: (body: Record<string, unknown>) =>
+      fetchWithAuth(u("/api/payments/verify-bank-account/"), { method: "POST", body: s(body) }),
+
+    earnings: () => fetchWithAuth(u("/api/payments/seller/earnings/")),
+
+    transactions: () => fetchWithAuth(u("/api/payments/seller/transactions/")),
+  },
+
+  // ─── Cart ─────────────────────────────────────────────────────────────────
+
+  cart: {
+    get: () => fetchWithAuth(u("/api/cart/")),
+
+    add: (body: Record<string, unknown>) =>
+      fetchWithAuth(u("/api/cart/add/"), { method: "POST", body: s(body) }),
+
+    remove: (id: number | string) =>
+      fetchWithAuth(u(`/api/cart/remove/${id}/`), { method: "DELETE" }),
+
+    update: (id: number | string, body: Record<string, unknown>) =>
+      fetchWithAuth(u(`/api/cart/update/${id}/`), { method: "PATCH", body: s(body) }),
+
+    clear: () => fetchWithAuth(u("/api/cart/clear/"), { method: "POST" }),
+  },
+
+  // ─── Wishlist ─────────────────────────────────────────────────────────────
+
+  wishlist: {
+    get: () => fetchWithAuth(u("/api/wishlist/")),
+
+    add: (body: Record<string, unknown>) =>
+      fetchWithAuth(u("/api/wishlist/add/"), { method: "POST", body: s(body) }),
+
+    remove: (id: number | string) =>
+      fetchWithAuth(u(`/api/wishlist/remove/${id}/`), { method: "DELETE" }),
+
+    clear: () => fetchWithAuth(u("/api/wishlist/clear/"), { method: "POST" }),
+  },
+
+  // ─── Chat ─────────────────────────────────────────────────────────────────
+
+  chat: {
+    conversations: () => fetchWithAuth(u("/api/chat/conversations/")),
+
+    conversation: (id: number | string) =>
+      fetchWithAuth(u(`/api/chat/conversations/${id}/`)),
+
+    start: (body: Record<string, unknown>) =>
+      fetchWithAuth(u("/api/chat/conversations/"), { method: "POST", body: s(body) }),
+
+    messages: (id: number | string) =>
+      fetchWithAuth(u(`/api/chat/conversations/${id}/messages/`)),
+
+    pinned: (id: number | string) =>
+      fetchWithAuth(u(`/api/chat/conversations/${id}/pinned/`)),
+
+    send: (id: number | string, body: Record<string, unknown>) =>
+      fetchWithAuth(u(`/api/chat/conversations/${id}/send/`), {
+        method: "POST",
+        body: s(body),
+      }),
+
+    sendImage: (id: number | string, formData: FormData) =>
+      fetchWithAuth(u(`/api/chat/conversations/${id}/send/`), {
+        method: "POST",
+        body: formData,
+      }),
+
+    deleteForMe: (msgId: number | string) =>
+      fetchWithAuth(u(`/api/chat/messages/${msgId}/delete_for_me/`), { method: "POST" }),
+
+    deleteForEveryone: (msgId: number | string) =>
+      fetchWithAuth(u(`/api/chat/messages/${msgId}/delete_for_everyone/`), { method: "POST" }),
+
+    editMessage: (msgId: number | string, body: Record<string, unknown>) =>
+      fetchWithAuth(u(`/api/chat/messages/${msgId}/edit_message/`), {
+        method: "PATCH",
+        body: s(body),
+      }),
+
+    pinMessage: (msgId: number | string) =>
+      fetchWithAuth(u(`/api/chat/messages/${msgId}/pin_message/`), { method: "POST" }),
+  },
+
+  // ─── Notifications ────────────────────────────────────────────────────────
+
+  notifications: {
+    list: () => fetchWithAuth(u("/api/notifications/")),
+
+    status: () => fetchWithAuth(u("/api/notifications/status/")),
+
+    markRead: (id: number | string) =>
+      fetchWithAuth(u(`/api/notifications/${id}/read/`), { method: "POST" }),
+
+    markAllRead: () =>
+      fetchWithAuth(u("/api/notifications/read-all/"), { method: "POST" }),
+
+    registerToken: (token: string) =>
+      fetchWithAuth(u("/api/notifications/fcm-token/"), {
+        method: "POST",
+        body: s({ token }),
+      }),
+  },
+
+  // ─── Loyalty ──────────────────────────────────────────────────────────────
+
+  loyalty: {
+    status: () => fetchWithAuth(u("/api/loyalty/status/")),
+  },
+
+  // ─── Reviews ──────────────────────────────────────────────────────────────
+
+  reviews: {
+    canReview: (orderId: number | string) =>
+      fetchWithAuth(u(`/api/reviews/reviews/can-review/${orderId}/`)),
+
+    submit: (body: Record<string, unknown>) =>
+      fetchWithAuth(u("/api/reviews/reviews/"), { method: "POST", body: s(body) }),
+
+    submitFeedback: (body: Record<string, unknown>) =>
+      fetchWithAuth(u("/api/reviews/submit-app-feedback/"), {
+        method: "POST",
+        body: s(body),
+      }),
+  },
+
+  // ─── Admin ────────────────────────────────────────────────────────────────
+
+  admin: {
+    dashboard: () => fetchWithAuth(u("/api/admin/dashboard/")),
+
+    activity: () => fetchWithAuth(u("/api/admin/activity/")),
+
+    analytics: (days: number) =>
+      fetchWithAuth(u(`/api/admin/analytics/timeseries/?days=${days}`)),
+
+    // Listings
+    listing: (id: number | string) => fetchWithAuth(u(`/api/admin/listings/${id}/`)),
+
+    updateListing: (id: number | string, body: Record<string, unknown>) =>
+      fetchWithAuth(u(`/api/admin/listings/${id}/`), { method: "PATCH", body: s(body) }),
+
+    deleteListing: (id: number | string) =>
+      fetchWithAuth(u(`/api/admin/listings/${id}/`), { method: "DELETE" }),
+
+    searchListings: (query: string) =>
+      fetchWithAuth(u(`/api/admin/listings/?search=${encodeURIComponent(query)}&page_size=8`)),
+
+    bulkUpdateCategory: (body: Record<string, unknown>) =>
+      fetchWithAuth(u("/api/admin/listings/bulk-update-category/"), {
+        method: "PATCH",
+        body: s(body),
+      }),
+
+    // Categories
+    categories: () => fetchWithAuth(u("/api/admin/categories/")),
+
+    createCategory: (body: Record<string, unknown>) =>
+      fetchWithAuth(u("/api/admin/categories/"), { method: "POST", body: s(body) }),
+
+    updateCategory: (id: number | string, body: Record<string, unknown>) =>
+      fetchWithAuth(u(`/api/admin/categories/${id}/`), { method: "PATCH", body: s(body) }),
+
+    deleteCategory: (id: number | string) =>
+      fetchWithAuth(u(`/api/admin/categories/${id}/`), { method: "DELETE" }),
+
+    // Orders
+    order: (id: number | string) => fetchWithAuth(u(`/api/admin/orders/${id}/`)),
+
+    updateOrder: (id: number | string, body: Record<string, unknown>) =>
+      fetchWithAuth(u(`/api/admin/orders/${id}/`), { method: "PATCH", body: s(body) }),
+
+    // Payments & transactions
+    payment: (id: number | string) => fetchWithAuth(u(`/api/admin/payments/${id}/`)),
+
+    updateServiceTransaction: (id: number | string, body: Record<string, unknown>) =>
+      fetchWithAuth(u(`/api/admin/service-transactions/${id}/`), {
+        method: "PATCH",
+        body: s(body),
+      }),
+
+    // Platform earnings & vendor payouts
+    platformEarnings: (search?: string) =>
+      fetchWithAuth(
+        u(`/api/admin/platform-earnings/${search ? "?search=" + encodeURIComponent(search) : ""}`)
+      ),
+
+    vendorPayouts: (params?: { search?: string; campus?: string }) => {
+      const qs = new URLSearchParams();
+      if (params?.search) qs.set("search", params.search);
+      if (params?.campus) qs.set("campus", params.campus);
+      const q = qs.toString();
+      return fetchWithAuth(u(`/api/admin/vendor-payouts/${q ? "?" + q : ""}`));
+    },
+
+    // Deals
+    deals: () => fetchWithAuth(u("/api/admin/deals/")),
+
+    createDeal: (body: Record<string, unknown>) =>
+      fetchWithAuth(u("/api/admin/deals/"), { method: "POST", body: s(body) }),
+
+    updateDeal: (id: number | string, body: Record<string, unknown>) =>
+      fetchWithAuth(u(`/api/admin/deals/${id}/`), { method: "PATCH", body: s(body) }),
+
+    deleteDeal: (id: number | string) =>
+      fetchWithAuth(u(`/api/admin/deals/${id}/`), { method: "DELETE" }),
+
+    // Disputes
+    dispute: (id: number | string) => fetchWithAuth(u(`/api/admin/disputes/${id}/`)),
+
+    updateDispute: (id: number | string, body: Record<string, unknown>) =>
+      fetchWithAuth(u(`/api/admin/disputes/${id}/`), { method: "PATCH", body: s(body) }),
+
+    // Reviews
+    deleteReview: (id: number | string) =>
+      fetchWithAuth(u(`/api/admin/reviews/${id}/`), { method: "DELETE" }),
+
+    // Bank accounts
+    updateBankAccount: (id: number | string, body: Record<string, unknown>) =>
+      fetchWithAuth(u(`/api/admin/bank-accounts/${id}/`), { method: "PATCH", body: s(body) }),
+
+    // Messaging & broadcast
+    broadcastCounts: (qs: string) =>
+      fetchWithAuth(u(`/api/admin/broadcast-counts/${qs}`)),
+
+    broadcastPreview: (body: Record<string, unknown>) =>
+      fetchWithAuth(u("/api/admin/broadcast-preview/"), { method: "POST", body: s(body) }),
+
+    notifyAll: (body: Record<string, unknown>) =>
+      fetchWithAuth(u("/api/admin/notify-all/"), { method: "POST", body: s(body) }),
+
+    // AI history & chat
+    aiHistory: () => fetchWithAuth(u("/api/admin/ai-history/")),
+
+    saveAiHistory: (body: Record<string, unknown>) =>
+      fetchWithAuth(u("/api/admin/ai-history/"), { method: "POST", body: s(body) }),
+
+    aiSession: (id: number | string) => fetchWithAuth(u(`/api/admin/ai-history/${id}/`)),
+
+    deleteAiSession: (id: number | string) =>
+      fetchWithAuth(u(`/api/admin/ai-history/${id}/`), { method: "DELETE" }),
+
+    aiChat: (body: Record<string, unknown>) =>
+      fetchWithAuth(u("/api/admin/ai-chat/"), { method: "POST", body: s(body) }),
+
+    aiAction: (body: Record<string, unknown>) =>
+      fetchWithAuth(u("/api/admin/ai-action/"), { method: "POST", body: s(body) }),
+
+    // Groq AI broadcast
+    groqLogs: () => fetchWithAuth(u("/api/admin/groq-notify/")),
+
+    groqNotify: (body: Record<string, unknown>) =>
+      fetchWithAuth(u("/api/admin/groq-notify/"), { method: "POST", body: s(body) }),
+
+    // Platform settings
+    platformSettings: () => fetchWithAuth(u("/api/admin/platform-settings/")),
+
+    updatePlatformSettings: (body: Record<string, unknown>) =>
+      fetchWithAuth(u("/api/admin/platform-settings/"), { method: "PATCH", body: s(body) }),
+
+    // Rewards
+    rewardsOverview: () => fetchWithAuth(u("/api/admin/rewards-overview/")),
+
+    // Conversations
+    conversation: (id: number | string) => fetchWithAuth(u(`/api/admin/conversations/${id}/`)),
+
+    // Seller approvals
+    sellerApprovals: (school?: string) =>
+      fetchWithAuth(u(`/api/auth/seller/applications/${school ? "?school=" + school : ""}`)),
+
+    sellerApplication: (id: number | string) =>
+      fetchWithAuth(u(`/api/auth/seller/applications/${id}/`)),
+
+    approveApplication: (
+      id: number | string,
+      action: string,
+      body?: Record<string, unknown>
+    ) =>
+      fetchWithAuth(u(`/api/auth/seller/applications/${id}/${action}/`), {
+        method: "POST",
+        body: body ? s(body) : undefined,
+      }),
+
+    // Vendor of month
+    vendorOfMonth: () => fetchWithAuth(u("/api/admin/vendor-of-month/")),
+
+    setVendorOfMonth: (body: Record<string, unknown>) =>
+      fetchWithAuth(u("/api/admin/vendor-of-month/"), { method: "POST", body: s(body) }),
+
+    updateVendorOfMonth: (body: Record<string, unknown>) =>
+      fetchWithAuth(u("/api/admin/vendor-of-month/"), { method: "PATCH", body: s(body) }),
+
+    deleteVendorOfMonth: () =>
+      fetchWithAuth(u("/api/admin/vendor-of-month/"), { method: "DELETE" }),
+
+    // Users
+    user: (id: number | string) => fetchWithAuth(u(`/api/admin/users/${id}/`)),
+
+    updateUser: (id: number | string, body: Record<string, unknown>) =>
+      fetchWithAuth(u(`/api/admin/users/${id}/`), { method: "PATCH", body: s(body) }),
+
+    notifyUser: (id: number | string, body: Record<string, unknown>) =>
+      fetchWithAuth(u(`/api/admin/users/${id}/notify/`), { method: "POST", body: s(body) }),
+
+    searchUsers: (search: string, userType?: string) =>
+      fetchWithAuth(
+        u(
+          `/api/admin/users/?search=${encodeURIComponent(search)}${
+            userType ? "&user_type=" + userType : ""
+          }`
+        )
+      ),
+  },
+};

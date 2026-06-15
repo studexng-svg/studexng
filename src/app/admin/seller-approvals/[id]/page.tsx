@@ -10,10 +10,8 @@ import {
 import AdminTopBar from "@/components/layout/AdminTopBar";
 import { useParams, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
-import { fetchWithAuth } from "@/lib/authStore";
+import { api } from "@/lib/api";
 import { GRAD } from "@/lib/tokens";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -173,7 +171,7 @@ export default function SellerApplicationDetail() {
 
   useEffect(() => {
     if (!id) return;
-    fetchWithAuth(`${API_URL}/api/auth/seller/applications/${id}/`)
+    api.admin.sellerApplication(id as string)
       .then(r => r.ok ? r.json() : Promise.reject())
       .then(d => setApp(d))
       .catch(() => setApp(null))
@@ -185,12 +183,10 @@ export default function SellerApplicationDetail() {
     setActionLoading(true);
     setError("");
     try {
-      const res = await fetchWithAuth(
-        `${API_URL}/api/auth/seller/applications/${app.id}/${action}/`,
-        {
-          method: "POST",
-          ...(action === "reject" ? { body: JSON.stringify({ notes: "Application rejected by admin." }) } : {}),
-        }
+      const res = await api.admin.approveApplication(
+        app.id,
+        action,
+        action === "reject" ? { notes: "Application rejected by admin." } : undefined
       );
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || `${action} failed`);

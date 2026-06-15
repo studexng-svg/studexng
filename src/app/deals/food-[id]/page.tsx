@@ -8,8 +8,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { useCartStore } from "@/lib/cartStore";
 import { useWishlistStore } from "@/lib/wishlistStore";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+import { api } from "@/lib/api";
 
 interface Listing {
   id: number;
@@ -40,7 +39,7 @@ export default function DealPage() {
   useEffect(() => {
     const fetchListing = async () => {
       try {
-        const res = await fetch(`${API_URL}/api/services/listings/${id}/`);
+        const res = await api.pub.listing(id as string);
         if (!res.ok) throw new Error("Not found");
         const data = await res.json();
         setListing(data);

@@ -7,10 +7,9 @@ import {
   UserX, Users, ChevronDown, ChevronLeft, Copy,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { fetchWithAuth, getToken, useAuth } from "@/lib/authStore";
+import { useAuth } from "@/lib/authStore";
+import { api } from "@/lib/api";
 import { GRAD } from "@/lib/tokens";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
 const DELETE_EVERYONE_LIMIT_HOURS = 60;
 
 interface ChatWindowProps {
@@ -148,16 +147,13 @@ export default function ChatWindow({
 
     const init = async () => {
       try {
-        const res = await fetchWithAuth(`${API_URL}/api/chat/conversations/`, {
-          method: 'POST',
-          body: JSON.stringify({ listing_id: listingId, seller_id: sellerId }),
-        });
+        const res = await api.chat.start({ listing_id: listingId, seller_id: sellerId });
         if (!res.ok) throw new Error('Could not start conversation');
         const conv = await res.json();
         setConversationId(conv.id);
         setOtherUserLastSeen(conv.other_user?.last_seen || null);
         setOtherUserOnline(conv.other_user?.is_online || false);
-        const msgRes = await fetchWithAuth(`${API_URL}/api/chat/conversations/${conv.id}/messages/`);
+        const msgRes = await api.chat.messages(conv.id);
         const data = await msgRes.json();
         setMessages(mapMessages(Array.isArray(data) ? data : data.results || []));
         await loadPinned(conv.id);
@@ -174,7 +170,7 @@ export default function ChatWindow({
     if (!conversationId) return;
     const interval = setInterval(async () => {
       try {
-        const res = await fetchWithAuth(`${API_URL}/api/chat/conversations/${conversationId}/messages/`);
+        const res = await api.chat.messages(conversationId);
         const data = await res.json();
         setMessages(mapMessages(Array.isArray(data) ? data : data.results || []));
       } catch {}
@@ -186,7 +182,7 @@ export default function ChatWindow({
     if (!conversationId) return;
     const interval = setInterval(async () => {
       try {
-        const res = await fetchWithAuth(`${API_URL}/api/chat/conversations/${conversationId}/`);
+        const res = await api.chat.conversation(conversationId);
         if (res.ok) {
           const conv = await res.json();
           setOtherUserLastSeen(conv.other_user?.last_seen || null);
@@ -211,7 +207,7 @@ export default function ChatWindow({
     const id = convId || conversationId;
     if (!id) return;
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/chat/conversations/${id}/pinned/`);
+      const res = await api.chat.pinned(id);
       if (res.ok) {
         const data = await res.json();
         setPinnedMessages(mapMessages(Array.isArray(data) ? data : []));
@@ -244,7 +240,7 @@ export default function ChatWindow({
   const deleteForMe = async (id: string) => {
     setActionMenu(null);
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/chat/messages/${id}/delete_for_me/`, { method: 'POST' });
+      const res = await api.chat.deleteForMe(id);
       if (res.ok) {
         setMessages(prev => prev.filter(m => m.id !== id));
         setPinnedMessages(prev => prev.filter(m => m.id !== id));
@@ -257,7 +253,7 @@ export default function ChatWindow({
   const deleteForEveryone = async (id: string) => {
     setActionMenu(null);
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/chat/messages/${id}/delete_for_everyone/`, { method: 'POST' });
+      const res = await api.chat.deleteForEveryone(id);
       if (res.ok) {
         setMessages(prev => prev.filter(m => m.id !== id));
         setPinnedMessages(prev => prev.filter(m => m.id !== id));
@@ -280,10 +276,7 @@ export default function ChatWindow({
   const submitEdit = async (id: string) => {
     if (!editContent.trim()) return;
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/chat/messages/${id}/edit_message/`, {
-        method: 'PATCH',
-        body: JSON.stringify({ content: editContent.trim() }),
-      });
+      const res = await api.chat.editMessage(id, { content: editContent.trim() });
       if (res.ok) {
         const updated = await res.json();
         setMessages(prev => prev.map(m => m.id === id
@@ -301,7 +294,7 @@ export default function ChatWindow({
   const togglePin = async (id: string) => {
     setActionMenu(null);
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/chat/messages/${id}/pin_message/`, { method: 'POST' });
+      const res = await api.chat.pinMessage(id);
       if (res.ok) {
         const data = await res.json();
         setMessages(prev => prev.map(m => m.id === id ? { ...m, is_pinned: data.is_pinned } : m));
@@ -338,7 +331,6 @@ export default function ChatWindow({
     }
     setSending(true);
     try {
-      const token = getToken();
       let sentMessage: any;
 
       if (imageFile) {
@@ -346,9 +338,7 @@ export default function ChatWindow({
         fd.append("image", imageFile);
         fd.append("message_type", "image");
         if (message.trim()) fd.append("content", message.trim());
-        const res = await fetch(`${API_URL}/api/chat/conversations/${conversationId}/send/`, {
-          method: "POST", headers: { Authorization: `Bearer ${token}` }, body: fd,
-        });
+        const res = await api.chat.sendImage(conversationId, fd);
         if (!res.ok) throw new Error("Send failed");
         sentMessage = await res.json();
         setMessages(prev => [...prev, {
@@ -359,9 +349,7 @@ export default function ChatWindow({
         cancelImage();
         setMessage("");
       } else {
-        const res = await fetchWithAuth(`${API_URL}/api/chat/conversations/${conversationId}/send/`, {
-          method: "POST", body: JSON.stringify({ content: message, message_type: "text" }),
-        });
+        const res = await api.chat.send(conversationId, { content: message, message_type: "text" });
         if (!res.ok) throw new Error("Send failed");
         sentMessage = await res.json();
         setMessages(prev => [...prev, {

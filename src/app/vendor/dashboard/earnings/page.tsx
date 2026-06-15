@@ -1,12 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { fetchWithAuth } from "@/lib/authStore";
 import { GRAD, toArray } from "@/lib/tokens";
 import { TrendingUp, DollarSign } from "lucide-react";
 import { LoadingSpinner, HEADING_FONT } from "../_shared";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+import { api } from "@/lib/api";
 
 export default function EarningsPage() {
   const [data, setData] = useState<any>(null);
@@ -17,8 +15,8 @@ export default function EarningsPage() {
     const load = async () => {
       try {
         const [earningsRes, txRes] = await Promise.all([
-          fetchWithAuth(`${API_URL}/api/payments/seller/earnings/`),
-          fetchWithAuth(`${API_URL}/api/payments/seller/transactions/`),
+          api.payments.earnings(),
+          api.payments.transactions(),
         ]);
         if (earningsRes.ok) setData(await earningsRes.json());
         if (txRes.ok) {

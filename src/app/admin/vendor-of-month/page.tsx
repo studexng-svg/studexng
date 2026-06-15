@@ -2,12 +2,11 @@
 
 import { useEffect, useState } from "react";
 import AdminTopBar from "@/components/layout/AdminTopBar";
-import { fetchWithAuth } from "@/lib/authStore";
+import { api } from "@/lib/api";
 import { GRAD } from "@/lib/tokens";
 import { Trophy, Star, RefreshCw, Search, CheckCircle, Trash2 } from "lucide-react";
 import { motion } from "framer-motion";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 interface VotmRecord {
   id: number;
@@ -52,7 +51,7 @@ export default function AdminVendorOfMonthPage() {
   const load = async () => {
     setLoading(true);
     try {
-      const r = await fetchWithAuth(`${API_URL}/api/admin/vendor-of-month/`);
+      const r = await api.admin.vendorOfMonth();
       if (r.ok) {
         const d = await r.json();
         setCurrent(d.current);
@@ -71,7 +70,7 @@ export default function AdminVendorOfMonthPage() {
     const t = setTimeout(async () => {
       setSearching(true);
       try {
-        const r = await fetchWithAuth(`${API_URL}/api/admin/users/?search=${encodeURIComponent(search)}&user_type=vendor`);
+        const r = await api.admin.searchUsers(search, "vendor");
         if (r.ok) {
           const d = await r.json();
           setSearchResults((d.results || d || []).slice(0, 6));
@@ -85,11 +84,7 @@ export default function AdminVendorOfMonthPage() {
     setPicking(true);
     setMsg("");
     try {
-      const r = await fetchWithAuth(`${API_URL}/api/admin/vendor-of-month/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "pick_now" }),
-      });
+      const r = await api.admin.setVendorOfMonth({ action: "pick_now" });
       const d = await r.json();
       if (r.ok) {
         setCurrent(d.current);
@@ -105,11 +100,7 @@ export default function AdminVendorOfMonthPage() {
     setSaving(true);
     setMsg("");
     try {
-      const r = await fetchWithAuth(`${API_URL}/api/admin/vendor-of-month/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ vendor_id: vendorId }),
-      });
+      const r = await api.admin.setVendorOfMonth({ vendor_id: vendorId });
       const d = await r.json();
       if (r.ok) {
         setCurrent(d.current);
@@ -127,7 +118,7 @@ export default function AdminVendorOfMonthPage() {
     setRemoving(true);
     setMsg("");
     try {
-      const r = await fetchWithAuth(`${API_URL}/api/admin/vendor-of-month/`, { method: "DELETE" });
+      const r = await api.admin.deleteVendorOfMonth();
       const d = await r.json();
       if (r.ok) {
         setCurrent(null);

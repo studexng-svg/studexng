@@ -4,10 +4,8 @@
 import { Store, Search } from "lucide-react";
 import { useEffect, useState } from "react";
 import AdminTopBar from "@/components/layout/AdminTopBar";
-import { fetchWithAuth } from "@/lib/authStore";
+import { api } from "@/lib/api";
 import { CampusPills, type Campus } from "@/components/admin/CampusPills";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 interface VendorPayout {
   vendor_id: number;
@@ -27,10 +25,7 @@ export default function AdminVendorPayoutsPage() {
 
   const load = (s = search, c = campus) => {
     setLoading(true);
-    let url = `${API_URL}/api/admin/vendor-payouts/?`;
-    if (s) url += `search=${encodeURIComponent(s)}&`;
-    if (c) url += `campus=${c}`;
-    fetchWithAuth(url)
+    api.admin.vendorPayouts({ search: s || undefined, campus: c || undefined })
       .then(r => r.ok ? r.json() : Promise.reject())
       .then(d => setVendors(Array.isArray(d) ? d : []))
       .catch(() => setVendors([]))

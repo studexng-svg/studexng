@@ -7,10 +7,9 @@ import {
   Trash2, Check, CheckCheck, PinOff, ChevronDown, UserX, Users, CornerDownLeft, Copy
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
-import { useAuth, fetchWithAuth, getToken } from "@/lib/authStore";
+import { useAuth } from "@/lib/authStore";
 import { GRAD } from "@/lib/tokens";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+import { api } from "@/lib/api";
 const DELETE_EVERYONE_LIMIT_HOURS = 60;
 
 function stripQuotedMarkup(text: string): string {
@@ -135,7 +134,7 @@ export default function ChatRoomPage() {
     if (!conversationId) return;
     const interval = setInterval(async () => {
       try {
-        const res = await fetchWithAuth(`${API_URL}/api/chat/conversations/${conversationId}/`);
+        const res = await api.chat.conversation(conversationId as string);
         if (res.ok) {
           const conv = await res.json();
           setOtherUserPicture(conv.other_user?.profile_picture || null);
@@ -175,12 +174,12 @@ export default function ChatRoomPage() {
     try {
       let convData: any = null;
       try {
-        const convRes = await fetchWithAuth(`${API_URL}/api/chat/conversations/${conversationId}/`);
+        const convRes = await api.chat.conversation(conversationId as string);
         if (convRes.ok) convData = await convRes.json();
       } catch {}
 
       if (!convData) {
-        const listRes = await fetchWithAuth(`${API_URL}/api/chat/conversations/`);
+        const listRes = await api.chat.conversations();
         if (listRes.ok) {
           const listData = await listRes.json();
           const list = Array.isArray(listData) ? listData : (listData.results || []);
@@ -207,7 +206,7 @@ export default function ChatRoomPage() {
 
   const loadMessages = async () => {
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/chat/conversations/${conversationId}/messages/`);
+      const res = await api.chat.messages(conversationId as string);
       if (!res.ok) return;
       const data = await res.json();
       const raw = Array.isArray(data) ? data : (data.results || []);
@@ -217,7 +216,7 @@ export default function ChatRoomPage() {
 
   const loadPinned = async () => {
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/chat/conversations/${conversationId}/pinned/`);
+      const res = await api.chat.pinned(conversationId as string);
       if (!res.ok) return;
       const data = await res.json();
       setPinnedMessages(Array.isArray(data) ? data : []);
@@ -284,7 +283,7 @@ export default function ChatRoomPage() {
   const deleteForMe = async (id: number) => {
     setActionMenu(null);
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/chat/messages/${id}/delete_for_me/`, { method: 'POST' });
+      const res = await api.chat.deleteForMe(id);
       if (res.ok) {
         setMessages(prev => prev.filter(m => m.id !== id));
         setPinnedMessages(prev => prev.filter(m => m.id !== id));
@@ -298,7 +297,7 @@ export default function ChatRoomPage() {
   const deleteForEveryone = async (id: number) => {
     setActionMenu(null);
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/chat/messages/${id}/delete_for_everyone/`, { method: 'POST' });
+      const res = await api.chat.deleteForEveryone(id);
       if (res.ok) {
         setMessages(prev => prev.filter(m => m.id !== id));
         setPinnedMessages(prev => prev.filter(m => m.id !== id));
@@ -322,10 +321,7 @@ export default function ChatRoomPage() {
   const submitEdit = async (id: number) => {
     if (!editContent.trim()) return;
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/chat/messages/${id}/edit_message/`, {
-        method: 'PATCH',
-        body: JSON.stringify({ content: editContent.trim() }),
-      });
+      const res = await api.chat.editMessage(id, { content: editContent.trim() });
       if (res.ok) {
         const updated = await res.json();
         setMessages(prev => prev.map(m => m.id === id ? { ...m, ...updated, is_mine: m.is_mine } : m));
@@ -342,7 +338,7 @@ export default function ChatRoomPage() {
   const togglePin = async (id: number) => {
     setActionMenu(null);
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/chat/messages/${id}/pin_message/`, { method: 'POST' });
+      const res = await api.chat.pinMessage(id);
       if (res.ok) {
         const data = await res.json();
         setMessages(prev => prev.map(m => m.id === id ? { ...m, is_pinned: data.is_pinned } : m));
@@ -373,15 +369,12 @@ export default function ChatRoomPage() {
     if (sending || (!input.trim() && !imageFile)) return;
     setSending(true);
     try {
-      const token = getToken();
       if (imageFile) {
         const fd = new FormData();
         fd.append("image", imageFile);
         fd.append("message_type", "image");
         if (input.trim()) fd.append("content", input.trim());
-        const res = await fetch(`${API_URL}/api/chat/conversations/${conversationId}/send/`, {
-          method: "POST", headers: { Authorization: `Bearer ${token}` }, body: fd,
-        });
+        const res = await api.chat.sendImage(conversationId as string, fd);
         if (!res.ok) throw new Error("Send failed");
         cancelImage();
       } else {
@@ -391,9 +384,7 @@ export default function ChatRoomPage() {
           const quotedText = mainText.substring(0, 100);
           content = `[quoted:@${replyingTo.sender_username}|${quotedText}]\n${content}`;
         }
-        const res = await fetchWithAuth(`${API_URL}/api/chat/conversations/${conversationId}/send/`, {
-          method: "POST", body: JSON.stringify({ content, message_type: "text" }),
-        });
+        const res = await api.chat.send(conversationId as string, { content, message_type: "text" });
         if (!res.ok) throw new Error("Send failed");
       }
       setInput("");

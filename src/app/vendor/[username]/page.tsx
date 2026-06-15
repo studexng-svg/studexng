@@ -5,11 +5,9 @@ import { useParams, useRouter } from "next/navigation";
 import { Star, Sparkles, MapPin, Shield, BellRing, UserX, X as XIcon } from "lucide-react";
 import TopNav from "@/components/layout/TopNav";
 import Link from "next/link";
-import { fetchWithAuth } from "@/lib/authStore";
+import { api } from "@/lib/api";
 import { GRAD, GRAD_TEXT, SERIF } from "@/lib/tokens";
 import { useAdminMode } from "@/hooks/useAdminMode";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 function VerifiedTick() {
   return (
@@ -70,8 +68,8 @@ export default function VendorProfilePage() {
     const load = async () => {
       try {
         const [vRes, lRes] = await Promise.all([
-          fetch(`${API_URL}/api/auth/vendors/${username}/`),
-          fetch(`${API_URL}/api/services/listings/?vendor_username=${username}&page_size=100`),
+          api.pub.vendor(username),
+          api.pub.listings({ vendor_username: username, page_size: "100" }),
         ]);
         if (vRes.ok) setVendor(await vRes.json());
         if (lRes.ok) {
@@ -108,10 +106,7 @@ export default function VendorProfilePage() {
     if (!confirmRevoke) { setConfirmRevoke(true); return; }
     setAdminLoading("revoke");
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/admin/users/${vendor.id}/`, {
-        method: "PATCH",
-        body: JSON.stringify({ user_type: "student" }),
-      });
+      const res = await api.admin.updateUser(vendor.id, { user_type: "student" });
       if (!res.ok) throw new Error("Failed to revoke vendor");
       showAdminToast("Vendor status revoked");
       setConfirmRevoke(false);
@@ -126,10 +121,7 @@ export default function VendorProfilePage() {
     if (!vendor?.id || !notifyTitle.trim() || !notifyMessage.trim()) return;
     setAdminLoading("notify");
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/admin/users/${vendor.id}/notify/`, {
-        method: "POST",
-        body: JSON.stringify({ title: notifyTitle.trim(), message: notifyMessage.trim() }),
-      });
+      const res = await api.admin.notifyUser(vendor.id, { title: notifyTitle.trim(), message: notifyMessage.trim() });
       if (!res.ok) throw new Error("Failed to send notification");
       showAdminToast("Notification sent!");
       setNotifyOpen(false);

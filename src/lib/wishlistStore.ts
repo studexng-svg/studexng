@@ -1,7 +1,5 @@
 import { create } from 'zustand';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
-
 export interface WishlistItem {
   id: number;       // listing_id
   title: string;
@@ -20,12 +18,9 @@ interface WishlistStore {
   loadWishlistForUser: (userId: number | null) => void;
 }
 
-// Dynamic require avoids circular-module issues (authStore ↔ wishlistStore)
-const authFetch = (url: string, options: RequestInit = {}) => {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { fetchWithAuth } = require('@/lib/authStore');
-  return fetchWithAuth(url, options) as Promise<Response>;
-};
+// Dynamic require avoids circular-module issues (api → authStore ↔ wishlistStore)
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const wishlistApi = (): typeof import("@/lib/api").api["wishlist"] => require("@/lib/api").api.wishlist;
 
 const userIsLoggedIn = (): boolean => {
   try {
@@ -63,10 +58,7 @@ export const useWishlistStore = create<WishlistStore>()((set, get) => ({
     set((state) => ({ wishlist: [...state.wishlist, item] }));
 
     if (userIsLoggedIn()) {
-      authFetch(`${API_URL}/api/wishlist/add/`, {
-        method: 'POST',
-        body: JSON.stringify({ listing_id: item.id }),
-      }).catch(() => {});
+      wishlistApi().add({ listing_id: item.id }).catch(() => {});
     } else {
       saveGuestWishlist(get().wishlist);
     }
@@ -76,7 +68,7 @@ export const useWishlistStore = create<WishlistStore>()((set, get) => ({
     set((state) => ({ wishlist: state.wishlist.filter((w) => w.id !== id) }));
 
     if (userIsLoggedIn()) {
-      authFetch(`${API_URL}/api/wishlist/remove/${id}/`, { method: 'DELETE' }).catch(() => {});
+      wishlistApi().remove(id).catch(() => {});
     } else {
       saveGuestWishlist(get().wishlist);
     }
@@ -88,7 +80,7 @@ export const useWishlistStore = create<WishlistStore>()((set, get) => ({
     set({ wishlist: [] });
 
     if (userIsLoggedIn()) {
-      authFetch(`${API_URL}/api/wishlist/clear/`, { method: 'POST' }).catch(() => {});
+      wishlistApi().clear().catch(() => {});
     } else {
       saveGuestWishlist([]);
     }
@@ -96,7 +88,7 @@ export const useWishlistStore = create<WishlistStore>()((set, get) => ({
 
   fetchWishlist: async () => {
     try {
-      const res = await authFetch(`${API_URL}/api/wishlist/`);
+      const res = await wishlistApi().get();
       if (!res.ok) return;
       const data: Array<{
         listing_id: number;

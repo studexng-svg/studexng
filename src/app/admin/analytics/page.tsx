@@ -8,10 +8,8 @@ import {
 } from "recharts";
 import { RefreshCw, TrendingUp, Users, Package, DollarSign, FileText } from "lucide-react";
 import AdminTopBar from "@/components/layout/AdminTopBar";
-import { fetchWithAuth } from "@/lib/authStore";
+import { api } from "@/lib/api";
 import { GRAD } from "@/lib/tokens";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 const TEAL  = "#0D9488";
 const PURPLE = "#7C3AED";
@@ -83,8 +81,8 @@ export default function AdminAnalytics() {
     else setRefreshing(true);
     try {
       const [summaryRes, tsRes] = await Promise.all([
-        fetchWithAuth(`${API_URL}/api/admin/dashboard/`),
-        fetchWithAuth(`${API_URL}/api/admin/analytics/timeseries/?days=${d}`),
+        api.admin.dashboard(),
+        api.admin.analytics(d),
       ]);
       if (summaryRes.ok) setSummary(await summaryRes.json());
       if (tsRes.ok) setTsData(await tsRes.json());

@@ -19,8 +19,8 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useAuth, getToken } from "@/lib/authStore";
+import { api } from "@/lib/api";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 const POLL_INTERVAL = 60_000;
 
 export interface NotificationPayload {
@@ -63,38 +63,27 @@ export function useNotifications() {
   }, [dismissToast]);
 
   const markRead = useCallback(async (notificationId: number) => {
-    const token = getToken();
-    if (!token) return;
+    if (!getToken()) return;
     try {
-      await fetch(`${API_URL}/api/notifications/${notificationId}/read/`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await api.notifications.markRead(notificationId);
       setUnreadCount(c => Math.max(0, c - 1));
     } catch {}
   }, []);
 
   const markAllRead = useCallback(async () => {
-    const token = getToken();
-    if (!token) return;
+    if (!getToken()) return;
     try {
-      await fetch(`${API_URL}/api/notifications/read-all/`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await api.notifications.markAllRead();
       setUnreadCount(0);
     } catch {}
   }, []);
 
   // ── Poll /api/notifications/status/ instead of SSE ──────────────────────
   const poll = useCallback(async () => {
-    const token = getToken();
-    if (!token || !mountedRef.current) return;
+    if (!getToken() || !mountedRef.current) return;
 
     try {
-      const res = await fetch(`${API_URL}/api/notifications/status/`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await api.notifications.status();
       if (!res.ok || !mountedRef.current) return;
 
       const data = await res.json();

@@ -4,9 +4,7 @@
 import { Send, User, Users, Search, CheckCircle, Loader2, Sparkles, Bot, Clock } from "lucide-react";
 import AdminTopBar from "@/components/layout/AdminTopBar";
 import { useState, useCallback, useEffect } from "react";
-import { fetchWithAuth } from "@/lib/authStore";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+import { api } from "@/lib/api";
 
 type Mode = "single" | "broadcast" | "ai";
 
@@ -38,7 +36,7 @@ function SingleUserCompose() {
     if (!q.trim()) { setResults([]); return; }
     setSearching(true);
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/admin/users/?search=${encodeURIComponent(q)}`);
+      const res = await api.admin.searchUsers(q);
       const data = await res.json();
       setResults(Array.isArray(data) ? data.slice(0, 8) : (data.results || []).slice(0, 8));
     } catch {
@@ -53,10 +51,7 @@ function SingleUserCompose() {
     setSending(true);
     setError("");
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/admin/users/${selected.id}/notify/`, {
-        method: "POST",
-        body: JSON.stringify({ title: title.trim(), message: message.trim() }),
-      });
+      const res = await api.admin.notifyUser(selected.id, { title: title.trim(), message: message.trim() });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to send");
       setSent(true);
@@ -221,7 +216,7 @@ function BroadcastCompose() {
     let cancelled = false;
     setCountsLoading(true);
     const qs = school ? `?school=${encodeURIComponent(school)}` : "";
-    fetchWithAuth(`${API_URL}/api/admin/broadcast-counts/${qs}`)
+    api.admin.broadcastCounts(qs)
       .then(r => r.json())
       .then(data => { if (!cancelled) setCounts(data); })
       .catch(() => {})
@@ -233,14 +228,11 @@ function BroadcastCompose() {
     if (!title.trim() || !message.trim()) return;
     setPreviewLoading(true);
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/admin/broadcast-preview/`, {
-        method: "POST",
-        body: JSON.stringify({
-          title: title.trim(),
-          message: message.trim(),
-          school: school || undefined,
-          user_type: userType || undefined,
-        }),
+      const res = await api.admin.broadcastPreview({
+        title: title.trim(),
+        message: message.trim(),
+        school: school || undefined,
+        user_type: userType || undefined,
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to load preview");
@@ -260,14 +252,11 @@ function BroadcastCompose() {
     setError("");
     setResult(null);
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/admin/notify-all/`, {
-        method: "POST",
-        body: JSON.stringify({
-          title: title.trim(),
-          message: message.trim(),
-          school: school || undefined,
-          user_type: userType || undefined,
-        }),
+      const res = await api.admin.notifyAll({
+        title: title.trim(),
+        message: message.trim(),
+        school: school || undefined,
+        user_type: userType || undefined,
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed");
@@ -448,7 +437,7 @@ function GroqBroadcast() {
 
   const fetchLogs = async () => {
     try {
-      const r = await fetchWithAuth(`${API_URL}/api/admin/groq-notify/`);
+      const r = await api.admin.groqLogs();
       const d = await r.json();
       if (Array.isArray(d)) setLogs(d);
     } catch {} finally { setLogsLoading(false); }
@@ -456,7 +445,7 @@ function GroqBroadcast() {
 
   const fetchSettings = async () => {
     try {
-      const r = await fetchWithAuth(`${API_URL}/api/admin/platform-settings/`);
+      const r = await api.admin.platformSettings();
       const d = await r.json();
       if (typeof d.grok_notifications_enabled === "boolean") setAiEnabled(d.grok_notifications_enabled);
     } catch {}
@@ -466,10 +455,7 @@ function GroqBroadcast() {
     if (aiEnabled === null || toggling) return;
     setToggling(true);
     try {
-      const r = await fetchWithAuth(`${API_URL}/api/admin/platform-settings/`, {
-        method: "PATCH",
-        body: JSON.stringify({ grok_notifications_enabled: !aiEnabled }),
-      });
+      const r = await api.admin.updatePlatformSettings({ grok_notifications_enabled: !aiEnabled });
       const d = await r.json();
       if (typeof d.grok_notifications_enabled === "boolean") setAiEnabled(d.grok_notifications_enabled);
     } catch {} finally { setToggling(false); }
@@ -480,10 +466,7 @@ function GroqBroadcast() {
   const generate = async () => {
     setLoading(true); setPreview(null); setError(""); setSent(null);
     try {
-      const r = await fetchWithAuth(`${API_URL}/api/admin/groq-notify/`, {
-        method: "POST",
-        body: JSON.stringify({ audience, school: school || undefined, preview: true }),
-      });
+      const r = await api.admin.groqNotify({ audience, school: school || undefined, preview: true });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "Failed");
       setPreview(d);
@@ -496,10 +479,7 @@ function GroqBroadcast() {
     if (!preview) return;
     setSending(true); setError("");
     try {
-      const r = await fetchWithAuth(`${API_URL}/api/admin/groq-notify/`, {
-        method: "POST",
-        body: JSON.stringify({ audience, school: school || undefined }),
-      });
+      const r = await api.admin.groqNotify({ audience, school: school || undefined });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "Failed");
       setSent(d); setPreview(null);

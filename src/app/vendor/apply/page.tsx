@@ -4,8 +4,9 @@ import { Store, CheckCircle, X, Shield, ArrowRight, CreditCard, FlipHorizontal, 
 import TopNav from "@/components/layout/TopNav";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth, fetchWithAuth } from "@/lib/authStore";
+import { useAuth } from "@/lib/authStore";
 import { GRAD, SERIF } from "@/lib/tokens";
+import { api } from "@/lib/api";
 
 type DocType = "id_card" | "admission_letter" | "nin";
 
@@ -85,10 +86,7 @@ export default function VendorApplyPage() {
     formData.append("business_age_confirmed", "true");
 
     try {
-      const response = await fetchWithAuth(
-        `${process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000"}/api/auth/seller/applications/`,
-        { method: "POST", body: formData }
-      );
+      const response = await api.auth.applyVendor(formData);
       if (!response.ok) {
         const data = await response.json();
         throw new Error(

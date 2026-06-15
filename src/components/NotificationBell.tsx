@@ -6,8 +6,7 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Bell, Check, X, Calendar, ShoppingCart, CheckCircle, AlertTriangle, Star, Package } from "lucide-react";
 import { getToken } from "@/lib/authStore";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+import { api } from "@/lib/api";
 
 const TYPE_ICONS: Record<string, React.ElementType> = {
   booking_reminder:  Calendar,
@@ -56,13 +55,10 @@ export function NotificationBell({
   }, [open]);
 
   const fetchNotifications = async () => {
-    const token = getToken();   // ✅ fresh token every call
-    if (!token) return;
+    if (!getToken()) return;
     setLoading(true);
     try {
-      const res = await fetch(`${API_URL}/api/notifications/`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await api.notifications.list();
       if (res.ok) {
         const data = await res.json();
         setNotifications(data.notifications || []);
@@ -79,18 +75,12 @@ export function NotificationBell({
   const handleClick = async (n: NotificationItem) => {
     setOpen(false);
     if (!n.is_read) {
-      const token = getToken();
-      if (token) {
-        try {
-          await fetch(`${API_URL}/api/notifications/${n.id}/read/`, {
-            method: "POST",
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          setNotifications(prev =>
-            prev.map(x => x.id === n.id ? { ...x, is_read: true } : x)
-          );
-        } catch {}
-      }
+      try {
+        await api.notifications.markRead(n.id);
+        setNotifications(prev =>
+          prev.map(x => x.id === n.id ? { ...x, is_read: true } : x)
+        );
+      } catch {}
     }
     if (n.action_url) router.push(n.action_url);
   };

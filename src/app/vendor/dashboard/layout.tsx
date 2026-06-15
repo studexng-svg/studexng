@@ -3,14 +3,13 @@
 import { useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
-import { useAuth, fetchWithAuth } from "@/lib/authStore";
+import { useAuth } from "@/lib/authStore";
 import { GRAD, GRAD_DARK } from "@/lib/tokens";
+import { api } from "@/lib/api";
 import {
   MessageCircle, Calendar, DollarSign, Package, ShoppingBag,
   Star, ArrowLeft, Link2, Share2, Check, History, MessageSquare,
 } from "lucide-react";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 const TABS = [
   { id: "messages",  label: "Messages",  icon: MessageCircle, href: "/vendor/dashboard/messages"  },
@@ -39,14 +38,14 @@ export default function VendorDashboardLayout({ children }: { children: React.Re
 
   useEffect(() => {
     if (!user) return;
-    fetchWithAuth(`${API_URL}/api/chat/conversations/`)
+    api.chat.conversations()
       .then(r => r.ok ? r.json() : null)
       .then(d => {
         if (!d) return;
         const list = Array.isArray(d) ? d : (d.results || []);
         setMsgBadge(list.reduce((s: number, c: any) => s + (c.unread_count || 0), 0));
       }).catch(() => {});
-    fetchWithAuth(`${API_URL}/api/orders/bookings/`)
+    api.orders.bookings()
       .then(r => r.ok ? r.json() : null)
       .then(d => {
         if (!d) return;

@@ -5,9 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { DollarSign } from "lucide-react";
 import AdminTopBar from "@/components/layout/AdminTopBar";
-import { fetchWithAuth } from "@/lib/authStore";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+import { api } from "@/lib/api";
 
 function Row({ label, value }: { label: string; value?: string | number | null }) {
   if (value === null || value === undefined || value === "") return null;
@@ -34,7 +32,7 @@ export default function AdminPaymentDetail() {
 
   useEffect(() => {
     if (!id) return;
-    fetchWithAuth(`${API_URL}/api/admin/payments/${id}/`)
+    api.admin.payment(id as string)
       .then(r => r.ok ? r.json() : Promise.reject())
       .then(d => setPayment(d))
       .catch(() => {})

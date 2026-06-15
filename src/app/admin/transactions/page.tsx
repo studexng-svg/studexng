@@ -4,10 +4,8 @@
 import { ArrowUpRight, Search } from "lucide-react";
 import { useEffect, useState } from "react";
 import AdminTopBar from "@/components/layout/AdminTopBar";
-import { fetchWithAuth, fetchAllPages } from "@/lib/authStore";
+import { api, fetchAllPages, BASE_URL } from "@/lib/api";
 import { CampusPills, type Campus } from "@/components/admin/CampusPills";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 const STATUS_STYLE: Record<string, string> = {
   in_escrow: "bg-amber-100 text-amber-700",
@@ -32,7 +30,7 @@ export default function AdminTransactionsPage() {
 
   const load = (s = search, st = tab, c = campus) => {
     setLoading(true);
-    let url = `${API_URL}/api/admin/service-transactions/?`;
+    let url = `${BASE_URL}/api/admin/service-transactions/?`;
     if (st) url += `status=${st}&`;
     if (s) url += `search=${encodeURIComponent(s)}&`;
     if (c) url += `campus=${c}`;
@@ -47,10 +45,7 @@ export default function AdminTransactionsPage() {
   const updateStatus = async (id: number, newStatus: string) => {
     setActing(id);
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/admin/service-transactions/${id}/`, {
-        method: "PATCH",
-        body: JSON.stringify({ status: newStatus }),
-      });
+      const res = await api.admin.updateServiceTransaction(id, { status: newStatus });
       if (res.ok) {
         const updated = await res.json();
         setTxs(prev => prev.map(t => t.id === updated.id ? { ...t, status: updated.status } : t));

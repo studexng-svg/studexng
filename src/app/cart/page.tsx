@@ -7,9 +7,10 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCartStore } from "@/lib/cartStore";
-import { useAuth, fetchWithAuth } from "@/lib/authStore";
+import { useAuth } from "@/lib/authStore";
 import { useEffect, useState, useMemo } from "react";
 import { GRAD, GRAD_TEXT, SERIF } from "@/lib/tokens";
+import { api } from "@/lib/api";
 
 function CountdownTimer({ reservedAt }: { reservedAt: string }) {
   const expiresAt = useMemo(() => new Date(reservedAt).getTime() + 10 * 60 * 1000, [reservedAt]);
@@ -42,8 +43,6 @@ function CountdownTimer({ reservedAt }: { reservedAt: string }) {
   );
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
-
 export default function CartPage() {
   const router = useRouter();
   const { cart, removeFromCart, updateQuantity, clearCart } = useCartStore();
@@ -69,7 +68,7 @@ export default function CartPage() {
       const limits: Record<number, number> = {};
       await Promise.all(cart.map(async item => {
         try {
-          const res = await fetch(`${API_URL}/api/services/listings/${item.id}/`);
+          const res = await api.pub.listing(item.id);
           if (res.ok) {
             const data = await res.json();
             if (!data.is_available || (data.track_inventory && data.stock_quantity === 0)) unavailable.add(item.id);
@@ -88,7 +87,7 @@ export default function CartPage() {
       // Fetch reserved_at times for countdown timers
       if (isLoggedIn) {
         try {
-          const cartRes = await fetchWithAuth(`${API_URL}/api/cart/`);
+          const cartRes = await api.cart.get();
           if (cartRes.ok) {
             const cartData: Array<{ listing_id: number; reserved_at: string | null }> = await cartRes.json();
             const reservations: Record<number, string> = {};

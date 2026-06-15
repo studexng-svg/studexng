@@ -10,10 +10,8 @@ import {
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import AdminTopBar from "@/components/layout/AdminTopBar";
-import { fetchWithAuth } from "@/lib/authStore";
+import { api } from "@/lib/api";
 import { GRAD, SERIF } from "@/lib/tokens";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 interface ActivityData {
   online_count: number;
@@ -102,7 +100,7 @@ function LiveActivity() {
 
   useEffect(() => {
     const fetch_ = () => {
-      fetchWithAuth(`${API_URL}/api/admin/activity/`)
+      api.admin.activity()
         .then(r => r.ok ? r.json() : Promise.reject())
         .then(d => setActivity(d))
         .catch(() => {});
@@ -175,7 +173,7 @@ export default function AdminDashboard() {
   const [refreshing, setRefreshing] = useState(false);
   const load = (manual = false) => {
     if (manual) setRefreshing(true);
-    return fetchWithAuth(`${API_URL}/api/admin/dashboard/`)
+    return api.admin.dashboard()
       .then(r => r.ok ? r.json() : Promise.reject())
       .then(d => setStats(d))
       .catch(() => {})

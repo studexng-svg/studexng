@@ -5,10 +5,8 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Package, Trash2, Eye, EyeOff } from "lucide-react";
 import AdminTopBar from "@/components/layout/AdminTopBar";
-import { fetchWithAuth } from "@/lib/authStore";
+import { api } from "@/lib/api";
 import { GRAD } from "@/lib/tokens";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 function Row({ label, value }: { label: string; value?: string | number | null }) {
   if (value === null || value === undefined || value === "") return null;
@@ -36,7 +34,7 @@ export default function AdminListingDetail() {
 
   useEffect(() => {
     if (!id) return;
-    fetchWithAuth(`${API_URL}/api/admin/listings/${id}/`)
+    api.admin.listing(id as string)
       .then(r => r.ok ? r.json() : Promise.reject())
       .then(d => {
         setListing(d);
@@ -52,10 +50,7 @@ export default function AdminListingDetail() {
   const patch = async (body: object) => {
     setSaving(true);
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/admin/listings/${id}/`, {
-        method: "PATCH",
-        body: JSON.stringify(body),
-      });
+      const res = await api.admin.updateListing(id as string, body as Record<string, unknown>);
       if (res.ok) setListing(await res.json());
     } catch {}
     finally { setSaving(false); }
@@ -69,7 +64,7 @@ export default function AdminListingDetail() {
   const deleteListing = async () => {
     if (!confirmDelete) { setConfirmDelete(true); return; }
     setSaving(true);
-    await fetchWithAuth(`${API_URL}/api/admin/listings/${id}/`, { method: "DELETE" });
+    await api.admin.deleteListing(id as string);
     router.replace("/admin/listings");
   };
 

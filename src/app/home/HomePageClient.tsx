@@ -13,13 +13,13 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { useAuth, fetchWithAuth } from "@/lib/authStore";
+import { useAuth } from "@/lib/authStore";
+import { api } from "@/lib/api";
 import { useWishlistStore } from "@/lib/wishlistStore";
 import { useCart } from "@/lib/cartStore";
 import { GRAD, GRAD_TEXT, SERIF } from "@/lib/tokens";
 import VendorOfMonthModal from "@/components/VendorOfMonthModal";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 interface Vendor {
   id: number;
@@ -142,7 +142,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
 
   const fetchDeals = useCallback(async (campus: string) => {
     try {
-      const res = await fetch(`${API_URL}/api/services/deals/?campus=${campus}`);
+      const res = await api.pub.deals(campus);
       if (res.ok) { const d = await res.json(); setDeals(Array.isArray(d) ? d : []); }
     } catch {}
     finally { setDealsReady(true); }
@@ -216,9 +216,9 @@ export default function HomePageClient({ initialVendors, initialListings, initia
     setCurrentCampus(campus); setCampusReady(false); setActiveFilter("All");
     try {
       const [l, v, c] = await Promise.all([
-        fetch(`${API_URL}/api/services/listings/?campus=${campus}&page_size=100`),
-        fetch(`${API_URL}/api/auth/vendors/?campus=${campus}&page_size=100`),
-        fetch(`${API_URL}/api/services/categories/?campus=${campus}`),
+        api.pub.listings({ campus, page_size: "100" }),
+        api.pub.vendors({ campus, page_size: "100" }),
+        api.pub.categories({ campus }),
       ]);
       if (l.ok) { const d = await l.json(); setAllListings(d.results || d || []); }
       if (v.ok) { const d = await v.json(); setVendors(d.results || d || []); }
@@ -244,9 +244,9 @@ export default function HomePageClient({ initialVendors, initialListings, initia
     const https = typeof window !== "undefined" && window.location.protocol === "https:";
     document.cookie = `studex_campus=${school}; path=/; max-age=31536000; SameSite=Lax${https ? "; Secure" : ""}`;
     Promise.all([
-      fetchWithAuth(`${API_URL}/api/services/listings/?campus=${school}&page_size=100`),
-      fetchWithAuth(`${API_URL}/api/auth/vendors/?campus=${school}&page_size=100`),
-      fetchWithAuth(`${API_URL}/api/services/categories/?campus=${school}`),
+      api.pub.listings({ campus: school, page_size: "100" }),
+      api.pub.vendors({ campus: school, page_size: "100" }),
+      api.pub.categories({ campus: school }),
     ]).then(async ([l, v, c]) => {
       if (l.ok) { const d = await l.json(); setAllListings(d.results || d || []); }
       if (v.ok) { const d = await v.json(); setVendors(d.results || d || []); }
@@ -259,8 +259,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
     const t = setTimeout(async () => {
       setSearching(true);
       try {
-        const url = `${API_URL}/api/services/listings/?search=${encodeURIComponent(searchQuery)}&page_size=20`;
-        const res = isLoggedIn ? await fetchWithAuth(url) : await fetch(url);
+        const res = await api.pub.listings({ search: searchQuery, page_size: "20" });
         const data = await res.json();
         setSearchResults(data.results || data || []); setShowResults(true);
       } catch { setSearchResults([]); } finally { setSearching(false); }

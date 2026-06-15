@@ -4,9 +4,7 @@
 import { DollarSign, Search, TrendingUp } from "lucide-react";
 import { useEffect, useState } from "react";
 import AdminTopBar from "@/components/layout/AdminTopBar";
-import { fetchWithAuth } from "@/lib/authStore";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+import { api } from "@/lib/api";
 
 interface EarningTotals {
   total_platform_fees: number;
@@ -40,9 +38,7 @@ export default function AdminPlatformEarningsPage() {
 
   const load = (s = search) => {
     setLoading(true);
-    let url = `${API_URL}/api/admin/platform-earnings/?`;
-    if (s) url += `search=${encodeURIComponent(s)}`;
-    fetchWithAuth(url)
+    api.admin.platformEarnings(s || undefined)
       .then(r => r.ok ? r.json() : Promise.reject())
       .then(d => setData(d))
       .catch(() => setData(null))

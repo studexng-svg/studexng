@@ -11,14 +11,13 @@ import {
   Shield, Share2
 } from "lucide-react";
 import TopNav from "@/components/layout/TopNav";
-import { useAuth, fetchWithAuth } from "@/lib/authStore";
+import { useAuth } from "@/lib/authStore";
 import { useCartStore } from "@/lib/cartStore";
+import { api } from "@/lib/api";
 import { GRAD, GRAD_TEXT, SERIF } from "@/lib/tokens";
 import VendorBadge from "@/components/VendorBadge";
 import ChatWindow from "@/components/ChatWindow";
 import { useAdminMode } from "@/hooks/useAdminMode";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 interface Review {
   id: number;
@@ -164,7 +163,7 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
   useEffect(() => {
     if (!listing?.vendor?.username) return;
     setVendorListingsLoading(true);
-    fetch(`${API_URL}/api/services/listings/?vendor_username=${listing.vendor.username}&page_size=12`)
+    api.pub.listings({ vendor_username: listing.vendor.username, page_size: "12" })
       .then(r => r.ok ? r.json() : Promise.reject())
       .then(d => {
         const items = (d.results || d || [])
@@ -182,7 +181,7 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
     const campus = listing?.campus;
     if (!slug || !campus) return;
     setSimilarLoading(true);
-    fetch(`${API_URL}/api/services/listings/?campus=${campus}&category=${slug}&page_size=8`)
+    api.pub.listings({ campus, category: slug, page_size: "8" })
       .then(r => r.ok ? r.json() : Promise.reject())
       .then(d => {
         const items = (d.results || d || [])
@@ -199,7 +198,7 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
     const campus = listing?.campus;
     if (!campus) return;
     setAlsoLikeLoading(true);
-    fetch(`${API_URL}/api/services/listings/?campus=${campus}&page_size=12`)
+    api.pub.listings({ campus, page_size: "12" })
       .then(r => r.ok ? r.json() : Promise.reject())
       .then(d => {
         const all = (d.results || d || []).filter((l: any) => l.id !== listing.id);
@@ -215,10 +214,7 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
     if (!isLoggedIn) { router.push("/auth"); return; }
 
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/cart/add/`, {
-        method: "POST",
-        body: JSON.stringify({ listing_id: listing.id, quantity: 1 }),
-      });
+      const res = await api.cart.add({ listing_id: listing.id, quantity: 1 });
 
       if (!res.ok) {
         const data = await res.json();
@@ -250,7 +246,7 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
     setBookingStep("confirming");
 
     try {
-      const freshRes = await fetch(`${API_URL}/api/services/listings/${listing!.id}/`);
+      const freshRes = await api.pub.listing(listing!.id);
       if (freshRes.ok) {
         const fresh = await freshRes.json();
         if (!fresh.is_available || (fresh.track_inventory && fresh.stock_quantity === 0)) {
@@ -263,15 +259,12 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
     } catch {}
 
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/orders/bookings/`, {
-        method: "POST",
-        body: JSON.stringify({
-          listing: listing!.id,
-          scheduled_date: bookingDate,
-          scheduled_time: bookingTime,
-          note: bookingNote,
-          location: bookingLocation.trim(),
-        }),
+      const res = await api.orders.createBooking({
+        listing: listing!.id,
+        scheduled_date: bookingDate,
+        scheduled_time: bookingTime,
+        note: bookingNote,
+        location: bookingLocation.trim(),
       });
       if (!res.ok) {
         const data = await res.json();
@@ -300,10 +293,7 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
     if (!listing) return;
     setAdminLoading("toggle");
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/admin/listings/${listing.id}/`, {
-        method: "PATCH",
-        body: JSON.stringify({ is_available: !listing.is_available }),
-      });
+      const res = await api.admin.updateListing(listing.id, { is_available: !listing.is_available });
       if (!res.ok) throw new Error("Failed to update listing");
       const updated = await res.json();
       setListing(prev => prev ? { ...prev, is_available: updated.is_available } : prev);
@@ -319,9 +309,7 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
     if (!confirmDelete) { setConfirmDelete(true); return; }
     setAdminLoading("delete");
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/admin/listings/${listing!.id}/`, {
-        method: "DELETE",
-      });
+      const res = await api.admin.deleteListing(listing!.id);
       if (!res.ok && res.status !== 204) throw new Error("Failed to delete listing");
       showToast("Listing deleted");
       setTimeout(() => router.back(), 1200);

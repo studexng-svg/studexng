@@ -4,10 +4,9 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Gift, Star, Loader } from "lucide-react";
 import TopNav from "@/components/layout/TopNav";
-import { useAuth, fetchWithAuth } from "@/lib/authStore";
+import { useAuth } from "@/lib/authStore";
 import { GRAD, SERIF } from "@/lib/tokens";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+import { api } from "@/lib/api";
 
 const MILESTONE = 10;
 const REWARD    = 200;
@@ -29,7 +28,7 @@ export default function LoyaltyPage() {
   useEffect(() => {
     if (isHydrated && !isLoggedIn) { router.push("/auth"); return; }
     if (!isHydrated || !isLoggedIn) return;
-    fetchWithAuth(`${API_URL}/api/loyalty/status/`)
+    api.loyalty.status()
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d) setData(d); })
       .finally(() => setLoading(false));

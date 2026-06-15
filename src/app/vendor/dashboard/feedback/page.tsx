@@ -1,12 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { fetchWithAuth } from "@/lib/authStore";
 import { GRAD } from "@/lib/tokens";
 import { Star } from "lucide-react";
 import { HEADING_FONT } from "../_shared";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+import { api } from "@/lib/api";
 
 export default function FeedbackPage() {
   const [rating, setRating] = useState(0);
@@ -20,10 +18,7 @@ export default function FeedbackPage() {
     if (!rating) { setError("Please select a rating."); return; }
     setSubmitting(true); setError("");
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/reviews/submit-app-feedback/`, {
-        method: "POST",
-        body: JSON.stringify({ feedback_type: "vendor", rating, comment }),
-      });
+      const res = await api.reviews.submitFeedback({ feedback_type: "vendor", rating, comment });
       if (res.ok) { setSent(true); }
       else {
         const d = await res.json();

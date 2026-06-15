@@ -1,12 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useAuth, fetchWithAuth } from "@/lib/authStore";
+import { useAuth } from "@/lib/authStore";
 import { GRAD, toArray } from "@/lib/tokens";
 import { Plus, Edit2, Trash2, Loader, ToggleLeft, ToggleRight, X } from "lucide-react";
 import { EmptyState, LoadingSpinner, HEADING_FONT } from "../_shared";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+import { api } from "@/lib/api";
 
 export default function ListingsPage() {
   const { user } = useAuth();
@@ -30,7 +29,7 @@ export default function ListingsPage() {
   const loadListings = async () => {
     if (!user?.username) return;
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/services/listings/?vendor_username=${user.username}`);
+      const res = await api.services.listingsAuth({ vendor_username: user.username });
       const data = await res.json();
       setListings(toArray(data));
     } catch {} finally { setLoading(false); }
@@ -38,7 +37,7 @@ export default function ListingsPage() {
 
   const loadCategories = async () => {
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/services/categories/`);
+      const res = await api.services.categoriesAuth();
       setCategories(toArray(await res.json()));
     } catch {}
   };
@@ -82,10 +81,9 @@ export default function ListingsPage() {
       const slots = ['image', 'image2', 'image3', 'image4', 'image5'];
       form.images.forEach((file, i) => { if (file) fd.append(slots[i], file); });
 
-      const url = editing
-        ? `${API_URL}/api/services/listings/${editing.id}/`
-        : `${API_URL}/api/services/listings/`;
-      const res = await fetchWithAuth(url, { method: editing ? "PATCH" : "POST", body: fd });
+      const res = editing
+        ? await api.services.updateListing(editing.id, fd)
+        : await api.services.createListing(fd);
       if (res.ok) { showToast(editing ? "Updated!" : "Created!"); resetForm(); loadListings(); }
       else showToast("Failed to save.");
     } catch { showToast("Error."); } finally { setSaving(false); }
@@ -94,7 +92,7 @@ export default function ListingsPage() {
   const handleDelete = async (id: number) => {
     setDeleting(true);
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/services/listings/${id}/`, { method: "DELETE" });
+      const res = await api.services.deleteListing(id);
       if (res.ok || res.status === 204) { showToast("Listing deleted."); loadListings(); }
       else showToast("Could not delete. Try again.");
     } catch { showToast("Error deleting listing."); }

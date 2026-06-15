@@ -10,10 +10,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useAuth, fetchWithAuth } from "@/lib/authStore";
+import { useAuth } from "@/lib/authStore";
 import { GRAD, GRAD_TEXT, SERIF } from "@/lib/tokens";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+import { api } from "@/lib/api";
 
 function VerifiedTick({ color, label }: { color: string; label: string }) {
   return (
@@ -168,7 +167,7 @@ export default function AccountPage() {
 
   const pollStatus = useCallback(async () => {
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/notifications/status/`);
+      const res = await api.notifications.status();
       if (!res.ok) return;
       const data = await res.json();
       setNotifications(data.notifications || []);
@@ -194,7 +193,7 @@ export default function AccountPage() {
         const cu = useAuth.getState().user;
         if (isApprovedVendor(cu)) {
           try {
-            const r = await fetchWithAuth(`${API_URL}/api/payments/seller/bank-account/`);
+            const r = await api.payments.bankAccount();
             if (r.ok && !cancelled) { const d = await r.json(); setHasBankAccount(!!d?.account_number); }
           } catch {}
         }
@@ -208,14 +207,14 @@ export default function AccountPage() {
 
   const handleLogout = async () => {
     if (pollTimer.current) clearInterval(pollTimer.current);
-    try { await fetchWithAuth(`${API_URL}/api/auth/logout/`, { method: 'POST' }); } catch {}
+    try { await api.auth.logout(); } catch {}
     logout();
     router.push("/auth");
   };
 
   const markAllRead = async () => {
     try {
-      await fetchWithAuth(`${API_URL}/api/notifications/read-all/`, { method: "POST" });
+      await api.notifications.markAllRead();
       setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
       setUnreadNotifications(0);
     } catch {}
@@ -224,7 +223,7 @@ export default function AccountPage() {
   const handleNotifClick = async (n: any) => {
     if (!n.is_read) {
       try {
-        await fetchWithAuth(`${API_URL}/api/notifications/${n.id}/read/`, { method: "POST" });
+        await api.notifications.markRead(n.id);
         setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, is_read: true } : x));
         setUnreadNotifications(prev => Math.max(0, prev - 1));
       } catch {}
@@ -249,7 +248,7 @@ export default function AccountPage() {
     try {
       const formData = new FormData();
       formData.append("profile_image", blob, "profile.jpg");
-      const res = await fetchWithAuth(`${API_URL}/api/auth/profile/update/`, { method: "PATCH", body: formData });
+      const res = await api.auth.updateProfile(formData);
       if (!res.ok) throw new Error("Upload failed");
       const data = await res.json();
       const newPic = data.profile_image || data.user?.profile_image;
@@ -262,7 +261,7 @@ export default function AccountPage() {
   const handleDeletePic = async () => {
     setViewModalOpen(false); setUploading(true);
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/auth/profile/update/`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ profile_image: null }) });
+      const res = await api.auth.updateProfile({ profile_image: null });
       if (!res.ok) throw new Error();
       setProfilePic(null); useAuth.getState().updateUser({ profile_image: null });
       showToast("Profile photo removed");

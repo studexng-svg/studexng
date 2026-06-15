@@ -3,10 +3,8 @@
 
 import { useEffect, useState } from "react";
 import AdminTopBar from "@/components/layout/AdminTopBar";
-import { fetchWithAuth } from "@/lib/authStore";
+import { api } from "@/lib/api";
 import { GRAD } from "@/lib/tokens";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 interface RewardUser {
   username: string;
@@ -34,7 +32,7 @@ export default function AdminRewardsPage() {
   const [filter, setFilter] = useState<"all" | "credits" | "discount">("all");
 
   useEffect(() => {
-    fetchWithAuth(`${API_URL}/api/admin/rewards-overview/`)
+    api.admin.rewardsOverview()
       .then(r => r.ok ? r.json() : null)
       .then(d => {
         if (d) { setSummary(d.summary); setUsers(d.users); }

@@ -5,10 +5,8 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AlertTriangle } from "lucide-react";
 import AdminTopBar from "@/components/layout/AdminTopBar";
-import { fetchWithAuth } from "@/lib/authStore";
+import { api } from "@/lib/api";
 import { GRAD } from "@/lib/tokens";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 const STATUS_STYLE: Record<string, string> = {
   open:         "bg-red-100 text-red-700",
@@ -38,7 +36,7 @@ export default function AdminDisputeDetail() {
 
   useEffect(() => {
     if (!id) return;
-    fetchWithAuth(`${API_URL}/api/admin/disputes/${id}/`)
+    api.admin.dispute(id as string)
       .then(r => r.ok ? r.json() : Promise.reject())
       .then(d => { setDispute(d); setDecision(d.admin_decision || ""); })
       .catch(() => {})
@@ -49,10 +47,7 @@ export default function AdminDisputeDetail() {
     if (!decision.trim()) { alert("Please enter an admin decision note first."); return; }
     setSaving(true);
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/admin/disputes/${id}/`, {
-        method: "PATCH",
-        body: JSON.stringify({ status: "resolved", resolution, admin_decision: decision }),
-      });
+      const res = await api.admin.updateDispute(id as string, { status: "resolved", resolution, admin_decision: decision });
       if (res.ok) setDispute(await res.json());
     } catch {}
     finally { setSaving(false); }
@@ -61,10 +56,7 @@ export default function AdminDisputeDetail() {
   const markUnderReview = async () => {
     setSaving(true);
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/admin/disputes/${id}/`, {
-        method: "PATCH",
-        body: JSON.stringify({ status: "under_review" }),
-      });
+      const res = await api.admin.updateDispute(id as string, { status: "under_review" });
       if (res.ok) setDispute(await res.json());
     } catch {}
     finally { setSaving(false); }

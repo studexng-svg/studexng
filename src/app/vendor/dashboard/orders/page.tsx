@@ -1,12 +1,10 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { fetchWithAuth } from "@/lib/authStore";
 import { GRAD, toArray } from "@/lib/tokens";
 import { ShoppingBag, MapPin, Camera, X, ImagePlus } from "lucide-react";
 import { StatusBadge, EmptyState, LoadingSpinner, HEADING_FONT } from "../_shared";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+import { api } from "@/lib/api";
 
 function ProofModal({ order, onSuccess, onClose }: {
   order: any;
@@ -39,10 +37,7 @@ function ProofModal({ order, onSuccess, onClose }: {
       const fd = new FormData();
       fd.append("proof_1", files[0]);
       if (files[1]) fd.append("proof_2", files[1]);
-      const res = await fetchWithAuth(
-        `${API_URL}/api/orders/orders/${order.id}/mark-complete/`,
-        { method: "PATCH", body: fd }
-      );
+      const res = await api.orders.markComplete(order.id, fd);
       const data = await res.json();
       if (!res.ok) { setError(data.detail || "Could not mark complete."); return; }
       onSuccess(order.id);
@@ -128,7 +123,7 @@ export default function OrdersPage() {
   useEffect(() => {
     const load = async () => {
       try {
-        const res = await fetchWithAuth(`${API_URL}/api/orders/orders/`);
+        const res = await api.orders.list();
         const data = await res.json();
         setOrders(toArray(data));
       } catch {} finally { setLoading(false); }
@@ -139,7 +134,7 @@ export default function OrdersPage() {
   const markComplete = async (orderId: number) => {
     setMarking(orderId); setError("");
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/orders/orders/${orderId}/mark-complete/`, { method: "PATCH" });
+      const res = await api.orders.markComplete(orderId);
       const data = await res.json();
       if (!res.ok) { setError(data.detail || data.error || "Could not mark complete."); return; }
       setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: "seller_completed" } : o));

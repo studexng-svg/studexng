@@ -5,9 +5,7 @@ import { CreditCard, Search, ToggleLeft, ToggleRight } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import AdminTopBar from "@/components/layout/AdminTopBar";
-import { fetchWithAuth, fetchAllPages } from "@/lib/authStore";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+import { api, fetchAllPages, BASE_URL } from "@/lib/api";
 
 export default function AdminBankAccountsPage() {
   const router = useRouter();
@@ -18,7 +16,7 @@ export default function AdminBankAccountsPage() {
 
   const load = (s = search) => {
     setLoading(true);
-    let url = `${API_URL}/api/admin/bank-accounts/?`;
+    let url = `${BASE_URL}/api/admin/bank-accounts/?`;
     if (s) url += `search=${encodeURIComponent(s)}`;
     fetchAllPages(url)
       .then(d => setAccounts(d))
@@ -31,10 +29,7 @@ export default function AdminBankAccountsPage() {
   const toggleActive = async (account: any) => {
     setToggling(account.id);
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/admin/bank-accounts/${account.id}/`, {
-        method: "PATCH",
-        body: JSON.stringify({ is_active: !account.is_active }),
-      });
+      const res = await api.admin.updateBankAccount(account.id, { is_active: !account.is_active });
       if (res.ok) {
         const updated = await res.json();
         setAccounts(prev => prev.map(a => a.id === updated.id ? { ...a, is_active: updated.is_active } : a));

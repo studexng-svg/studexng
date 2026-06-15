@@ -7,9 +7,7 @@ import {
   History, Trash2, PackageCheck, ChevronDown,
 } from "lucide-react";
 import AdminTopBar from "@/components/layout/AdminTopBar";
-import { fetchWithAuth } from "@/lib/authStore";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+import { api } from "@/lib/api";
 
 type ActionType = "send_notification" | "verify_vendor" | "generate_report" | "set_listing_status" | "lookup_user" | "lookup_order" | "lookup_conversation";
 
@@ -283,7 +281,7 @@ export default function AdminAIPage() {
   const loadHistory = useCallback(async () => {
     setLoadingHistory(true);
     try {
-      const res  = await fetchWithAuth(`${API_URL}/api/admin/ai-history/`);
+      const res  = await api.admin.aiHistory();
       const data = await res.json();
       if (res.ok) setSessions(data);
     } catch {}
@@ -303,10 +301,7 @@ export default function AdminAIPage() {
     const payload   = messages.map(m => ({ id: m.id, role: m.role, content: m.content }));
     try {
       setSaving(true);
-      await fetchWithAuth(`${API_URL}/api/admin/ai-history/`, {
-        method: "POST",
-        body: JSON.stringify({ title, messages: payload }),
-      });
+      await api.admin.saveAiHistory({ title, messages: payload });
     } catch {}
     finally { setSaving(false); }
   };
@@ -319,7 +314,7 @@ export default function AdminAIPage() {
 
   const loadSession = async (id: number) => {
     try {
-      const res  = await fetchWithAuth(`${API_URL}/api/admin/ai-history/${id}/`);
+      const res  = await api.admin.aiSession(id);
       const data = await res.json();
       if (res.ok && data.messages) {
         setMessages(data.messages as Message[]);
@@ -330,7 +325,7 @@ export default function AdminAIPage() {
 
   const deleteSession = async (id: number) => {
     try {
-      await fetchWithAuth(`${API_URL}/api/admin/ai-history/${id}/`, { method: "DELETE" });
+      await api.admin.deleteAiSession(id);
       setSessions(prev => prev.filter(s => s.id !== id));
     } catch {}
   };
@@ -347,11 +342,8 @@ export default function AdminAIPage() {
     inputRef.current?.focus();
 
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/admin/ai-chat/`, {
-        method: "POST",
-        body: JSON.stringify({
-          messages: next.map(m => ({ role: m.role, content: m.content })),
-        }),
+      const res = await api.admin.aiChat({
+        messages: next.map(m => ({ role: m.role, content: m.content })),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "AI error");
@@ -369,10 +361,7 @@ export default function AdminAIPage() {
       if (data.action?.type && AUTO_EXECUTE.includes(data.action.type)) {
         setMessages(prev => [...prev, { ...aiMsg, actionStatus: "dismissed" }]);
         try {
-          const lookupRes  = await fetchWithAuth(`${API_URL}/api/admin/ai-action/`, {
-            method: "POST",
-            body: JSON.stringify({ type: "lookup_user", params: data.action.params }),
-          });
+          const lookupRes  = await api.admin.aiAction({ type: "lookup_user", params: data.action.params });
           const lookupData = await lookupRes.json();
           const resultText = lookupData.detail || "No result";
 
@@ -387,11 +376,8 @@ export default function AdminAIPage() {
           setMessages(withLookup);
 
           // Call AI again with the lookup data so it can give a proper answer
-          const res2 = await fetchWithAuth(`${API_URL}/api/admin/ai-chat/`, {
-            method: "POST",
-            body: JSON.stringify({
-              messages: withLookup.map(m => ({ role: m.role, content: m.content })),
-            }),
+          const res2 = await api.admin.aiChat({
+            messages: withLookup.map(m => ({ role: m.role, content: m.content })),
           });
           const data2 = await res2.json();
           if (!res2.ok) throw new Error(data2.error || "AI error");
@@ -437,10 +423,7 @@ export default function AdminAIPage() {
     ));
 
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/admin/ai-action/`, {
-        method: "POST",
-        body: JSON.stringify({ type: action.type, params: finalParams }),
-      });
+      const res = await api.admin.aiAction({ type: action.type, params: finalParams });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Action failed");
       setMessages(prev => prev.map(m =>

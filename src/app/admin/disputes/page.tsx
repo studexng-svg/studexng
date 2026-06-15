@@ -5,10 +5,8 @@ import { AlertTriangle, Search } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import AdminTopBar from "@/components/layout/AdminTopBar";
-import { fetchAllPages } from "@/lib/authStore";
+import { fetchAllPages, BASE_URL } from "@/lib/api";
 import { CampusPills, type Campus } from "@/components/admin/CampusPills";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 const STATUS_STYLE: Record<string, string> = {
   open:         "bg-red-100 text-red-700",
@@ -36,7 +34,7 @@ export default function AdminDisputesPage() {
 
   const load = (s = search, st = tab, c = campus, silent = false) => {
     if (!silent) setLoading(true);
-    let url = `${API_URL}/api/admin/disputes/?`;
+    let url = `${BASE_URL}/api/admin/disputes/?`;
     if (st) url += `status=${st}&`;
     if (s) url += `search=${encodeURIComponent(s)}&`;
     if (c) url += `campus=${c}`;

@@ -4,10 +4,8 @@
 import { Star, Search, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import AdminTopBar from "@/components/layout/AdminTopBar";
-import { fetchWithAuth, fetchAllPages } from "@/lib/authStore";
+import { api, fetchAllPages, BASE_URL } from "@/lib/api";
 import { CampusPills, type Campus } from "@/components/admin/CampusPills";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 function StarRating({ rating }: { rating: number }) {
   return (
@@ -29,7 +27,7 @@ export default function AdminReviewsPage() {
 
   const load = (s = search, c = campus) => {
     setLoading(true);
-    let url = `${API_URL}/api/admin/reviews/?`;
+    let url = `${BASE_URL}/api/admin/reviews/?`;
     if (s) url += `search=${encodeURIComponent(s)}&`;
     if (c) url += `campus=${c}`;
     fetchAllPages(url)
@@ -45,7 +43,7 @@ export default function AdminReviewsPage() {
     setDeleting(id);
     setConfirmId(null);
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/admin/reviews/${id}/`, { method: "DELETE" });
+      const res = await api.admin.deleteReview(id);
       if (res.status === 204 || res.ok) {
         setReviews(prev => prev.filter(r => r.id !== id));
       }

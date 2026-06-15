@@ -1,12 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { fetchWithAuth } from "@/lib/authStore";
 import { GRAD, toArray } from "@/lib/tokens";
 import { History, TrendingUp, Download, Calendar, User, Package } from "lucide-react";
 import { EmptyState, LoadingSpinner, HEADING_FONT } from "../_shared";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+import { api } from "@/lib/api";
 
 type DateFilter = "all" | "week" | "month";
 
@@ -21,8 +19,8 @@ export default function HistoryPage() {
     const load = async () => {
       try {
         const [ordersRes, bookingsRes] = await Promise.all([
-          fetchWithAuth(`${API_URL}/api/orders/orders/`),
-          fetchWithAuth(`${API_URL}/api/orders/bookings/`),
+          api.orders.list(),
+          api.orders.bookings(),
         ]);
         if (ordersRes.ok) {
           const data = toArray(await ordersRes.json());

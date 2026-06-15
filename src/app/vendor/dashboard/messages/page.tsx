@@ -1,12 +1,11 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useAuth, fetchWithAuth } from "@/lib/authStore";
+import { useAuth } from "@/lib/authStore";
 import { GRAD, toArray } from "@/lib/tokens";
 import { ArrowLeft, MessageCircle, Check, CheckCheck, Send, Loader } from "lucide-react";
 import { LoadingSpinner, EmptyState } from "../_shared";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+import { api } from "@/lib/api";
 
 function getDayLabel(dateStr: string) {
   const d = new Date(dateStr);
@@ -49,7 +48,7 @@ export default function MessagesPage() {
 
   const loadConversations = async () => {
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/chat/conversations/`);
+      const res = await api.chat.conversations();
       const data = await res.json();
       setConversations(toArray(data));
     } catch {} finally { setLoading(false); }
@@ -57,7 +56,7 @@ export default function MessagesPage() {
 
   const loadMessages = async (id: number) => {
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/chat/conversations/${id}/messages/`);
+      const res = await api.chat.messages(id);
       const data = await res.json();
       const raw = toArray(data);
       const currentUsername = user?.username;
@@ -72,10 +71,7 @@ export default function MessagesPage() {
     if (!text.trim() || !activeConv || sending) return;
     setSending(true);
     try {
-      await fetchWithAuth(`${API_URL}/api/chat/conversations/${activeConv.id}/send/`, {
-        method: "POST",
-        body: JSON.stringify({ content: text, message_type: "text" }),
-      });
+      await api.chat.send(activeConv.id, { content: text, message_type: "text" });
       setText("");
       loadMessages(activeConv.id);
     } catch {} finally { setSending(false); }

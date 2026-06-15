@@ -10,10 +10,11 @@ import {
   ChevronRight, Hourglass, Ban,
 } from "lucide-react";
 import TopNav from "@/components/layout/TopNav";
-import { useAuth, fetchWithAuth } from "@/lib/authStore";
+import { useAuth } from "@/lib/authStore";
+import { api } from "@/lib/api";
 import { GRAD, SERIF, toArray, calcServiceFee } from "@/lib/tokens";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+
 
 interface Booking {
   id: number;
@@ -104,7 +105,7 @@ export default function BuyerBookingsPage() {
 
   useEffect(() => {
     if (!isLoggedIn) return;
-    fetchWithAuth(`${API_URL}/api/loyalty/status/`)
+    api.loyalty.status()
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d) setLoyaltyBalance(parseFloat(d.credit_balance) || 0); })
       .catch(() => {});
@@ -115,7 +116,7 @@ export default function BuyerBookingsPage() {
     setLoading(true);
     setError("");
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/orders/bookings/`);
+      const res = await api.orders.bookings();
       if (!res.ok) throw new Error("Failed to load bookings");
       const data = await res.json();
       const all: Booking[] = toArray(data);
@@ -135,7 +136,7 @@ export default function BuyerBookingsPage() {
   const cancelBooking = async (id: number) => {
     if (!confirm("Are you sure you want to cancel this booking?")) return;
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/orders/bookings/${id}/cancel/`, { method: "POST" });
+      const res = await api.orders.bookingAction(id, "cancel");
       if (res.ok) { showToast("Booking cancelled."); loadBookings(); }
       else showToast("Could not cancel. Try again.", false);
     } catch { showToast("Error cancelling booking.", false); }
@@ -158,10 +159,7 @@ export default function BuyerBookingsPage() {
       setPayingId(null);
       setVerifying(true);
       try {
-        const res = await fetchWithAuth(`${API_URL}/api/payments/pay-with-credits/`, {
-          method: "POST",
-          body: JSON.stringify({ listing_id: activeBooking.listing }),
-        });
+        const res = await api.payments.payWithCredits({ listing_id: activeBooking.listing });
         const data = await res.json();
         if (res.ok && data.order_id) {
           setVerifying(false);
@@ -194,12 +192,9 @@ export default function BuyerBookingsPage() {
     setVerifying(true);
     let accessCode: string, reference: string, amountKobo: number, appliedCredits = 0;
     try {
-      const initRes = await fetchWithAuth(`${API_URL}/api/payments/initialize/`, {
-        method: "POST",
-        body: JSON.stringify({
-          listing_id: bookingToCharge.listing,
-          ...(useCredits && creditsToApply > 0 ? { use_credits: true } : {}),
-        }),
+      const initRes = await api.payments.initialize({
+        listing_id: bookingToCharge.listing,
+        ...(useCredits && creditsToApply > 0 ? { use_credits: true } : {}),
       });
       const initData = await initRes.json();
       if (!initRes.ok) throw new Error(initData.error || "Failed to initialize payment");
@@ -229,16 +224,13 @@ export default function BuyerBookingsPage() {
           // Payment successful — verify and create the order (same as checkout page)
           setVerifying(true);
           try {
-            const res = await fetchWithAuth(`${API_URL}/api/payments/verify/`, {
-              method: "POST",
-              body: JSON.stringify({
-                reference: response.reference,
-                transaction_id: response.reference,
-                listing_id: bookingToCharge.listing,
-                order_type: "service",
-                use_credits: appliedCredits > 0,
-                credits_applied: appliedCredits,
-              }),
+            const res = await api.payments.verify({
+              reference: response.reference,
+              transaction_id: response.reference,
+              listing_id: bookingToCharge.listing,
+              order_type: "service",
+              use_credits: appliedCredits > 0,
+              credits_applied: appliedCredits,
             });
             const data = await res.json();
             if (res.ok && data.order_id) {

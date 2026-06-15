@@ -5,10 +5,8 @@ import { MessageCircle, Search, ChevronRight } from "lucide-react";
 import AdminTopBar from "@/components/layout/AdminTopBar";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { fetchAllPages } from "@/lib/authStore";
+import { fetchAllPages, BASE_URL } from "@/lib/api";
 import { CampusPills, type Campus } from "@/components/admin/CampusPills";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 function timeAgo(iso: string) {
   const diff = Date.now() - new Date(iso).getTime();
@@ -30,7 +28,7 @@ export default function AdminConversationsPage() {
 
   const load = useCallback((s = search, c = campus, silent = false) => {
     if (!silent) setLoading(true);
-    let url = `${API_URL}/api/admin/conversations/?`;
+    let url = `${BASE_URL}/api/admin/conversations/?`;
     if (s) url += `search=${encodeURIComponent(s)}&`;
     if (c) url += `campus=${c}`;
     fetchAllPages(url)

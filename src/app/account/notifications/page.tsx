@@ -10,10 +10,9 @@ import {
   AlarmClock, Package, ShoppingBag, Tag, Store, FileText, MessageCircle,
 } from "lucide-react";
 import TopNav from "@/components/layout/TopNav";
-import { useAuth, fetchWithAuth } from "@/lib/authStore";
+import { useAuth } from "@/lib/authStore";
 import { GRAD, SERIF } from "@/lib/tokens";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+import { api } from "@/lib/api";
 
 interface Notification {
   id: number;
@@ -98,7 +97,7 @@ export default function NotificationsPage() {
 
   const fetchNotifications = useCallback(async () => {
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/notifications/`);
+      const res = await api.notifications.list();
       if (!res.ok) return;
       const data = await res.json();
       setNotifications(data.notifications || []);
@@ -116,7 +115,7 @@ export default function NotificationsPage() {
 
   const markAllRead = async () => {
     try {
-      await fetchWithAuth(`${API_URL}/api/notifications/read-all/`, { method: "POST" });
+      await api.notifications.markAllRead();
       setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
       setUnreadCount(0);
     } catch {}
@@ -125,7 +124,7 @@ export default function NotificationsPage() {
   const handleClick = async (n: Notification) => {
     if (!n.is_read) {
       try {
-        await fetchWithAuth(`${API_URL}/api/notifications/${n.id}/read/`, { method: "POST" });
+        await api.notifications.markRead(n.id);
         setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, is_read: true } : x));
         setUnreadCount(prev => Math.max(0, prev - 1));
       } catch {}

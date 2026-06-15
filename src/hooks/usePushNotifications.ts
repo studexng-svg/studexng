@@ -2,9 +2,9 @@
 
 import { useEffect } from "react";
 import { useAuth, getToken as getAuthToken } from "@/lib/authStore";
+import { api } from "@/lib/api";
 import { getFirebaseMessaging } from "@/lib/firebase";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 const VAPID_KEY = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
 
 export function usePushNotifications() {
@@ -38,17 +38,9 @@ export function usePushNotifications() {
           return;
         }
 
-        const authToken = getAuthToken();
-        if (!authToken) return;
+        if (!getAuthToken()) return;
 
-        const res = await fetch(`${API_URL}/api/notifications/fcm-token/`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${authToken}`,
-          },
-          body: JSON.stringify({ token: fcmToken }),
-        });
+        const res = await api.notifications.registerToken(fcmToken);
 
         if (!res.ok) {
           console.warn("[FCM] Token save failed:", res.status);

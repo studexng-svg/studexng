@@ -10,7 +10,8 @@ import {
 import TopNav from "@/components/layout/TopNav";
 import { useState, useEffect } from "react";
 import { useCartStore } from "@/lib/cartStore";
-import { useAuth, fetchWithAuth } from "@/lib/authStore";
+import { useAuth } from "@/lib/authStore";
+import { api } from "@/lib/api";
 import { useWishlistStore } from "@/lib/wishlistStore";
 import ChatWindow from "@/components/ChatWindow";
 import { GRAD, SERIF } from "@/lib/tokens";
@@ -166,10 +167,9 @@ export default function CategoryPageClient({ slug, initialListings, initialNextP
       return;
     }
 
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
     const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
     document.cookie = `studex_campus=${userSchool}; path=/; max-age=31536000; SameSite=Lax${isHttps ? '; Secure' : ''}`;
-    fetchWithAuth(`${API_URL}/api/services/listings/?category=${slug}&campus=${userSchool}&page_size=100`)
+    api.services.listingsAuth({ category: slug, campus: userSchool, page_size: "100" })
       .then(async (res) => {
         if (res.ok) {
           const data = await res.json();
@@ -190,7 +190,7 @@ export default function CategoryPageClient({ slug, initialListings, initialNextP
     if (!nextPage || loadingMore) return;
     setLoadingMore(true);
     try {
-      const res = isLoggedIn ? await fetchWithAuth(nextPage) : await fetch(nextPage);
+      const res = await fetch(nextPage);
       if (res.ok) {
         const data = await res.json();
         setListings(prev => [...prev, ...(data.results || [])]);
@@ -222,16 +222,11 @@ export default function CategoryPageClient({ slug, initialListings, initialNextP
     return () => observer.disconnect();
   }, [nextPage, loadingMore, mounted, isLoggedIn]);
 
-  const API_URL_LOCAL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
-
   const handleAddToCart = async (listing: Listing) => {
     if (!isLoggedIn) { router.push("/auth"); return; }
 
     try {
-      const res = await fetchWithAuth(`${API_URL_LOCAL}/api/cart/add/`, {
-        method: "POST",
-        body: JSON.stringify({ listing_id: listing.id, quantity: 1 }),
-      });
+      const res = await api.cart.add({ listing_id: listing.id, quantity: 1 });
 
       if (!res.ok) {
         const data = await res.json();

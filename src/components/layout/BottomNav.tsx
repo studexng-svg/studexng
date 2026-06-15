@@ -7,9 +7,8 @@ import { motion } from "framer-motion";
 import { Home, Grid3x3, ShoppingCart, MessageCircle, User } from "lucide-react";
 import Image from "next/image";
 import { useState, useEffect } from "react";
-import { useAuth, fetchWithAuth } from "@/lib/authStore";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+import { useAuth } from "@/lib/authStore";
+import { api } from "@/lib/api";
 
 const navItems = [
   { href: "/home",       icon: Home,          label: "Home"     },
@@ -33,7 +32,7 @@ export default function BottomNav() {
     if (!isLoggedIn) return;
     const fetchUnread = async () => {
       try {
-        const res = await fetchWithAuth(`${API_URL}/api/chat/conversations/`);
+        const res = await api.chat.conversations();
         if (!res.ok) return;
         const data = await res.json();
         const convs = data.results || data;

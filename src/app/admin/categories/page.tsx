@@ -4,10 +4,8 @@
 import { Tag, Trash2, Plus, Edit2, Check, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import AdminTopBar from "@/components/layout/AdminTopBar";
-import { fetchWithAuth } from "@/lib/authStore";
+import { api } from "@/lib/api";
 import { GRAD } from "@/lib/tokens";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 const CAMPUS_LABEL: Record<string, string> = {
   pau:  "PAU",
@@ -42,7 +40,7 @@ export default function AdminCategoriesPage() {
 
   const load = () => {
     setLoading(true);
-    fetchWithAuth(`${API_URL}/api/admin/categories/`)
+    api.admin.categories()
       .then(r => r.ok ? r.json() : Promise.reject())
       .then(d => setCategories(Array.isArray(d) ? d : []))
       .catch(() => {})
@@ -55,10 +53,7 @@ export default function AdminCategoriesPage() {
     if (!newTitle.trim()) return;
     setSaving(true);
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/admin/categories/`, {
-        method: "POST",
-        body: JSON.stringify({ title: newTitle.trim(), campus: newCampus }),
-      });
+      const res = await api.admin.createCategory({ title: newTitle.trim(), campus: newCampus });
       if (res.ok) {
         const cat = await res.json();
         setCategories(prev => [...prev, { ...cat, listing_count: 0 }]);
@@ -72,10 +67,7 @@ export default function AdminCategoriesPage() {
   const saveEdit = async (id: number) => {
     setSaving(true);
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/admin/categories/${id}/`, {
-        method: "PATCH",
-        body: JSON.stringify({ title: editTitle.trim(), campus: editCampus }),
-      });
+      const res = await api.admin.updateCategory(id, { title: editTitle.trim(), campus: editCampus });
       if (res.ok) {
         const updated = await res.json();
         setCategories(prev => prev.map(c => c.id === id ? { ...c, title: updated.title, campus: updated.campus } : c));
@@ -90,7 +82,7 @@ export default function AdminCategoriesPage() {
     setDeletingId(id);
     setConfirmId(null);
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/admin/categories/${id}/`, { method: "DELETE" });
+      const res = await api.admin.deleteCategory(id);
       if (res.status === 204 || res.ok) {
         setCategories(prev => prev.filter(c => c.id !== id));
       }

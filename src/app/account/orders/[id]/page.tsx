@@ -5,12 +5,11 @@ import {
   Package, CheckCircle, Clock, AlertCircle, MessageCircle, XCircle, MapPin,
 } from "lucide-react";
 import { useState, useEffect } from "react";
-import { useAuth, fetchWithAuth } from "@/lib/authStore";
+import { useAuth } from "@/lib/authStore";
 import { GRAD, SERIF } from "@/lib/tokens";
 import ReviewForm from "@/components/ReviewForm";
 import TopNav from "@/components/layout/TopNav";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+import { api } from "@/lib/api";
 
 function useElapsed(isoDate?: string | null) {
   const [elapsed, setElapsed] = useState("");
@@ -77,7 +76,7 @@ export default function OrderDetailPage() {
 
   const fetchLoyalty = async () => {
     try {
-      const r = await fetchWithAuth(`${API_URL}/api/loyalty/status/`);
+      const r = await api.loyalty.status();
       if (r.ok) setLoyalty(await r.json());
     } catch {}
   };
@@ -90,13 +89,13 @@ export default function OrderDetailPage() {
 
     const load = async () => {
       try {
-        const orderRes = await fetchWithAuth(`${API_URL}/api/orders/orders/${orderId}/`);
+        const orderRes = await api.orders.get(orderId);
         if (orderRes.status === 404) { setError("not_found"); return; }
         if (!orderRes.ok) throw new Error();
         const data = await orderRes.json();
         setOrder(data);
         if (data.status === "completed") {
-          const rv = await fetchWithAuth(`${API_URL}/api/reviews/reviews/can-review/${orderId}/`);
+          const rv = await api.reviews.canReview(orderId);
           if (rv.ok) { const d = await rv.json(); setCanReview(d.can_review); }
         }
       } catch { setError("failed"); }
@@ -106,7 +105,7 @@ export default function OrderDetailPage() {
 
     const interval = setInterval(async () => {
       try {
-        const res = await fetchWithAuth(`${API_URL}/api/orders/orders/${orderId}/`);
+        const res = await api.orders.get(orderId);
         if (res.ok) setOrder(await res.json());
       } catch {}
     }, 15000);
@@ -117,7 +116,7 @@ export default function OrderDetailPage() {
     if (!order) return;
     setConfirming(true);
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/orders/orders/${orderId}/confirm/`, { method: "POST" });
+      const res = await api.orders.confirm(orderId);
       if (res.ok) {
         const data = await res.json();
         setOrder(prev => prev ? { ...prev, status: "completed" } : null);
@@ -136,14 +135,11 @@ export default function OrderDetailPage() {
     setDisputing(true);
     setDisputeError("");
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/orders/disputes/`, {
-        method: "POST",
-        body: JSON.stringify({
-          order: order.id,
-          reason: disputeReason,
-          complaint: disputeComplaint.trim(),
-          evidence: disputeEvidence.trim(),
-        }),
+      const res = await api.orders.createDispute({
+        order: order.id,
+        reason: disputeReason,
+        complaint: disputeComplaint.trim(),
+        evidence: disputeEvidence.trim(),
       });
       if (res.ok) {
         setOrder(prev => prev ? { ...prev, status: "disputed" } : null);
@@ -160,10 +156,7 @@ export default function OrderDetailPage() {
   const handleOpenChat = async () => {
     if (!order) return;
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/chat/conversations/`, {
-        method: "POST",
-        body: JSON.stringify({ listing_id: order.listing?.id, seller_id: order.listing?.vendor?.id }),
-      });
+      const res = await api.chat.start({ listing_id: order.listing?.id, seller_id: order.listing?.vendor?.id });
       if (res.ok) { const data = await res.json(); router.push(`/chat/${data.id}`); }
     } catch { router.push("/chat"); }
   };

@@ -3,9 +3,7 @@
 import { Trash2, Plus, Loader2, Search, Tag, Pencil, Check, X, ToggleLeft, ToggleRight, Store, Clock } from "lucide-react";
 import AdminTopBar from "@/components/layout/AdminTopBar";
 import { useState, useEffect, useCallback, useRef } from "react";
-import { fetchWithAuth } from "@/lib/authStore";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+import { api } from "@/lib/api";
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -55,7 +53,7 @@ export default function DealsPage() {
   const loadDeals = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/admin/deals/`);
+      const res = await api.admin.deals();
       if (res.ok) { const d = await res.json(); setDeals(Array.isArray(d) ? d : []); }
     } catch {
       showError("Failed to load deals");
@@ -73,9 +71,7 @@ export default function DealsPage() {
     if (!query.trim()) { setListingResults([]); setShowDropdown(false); return; }
     setSearchingListings(true);
     try {
-      const res = await fetchWithAuth(
-        `${API_URL}/api/admin/listings/?search=${encodeURIComponent(query)}&page_size=8`
-      );
+      const res = await api.admin.searchListings(query);
       if (!res.ok) return;
       const data = await res.json();
       const items: any[] = Array.isArray(data) ? data : (data.results ?? []);
@@ -135,10 +131,7 @@ export default function DealsPage() {
 
     setSavingDeal(true);
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/admin/deals/`, {
-        method: "POST",
-        body: JSON.stringify({ listing_id: selectedListing.id, discount_percent: percent }),
-      });
+      const res = await api.admin.createDeal({ listing_id: selectedListing.id, discount_percent: percent });
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data.error || "Failed to save deal");
@@ -163,10 +156,7 @@ export default function DealsPage() {
     if (percent === null) { showError("Discount must be a whole number between 1 and 100"); return; }
     setSavingEdit(true);
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/admin/deals/${dealId}/`, {
-        method: "PATCH",
-        body: JSON.stringify({ discount_percent: percent }),
-      });
+      const res = await api.admin.updateDeal(dealId, { discount_percent: percent });
       if (!res.ok) { const d = await res.json(); throw new Error(d.error || "Failed to update deal"); }
       await loadDeals();
       showSuccess("Deal updated!");
@@ -181,10 +171,7 @@ export default function DealsPage() {
   const toggleActive = async (deal: any) => {
     setTogglingId(deal.id);
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/admin/deals/${deal.id}/`, {
-        method: "PATCH",
-        body: JSON.stringify({ is_active: !deal.is_active }),
-      });
+      const res = await api.admin.updateDeal(deal.id, { is_active: !deal.is_active });
       if (!res.ok) throw new Error("Failed to toggle deal");
       await loadDeals();
     } catch (e: any) {
@@ -198,7 +185,7 @@ export default function DealsPage() {
     if (!window.confirm("Delete this deal?")) return;
     setDeletingId(dealId);
     try {
-      const res = await fetchWithAuth(`${API_URL}/api/admin/deals/${dealId}/`, { method: "DELETE" });
+      const res = await api.admin.deleteDeal(dealId);
       if (!res.ok) throw new Error("Failed to delete");
       await loadDeals();
       showSuccess("Deal deleted");
