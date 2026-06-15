@@ -20,3 +20,37 @@ def notify_admin_new_order(sender, instance, created, **kwargs):
         )
     except Exception:
         pass
+
+
+@receiver(post_save, sender='orders.Order')
+def sync_payout_transaction(sender, instance, **kwargs):
+    """Keep services.Transaction in sync with Order status changes."""
+    PAYOUT_STATUSES = {'paid', 'seller_completed', 'completed'}
+    if instance.status not in PAYOUT_STATUSES:
+        return
+    if not instance.listing_id:
+        return
+    try:
+        from services.models import Transaction
+        from django.utils import timezone
+
+        listing = instance.listing
+        vendor = listing.vendor
+        if not vendor:
+            return
+
+        txn, _ = Transaction.objects.get_or_create(
+            order=instance,
+            defaults={
+                'vendor': vendor,
+                'amount': listing.price,
+                'status': 'in_escrow',
+            }
+        )
+
+        if instance.status == 'completed' and txn.status == 'in_escrow':
+            txn.status = 'released'
+            txn.released_at = instance.buyer_confirmed_at or timezone.now()
+            txn.save(update_fields=['status', 'released_at'])
+    except Exception:
+        pass
