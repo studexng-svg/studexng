@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   X, Send, Loader, ImageIcon,
   Pin, PinOff, Pencil, Trash2, Check, CheckCheck,
@@ -84,6 +85,7 @@ export default function ChatWindow({
   sellerId, sellerName, listingId, productName, originalPrice, onClose,
 }: ChatWindowProps) {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [conversationId, setConversationId] = useState<number | null>(null);
@@ -154,8 +156,11 @@ export default function ChatWindow({
         setOtherUserLastSeen(conv.other_user?.last_seen || null);
         setOtherUserOnline(conv.other_user?.is_online || false);
         const msgRes = await api.chat.messages(conv.id);
-        const data = await msgRes.json();
-        setMessages(mapMessages(Array.isArray(data) ? data : data.results || []));
+        const raw = await msgRes.json();
+        const mapped = mapMessages(Array.isArray(raw) ? raw : raw.results || []);
+        setMessages(mapped);
+        queryClient.setQueryData(["chat-messages", conv.id], mapped);
+        queryClient.setQueryData(["chat-presence", conv.id], conv);
         await loadPinned(conv.id);
       } catch {
         setError("Could not load chat. Please try again.");
@@ -166,32 +171,39 @@ export default function ChatWindow({
     init();
   }, [listingId, sellerId, user?.id, onClose]);
 
-  useEffect(() => {
-    if (!conversationId) return;
-    const interval = setInterval(async () => {
-      try {
-        const res = await api.chat.messages(conversationId);
-        const data = await res.json();
-        setMessages(mapMessages(Array.isArray(data) ? data : data.results || []));
-      } catch {}
-    }, 15000);
-    return () => clearInterval(interval);
-  }, [conversationId, user?.username]);
+  const { data: messagesData } = useQuery({
+    queryKey: ["chat-messages", conversationId],
+    queryFn: async () => {
+      const res = await api.chat.messages(conversationId!);
+      const raw = await res.json();
+      return mapMessages(Array.isArray(raw) ? raw : raw.results || []);
+    },
+    enabled: !!conversationId,
+    refetchInterval: 15_000,
+    staleTime: 14_000,
+  });
+
+  const { data: presenceData } = useQuery({
+    queryKey: ["chat-presence", conversationId],
+    queryFn: async () => {
+      const res = await api.chat.conversation(conversationId!);
+      if (!res.ok) throw new Error("presence fetch failed");
+      return res.json();
+    },
+    enabled: !!conversationId,
+    refetchInterval: 15_000,
+    staleTime: 14_000,
+  });
 
   useEffect(() => {
-    if (!conversationId) return;
-    const interval = setInterval(async () => {
-      try {
-        const res = await api.chat.conversation(conversationId);
-        if (res.ok) {
-          const conv = await res.json();
-          setOtherUserLastSeen(conv.other_user?.last_seen || null);
-          setOtherUserOnline(conv.other_user?.is_online || false);
-        }
-      } catch {}
-    }, 15000);
-    return () => clearInterval(interval);
-  }, [conversationId]);
+    if (messagesData) setMessages(messagesData);
+  }, [messagesData]);
+
+  useEffect(() => {
+    if (!presenceData) return;
+    setOtherUserLastSeen(presenceData.other_user?.last_seen || null);
+    setOtherUserOnline(presenceData.other_user?.is_online || false);
+  }, [presenceData]);
 
   const formatLastSeen = (lastSeen: string | null): string => {
     if (!lastSeen) return '';
