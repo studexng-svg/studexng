@@ -197,7 +197,7 @@ class AdminUserListView(generics.ListAPIView):
 
     def list(self, request, *args, **kwargs):
         p = request.query_params
-        cache_key = f'admin_users_{p.get("search","")}_{p.get("user_type","")}_{p.get("is_active","")}_{p.get("school","")}_{p.get("verification_type","")}'
+        cache_key = f'admin_users_{p.get("search","")}_{p.get("user_type","")}_{p.get("is_active","")}_{p.get("school","")}_{p.get("verification_type","")}_{p.get("page","1")}'
         cached = cache.get(cache_key)
         if cached is not None:
             return Response(cached)
@@ -377,7 +377,7 @@ try:
 
         def list(self, request, *args, **kwargs):
             p = request.query_params
-            cache_key = f'admin_listings_{p.get("search","")}_{p.get("is_available","")}_{p.get("category","")}_{p.get("campus","")}'
+            cache_key = f'admin_listings_{p.get("search","")}_{p.get("is_available","")}_{p.get("category","")}_{p.get("campus","")}_{p.get("page","1")}'
             cached = cache.get(cache_key)
             if cached is not None:
                 return Response(cached)
@@ -542,7 +542,7 @@ try:
 
         def list(self, request, *args, **kwargs):
             p = request.query_params
-            cache_key = f'admin_orders_{p.get("status","")}_{p.get("campus","")}'
+            cache_key = f'admin_orders_{p.get("status","")}_{p.get("campus","")}_{p.get("page","1")}'
             cached = cache.get(cache_key)
             if cached is not None:
                 return Response(cached)
@@ -688,7 +688,7 @@ try:
 
         def list(self, request, *args, **kwargs):
             p = request.query_params
-            cache_key = f'admin_disputes_{p.get("status","")}_{p.get("search","")}_{p.get("campus","")}'
+            cache_key = f'admin_disputes_{p.get("status","")}_{p.get("search","")}_{p.get("campus","")}_{p.get("page","1")}'
             cached = cache.get(cache_key)
             if cached is not None:
                 return Response(cached)
@@ -857,7 +857,7 @@ try:
 
         def list(self, request, *args, **kwargs):
             params = request.query_params
-            cache_key = f'admin_payments_{params.get("status","")}_{params.get("search","")}_{params.get("campus","")}'
+            cache_key = f'admin_payments_{params.get("status","")}_{params.get("search","")}_{params.get("campus","")}_{params.get("page","1")}'
             cached = cache.get(cache_key)
             if cached is not None:
                 return Response(cached)
@@ -1499,7 +1499,7 @@ try:
         def get(self, request):
             search = request.query_params.get('search', '')
             campus = request.query_params.get('campus', '')
-            cache_key = f'admin_conversations_{search}_{campus}'
+            cache_key = f'admin_conversations_{search}_{campus}_{request.query_params.get("page","1")}'
             cached = cache.get(cache_key)
             if cached is not None:
                 return Response(cached)
