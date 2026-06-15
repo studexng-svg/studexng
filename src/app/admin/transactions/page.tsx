@@ -119,12 +119,6 @@ export default function AdminTransactionsPage() {
                         {acting === t.id ? "…" : "Release"}
                       </button>
                     )}
-                    {t.status === "released" && (
-                      <button onClick={() => updateStatus(t.id, "withdrawn")} disabled={acting === t.id}
-                        className="text-xs text-stone-600 font-semibold bg-stone-50 border border-stone-200 rounded-lg px-3 py-1.5 disabled:opacity-50">
-                        {acting === t.id ? "…" : "Mark Withdrawn"}
-                      </button>
-                    )}
                   </div>
                 </div>
               </div>
