@@ -14,7 +14,7 @@ class CategoryImageForm(forms.ModelForm):
 
     class Meta:
         model = Category
-        fields = ['title', 'slug', 'image_file', 'campus']
+        fields = ['title', 'slug', 'image_file', 'is_pau', 'is_futo', 'is_imsu']
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -62,12 +62,16 @@ class ListingChangelistForm(forms.ModelForm):
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):
     form = CategoryImageForm
-    list_display = ('title', 'slug', 'campus', 'image_preview', 'listing_count', 'active_listing_count')
-    list_filter = ('campus',)
+    list_display = ('title', 'slug', 'campus_display', 'image_preview', 'listing_count', 'active_listing_count')
+    list_filter = ('is_pau', 'is_futo', 'is_imsu')
     search_fields = ('title',)
     prepopulated_fields = {"slug": ("title",)}
     ordering = ('title',)
     actions = ['export_to_csv']
+
+    def campus_display(self, obj):
+        return obj.campus_display
+    campus_display.short_description = 'Campuses'
 
     def image_preview(self, obj):
         if obj.image:
@@ -108,8 +112,8 @@ class CategoryAdmin(admin.ModelAdmin):
         extra_context = extra_context or {}
         extra_context['summary_stats'] = [
             {'label': 'Total Categories', 'value': c.count(),                              'color': '#fff'},
-            {'label': 'PAU',              'value': c.filter(campus='pau').count(),         'color': '#60a5fa'},
-            {'label': 'FUTO',             'value': c.filter(campus='futo').count(),        'color': '#c084fc'},
+            {'label': 'PAU',              'value': c.filter(is_pau=True).count(),          'color': '#60a5fa'},
+            {'label': 'FUTO',             'value': c.filter(is_futo=True).count(),         'color': '#c084fc'},
             {'label': 'Total Listings',   'value': l.count(),                              'color': '#fbbf24'},
             {'label': 'Active Listings',  'value': l.filter(is_available=True).count(),    'color': '#34d399'},
             {'label': 'Inactive Listings','value': l.filter(is_available=False).count(),   'color': '#f87171'},

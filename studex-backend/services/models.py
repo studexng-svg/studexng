@@ -9,14 +9,17 @@ class Category(models.Model):
     title = models.CharField(max_length=100, unique=True)
     slug = models.SlugField(max_length=100, unique=True)
     image = models.URLField(max_length=500, blank=True, null=True)
-    campus = models.CharField(
-        max_length=20,
-        default='pau',
-        choices=[('pau', 'PAU'), ('futo', 'FUTO'), ('imsu', 'IMSU'), ('all', 'All Campuses')],
-    )
+    is_pau  = models.BooleanField(default=False, verbose_name='PAU')
+    is_futo = models.BooleanField(default=False, verbose_name='FUTO')
+    is_imsu = models.BooleanField(default=False, verbose_name='IMSU')
 
     def __str__(self):
         return self.title
+
+    @property
+    def campus_display(self):
+        names = [n for flag, n in [(self.is_pau, 'PAU'), (self.is_futo, 'FUTO'), (self.is_imsu, 'IMSU')] if flag]
+        return ', '.join(names) if names else '—'
 
     class Meta:
         verbose_name_plural = "Categories"

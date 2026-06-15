@@ -81,7 +81,7 @@ class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
             campus_param = self.request.query_params.get('campus', '').lower()
             if campus_param in ('pau', 'futo', 'imsu'):
                 campus = campus_param
-        return Category.objects.filter(campus__in=[campus, 'all']).order_by('title')
+        return Category.objects.filter(**{f'is_{campus}': True}).order_by('title')
 
     def list(self, request, *args, **kwargs):
         user = request.user
