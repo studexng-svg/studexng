@@ -589,7 +589,7 @@ export const api = {
       }),
 
     // Vendor of month
-    vendorOfMonth: () => fetchWithAuth(u("/api/admin/vendor-of-month/")),
+    vendorOfMonth: (campus: string) => fetchWithAuth(u(`/api/admin/vendor-of-month/?campus=${campus}`)),
 
     setVendorOfMonth: (body: Record<string, unknown>) =>
       fetchWithAuth(u("/api/admin/vendor-of-month/"), { method: "POST", body: s(body) }),
@@ -597,8 +597,8 @@ export const api = {
     updateVendorOfMonth: (body: Record<string, unknown>) =>
       fetchWithAuth(u("/api/admin/vendor-of-month/"), { method: "PATCH", body: s(body) }),
 
-    deleteVendorOfMonth: () =>
-      fetchWithAuth(u("/api/admin/vendor-of-month/"), { method: "DELETE" }),
+    deleteVendorOfMonth: (campus: string) =>
+      fetchWithAuth(u(`/api/admin/vendor-of-month/?campus=${campus}`), { method: "DELETE" }),
 
     // Users
     user: (id: number | string) => fetchWithAuth(u(`/api/admin/users/${id}/`)),

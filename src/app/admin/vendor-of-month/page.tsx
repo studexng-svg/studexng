@@ -25,6 +25,7 @@ interface VotmRecord {
   completion_rate: number;
   is_manual_override: boolean;
   nominated_at: string;
+  campus: string;
 }
 
 interface VendorResult {
@@ -34,7 +35,16 @@ interface VendorResult {
   profile_picture: string | null;
 }
 
+const CAMPUSES = [
+  { key: "futo", label: "FUTO" },
+  { key: "imsu", label: "IMSU" },
+  { key: "pau",  label: "PAU"  },
+] as const;
+
+type Campus = (typeof CAMPUSES)[number]["key"];
+
 export default function AdminVendorOfMonthPage() {
+  const [campus, setCampus] = useState<Campus>("futo");
   const [current, setCurrent] = useState<VotmRecord | null>(null);
   const [history, setHistory] = useState<VotmRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -48,10 +58,11 @@ export default function AdminVendorOfMonthPage() {
   const [searchResults, setSearchResults] = useState<VendorResult[]>([]);
   const [searching, setSearching] = useState(false);
 
-  const load = async () => {
+  const load = async (c: Campus = campus) => {
     setLoading(true);
+    setMsg("");
     try {
-      const r = await api.admin.vendorOfMonth();
+      const r = await api.admin.vendorOfMonth(c);
       if (r.ok) {
         const d = await r.json();
         setCurrent(d.current);
@@ -62,7 +73,7 @@ export default function AdminVendorOfMonthPage() {
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(campus); }, [campus]);
 
   // Search vendors for manual override
   useEffect(() => {
@@ -84,7 +95,7 @@ export default function AdminVendorOfMonthPage() {
     setPicking(true);
     setMsg("");
     try {
-      const r = await api.admin.setVendorOfMonth({ action: "pick_now" });
+      const r = await api.admin.setVendorOfMonth({ action: "pick_now", campus });
       const d = await r.json();
       if (r.ok) {
         setCurrent(d.current);
@@ -100,7 +111,7 @@ export default function AdminVendorOfMonthPage() {
     setSaving(true);
     setMsg("");
     try {
-      const r = await api.admin.setVendorOfMonth({ vendor_id: vendorId });
+      const r = await api.admin.setVendorOfMonth({ vendor_id: vendorId, campus });
       const d = await r.json();
       if (r.ok) {
         setCurrent(d.current);
@@ -114,11 +125,11 @@ export default function AdminVendorOfMonthPage() {
   };
 
   const removeCurrent = async () => {
-    if (!confirm("Remove the current Vendor of the Month? The hero will revert to the generic banner.")) return;
+    if (!confirm(`Remove the current ${campus.toUpperCase()} Vendor of the Month? The hero will revert to the generic banner.`)) return;
     setRemoving(true);
     setMsg("");
     try {
-      const r = await api.admin.deleteVendorOfMonth();
+      const r = await api.admin.deleteVendorOfMonth(campus);
       const d = await r.json();
       if (r.ok) {
         setCurrent(null);
@@ -144,9 +155,27 @@ export default function AdminVendorOfMonthPage() {
               <Trophy className="w-5 h-5 text-amber-500" /> Vendor of the Month
             </h2>
           </div>
-          <button onClick={load} className="p-2 text-stone-400 hover:text-teal-600 transition">
+          <button onClick={() => load(campus)} className="p-2 text-stone-400 hover:text-teal-600 transition">
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
           </button>
+        </div>
+
+        {/* Campus tabs */}
+        <div className="flex bg-white rounded-2xl border border-stone-200 p-1 shadow-sm gap-1">
+          {CAMPUSES.map(c => (
+            <button
+              key={c.key}
+              onClick={() => { setCampus(c.key); setSearch(""); setSearchResults([]); }}
+              className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition ${
+                campus === c.key
+                  ? "text-white shadow-sm"
+                  : "text-stone-500 hover:text-stone-700"
+              }`}
+              style={campus === c.key ? { background: GRAD } : {}}
+            >
+              {c.label}
+            </button>
+          ))}
         </div>
 
         {/* Status message */}
@@ -160,7 +189,9 @@ export default function AdminVendorOfMonthPage() {
         {/* Current winner */}
         <div className="bg-white rounded-2xl border border-stone-200 overflow-hidden shadow-sm">
           <div className="px-4 py-3 border-b border-stone-100">
-            <p className="font-semibold text-stone-900 text-sm">Current Winner</p>
+            <p className="font-semibold text-stone-900 text-sm">
+              Current Winner — <span className="text-teal-600">{campus.toUpperCase()}</span>
+            </p>
           </div>
 
           {loading ? (
@@ -220,7 +251,7 @@ export default function AdminVendorOfMonthPage() {
             </div>
           ) : (
             <div className="p-8 text-center text-stone-400 text-sm">
-              No vendor of the month picked yet.
+              No vendor of the month picked yet for {campus.toUpperCase()}.
             </div>
           )}
         </div>
@@ -228,7 +259,7 @@ export default function AdminVendorOfMonthPage() {
         {/* Actions */}
         <div className="bg-white rounded-2xl border border-stone-200 shadow-sm overflow-hidden">
           <div className="px-4 py-3 border-b border-stone-100">
-            <p className="font-semibold text-stone-900 text-sm">Actions</p>
+            <p className="font-semibold text-stone-900 text-sm">Actions — {campus.toUpperCase()}</p>
           </div>
           <div className="p-4 space-y-4">
 
@@ -236,7 +267,7 @@ export default function AdminVendorOfMonthPage() {
             <div>
               <p className="text-sm font-medium text-stone-700 mb-1">Auto-Pick Based on Last Month's Data</p>
               <p className="text-xs text-stone-400 mb-3">
-                Scores all verified vendors by completed orders (50%), rating (30%), completion rate (20%). Will not overwrite an existing pick for the same month — delete it first from Django Admin if you want to re-run.
+                Scores verified {campus.toUpperCase()} vendors by completed orders (50%), rating (30%), completion rate (20%). Will not overwrite an existing pick — remove it first if you want to re-run.
               </p>
               <motion.button
                 whileTap={{ scale: 0.97 }}
@@ -246,14 +277,14 @@ export default function AdminVendorOfMonthPage() {
                 style={{ background: GRAD }}
               >
                 {picking ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Trophy className="w-4 h-4" />}
-                {picking ? "Picking…" : "Pick Now (Auto)"}
+                {picking ? "Picking…" : `Pick Now (${campus.toUpperCase()})`}
               </motion.button>
             </div>
 
             <div className="border-t border-stone-100 pt-4">
               <p className="text-sm font-medium text-stone-700 mb-1">Manual Override</p>
               <p className="text-xs text-stone-400 mb-3">
-                Choose a specific vendor. This overwrites the current month's pick and sends them a notification.
+                Choose a specific vendor for {campus.toUpperCase()}. This overwrites the current month's pick and sends them a notification.
               </p>
               <div className="relative">
                 <Search className="w-4 h-4 absolute left-3 top-3 text-stone-400 pointer-events-none" />
@@ -300,7 +331,7 @@ export default function AdminVendorOfMonthPage() {
         {history.length > 0 && (
           <div className="bg-white rounded-2xl border border-stone-200 shadow-sm overflow-hidden">
             <div className="px-4 py-3 border-b border-stone-100">
-              <p className="font-semibold text-stone-900 text-sm">History (last 6 months)</p>
+              <p className="font-semibold text-stone-900 text-sm">History — {campus.toUpperCase()} (last 6 months)</p>
             </div>
             <div className="divide-y divide-stone-50">
               {history.map((r, i) => (

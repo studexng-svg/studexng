@@ -173,11 +173,14 @@ class VendorOfTheMonth(models.Model):
     based on completed orders, rating, and completion rate from the previous month.
     Admin can also set a manual override from the Django admin.
     """
+    CAMPUS_CHOICES = [('pau', 'PAU'), ('futo', 'FUTO'), ('imsu', 'IMSU')]
+
     vendor = models.ForeignKey(
         User, on_delete=models.SET_NULL, null=True,
         related_name='vendor_of_month_awards',
     )
     month = models.DateField(help_text="First day of the month this award covers")
+    campus = models.CharField(max_length=10, choices=CAMPUS_CHOICES, default='futo')
     score = models.FloatField(default=0)
     total_orders = models.IntegerField(default=0)
     avg_rating = models.FloatField(default=0)
@@ -187,7 +190,7 @@ class VendorOfTheMonth(models.Model):
 
     class Meta:
         ordering = ['-month']
-        unique_together = ['month']
+        unique_together = ['month', 'campus']
         verbose_name = "Vendor of the Month"
         verbose_name_plural = "Vendors of the Month"
 

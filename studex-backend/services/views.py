@@ -286,9 +286,10 @@ class VendorOfMonthView(APIView):
 
     def get(self, request):
         try:
+            campus = (request.query_params.get('campus') or 'futo').lower()
             votm = VendorOfTheMonth.objects.select_related(
                 'vendor', 'vendor__profile'
-            ).first()
+            ).filter(campus=campus).first()
             if not votm or not votm.vendor:
                 return Response(None)
 
@@ -319,6 +320,7 @@ class VendorOfMonthView(APIView):
                 'month': votm.month.strftime('%B %Y'),
                 'total_orders': votm.total_orders,
                 'completion_rate': votm.completion_rate,
+                'campus': votm.campus,
             })
         except Exception as e:
             import logging

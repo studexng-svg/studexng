@@ -51,10 +51,7 @@ export default async function HomePage() {
     if (cRes.ok) { const d = await cRes.json(); initialCategories = d.results || d || []; }
     if (mRes.ok) {
       const votm = await mRes.json();
-      // Only show the VotM hero if the vendor actually belongs to this campus.
-      // The backend stores one global winner so we cross-check against the campus vendor list.
-      const inCampus = votm?.username && initialVendors.some((v: any) => v.username === votm.username);
-      vendorOfMonth = inCampus ? votm : null;
+      vendorOfMonth = votm?.username ? votm : null;
     }
     if (dRes.ok) { const d = await dRes.json(); initialDeals = Array.isArray(d) ? d : []; }
   } catch {}

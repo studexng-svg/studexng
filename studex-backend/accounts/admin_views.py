@@ -1637,11 +1637,13 @@ class AdminVendorOfMonthView(APIView):
             'completion_rate': round(votm.completion_rate, 1),
             'is_manual_override': votm.is_manual_override,
             'nominated_at': votm.nominated_at.isoformat(),
+            'campus': votm.campus,
         }
 
     def get(self, request):
         from services.models import VendorOfTheMonth
-        records = VendorOfTheMonth.objects.select_related('vendor', 'vendor__profile').order_by('-month')[:6]
+        campus = (request.query_params.get('campus') or 'futo').lower()
+        records = VendorOfTheMonth.objects.filter(campus=campus).select_related('vendor', 'vendor__profile').order_by('-month')[:6]
         current = records[0] if records else None
         return Response({
             'current': self._serialize(current, request),
@@ -1651,15 +1653,25 @@ class AdminVendorOfMonthView(APIView):
     def post(self, request):
         from services.models import VendorOfTheMonth
         action = request.data.get('action')
+        campus = (request.data.get('campus') or 'futo').lower()
 
         if action == 'pick_now':
             try:
-                from scheduler import pick_vendor_of_month
-                pick_vendor_of_month()
-                records = VendorOfTheMonth.objects.select_related('vendor', 'vendor__profile').order_by('-month')[:6]
+                from datetime import date
+                today = date.today()
+                if today.month == 1:
+                    month_start = date(today.year - 1, 12, 1)
+                    month_end   = date(today.year, 1, 1)
+                else:
+                    month_start = date(today.year, today.month - 1, 1)
+                    month_end   = date(today.year, today.month, 1)
+
+                from scheduler import pick_vendor_of_month_for_campus
+                pick_vendor_of_month_for_campus(campus, month_start, month_end)
+                records = VendorOfTheMonth.objects.filter(campus=campus).select_related('vendor', 'vendor__profile').order_by('-month')[:6]
                 current = records[0] if records else None
                 return Response({
-                    'message': 'Vendor of the Month picked successfully.',
+                    'message': f'Vendor of the Month picked for {campus.upper()}.',
                     'current': self._serialize(current, request),
                     'history': [self._serialize(r, request) for r in records],
                 })
@@ -1678,8 +1690,6 @@ class AdminVendorOfMonthView(APIView):
 
         from datetime import date
         today = date.today()
-        # Award covers the previous calendar month, same as the scheduler.
-        # A manual override on June 1 should award May, not June.
         if today.month == 1:
             month_start = date(today.year - 1, 12, 1)
         else:
@@ -1691,6 +1701,7 @@ class AdminVendorOfMonthView(APIView):
 
         votm, created = VendorOfTheMonth.objects.update_or_create(
             month=month_start,
+            campus=campus,
             defaults={
                 'vendor': vendor,
                 'score': 0,
@@ -1709,7 +1720,7 @@ class AdminVendorOfMonthView(APIView):
                 title='🏆 You are Vendor of the Month!',
                 message=(
                     f'Congratulations {vendor.username}! You have been selected as '
-                    f'Vendor of the Month for {month_start.strftime("%B %Y")}. '
+                    f'Vendor of the Month for {month_start.strftime("%B %Y")} at {campus.upper()}. '
                     f'Your profile is now featured on the StudEx home page!'
                 ),
                 action_url='/seller',
@@ -1718,18 +1729,19 @@ class AdminVendorOfMonthView(APIView):
             pass
 
         return Response({
-            'message': f'{vendor.username} set as Vendor of the Month for {month_start.strftime("%B %Y")}.',
+            'message': f'{vendor.username} set as Vendor of the Month for {campus.upper()} — {month_start.strftime("%B %Y")}.',
             'current': self._serialize(votm, request),
         }, status=201 if created else 200)
 
     def delete(self, request):
-        """DELETE /api/admin/vendor-of-month/ — remove the most recent winner."""
+        """DELETE /api/admin/vendor-of-month/?campus=X — remove the most recent winner for a campus."""
         from services.models import VendorOfTheMonth
-        record = VendorOfTheMonth.objects.order_by('-month').first()
+        campus = (request.query_params.get('campus') or 'futo').lower()
+        record = VendorOfTheMonth.objects.filter(campus=campus).order_by('-month').first()
         if record:
             record.delete()
-            return Response({'message': 'Vendor of the Month removed.'})
-        return Response({'error': 'No vendor of the month set.'}, status=404)
+            return Response({'message': f'Vendor of the Month for {campus.upper()} removed.'})
+        return Response({'error': 'No vendor of the month set for this campus.'}, status=404)
 
 
 class AdminActivityView(APIView):

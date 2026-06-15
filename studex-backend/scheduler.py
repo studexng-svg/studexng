@@ -366,40 +366,26 @@ def _alert_admin_transfer_failure(txn):
 # JOB 5: Pick vendor of the month — 1st of each month at 00:05 WAT
 # ─────────────────────────────────────────────────────────────────────────────
 
-def pick_vendor_of_month():
+def pick_vendor_of_month_for_campus(campus, month_start, month_end):
     """
-    Runs on the 1st of each month. Scores all verified vendors based on
-    their completed orders, avg rating, and completion rate from the previous
-    month, then creates a VendorOfTheMonth record for the winner.
-    Idempotent — skips if a record for the previous month already exists.
+    Picks the best vendor for a single campus and month. Returns True if a winner
+    was found and saved, False if the campus already had a pick or no vendors qualified.
     """
-    from datetime import date
     from django.contrib.auth import get_user_model
+    from django.db.models import Count, Q, Avg, ExpressionWrapper, F, DurationField
     from orders.models import Order
     from services.models import VendorOfTheMonth
     from accounts.utils import send_notification
 
     User = get_user_model()
-    today = date.today()
 
-    # The award covers the previous calendar month
-    if today.month == 1:
-        month_start = date(today.year - 1, 12, 1)
-        month_end   = date(today.year, 1, 1)
-    else:
-        month_start = date(today.year, today.month - 1, 1)
-        month_end   = date(today.year, today.month, 1)
+    if VendorOfTheMonth.objects.filter(month=month_start, campus=campus).exists():
+        logger.info(f"pick_vendor_of_month: already picked for {campus.upper()} {month_start.strftime('%B %Y')}")
+        return False
 
-    if VendorOfTheMonth.objects.filter(month=month_start).exists():
-        logger.info(f"pick_vendor_of_month: already picked for {month_start.strftime('%B %Y')}")
-        return
-
-    from django.db.models import Count, Q, Avg, ExpressionWrapper, F, DurationField
-
-    # Single query: annotate each vendor with their completed order count for the month
     vendors = (
         User.objects
-        .filter(is_verified_vendor=True)
+        .filter(is_verified_vendor=True, school=campus)
         .select_related('profile')
         .annotate(
             monthly_orders=Count(
@@ -411,7 +397,7 @@ def pick_vendor_of_month():
                 )
             )
         )
-        .filter(monthly_orders__gt=0)  # skip vendors with no sales that month
+        .filter(monthly_orders__gt=0)
     )
 
     best_vendor = None
@@ -424,10 +410,8 @@ def pick_vendor_of_month():
         avg_rating      = float(getattr(profile, 'rating', 0) or 0)
         completion_rate = float(getattr(profile, 'completion_rate', 0) or 0)
 
-        # Weighted score: orders drive most of it, rating and completion fine-tune
         score = completed * 5 + avg_rating * 10 + completion_rate * 0.5
 
-        # Average seconds from paid_at → seller_completed_at (lower = faster)
         avg_time_result = Order.objects.filter(
             listing__vendor=vendor,
             status__in=['completed', 'seller_completed'],
@@ -446,39 +430,36 @@ def pick_vendor_of_month():
             if avg_time_result['avg_time'] else None
         )
 
-        # Determine whether this vendor beats the current leader
         def beats(s=score, c=completed, r=avg_rating, t=avg_secs):
             if s != best_score:
                 return s > best_score
-            # Tie on score — tiebreaker 1: more completed orders
             if c != best_stats.get('total_orders', 0):
                 return c > best_stats.get('total_orders', 0)
-            # Tiebreaker 2: higher rating
             if r != best_stats.get('avg_rating', 0):
                 return r > best_stats.get('avg_rating', 0)
-            # Tiebreaker 3: faster average completion time
             best_t = best_stats.get('avg_completion_seconds')
             if t is not None and best_t is not None:
                 return t < best_t
-            return t is not None  # has timing data; current best does not
+            return t is not None
 
         if best_vendor is None or beats():
             best_score  = score
             best_vendor = vendor
             best_stats  = {
-                'total_orders':          completed,
-                'avg_rating':            avg_rating,
-                'completion_rate':       completion_rate,
+                'total_orders':           completed,
+                'avg_rating':             avg_rating,
+                'completion_rate':        completion_rate,
                 'avg_completion_seconds': avg_secs,
             }
 
     if not best_vendor:
-        logger.info("pick_vendor_of_month: no qualifying vendor found (no completed orders last month)")
-        return
+        logger.info(f"pick_vendor_of_month: no qualifying vendor for {campus.upper()} (no completed orders last month)")
+        return False
 
     VendorOfTheMonth.objects.create(
         vendor=best_vendor,
         month=month_start,
+        campus=campus,
         score=best_score,
         total_orders=best_stats['total_orders'],
         avg_rating=best_stats['avg_rating'],
@@ -499,13 +480,35 @@ def pick_vendor_of_month():
             action_url='/seller',
         )
     except Exception as ne:
-        logger.warning(f"pick_vendor_of_month: notification failed: {ne}")
+        logger.warning(f"pick_vendor_of_month: notification failed for {campus}: {ne}")
 
     logger.info(
-        f"pick_vendor_of_month: {best_vendor.username} wins {month_start.strftime('%B %Y')} "
+        f"pick_vendor_of_month: {best_vendor.username} wins {campus.upper()} {month_start.strftime('%B %Y')} "
         f"(score={best_score:.1f}, orders={best_stats['total_orders']}, "
         f"rating={best_stats['avg_rating']}, completion={best_stats['completion_rate']}%)"
     )
+    return True
+
+
+def pick_vendor_of_month():
+    """
+    Runs on the 1st of each month. Picks one Vendor of the Month per campus
+    based on completed orders, avg rating, and completion rate from the previous month.
+    Idempotent — skips campuses that already have a pick for the month.
+    """
+    from datetime import date
+
+    today = date.today()
+
+    if today.month == 1:
+        month_start = date(today.year - 1, 12, 1)
+        month_end   = date(today.year, 1, 1)
+    else:
+        month_start = date(today.year, today.month - 1, 1)
+        month_end   = date(today.year, today.month, 1)
+
+    for campus in _CAMPUSES:
+        pick_vendor_of_month_for_campus(campus, month_start, month_end)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
