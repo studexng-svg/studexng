@@ -106,8 +106,15 @@ export default function AdminTransactionsPage() {
                     <p className="text-stone-600 text-sm mt-0.5 font-semibold">₦{Number(t.amount).toLocaleString()}</p>
                     {t.order_reference && <p className="text-stone-400 text-xs mt-0.5">Order {t.order_reference}</p>}
                     <p className="text-stone-400 text-xs mt-0.5">
-                      {t.created_at ? new Date(t.created_at).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" }) : ""}
+                      Ordered: {t.created_at ? new Date(t.created_at).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" }) : ""}
                     </p>
+                    {t.released_at && (
+                      <p className="text-teal-600 text-xs mt-0.5">
+                        Released: {new Date(t.released_at).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}
+                        {" "}·{" "}
+                        {new Date(t.released_at).toLocaleTimeString("en-NG", { hour: "2-digit", minute: "2-digit" })}
+                      </p>
+                    )}
                   </div>
                   <div className="flex flex-col items-end gap-2 flex-shrink-0">
                     <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${STATUS_STYLE[t.status] || "bg-stone-100 text-stone-600"}`}>
