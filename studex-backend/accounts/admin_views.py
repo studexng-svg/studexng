@@ -1199,78 +1199,116 @@ class AdminPlatformEarningsView(APIView):
 
 # ============================================
 # SERVICE TRANSACTIONS (ESCROW / PAYOUTS)
+# Backed by PaymentTransaction — the only model the order flow actually writes to.
+# services.models.Transaction is a dead table; nothing creates records there.
 # ============================================
 
-try:
-    from services.models import Transaction as ServiceTransaction
+def _txn_display_status(txn):
+    """Map PaymentTransaction transfer_status → UI status for the payout panel."""
+    ts = (txn.transfer_status or '').lower()
+    if ts == 'success':
+        return 'released'
+    if ts in ('failed', 'reversed'):
+        return 'withdrawn'
+    return 'in_escrow'
 
-    class AdminServiceTransactionListView(generics.ListAPIView):
-        """GET /api/admin/service-transactions/ — payout escrow records."""
-        permission_classes = [IsAdminUser]
 
-        def list(self, request, *args, **kwargs):
-            qs = ServiceTransaction.objects.all().select_related('vendor', 'order').order_by('-created_at')
-            tx_status = request.query_params.get('status')
-            if tx_status:
-                qs = qs.filter(status=tx_status)
-            search = request.query_params.get('search')
-            if search:
+class AdminServiceTransactionListView(generics.ListAPIView):
+    """GET /api/admin/service-transactions/ — vendor payout records from PaymentTransaction."""
+    permission_classes = [IsAdminUser]
+
+    def list(self, request, *args, **kwargs):
+        from payments.models import PaymentTransaction
+        qs = (
+            PaymentTransaction.objects
+            .filter(status='success')
+            .select_related('seller')
+            .order_by('-created_at')
+        )
+
+        # Map UI tab value → PaymentTransaction filter
+        tx_status = request.query_params.get('status', '')
+        if tx_status == 'released':
+            qs = qs.filter(transfer_status='success')
+        elif tx_status == 'withdrawn':
+            qs = qs.filter(transfer_status__in=['failed', 'reversed'])
+        elif tx_status == 'in_escrow':
+            qs = qs.filter(
+                Q(transfer_status__isnull=True) | Q(transfer_status='') | Q(transfer_status='pending')
+            )
+
+        search = request.query_params.get('search', '')
+        if search:
+            qs = qs.filter(
+                Q(seller__username__icontains=search) |
+                Q(seller__business_name__icontains=search) |
+                Q(reference__icontains=search)
+            )
+
+        campus = request.query_params.get('campus', '')
+        if campus:
+            campus = campus.lower()
+            if campus == 'pau':
                 qs = qs.filter(
-                    Q(vendor__username__icontains=search) |
-                    Q(order__reference__icontains=search)
+                    Q(seller__school__iexact='pau') | Q(seller__school='') | Q(seller__school__isnull=True)
                 )
-            campus = request.query_params.get('campus')
-            if campus:
-                campus = campus.lower()
-                if campus == 'pau':
-                    qs = qs.filter(
-                        Q(vendor__school__iexact='pau') | Q(vendor__school='') | Q(vendor__school__isnull=True)
-                    )
-                else:
-                    qs = qs.filter(vendor__school__iexact=campus)
-            data = []
-            for t in qs:
-                data.append({
-                    'id': t.id,
-                    'vendor_id': t.vendor.id,
-                    'vendor': t.vendor.username,
-                    'business_name': getattr(t.vendor, 'business_name', None),
-                    'order_id': t.order.id if t.order else None,
-                    'order_reference': t.order.reference if t.order else None,
-                    'amount': str(t.amount),
-                    'status': t.status,
-                    'created_at': t.created_at.isoformat(),
-                    'released_at': t.released_at.isoformat() if t.released_at else None,
-                    'withdrawn_at': t.withdrawn_at.isoformat() if t.withdrawn_at else None,
-                })
-            return Response(data)
+            else:
+                qs = qs.filter(seller__school__iexact=campus)
 
-    class AdminServiceTransactionDetailView(APIView):
-        """PATCH /api/admin/service-transactions/{id}/ — release or mark withdrawn."""
-        permission_classes = [IsAdminUser]
+        data = []
+        for t in qs:
+            seller = t.seller
+            data.append({
+                'id': t.id,
+                'vendor_id': seller.id if seller else None,
+                'vendor': seller.username if seller else '[Deleted]',
+                'business_name': getattr(seller, 'business_name', None) if seller else None,
+                'order_id': t.order_id,
+                'order_reference': t.reference,
+                'amount': str(t.seller_amount),
+                'status': _txn_display_status(t),
+                'transfer_status': t.transfer_status or 'pending',
+                'transfer_reference': t.transfer_reference,
+                'created_at': t.created_at.isoformat(),
+                'released_at': None,
+                'withdrawn_at': None,
+            })
+        return Response(data)
 
-        def patch(self, request, tx_id):
-            try:
-                from django.utils import timezone as tz
-                t = ServiceTransaction.objects.select_related('vendor').get(id=tx_id)
-                new_status = request.data.get('status')
-                if new_status == 'released' and t.status == 'in_escrow':
-                    t.status = 'released'
-                    t.released_at = tz.now()
-                    t.vendor.wallet_balance = (t.vendor.wallet_balance or 0) + t.amount
-                    t.vendor.save()
-                    t.save()
-                elif new_status == 'withdrawn' and t.status == 'released':
-                    t.status = 'withdrawn'
-                    t.withdrawn_at = tz.now()
-                    t.save()
-                return Response({'id': t.id, 'status': t.status})
-            except ServiceTransaction.DoesNotExist:
-                return Response({'error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
 
-except ImportError:
-    AdminServiceTransactionListView = None
-    AdminServiceTransactionDetailView = None
+class AdminServiceTransactionDetailView(APIView):
+    """PATCH /api/admin/service-transactions/{id}/ — retry payout or mark resolved."""
+    permission_classes = [IsAdminUser]
+
+    def patch(self, request, tx_id):
+        from payments.models import PaymentTransaction
+        from payments.views import _transfer_to_vendor
+        try:
+            txn = PaymentTransaction.objects.select_related('seller').get(id=tx_id, status='success')
+        except PaymentTransaction.DoesNotExist:
+            return Response({'error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        new_status = request.data.get('status')
+
+        if new_status == 'released':
+            # Attempt (or retry) the Paystack transfer to vendor
+            if not txn.transfer_reference:
+                listing_title = ''
+                try:
+                    from orders.models import Order
+                    order = Order.objects.select_related('listing').get(id=txn.order_id)
+                    listing_title = order.listing.title
+                except Exception:
+                    pass
+                _transfer_to_vendor(txn, listing_title)
+                txn.refresh_from_db(fields=['transfer_status', 'transfer_reference'])
+
+        elif new_status == 'withdrawn':
+            # Manually mark a stuck transfer as resolved
+            txn.transfer_status = 'success'
+            txn.save(update_fields=['transfer_status'])
+
+        return Response({'id': txn.id, 'status': _txn_display_status(txn)})
 
 
 # ============================================
