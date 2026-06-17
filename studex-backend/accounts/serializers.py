@@ -330,7 +330,18 @@ class UserProfileSerializer(serializers.ModelSerializer):
                 profile.level = level
             profile.save()
         except Profile.DoesNotExist:
-            Profile.objects.create(user=instance, whatsapp=whatsapp or '', instagram=instagram or '')
+            Profile.objects.create(
+                user=instance,
+                whatsapp=whatsapp or '',
+                instagram=instagram or '',
+                available_days=available_days or [],
+                opening_time=opening_time,
+                closing_time=closing_time,
+                date_of_birth=date_of_birth,
+                gender=gender or '',
+                department=department or '',
+                level=level or '',
+            )
 
         return instance
 
