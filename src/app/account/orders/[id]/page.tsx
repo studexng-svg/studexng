@@ -189,7 +189,7 @@ export default function OrderDetailPage() {
   };
 
   const handleDisputeSubmit = async () => {
-    if (!order || !disputeComplaint.trim()) return;
+    if (!order || !disputeComplaint.trim() || !disputeEvidence.trim() || !disputeImages[0]) return;
     setDisputing(true);
     setDisputeError("");
     try {
@@ -595,7 +595,7 @@ export default function OrderDetailPage() {
 
               <div>
                 <label className="text-xs font-semibold text-stone-500 mb-1.5 block">
-                  Evidence <span className="text-stone-400">(optional)</span>
+                  Evidence <span className="text-red-400">*</span>
                 </label>
                 <textarea
                   value={disputeEvidence}
@@ -609,7 +609,7 @@ export default function OrderDetailPage() {
 
               <div>
                 <label className="text-xs font-semibold text-stone-500 mb-1.5 block">
-                  Photos <span className="text-stone-400">(optional, max 2)</span>
+                  Photos <span className="text-red-400">* </span><span className="text-stone-400 font-normal">(max 2)</span>
                 </label>
                 <div className="flex gap-3">
                   {[0, 1].map(idx => (
@@ -659,7 +659,7 @@ export default function OrderDetailPage() {
               </button>
               <button
                 onClick={handleDisputeSubmit}
-                disabled={disputing || !disputeComplaint.trim()}
+                disabled={disputing || !disputeComplaint.trim() || !disputeEvidence.trim() || !disputeImages[0]}
                 className="flex-1 py-3 bg-red-500 text-white rounded-full font-semibold text-sm disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {disputing
