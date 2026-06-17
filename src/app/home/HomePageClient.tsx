@@ -1078,7 +1078,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
             </div>
 
             {/* Deals skeleton — shown while deals are loading */}
-            {activeTab === "listings" && !dealsReady && (
+            {activeTab === "listings" && activeFilter === "All" && !dealsReady && (
               <div className="mb-6">
                 <div className="animate-pulse mb-4">
                   <div className="h-2.5 bg-stone-200 rounded w-20 mb-1.5" />
@@ -1104,7 +1104,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
             )}
 
             {/* Deals Section — horizontal scroll strip */}
-            {activeTab === "listings" && deals.length > 0 && dealsReady && (
+            {activeTab === "listings" && activeFilter === "All" && deals.length > 0 && dealsReady && (
               <div className="mb-6">
                 <div className="flex items-center justify-between mb-4">
                   <div>
