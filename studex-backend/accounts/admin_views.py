@@ -2364,8 +2364,8 @@ class AdminAIActionView(APIView):
                 recipient=vendor_user,
                 notification_type='seller_approved',
                 title='Application Accepted!',
-                message='Your seller application has been approved. You are now a verified vendor on StudEx. Start listing your services!',
-                action_url='/seller',
+                message='Your seller application has been approved. You are now a verified vendor on StudEx. Go to Account Settings → Bank Account to add your bank details so you can receive payouts, then start listing your services!',
+                action_url='/account',
             )
             return Response({'detail': f'{vendor_user.username} approved as a vendor'})
 
