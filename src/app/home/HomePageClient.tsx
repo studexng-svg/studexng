@@ -130,7 +130,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
   const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlistStore();
   const { addToCart, cart } = useCart();
   const router = useRouter();
-  useScrollRestoration("home", ["/category/"]);
+  useScrollRestoration("home", ["/category/"], campusReady);
   useEffect(() => { localStorage.setItem("home:viewMode", viewMode); }, [viewMode]);
 
   const [mounted, setMounted]           = useState(false);
