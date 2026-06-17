@@ -530,7 +530,7 @@ export default function OrderDetailPage() {
       {/* DISPUTE MODAL */}
       {showDisputeModal && (
         <div
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fadeIn"
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 pb-24 sm:pb-4 animate-fadeIn"
           onClick={() => { if (!disputing) { resetDisputeModal(); setShowDisputeModal(false); } }}
         >
           <div
