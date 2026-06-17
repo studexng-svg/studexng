@@ -363,6 +363,9 @@ export const api = {
     conversation: (id: number | string) =>
       fetchWithAuth(u(`/api/chat/conversations/${id}/`)),
 
+    deleteConversation: (id: number | string) =>
+      fetchWithAuth(u(`/api/chat/conversations/${id}/`), { method: "DELETE" }),
+
     start: (body: Record<string, unknown>) =>
       fetchWithAuth(u("/api/chat/conversations/"), { method: "POST", body: s(body) }),
 

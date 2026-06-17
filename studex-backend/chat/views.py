@@ -100,11 +100,6 @@ class ConversationViewSet(viewsets.ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         conversation = self.get_object()
-        if conversation.messages.exists():
-            return Response(
-                {'error': 'Cannot delete a conversation that has messages.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
         conversation.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
