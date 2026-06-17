@@ -83,7 +83,8 @@ class DisputeSerializer(serializers.ModelSerializer):
         model = Dispute
         fields = [
             'id', 'order', 'order_reference', 'filed_by', 'filer', 'filer_username',
-            'reason', 'complaint', 'evidence', 'provider_response', 'provider_responded_at',
+            'reason', 'complaint', 'evidence', 'evidence_image_1', 'evidence_image_2',
+            'provider_response', 'provider_responded_at',
             'status', 'resolution', 'assigned_to', 'assigned_to_username',
             'admin_decision', 'resolved_at', 'resolved_by', 'resolved_by_username',
             'appeal_text', 'appealed_at', 'appeal_decision', 'created_at', 'updated_at'

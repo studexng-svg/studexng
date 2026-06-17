@@ -3,8 +3,9 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import {
   Package, CheckCircle, Clock, AlertCircle, MessageCircle, XCircle, MapPin, Timer,
+  Camera, ImagePlus, X,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/lib/authStore";
 import { GRAD, SERIF } from "@/lib/tokens";
 import ReviewForm from "@/components/ReviewForm";
@@ -91,6 +92,10 @@ export default function OrderDetailPage() {
   const [disputeEvidence, setDisputeEvidence] = useState("");
   const [disputing, setDisputing] = useState(false);
   const [disputeError, setDisputeError] = useState("");
+  const [disputeImages, setDisputeImages] = useState<(File | null)[]>([null, null]);
+  const [disputePreviews, setDisputePreviews] = useState<(string | null)[]>([null, null]);
+  const disputeImgRef1 = useRef<HTMLInputElement>(null);
+  const disputeImgRef2 = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (isHydrated && !isLoggedIn) router.push("/auth");
@@ -158,21 +163,49 @@ export default function OrderDetailPage() {
     finally { setConfirming(false); }
   };
 
+  const resetDisputeModal = () => {
+    setDisputeComplaint("");
+    setDisputeEvidence("");
+    setDisputeError("");
+    setDisputeImages([null, null]);
+    disputePreviews.forEach(p => { if (p) URL.revokeObjectURL(p); });
+    setDisputePreviews([null, null]);
+  };
+
+  const pickDisputeImage = (idx: number, file: File) => {
+    const imgs = [...disputeImages]; imgs[idx] = file;
+    const prevs = [...disputePreviews];
+    if (prevs[idx]) URL.revokeObjectURL(prevs[idx]!);
+    prevs[idx] = URL.createObjectURL(file);
+    setDisputeImages(imgs); setDisputePreviews(prevs);
+  };
+
+  const removeDisputeImage = (idx: number) => {
+    const imgs = [...disputeImages]; imgs[idx] = null;
+    const prevs = [...disputePreviews];
+    if (prevs[idx]) URL.revokeObjectURL(prevs[idx]!);
+    prevs[idx] = null;
+    setDisputeImages(imgs); setDisputePreviews(prevs);
+  };
+
   const handleDisputeSubmit = async () => {
     if (!order || !disputeComplaint.trim()) return;
     setDisputing(true);
     setDisputeError("");
     try {
-      const res = await api.orders.createDispute({
-        order: order.id,
-        reason: disputeReason,
-        complaint: disputeComplaint.trim(),
-        evidence: disputeEvidence.trim(),
-      });
+      const fd = new FormData();
+      fd.append("order", String(order.id));
+      fd.append("reason", disputeReason);
+      fd.append("complaint", disputeComplaint.trim());
+      fd.append("evidence", disputeEvidence.trim());
+      if (disputeImages[0]) fd.append("evidence_image_1", disputeImages[0]);
+      if (disputeImages[1]) fd.append("evidence_image_2", disputeImages[1]);
+      const res = await api.orders.createDispute(fd);
       if (res.ok) {
         queryClient.setQueryData<Order>(["order", orderId], prev =>
           prev ? { ...prev, status: "disputed" } : prev
         );
+        resetDisputeModal();
         setShowDisputeModal(false);
       } else {
         const data = await res.json();
@@ -454,7 +487,7 @@ export default function OrderDetailPage() {
         {canConfirm && (
           <div className="flex gap-3 animate-fadeUp">
             <button
-              onClick={() => setShowDisputeModal(true)}
+              onClick={() => { resetDisputeModal(); setShowDisputeModal(true); }}
               className="flex-1 py-4 bg-red-50 text-red-600 rounded-full font-semibold text-sm border border-red-200 active:scale-[0.98] transition-all flex items-center justify-center gap-1.5"
             >
               <AlertCircle className="w-4 h-4" /> Report Issue
@@ -474,7 +507,7 @@ export default function OrderDetailPage() {
               <Clock className="w-5 h-5" /> Waiting for vendor to confirm delivery
             </div>
             <button
-              onClick={() => setShowDisputeModal(true)}
+              onClick={() => { resetDisputeModal(); setShowDisputeModal(true); }}
               className="w-full py-3 bg-red-50 text-red-600 rounded-full font-semibold text-sm border border-red-100 active:scale-[0.98] transition-all"
             >
               Report an Issue
@@ -497,11 +530,11 @@ export default function OrderDetailPage() {
       {/* DISPUTE MODAL */}
       {showDisputeModal && (
         <div
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4 animate-fadeIn"
-          onClick={() => !disputing && setShowDisputeModal(false)}
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fadeIn"
+          onClick={() => { if (!disputing) { resetDisputeModal(); setShowDisputeModal(false); } }}
         >
           <div
-            className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl border border-stone-100 mb-20 sm:mb-0 animate-fadeUp"
+            className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl border border-stone-100 animate-fadeUp max-h-[90vh] overflow-y-auto"
             onClick={e => e.stopPropagation()}
           >
             <h3 className="text-xl font-bold text-stone-900 mb-1">Report an Issue</h3>
@@ -550,7 +583,7 @@ export default function OrderDetailPage() {
 
               <div>
                 <label className="text-xs font-semibold text-stone-500 mb-1.5 block">
-                  Evidence <span className="text-stone-300">(optional)</span>
+                  Evidence <span className="text-stone-400">(optional)</span>
                 </label>
                 <textarea
                   value={disputeEvidence}
@@ -561,11 +594,51 @@ export default function OrderDetailPage() {
                   className="w-full px-4 py-3 rounded-xl border border-stone-200 text-stone-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 bg-white placeholder:text-stone-400 resize-none transition disabled:opacity-50"
                 />
               </div>
+
+              <div>
+                <label className="text-xs font-semibold text-stone-500 mb-1.5 block">
+                  Photos <span className="text-stone-400">(optional, max 2)</span>
+                </label>
+                <div className="flex gap-3">
+                  {[0, 1].map(idx => (
+                    <div key={idx} className="flex-1">
+                      {disputePreviews[idx] ? (
+                        <div className="relative aspect-square rounded-xl overflow-hidden border border-stone-200">
+                          <img src={disputePreviews[idx]!} alt={`Evidence ${idx + 1}`} className="w-full h-full object-cover" />
+                          <button
+                            onClick={() => removeDisputeImage(idx)}
+                            disabled={disputing}
+                            className="absolute top-1 right-1 w-6 h-6 bg-black/60 text-white rounded-full flex items-center justify-center"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => [disputeImgRef1, disputeImgRef2][idx].current?.click()}
+                          disabled={disputing || (idx === 1 && !disputeImages[0])}
+                          className="w-full aspect-square rounded-xl border-2 border-dashed border-stone-200 flex flex-col items-center justify-center gap-1.5 text-stone-400 hover:border-red-300 hover:text-red-400 transition disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                          {idx === 0 ? <Camera className="w-6 h-6" /> : <ImagePlus className="w-6 h-6" />}
+                          <span className="text-xs font-medium">{idx === 0 ? "Photo 1" : "Photo 2"}</span>
+                        </button>
+                      )}
+                      <input
+                        ref={[disputeImgRef1, disputeImgRef2][idx]}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={e => { const f = e.target.files?.[0]; if (f) pickDisputeImage(idx, f); e.target.value = ""; }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
 
             <div className="flex gap-3 mt-5">
               <button
-                onClick={() => setShowDisputeModal(false)}
+                onClick={() => { resetDisputeModal(); setShowDisputeModal(false); }}
                 disabled={disputing}
                 className="flex-1 py-3 bg-stone-100 text-stone-700 rounded-full font-semibold disabled:opacity-50"
               >

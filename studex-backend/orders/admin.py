@@ -184,7 +184,7 @@ class DisputeAdmin(admin.ModelAdmin):
 
     fieldsets = (
         ('Dispute Information', {
-            'fields': ('order', 'filed_by', 'filer', 'reason', 'complaint', 'evidence')
+            'fields': ('order', 'filed_by', 'filer', 'reason', 'complaint', 'evidence', 'evidence_image_1', 'evidence_image_2')
         }),
         ('Provider Response', {
             'fields': ('provider_response', 'provider_responded_at')

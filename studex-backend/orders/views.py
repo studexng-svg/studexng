@@ -349,6 +349,35 @@ class DisputeViewSet(viewsets.ModelViewSet):
             models.Q(order__buyer=user) | models.Q(order__listing__vendor=user)
         ).distinct()
 
+    def create(self, request, *args, **kwargs):
+        import logging as _logging
+        _logger = _logging.getLogger(__name__)
+
+        image_urls = ['', '']
+        for i, field_name in enumerate(['evidence_image_1', 'evidence_image_2']):
+            img = request.FILES.get(field_name)
+            if img:
+                try:
+                    import cloudinary.uploader
+                    result = cloudinary.uploader.upload(
+                        img,
+                        folder='studex/dispute_evidence',
+                        transformation=[{'quality': 'auto', 'fetch_format': 'auto'}],
+                    )
+                    image_urls[i] = result.get('secure_url', '')
+                except Exception as e:
+                    _logger.warning(f"Cloudinary dispute image upload failed ({field_name}): {e}")
+
+        data = request.data.copy() if hasattr(request.data, 'copy') else dict(request.data)
+        data['evidence_image_1'] = image_urls[0]
+        data['evidence_image_2'] = image_urls[1]
+
+        serializer = self.get_serializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
 
 class BookingViewSet(viewsets.ModelViewSet):
     serializer_class = BookingSerializer

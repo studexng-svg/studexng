@@ -103,6 +103,8 @@ class Dispute(models.Model):
     reason = models.CharField(max_length=50, choices=REASON_CHOICES)
     complaint = models.TextField(help_text="Detailed description of the issue")
     evidence = models.TextField(blank=True, help_text="Evidence or screenshots description")
+    evidence_image_1 = models.URLField(blank=True, help_text="Cloudinary URL for first evidence image")
+    evidence_image_2 = models.URLField(blank=True, help_text="Cloudinary URL for second evidence image")
 
     provider_response = models.TextField(blank=True, null=True)
     provider_responded_at = models.DateTimeField(null=True, blank=True)

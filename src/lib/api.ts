@@ -281,8 +281,11 @@ export const api = {
     bookingAction: (id: number | string, action: string) =>
       fetchWithAuth(u(`/api/orders/bookings/${id}/${action}/`), { method: "POST" }),
 
-    createDispute: (body: Record<string, unknown>) =>
-      fetchWithAuth(u("/api/orders/disputes/"), { method: "POST", body: s(body) }),
+    createDispute: (body: FormData | Record<string, unknown>) =>
+      fetchWithAuth(u("/api/orders/disputes/"), {
+        method: "POST",
+        body: body instanceof FormData ? body : s(body),
+      }),
   },
 
   // ─── Payments ─────────────────────────────────────────────────────────────
