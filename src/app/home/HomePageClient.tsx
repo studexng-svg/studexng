@@ -130,8 +130,6 @@ export default function HomePageClient({ initialVendors, initialListings, initia
   const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlistStore();
   const { addToCart, cart } = useCart();
   const router = useRouter();
-  useScrollRestoration("home", ["/category/"], campusReady);
-  useEffect(() => { localStorage.setItem("home:viewMode", viewMode); }, [viewMode]);
 
   const [mounted, setMounted]           = useState(false);
   const [campusReady, setCampusReady]   = useState(initialListings.length > 0);
@@ -169,6 +167,8 @@ export default function HomePageClient({ initialVendors, initialListings, initia
 
   useEffect(() => { activeTabRef.current = activeTab; }, [activeTab]);
   useEffect(() => { activeFilterRef.current = activeFilter; }, [activeFilter]);
+  useEffect(() => { localStorage.setItem("home:viewMode", viewMode); }, [viewMode]);
+  useScrollRestoration("home", ["/category/"], campusReady);
 
   useEffect(() => {
     setMounted(true);
