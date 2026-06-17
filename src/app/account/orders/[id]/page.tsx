@@ -82,6 +82,7 @@ export default function OrderDetailPage() {
 
   const [confirming, setConfirming] = useState(false);
   const [showModal, setShowModal] = useState(false);
+  const [acknowledged, setAcknowledged] = useState(false);
   const [loyaltyReward, setLoyaltyReward] = useState<string | null>(null);
   const [justConfirmed, setJustConfirmed] = useState(false);
   const [showDisputeModal, setShowDisputeModal] = useState(false);
@@ -408,6 +409,21 @@ export default function OrderDetailPage() {
           </div>
         )}
 
+        {/* PRE-CONFIRM WARNING */}
+        {canConfirm && (
+          <div className="bg-red-50 border-2 border-red-300 rounded-2xl p-4 animate-fadeUp">
+            <div className="flex gap-3">
+              <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="font-bold text-red-900 text-sm">Check the proof carefully before confirming</p>
+                <p className="text-xs text-red-700 mt-1 leading-relaxed">
+                  Once you confirm, payment is released to the vendor <span className="font-bold">immediately and cannot be reversed</span>. After confirming, you will no longer be able to file a dispute yourself. If anything looks wrong with the delivery proof above, tap <span className="font-bold">Report an Issue</span> instead.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* LOYALTY PROGRESS */}
         {loyalty && (
           <div className="bg-white rounded-2xl p-4 shadow-sm border border-stone-200 animate-fadeUp">
@@ -435,21 +451,28 @@ export default function OrderDetailPage() {
         )}
 
         {/* CONFIRM BUTTON */}
-        {(canConfirm || awaitingVendor) && (
+        {canConfirm && (
+          <div className="flex gap-3 animate-fadeUp">
+            <button
+              onClick={() => setShowDisputeModal(true)}
+              className="flex-1 py-4 bg-red-50 text-red-600 rounded-full font-semibold text-sm border border-red-200 active:scale-[0.98] transition-all flex items-center justify-center gap-1.5"
+            >
+              <AlertCircle className="w-4 h-4" /> Report Issue
+            </button>
+            <button
+              onClick={() => { setAcknowledged(false); setShowModal(true); }}
+              className="flex-1 py-4 text-white rounded-full font-semibold text-sm shadow-lg flex items-center justify-center gap-1.5 active:scale-[0.98] transition-all"
+              style={{ background: GRAD }}
+            >
+              <CheckCircle className="w-4 h-4" /> Confirm
+            </button>
+          </div>
+        )}
+        {awaitingVendor && (
           <div className="space-y-3 animate-fadeUp">
-            {awaitingVendor ? (
-              <div className="w-full py-4 bg-stone-100 text-stone-400 rounded-full font-semibold text-base flex items-center justify-center gap-2 cursor-not-allowed select-none">
-                <Clock className="w-5 h-5" /> Waiting for vendor to confirm delivery
-              </div>
-            ) : (
-              <button
-                onClick={() => setShowModal(true)}
-                className="w-full py-4 text-white rounded-full font-semibold text-base shadow-lg flex items-center justify-center gap-2 active:scale-[0.98] transition-all"
-                style={{ background: GRAD }}
-              >
-                <CheckCircle className="w-5 h-5" /> Confirm Service Received
-              </button>
-            )}
+            <div className="w-full py-4 bg-stone-100 text-stone-400 rounded-full font-semibold text-base flex items-center justify-center gap-2 cursor-not-allowed select-none">
+              <Clock className="w-5 h-5" /> Waiting for vendor to confirm delivery
+            </div>
             <button
               onClick={() => setShowDisputeModal(true)}
               className="w-full py-3 bg-red-50 text-red-600 rounded-full font-semibold text-sm border border-red-100 active:scale-[0.98] transition-all"
@@ -566,23 +589,29 @@ export default function OrderDetailPage() {
       {showModal && (
         <div
           className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4 animate-fadeIn"
-          onClick={() => !confirming && setShowModal(false)}
+          onClick={() => !confirming && (setShowModal(false), setAcknowledged(false))}
         >
           <div
             className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl border border-stone-100 mb-20 sm:mb-0 animate-fadeUp"
             onClick={e => e.stopPropagation()}
           >
             <h3 className="text-xl font-bold text-stone-900 mb-2">Confirm Service Received?</h3>
-            <p className="text-stone-500 text-sm mb-5">
-              Only confirm if the vendor delivered the service. This releases the payment.
-            </p>
-            <div className="bg-teal-50 rounded-xl p-4 mb-5 text-center">
+
+            <div className="bg-red-50 border border-red-200 rounded-xl p-3 mb-4 flex gap-2">
+              <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-red-700 leading-relaxed">
+                Payment is released to the vendor <span className="font-bold">immediately</span> once you confirm. You will not be able to file a dispute yourself after this point. Only confirm if you are satisfied.
+              </p>
+            </div>
+
+            <div className="bg-teal-50 rounded-xl p-4 mb-4 text-center">
               <p className="text-xs text-stone-400">Amount paid</p>
               <p className="text-3xl font-bold text-teal-700 mt-1">
                 ₦{parseFloat(String(order.amount)).toLocaleString("en-NG", { minimumFractionDigits: 2 })}
               </p>
               <p className="text-xs text-stone-400 mt-1">to {order.listing?.vendor?.username}</p>
             </div>
+
             <p className="text-xs text-center text-amber-600 mb-4">
               {loyalty
                 ? loyalty.orders_until_next_reward === 1
@@ -592,12 +621,26 @@ export default function OrderDetailPage() {
                   : `🎁 ${loyalty.orders_until_next_reward} more orders to earn ₦200 loyalty credits`
                 : "🎁 Complete 10 orders to earn ₦200 loyalty credits"}
             </p>
+
+            <label className="flex items-start gap-3 mb-5 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={acknowledged}
+                onChange={e => setAcknowledged(e.target.checked)}
+                disabled={confirming}
+                className="mt-0.5 w-4 h-4 accent-teal-600 flex-shrink-0 cursor-pointer"
+              />
+              <span className="text-xs text-stone-700 leading-relaxed">
+                I have inspected the delivery proof and I understand that confirming releases payment to the vendor immediately and cannot be undone.
+              </span>
+            </label>
+
             <div className="flex gap-3">
-              <button onClick={() => setShowModal(false)} disabled={confirming}
+              <button onClick={() => { setShowModal(false); setAcknowledged(false); }} disabled={confirming}
                 className="flex-1 py-3 bg-stone-100 text-stone-700 rounded-full font-semibold disabled:opacity-50">
                 Cancel
               </button>
-              <button onClick={handleConfirm} disabled={confirming}
+              <button onClick={handleConfirm} disabled={confirming || !acknowledged}
                 className="flex-1 py-3 text-white rounded-full font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
                 style={{ background: GRAD }}>
                 {confirming
