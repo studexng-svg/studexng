@@ -167,8 +167,10 @@ export default function HomePageClient({ initialVendors, initialListings, initia
 
   useEffect(() => { activeTabRef.current = activeTab; }, [activeTab]);
   useEffect(() => { activeFilterRef.current = activeFilter; }, [activeFilter]);
-  useEffect(() => { localStorage.setItem("home:viewMode", viewMode); }, [viewMode]);
-  useScrollRestoration("home", ["/category/"], campusReady);
+  // Only persist after mount so the initial "grid" default doesn't overwrite a saved value
+  useEffect(() => { if (mounted) localStorage.setItem("home:viewMode", viewMode); }, [viewMode, mounted]);
+  // Wait for both campus data and mount (viewMode from localStorage) before restoring scroll
+  useScrollRestoration("home", ["/category/"], campusReady && mounted);
 
   useEffect(() => {
     setMounted(true);
