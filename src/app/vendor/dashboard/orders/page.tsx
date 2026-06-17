@@ -212,22 +212,18 @@ export default function OrdersPage() {
                 </p>
               </div>
               {order.status === "paid" && (() => {
-                // tick is read so this re-evaluates every second
                 void tick;
                 const { canMark, label } = getCountdown(order.paid_at);
-                return canMark ? (
+                return (
                   <button
-                    onClick={() => setProofOrder(order)}
-                    className="w-full py-2.5 rounded-xl text-sm font-semibold text-white transition-all active:scale-[0.98]"
+                    onClick={() => canMark && setProofOrder(order)}
+                    disabled={!canMark}
+                    className="w-full py-2.5 rounded-xl text-sm font-semibold text-white flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
                     style={{ background: GRAD }}
                   >
-                    Mark as Delivered
+                    {!canMark && <Clock className="w-4 h-4" />}
+                    {canMark ? "Mark as Delivered" : `Mark as Delivered (${label})`}
                   </button>
-                ) : (
-                  <div className="w-full py-2.5 rounded-xl text-sm font-semibold text-center bg-stone-100 text-stone-400 flex items-center justify-center gap-2 select-none">
-                    <Clock className="w-4 h-4" />
-                    Available in {label}
-                  </div>
                 );
               })()}
               {order.status === "seller_completed" && (
