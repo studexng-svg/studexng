@@ -260,13 +260,13 @@ export default function HomePageClient({ initialVendors, initialListings, initia
     const t = setTimeout(async () => {
       setSearching(true);
       try {
-        const res = await api.pub.listings({ search: searchQuery, page_size: "20" });
+        const res = await api.pub.listings({ search: searchQuery, page_size: "20", campus: currentCampus });
         const data = await res.json();
         setSearchResults(data.results || data || []); setShowResults(true);
       } catch { setSearchResults([]); } finally { setSearching(false); }
     }, 400);
     return () => clearTimeout(t);
-  }, [searchQuery, isLoggedIn]);
+  }, [searchQuery, currentCampus]);
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 2000); };
 

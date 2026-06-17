@@ -62,6 +62,8 @@ class ConversationViewSet(viewsets.ModelViewSet):
         user = self.request.user
         return Conversation.objects.filter(
             Q(buyer=user) | Q(seller=user)
+        ).filter(
+            Q(listing__isnull=True) | Q(listing__campus=user.school)
         ).select_related('buyer', 'seller', 'listing').order_by('-updated_at')
 
     def create(self, request, *args, **kwargs):
@@ -83,6 +85,9 @@ class ConversationViewSet(viewsets.ModelViewSet):
 
         if request.user == seller:
             return Response({'error': 'You cannot message yourself'}, status=400)
+
+        if listing.campus and request.user.school and listing.campus != request.user.school:
+            return Response({'error': 'You can only message vendors from your campus.'}, status=403)
 
         conversation, created = Conversation.objects.get_or_create(
             buyer=request.user,
