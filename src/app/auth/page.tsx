@@ -303,7 +303,7 @@ export default function AuthPage() {
 
         const result = await api.register({
           username: signupForm.username, email: signupForm.email, phone: signupForm.phone,
-          password: signupForm.password, password2: signupForm.password, user_type: "student",
+          password: signupForm.password, password2: signupForm.password, user_type: isNonStudent ? "non_student" : "student",
           hostel: signupForm.hostel || "",
           school: signupForm.school,
           campus: signupForm.school.toLowerCase(),
