@@ -206,6 +206,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
     level = serializers.CharField(write_only=True, required=False, allow_blank=True, allow_null=True)
     disclaimer_accepted = serializers.BooleanField(required=False)
     disclaimer_accepted_at = serializers.SerializerMethodField()
+    vendor_application_pending = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -218,6 +219,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'whatsapp', 'instagram', 'available_days', 'opening_time', 'closing_time',
             'date_of_birth', 'gender', 'department', 'level',
             'disclaimer_accepted', 'disclaimer_accepted_at',
+            'vendor_application_pending',
         ]
         read_only_fields = ['wallet_balance', 'is_verified_vendor', 'created_at', 'is_staff', 'is_superuser', 'is_admin']
 
@@ -230,6 +232,12 @@ class UserProfileSerializer(serializers.ModelSerializer):
             return obj.profile.disclaimer_accepted_at
         except Exception:
             return None
+
+    def get_vendor_application_pending(self, obj):
+        try:
+            return obj.seller_application.status == 'pending'
+        except Exception:
+            return False
 
     def get_profile_image(self, obj):
         """Always return an absolute URL — works with Cloudinary, S3, and local storage."""

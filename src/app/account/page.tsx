@@ -30,7 +30,8 @@ function VerifiedTick({ color, label }: { color: string; label: string }) {
 const POLL_INTERVAL = 30_000;
 
 const isApprovedVendor = (u: any) => !!u?.is_verified_vendor;
-const isPendingVendor = (u: any) => u?.user_type === "vendor" && !u?.is_verified_vendor;
+const isPendingVendor = (u: any) =>
+  u?.vendor_application_pending || (u?.user_type === "vendor" && !u?.is_verified_vendor);
 
 // ── Menu config ───────────────────────────────────────────────────────────────
 const MENU_ITEMS = [

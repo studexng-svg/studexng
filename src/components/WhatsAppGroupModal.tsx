@@ -6,31 +6,39 @@ import { X } from "lucide-react";
 import { GRAD } from "@/lib/tokens";
 import { useAuth } from "@/lib/authStore";
 
-const STORAGE_KEY = "wa_imsu_dismissed";
-const WA_LINK = "https://chat.whatsapp.com/H2rwr1Zhmra0GVryF8ZEWp?s=cl&p=i&ilr=2";
+const STORAGE_KEY: Record<string, string> = {
+  imsu: "wa_imsu_dismissed",
+  futo: "wa_futo_dismissed",
+};
+const WA_LINK: Record<string, string> = {
+  imsu: "https://chat.whatsapp.com/H2rwr1Zhmra0GVryF8ZEWp?s=cl&p=i&ilr=2",
+  futo: "https://chat.whatsapp.com/KTlpG2on7YFGUN7FYQ1s2V",
+};
 
 export default function WhatsAppGroupModal() {
   const { user, isLoggedIn, isHydrated } = useAuth();
   const [visible, setVisible] = useState(false);
+  const [school, setSchool] = useState("");
 
   useEffect(() => {
     if (!isHydrated || !isLoggedIn) return;
-    const school = (user?.school || "").toLowerCase();
-    if (school !== "imsu") return;
-    if (localStorage.getItem(STORAGE_KEY)) return;
+    const s = (user?.school || "").toLowerCase();
+    if (s !== "imsu" && s !== "futo") return;
+    if (localStorage.getItem(STORAGE_KEY[s])) return;
+    setSchool(s);
     const t = setTimeout(() => setVisible(true), 1200);
     return () => clearTimeout(t);
   }, [isHydrated, isLoggedIn, user]);
 
   const dismiss = () => {
-    localStorage.setItem(STORAGE_KEY, "1");
+    if (school) localStorage.setItem(STORAGE_KEY[school], "1");
     setVisible(false);
   };
 
   const join = () => {
-    localStorage.setItem(STORAGE_KEY, "1");
+    if (school) localStorage.setItem(STORAGE_KEY[school], "1");
     setVisible(false);
-    window.open(WA_LINK, "_blank", "noopener,noreferrer");
+    window.open(WA_LINK[school], "_blank", "noopener,noreferrer");
   };
 
   return (
@@ -71,7 +79,7 @@ export default function WhatsAppGroupModal() {
               </div>
 
               <p className="text-white font-bold text-base px-4 text-center leading-snug">
-                Join the IMSU StudEx WhatsApp Group
+                Join the {school.toUpperCase()} StudEx WhatsApp Group
               </p>
             </div>
 

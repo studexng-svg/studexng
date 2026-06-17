@@ -733,11 +733,13 @@ export default function AuthPage() {
                         <label className="text-sm font-medium text-stone-700 flex items-center gap-1.5 mb-1.5">
                           <MapPin className="w-4 h-4" /> Location
                         </label>
-                        <select
+                        <input
+                          type="text"
                           name="hostel"
                           value={signupForm.hostel}
                           onChange={handleSignupChange}
-                          className={`w-full px-4 py-2.5 rounded-xl border focus:outline-none focus:ring-2 transition-all text-sm bg-white text-stone-900 appearance-none ${
+                          placeholder="e.g. Owerri, Agbowo, Off-Campus..."
+                          className={`w-full px-4 py-2.5 rounded-xl border focus:outline-none focus:ring-2 transition-all text-sm bg-white text-stone-900 ${
                             touched.hostel && !hostelOk
                               ? "border-red-300 focus:ring-red-200 focus:border-red-400"
                               : hostelOk
@@ -745,13 +747,8 @@ export default function AuthPage() {
                               : "border-stone-200 focus:ring-teal-500/30 focus:border-teal-500"
                           }`}
                           disabled={isLoading}
-                        >
-                          <option value="">Select your area</option>
-                          {NON_STUDENT_LOCATIONS.map(l => (
-                            <option key={l} value={l}>{l}</option>
-                          ))}
-                        </select>
-                        {touched.hostel && !hostelOk && <FieldFeedback ok={false} msg="Please select your location" />}
+                        />
+                        {touched.hostel && !hostelOk && <FieldFeedback ok={false} msg="Please enter your location" />}
                       </div>
                     )}
 
