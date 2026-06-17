@@ -1066,7 +1066,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
               </div>
             </div>
 
-            {/* Deals Section — always visible above the category filter */}
+            {/* Deals Section — horizontal scroll strip */}
             {activeTab === "listings" && deals.length > 0 && dealsReady && (
               <div className="mb-6">
                 <div className="flex items-center justify-between mb-4">
@@ -1074,9 +1074,19 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                     <p className="text-red-600 text-xs tracking-widest uppercase font-bold">🏷️ {deals.length} deal{deals.length !== 1 ? "s" : ""}</p>
                     <h3 className="text-lg font-bold text-stone-900 mt-0.5">Hot Deals</h3>
                   </div>
+                  <Link href="/deals" className="text-teal-600 text-sm font-semibold flex items-center gap-1 hover:text-teal-700 transition">
+                    See all <ChevronRight className="w-4 h-4" />
+                  </Link>
                 </div>
-                <div className={gridClass}>
-                  {deals.map((deal, i) => renderDealCard(deal, i))}
+                <div
+                  className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4"
+                  style={{ scrollbarWidth: "none", msOverflowStyle: "none" } as React.CSSProperties}
+                >
+                  {deals.map((deal, i) => (
+                    <div key={deal.listing?.id ?? i} className="flex-shrink-0 w-44">
+                      {renderDealCard(deal, i)}
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
