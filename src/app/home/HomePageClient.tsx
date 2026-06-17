@@ -131,6 +131,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
   const { addToCart, cart } = useCart();
   const router = useRouter();
   useScrollRestoration("home", ["/category/"]);
+  useEffect(() => { localStorage.setItem("home:viewMode", viewMode); }, [viewMode]);
 
   const [mounted, setMounted]           = useState(false);
   const [campusReady, setCampusReady]   = useState(initialListings.length > 0);
@@ -140,7 +141,11 @@ export default function HomePageClient({ initialVendors, initialListings, initia
   const [minPrice, setMinPrice]         = useState<string>("");
   const [maxPrice, setMaxPrice]         = useState<string>("");
   const [heroIndex, setHeroIndex]       = useState(0);
-  const [viewMode, setViewMode]         = useState<"grid" | "list" | "scroll">("grid");
+  const [viewMode, setViewMode]         = useState<"grid" | "list" | "scroll">(() => {
+    if (typeof window === "undefined") return "grid";
+    const saved = localStorage.getItem("home:viewMode");
+    return (saved === "list" || saved === "scroll") ? saved : "grid";
+  });
   const [deals, setDeals]               = useState<any[]>([]);
 
   const fetchDeals = useCallback(async (campus: string) => {
