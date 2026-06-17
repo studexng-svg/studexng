@@ -92,6 +92,7 @@ export default function OrderDetailPage() {
   const [disputeEvidence, setDisputeEvidence] = useState("");
   const [disputing, setDisputing] = useState(false);
   const [disputeError, setDisputeError] = useState("");
+  const [disputeSuccess, setDisputeSuccess] = useState(false);
   const [disputeImages, setDisputeImages] = useState<(File | null)[]>([null, null]);
   const [disputePreviews, setDisputePreviews] = useState<(string | null)[]>([null, null]);
   const disputeImgRef1 = useRef<HTMLInputElement>(null);
@@ -167,6 +168,7 @@ export default function OrderDetailPage() {
     setDisputeComplaint("");
     setDisputeEvidence("");
     setDisputeError("");
+    setDisputeSuccess(false);
     setDisputeImages([null, null]);
     disputePreviews.forEach(p => { if (p) URL.revokeObjectURL(p); });
     setDisputePreviews([null, null]);
@@ -205,11 +207,20 @@ export default function OrderDetailPage() {
         queryClient.setQueryData<Order>(["order", orderId], prev =>
           prev ? { ...prev, status: "disputed" } : prev
         );
-        resetDisputeModal();
-        setShowDisputeModal(false);
+        setDisputeSuccess(true);
+        setTimeout(() => {
+          resetDisputeModal();
+          setShowDisputeModal(false);
+        }, 2000);
       } else {
-        const data = await res.json();
-        const msg = data.non_field_errors?.[0] || data.detail || "Failed to submit dispute.";
+        let msg = "Failed to submit dispute.";
+        try {
+          const data = await res.json();
+          msg = data.non_field_errors?.[0]
+            || data.detail
+            || Object.values(data).flat().find((v): v is string => typeof v === "string")
+            || msg;
+        } catch {}
         setDisputeError(msg);
       }
     } catch { setDisputeError("Network error. Please try again."); }
@@ -539,27 +550,42 @@ export default function OrderDetailPage() {
             onClick={e => e.stopPropagation()}
           >
             {/* Fixed header */}
-            <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-stone-100 shrink-0">
-              <div>
-                <h3 className="text-lg font-bold text-stone-900 leading-tight">Report an Issue</h3>
-                <p className="text-stone-400 text-xs mt-0.5">Our team will review and follow up.</p>
+            <div className="px-5 pt-5 pb-3 border-b border-stone-100 shrink-0">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-bold text-stone-900 leading-tight">Report an Issue</h3>
+                  <p className="text-stone-400 text-xs mt-0.5">Our team will review and follow up.</p>
+                </div>
+                <button
+                  onClick={() => { resetDisputeModal(); setShowDisputeModal(false); }}
+                  disabled={disputing}
+                  className="p-2 rounded-full text-stone-400 hover:text-stone-600 hover:bg-stone-100 transition disabled:opacity-40"
+                >
+                  <X className="w-5 h-5" />
+                </button>
               </div>
-              <button
-                onClick={() => { resetDisputeModal(); setShowDisputeModal(false); }}
-                disabled={disputing}
-                className="p-2 rounded-full text-stone-400 hover:text-stone-600 hover:bg-stone-100 transition disabled:opacity-40"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Scrollable body */}
-            <div className="overflow-y-auto flex-1 px-5 py-4 space-y-3">
               {disputeError && (
-                <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-600 font-medium">
+                <div className="mt-3 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-600 font-medium">
                   {disputeError}
                 </div>
               )}
+            </div>
+
+            {/* Success screen */}
+            {disputeSuccess ? (
+              <div className="flex-1 flex flex-col items-center justify-center px-5 py-10 gap-4">
+                <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center">
+                  <CheckCircle className="w-8 h-8 text-emerald-500" />
+                </div>
+                <div className="text-center">
+                  <p className="font-bold text-stone-900 text-lg">Dispute Filed</p>
+                  <p className="text-stone-500 text-sm mt-1">Our team has been notified and will review your case shortly.</p>
+                </div>
+              </div>
+            ) : null}
+
+            {/* Scrollable body */}
+            {!disputeSuccess && <div className="overflow-y-auto flex-1 px-5 py-4 space-y-3">
 
               <div>
                 <label className="text-xs font-semibold text-stone-500 mb-1.5 block">Reason</label>
@@ -646,10 +672,10 @@ export default function OrderDetailPage() {
                   ))}
                 </div>
               </div>
-            </div>
+            </div>}
 
             {/* Pinned action buttons — always above nav */}
-            <div className="px-5 pt-3 pb-6 border-t border-stone-100 flex gap-3 shrink-0">
+            {!disputeSuccess && <div className="px-5 pt-3 pb-6 border-t border-stone-100 flex gap-3 shrink-0">
               <button
                 onClick={() => { resetDisputeModal(); setShowDisputeModal(false); }}
                 disabled={disputing}
@@ -666,7 +692,7 @@ export default function OrderDetailPage() {
                   ? <div className="animate-spin"><Clock className="w-5 h-5" /></div>
                   : <><AlertCircle className="w-4 h-4" /> Submit Dispute</>}
               </button>
-            </div>
+            </div>}
           </div>
         </div>
       )}
