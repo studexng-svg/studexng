@@ -99,12 +99,11 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         if data['password'] != data['password2']:
             raise serializers.ValidationError({"password": "Passwords do not match"})
 
-        user_type = data.get('user_type', 'student')
         school = (data.get('school') or '').lower()
+        is_non_student = bool(data.get('nin'))
 
-        if user_type != 'student':
-            if not data.get('nin'):
-                raise serializers.ValidationError({"nin": "NIN is required for non-student accounts."})
+        if is_non_student:
+            pass  # NIN field-level validator already enforces format and uniqueness
         elif school == 'futo':
             matric = data.get('matric_number', '')
             if not matric or not re.match(r'^\d{11}$', matric):
