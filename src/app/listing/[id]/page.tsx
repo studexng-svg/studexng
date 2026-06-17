@@ -13,18 +13,25 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     );
     if (res.ok) {
       const listing = await res.json();
-      const price = listing.price
-        ? `₦${Number(listing.price).toLocaleString("en-NG")}`
-        : null;
+      const price = listing.price ? Number(listing.price) : null;
+      const discount = listing.discount_percent ? Number(listing.discount_percent) : 0;
+      const salePrice = price && discount > 0 ? Math.round(price * (1 - discount / 100)) : null;
       const vendorName = listing.vendor?.business_name || listing.vendor?.username || "a student vendor";
       const rawDesc = listing.description
         ? listing.description.slice(0, 120) + (listing.description.length > 120 ? "…" : "")
         : "";
-      const ogTitle = price
-        ? `${listing.title} - ${price} | StudEx`
+      const priceStr = salePrice
+        ? `₦${salePrice.toLocaleString("en-NG")} (${discount}% off)`
+        : price
+        ? `₦${price.toLocaleString("en-NG")}`
+        : null;
+      const ogTitle = salePrice
+        ? `${listing.title} — ${discount}% OFF | StudEx`
+        : price
+        ? `${listing.title} — ₦${price.toLocaleString("en-NG")} | StudEx`
         : `${listing.title} | StudEx`;
       const ogDesc = [
-        price ? `${price} · Sold by @${vendorName}` : `Sold by @${vendorName}`,
+        priceStr ? `${priceStr} · Sold by @${vendorName}` : `Sold by @${vendorName}`,
         rawDesc,
       ].filter(Boolean).join(" · ");
 
@@ -34,16 +41,12 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
         openGraph: {
           title: ogTitle,
           description: ogDesc,
-          images: listing.image
-            ? [{ url: listing.image, alt: listing.title, width: 1200, height: 630 }]
-            : undefined,
           type: "website",
         },
         twitter: {
           card: "summary_large_image",
           title: ogTitle,
           description: ogDesc,
-          images: listing.image ? [listing.image] : undefined,
         },
       };
     }
