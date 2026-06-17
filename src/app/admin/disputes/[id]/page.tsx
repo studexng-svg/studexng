@@ -33,6 +33,7 @@ export default function AdminDisputeDetail() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [decision, setDecision] = useState("");
+  const [actionError, setActionError] = useState("");
 
   useEffect(() => {
     if (!id) return;
@@ -45,21 +46,35 @@ export default function AdminDisputeDetail() {
 
   const resolve = async (resolution: string) => {
     if (!decision.trim()) { alert("Please enter an admin decision note first."); return; }
+    setActionError("");
     setSaving(true);
     try {
       const res = await api.admin.updateDispute(id as string, { status: "resolved", resolution, admin_decision: decision });
-      if (res.ok) setDispute(await res.json());
-    } catch {}
-    finally { setSaving(false); }
+      if (res.ok) {
+        setDispute(await res.json());
+      } else {
+        const body = await res.json().catch(() => ({}));
+        setActionError(body.error || `Action failed (${res.status}). Check server logs.`);
+      }
+    } catch (e: any) {
+      setActionError("Network error — please try again.");
+    } finally { setSaving(false); }
   };
 
   const markUnderReview = async () => {
+    setActionError("");
     setSaving(true);
     try {
       const res = await api.admin.updateDispute(id as string, { status: "under_review" });
-      if (res.ok) setDispute(await res.json());
-    } catch {}
-    finally { setSaving(false); }
+      if (res.ok) {
+        setDispute(await res.json());
+      } else {
+        const body = await res.json().catch(() => ({}));
+        setActionError(body.error || `Action failed (${res.status}).`);
+      }
+    } catch {
+      setActionError("Network error — please try again.");
+    } finally { setSaving(false); }
   };
 
   if (loading) return (
@@ -152,6 +167,12 @@ export default function AdminDisputeDetail() {
         {!resolved && (
           <div className="bg-white border border-stone-200 rounded-2xl p-4 shadow-sm space-y-3">
             <p className="text-teal-600 text-xs tracking-[0.2em] uppercase font-semibold">Admin Actions</p>
+
+            {actionError && (
+              <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2.5 text-sm text-red-700">
+                {actionError}
+              </div>
+            )}
 
             <textarea
               rows={3}
