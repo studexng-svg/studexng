@@ -775,21 +775,44 @@ try:
                         try:
                             from payments.views import _refund_paystack_transaction
                             from payments.models import PaymentTransaction
+                            import logging as _log
                             txn = PaymentTransaction.objects.filter(
                                 reference=order.reference, status='success'
                             ).first()
                             if txn:
+                                # Guard: vendor already received a bank transfer.
+                                # Refunding the buyer here would mean StudEx absorbs
+                                # both sides. Block and require manual resolution.
+                                if txn.transfer_reference:
+                                    _log.getLogger(__name__).error(
+                                        f"Dispute {dispute_id}: refund blocked — vendor transfer "
+                                        f"{txn.transfer_reference} already sent for order {order.id}."
+                                    )
+                                    return Response({
+                                        'error': (
+                                            f'Cannot auto-refund: vendor payout {txn.transfer_reference} '
+                                            'was already sent. Resolve this manually.'
+                                        )
+                                    }, status=status.HTTP_409_CONFLICT)
                                 amount_kobo = int(txn.amount * 100)
                                 ok = _refund_paystack_transaction(order.reference, amount_kobo)
-                                if ok:
-                                    txn.status = 'refunded'
-                                    txn.save()
+                                if not ok:
+                                    _log.getLogger(__name__).warning(
+                                        f"Dispute refund: Paystack rejected refund for order {order.id}")
+                                    return Response(
+                                        {'error': 'Paystack refund request failed. Retry or process manually.'},
+                                        status=status.HTTP_502_BAD_GATEWAY
+                                    )
+                                txn.status = 'refunded'
+                                txn.save()
+                            # txn is None when payment was made entirely with loyalty
+                            # credits — no Paystack charge to reverse, just cancel.
+                            order.status = 'cancelled'
+                            order.save()
                         except Exception as pe:
                             import logging as _log
                             _log.getLogger(__name__).warning(
                                 f"Dispute refund failed for order {order.id}: {pe}")
-                        order.status = 'cancelled'
-                        order.save()
                         _dn(order.buyer, 'order_update',
                             '✅ Dispute Resolved — Refund Initiated',
                             f'Your dispute for "{order.listing.title}" was resolved in your favour. A refund has been initiated to your original payment method.',
