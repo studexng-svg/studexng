@@ -26,7 +26,7 @@ export default function ListingsPage() {
   const { data: listingsData, isPending: loading } = useQuery({
     queryKey: ["vendor-listings"],
     queryFn: async () => {
-      const res = await api.services.listingsAuth({ vendor_username: user!.username });
+      const res = await api.services.listingsAuth({ vendor_username: user!.username, page_size: "500" });
       const data = await res.json();
       return toArray(data);
     },

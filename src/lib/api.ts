@@ -628,5 +628,14 @@ export const api = {
           }`
         )
       ),
+
+    abandonedCarts: (campus?: string) =>
+      fetchWithAuth(u(`/api/admin/abandoned-carts/${campus ? "?campus=" + campus : ""}`)),
+
+    sendAbandonedCartReminder: (userIds: number[]) =>
+      fetchWithAuth(u("/api/admin/abandoned-carts/remind/"), {
+        method: "POST",
+        body: s({ user_ids: userIds }),
+      }),
   },
 };

@@ -1577,8 +1577,113 @@ try:
                 })
             return Response(data)
 
+    class AdminAbandonedCartsView(APIView):
+        """GET /api/admin/abandoned-carts/ — users with cart items added 5+ hours ago."""
+        permission_classes = [IsAdminUser]
+
+        def get(self, request):
+            from django.utils import timezone
+            from datetime import timedelta
+            from collections import defaultdict
+
+            cutoff = timezone.now() - timedelta(hours=5)
+            qs = CartItem.objects.filter(
+                created_at__lte=cutoff
+            ).select_related('user', 'listing').order_by('user_id', 'created_at')
+
+            campus = request.query_params.get('campus')
+            if campus:
+                qs = qs.filter(user__school__iexact=campus)
+
+            user_items = defaultdict(list)
+            for item in qs:
+                user_items[item.user_id].append(item)
+
+            data = []
+            now = timezone.now()
+            for uid, cart_items in user_items.items():
+                user = cart_items[0].user
+                oldest = cart_items[0].created_at
+                age_hours = (now - oldest).total_seconds() / 3600
+                total_value = sum(float(item.listing.price) * item.quantity for item in cart_items)
+                data.append({
+                    'user_id': uid,
+                    'username': user.username,
+                    'email': user.email,
+                    'campus': (user.school or 'pau').lower(),
+                    'item_count': len(cart_items),
+                    'total_value': round(total_value, 2),
+                    'oldest_item_hours': round(age_hours, 1),
+                    'items': [
+                        {
+                            'listing_title': item.listing.title,
+                            'quantity': item.quantity,
+                            'price': str(item.listing.price),
+                            'added_at': item.created_at.isoformat(),
+                        }
+                        for item in cart_items
+                    ],
+                })
+
+            data.sort(key=lambda x: x['oldest_item_hours'], reverse=True)
+            return Response(data)
+
+    class AdminAbandonedCartReminderView(APIView):
+        """POST /api/admin/abandoned-carts/remind/ — send reminders to selected users."""
+        permission_classes = [IsAdminUser]
+
+        def post(self, request):
+            from django.utils import timezone
+            from datetime import timedelta
+            from accounts.utils import send_notification
+            from django.contrib.auth import get_user_model
+            _User = get_user_model()
+
+            user_ids = request.data.get('user_ids', [])
+            if not user_ids:
+                return Response({'error': 'No user_ids provided.'}, status=status.HTTP_400_BAD_REQUEST)
+
+            cutoff = timezone.now() - timedelta(hours=5)
+            sent = 0
+            failed = 0
+
+            for uid in user_ids:
+                try:
+                    user = _User.objects.get(id=uid)
+                    items = CartItem.objects.filter(
+                        user=user, created_at__lte=cutoff
+                    ).select_related('listing')
+
+                    if not items.exists():
+                        continue
+
+                    count = items.count()
+                    names = ', '.join(i.listing.title for i in items[:3])
+                    if count > 3:
+                        names += f' and {count - 3} more'
+
+                    send_notification(
+                        recipient=user,
+                        notification_type='order_update',
+                        title='🛒 You left items in your cart!',
+                        message=(
+                            f'You have {count} item{"s" if count > 1 else ""} waiting: {names}. '
+                            f'Complete your purchase before they sell out!'
+                        ),
+                        action_url='/cart',
+                    )
+                    sent += 1
+                except Exception as e:
+                    import logging
+                    logging.getLogger(__name__).warning(f'Abandoned cart reminder failed for user {uid}: {e}')
+                    failed += 1
+
+            return Response({'sent': sent, 'failed': failed})
+
 except ImportError:
     AdminCartListView = None
+    AdminAbandonedCartsView = None
+    AdminAbandonedCartReminderView = None
 
 
 # ============================================

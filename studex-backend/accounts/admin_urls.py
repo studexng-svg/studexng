@@ -30,6 +30,8 @@ from accounts.admin_views import (
     AdminCategoryListView,
     AdminCategoryDetailView,
     AdminCartListView,
+    AdminAbandonedCartsView,
+    AdminAbandonedCartReminderView,
     AdminConversationListView,
     AdminConversationDetailView,
     AdminBroadcastMessageView,
@@ -135,6 +137,8 @@ urlpatterns += [
 if AdminCartListView is not None:
     urlpatterns += [
         path('cart/', AdminCartListView.as_view(), name='cart-list'),
+        path('abandoned-carts/', AdminAbandonedCartsView.as_view(), name='abandoned-carts'),
+        path('abandoned-carts/remind/', AdminAbandonedCartReminderView.as_view(), name='abandoned-carts-remind'),
     ]
 
 if AdminConversationListView is not None:
