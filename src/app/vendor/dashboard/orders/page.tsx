@@ -1,11 +1,23 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { GRAD, toArray } from "@/lib/tokens";
-import { ShoppingBag, MapPin, Camera, X, ImagePlus } from "lucide-react";
+import { ShoppingBag, MapPin, Camera, X, ImagePlus, Clock } from "lucide-react";
 import { StatusBadge, EmptyState, LoadingSpinner, HEADING_FONT } from "../_shared";
 import { api } from "@/lib/api";
+
+const MARK_COMPLETE_WAIT_SECS = 15 * 60;
+
+function getCountdown(paidAt: string | null | undefined): { canMark: boolean; label: string } {
+  if (!paidAt) return { canMark: true, label: "" };
+  const elapsed = Math.floor((Date.now() - new Date(paidAt).getTime()) / 1000);
+  const remaining = Math.max(0, MARK_COMPLETE_WAIT_SECS - elapsed);
+  if (remaining === 0) return { canMark: true, label: "" };
+  const m = String(Math.floor(remaining / 60)).padStart(2, "0");
+  const s = String(remaining % 60).padStart(2, "0");
+  return { canMark: false, label: `${m}:${s}` };
+}
 
 function ProofModal({ order, onSuccess, onClose }: {
   order: any;
@@ -116,9 +128,14 @@ function ProofModal({ order, onSuccess, onClose }: {
 
 export default function OrdersPage() {
   const queryClient = useQueryClient();
-  const [marking, setMarking] = useState<number | null>(null);
   const [error, setError] = useState("");
   const [proofOrder, setProofOrder] = useState<any | null>(null);
+  const [tick, setTick] = useState(0);
+
+  useEffect(() => {
+    const t = setInterval(() => setTick(n => n + 1), 1000);
+    return () => clearInterval(t);
+  }, []);
 
   const { data: ordersData, isPending: loading } = useQuery({
     queryKey: ["vendor-orders"],
@@ -131,28 +148,6 @@ export default function OrdersPage() {
   });
 
   const orders: any[] = ordersData ?? [];
-
-  const markComplete = async (orderId: number) => {
-    setMarking(orderId); setError("");
-    try {
-      const res = await api.orders.markComplete(orderId);
-      const data = await res.json();
-      if (!res.ok) { setError(data.detail || data.error || "Could not mark complete."); return; }
-      queryClient.setQueryData<any[]>(["vendor-orders"], prev =>
-        prev ? prev.map(o => o.id === orderId ? { ...o, status: "seller_completed" } : o) : prev
-      );
-    } catch { setError("Network error. Please try again."); }
-    finally { setMarking(null); }
-  };
-
-  const handleMarkDelivered = (order: any) => {
-    const lt = order.listing?.listing_type;
-    if (lt === "product" || lt === "food") {
-      setProofOrder(order);
-    } else {
-      markComplete(order.id);
-    }
-  };
 
   if (loading) return <LoadingSpinner />;
 
@@ -216,16 +211,25 @@ export default function OrdersPage() {
                   {order.delivery_location || <span className="text-stone-400 italic">No delivery location set</span>}
                 </p>
               </div>
-              {order.status === "paid" && (
-                <button
-                  onClick={() => handleMarkDelivered(order)}
-                  disabled={marking === order.id}
-                  className="w-full py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-50 transition-all active:scale-[0.98]"
-                  style={{ background: GRAD }}
-                >
-                  {marking === order.id ? "Marking…" : "Mark as Delivered"}
-                </button>
-              )}
+              {order.status === "paid" && (() => {
+                // tick is read so this re-evaluates every second
+                void tick;
+                const { canMark, label } = getCountdown(order.paid_at);
+                return canMark ? (
+                  <button
+                    onClick={() => setProofOrder(order)}
+                    className="w-full py-2.5 rounded-xl text-sm font-semibold text-white transition-all active:scale-[0.98]"
+                    style={{ background: GRAD }}
+                  >
+                    Mark as Delivered
+                  </button>
+                ) : (
+                  <div className="w-full py-2.5 rounded-xl text-sm font-semibold text-center bg-stone-100 text-stone-400 flex items-center justify-center gap-2 select-none">
+                    <Clock className="w-4 h-4" />
+                    Available in {label}
+                  </div>
+                );
+              })()}
               {order.status === "seller_completed" && (
                 <div className="w-full py-2.5 rounded-xl text-sm font-semibold text-center bg-teal-50 text-teal-700 border border-teal-100">
                   Waiting for buyer to confirm
