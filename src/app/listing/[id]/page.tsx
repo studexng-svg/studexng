@@ -41,12 +41,16 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
         openGraph: {
           title: ogTitle,
           description: ogDesc,
+          images: listing.image
+            ? [{ url: listing.image, alt: listing.title, width: 1200, height: 630 }]
+            : undefined,
           type: "website",
         },
         twitter: {
           card: "summary_large_image",
           title: ogTitle,
           description: ogDesc,
+          images: listing.image ? [listing.image] : undefined,
         },
       };
     }
