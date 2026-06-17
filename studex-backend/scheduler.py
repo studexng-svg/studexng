@@ -96,7 +96,7 @@ def send_booking_reminders():
 
 def auto_release_orders():
     """
-    Auto-completes orders stuck in seller_completed for 48 h+ with no buyer
+    Auto-completes orders stuck in seller_completed for 24 h+ with no buyer
     confirmation and no open dispute. Vendor was already paid via Paystack
     Transfer at order time — this just closes the order record.
     Idempotent: auto_released=True prevents double-processing.
@@ -105,7 +105,7 @@ def auto_release_orders():
     from orders.models import Order
     from accounts.utils import send_notification
 
-    cutoff = timezone.now() - timedelta(hours=48)
+    cutoff = timezone.now() - timedelta(hours=24)
 
     stale = (
         Order.objects
@@ -137,7 +137,7 @@ def auto_release_orders():
                 title='Order automatically completed',
                 message=(
                     f'Order {order.reference} was automatically marked complete '
-                    f'after 48 hours with no buyer response.'
+                    f'after 24 hours with no buyer response.'
                 ),
                 action_url='/vendor/dashboard',
             )
@@ -147,7 +147,7 @@ def auto_release_orders():
                 title='Order automatically completed',
                 message=(
                     f'Your order {order.reference} was automatically marked complete '
-                    f'after 48 hours. Raise a dispute if you have any issues.'
+                    f'after 24 hours. Raise a dispute if you have any issues.'
                 ),
                 action_url='/account/orders',
             )
@@ -572,7 +572,7 @@ def start():
         auto_release_orders,
         trigger=CronTrigger(hour=0, minute=0, timezone=LAGOS_TZ),
         id="auto_release_orders",
-        name="Auto-complete seller_completed orders after 48 h",
+        name="Auto-complete seller_completed orders after 24 h",
         replace_existing=True,
         max_instances=1,
         coalesce=True,

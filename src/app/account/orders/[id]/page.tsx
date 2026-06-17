@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import {
-  Package, CheckCircle, Clock, AlertCircle, MessageCircle, XCircle, MapPin,
+  Package, CheckCircle, Clock, AlertCircle, MessageCircle, XCircle, MapPin, Timer,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/authStore";
@@ -11,6 +11,26 @@ import ReviewForm from "@/components/ReviewForm";
 import TopNav from "@/components/layout/TopNav";
 import { api } from "@/lib/api";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+
+const AUTO_RELEASE_HOURS = 24;
+
+function useAutoReleaseCountdown(sellerCompletedAt?: string | null) {
+  const [remaining, setRemaining] = useState<{ h: number; m: number; s: number; expired: boolean } | null>(null);
+  useEffect(() => {
+    if (!sellerCompletedAt) return;
+    const deadline = new Date(sellerCompletedAt).getTime() + AUTO_RELEASE_HOURS * 60 * 60 * 1000;
+    const update = () => {
+      const diff = deadline - Date.now();
+      if (diff <= 0) { setRemaining({ h: 0, m: 0, s: 0, expired: true }); return; }
+      const total = Math.floor(diff / 1000);
+      setRemaining({ h: Math.floor(total / 3600), m: Math.floor((total % 3600) / 60), s: total % 60, expired: false });
+    };
+    update();
+    const t = setInterval(update, 1000);
+    return () => clearInterval(t);
+  }, [sellerCompletedAt]);
+  return remaining;
+}
 
 function useElapsed(isoDate?: string | null) {
   const [elapsed, setElapsed] = useState("");
@@ -39,6 +59,7 @@ interface Order {
   amount: number;
   created_at: string;
   paid_at?: string | null;
+  seller_completed_at?: string | null;
   status: "pending" | "paid" | "seller_completed" | "completed" | "disputed" | "cancelled";
   current_status: string;
   delivery_location?: string;
@@ -112,6 +133,9 @@ export default function OrderDetailPage() {
 
   const canReview = canReviewData?.can_review ?? false;
   const elapsed = useElapsed(order?.paid_at || order?.created_at);
+  const countdown = useAutoReleaseCountdown(
+    order?.status === "seller_completed" ? order.seller_completed_at : null
+  );
 
   const handleConfirm = async () => {
     if (!order) return;
@@ -260,16 +284,44 @@ export default function OrderDetailPage() {
           </div>
         )}
 
-        {/* SELLER COMPLETED NOTICE */}
+        {/* SELLER COMPLETED NOTICE + AUTO-RELEASE COUNTDOWN */}
         {order.status === "seller_completed" && (
-          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 animate-fadeUp">
+          <div className="bg-amber-50 border-2 border-amber-400 rounded-2xl p-4 animate-fadeUp shadow-sm">
             <div className="flex gap-3">
-              <Clock className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="font-semibold text-amber-900 text-sm">Awaiting Your Confirmation</p>
-                <p className="text-xs text-amber-800 mt-1">
-                  The vendor has delivered your order — please confirm below to release their payment.
+              <Timer className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-amber-900 text-sm">Action Required — Confirm Your Delivery</p>
+                <p className="text-xs text-amber-800 mt-1 leading-relaxed">
+                  The vendor has marked this order as delivered. Please confirm receipt below or raise a dispute.
+                  If you take no action, <span className="font-semibold">payment will automatically be released to the vendor.</span>
                 </p>
+                <div className="mt-3">
+                  {countdown && !countdown.expired ? (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs font-semibold text-amber-700">Auto-release in:</span>
+                      <div className="flex gap-1.5">
+                        {[
+                          { val: countdown.h, label: "h" },
+                          { val: countdown.m, label: "m" },
+                          { val: countdown.s, label: "s" },
+                        ].map(({ val, label }) => (
+                          <span
+                            key={label}
+                            className="bg-amber-200 text-amber-900 text-xs font-mono font-bold px-2 py-1 rounded-lg min-w-[34px] text-center tabular-nums"
+                          >
+                            {String(val).padStart(2, "0")}{label}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ) : countdown?.expired ? (
+                    <p className="text-xs font-semibold text-amber-700 flex items-center gap-1.5">
+                      <AlertCircle className="w-3.5 h-3.5" /> Time expired — funds will be released shortly.
+                    </p>
+                  ) : (
+                    <p className="text-xs text-amber-700">You have {AUTO_RELEASE_HOURS} hours from delivery confirmation to respond.</p>
+                  )}
+                </div>
               </div>
             </div>
           </div>

@@ -37,7 +37,7 @@ class Command(BaseCommand):
 
         now = timezone.now()
 
-        release_cutoff = now - timedelta(hours=48)
+        release_cutoff = now - timedelta(hours=24)
         to_release = Order.objects.filter(
             status='seller_completed',
             seller_completed_at__lte=release_cutoff,

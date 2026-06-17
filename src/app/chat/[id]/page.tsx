@@ -315,13 +315,22 @@ export default function ChatRoomPage() {
   const startEdit = (msg: Message) => {
     setActionMenu(null);
     setEditingId(msg.id);
-    setEditContent(msg.content);
+    setEditContent(parseQuoted(msg.content).main);
   };
 
   const submitEdit = async (id: number) => {
     if (!editContent.trim()) return;
     try {
-      const res = await api.chat.editMessage(id, { content: editContent.trim() });
+      const original = messages.find(m => m.id === id);
+      let newContent = editContent.trim();
+      if (original) {
+        const pipeIdx = original.content.indexOf('|', 9);
+        const closeIdx = original.content.indexOf(']\n', pipeIdx);
+        if (original.content.startsWith('[quoted:@') && pipeIdx !== -1 && closeIdx !== -1) {
+          newContent = `${original.content.substring(0, closeIdx + 1)}\n${editContent.trim()}`;
+        }
+      }
+      const res = await api.chat.editMessage(id, { content: newContent });
       if (res.ok) {
         const updated = await res.json();
         setMessages(prev => prev.map(m => m.id === id ? { ...m, ...updated, is_mine: m.is_mine } : m));
