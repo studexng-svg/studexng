@@ -19,6 +19,7 @@ import { useWishlistStore } from "@/lib/wishlistStore";
 import { useCart } from "@/lib/cartStore";
 import { GRAD, GRAD_TEXT, SERIF } from "@/lib/tokens";
 import VendorOfMonthModal from "@/components/VendorOfMonthModal";
+import { useScrollRestoration } from "@/hooks/useScrollRestoration";
 import WhatsAppGroupModal from "@/components/WhatsAppGroupModal";
 
 
@@ -129,6 +130,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
   const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlistStore();
   const { addToCart, cart } = useCart();
   const router = useRouter();
+  useScrollRestoration("home", ["/category/"]);
 
   const [mounted, setMounted]           = useState(false);
   const [campusReady, setCampusReady]   = useState(initialListings.length > 0);
