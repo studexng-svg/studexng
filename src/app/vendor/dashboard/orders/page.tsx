@@ -59,9 +59,9 @@ function ProofModal({ order, onSuccess, onClose }: {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4"
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
       onClick={() => !submitting && onClose()}>
-      <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl mb-16 sm:mb-0"
+      <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl"
         onClick={e => e.stopPropagation()}>
 
         <div className="flex items-center justify-between mb-1">
