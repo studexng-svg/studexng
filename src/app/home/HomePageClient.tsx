@@ -169,6 +169,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
   useEffect(() => { activeFilterRef.current = activeFilter; }, [activeFilter]);
   // Only persist after mount so the initial "grid" default doesn't overwrite a saved value
   useEffect(() => { if (mounted) localStorage.setItem("home:viewMode", viewMode); }, [viewMode, mounted]);
+  useEffect(() => { if (mounted) localStorage.setItem("home:activeTab", activeTab); }, [activeTab, mounted]);
   // Wait for both campus data and mount (viewMode from localStorage) before restoring scroll
   useScrollRestoration("home", ["/category/"], campusReady && mounted);
 
@@ -176,6 +177,8 @@ export default function HomePageClient({ initialVendors, initialListings, initia
     setMounted(true);
     const savedViewMode = localStorage.getItem("home:viewMode");
     if (savedViewMode === "list" || savedViewMode === "scroll") setViewMode(savedViewMode);
+    const savedTab = localStorage.getItem("home:activeTab");
+    if (savedTab === "vendors") setActiveTab("vendors");
     const c = document.cookie.split(";").find(s => s.trim().startsWith("studex_campus="))?.split("=")?.[1]?.toLowerCase();
     if (c === "pau" || c === "futo" || c === "imsu") setCurrentCampus(c as "pau" | "futo" | "imsu");
 

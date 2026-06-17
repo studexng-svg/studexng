@@ -416,6 +416,9 @@ export const api = {
     markAllRead: () =>
       fetchWithAuth(u("/api/notifications/read-all/"), { method: "POST" }),
 
+    delete: (id: number | string) =>
+      fetchWithAuth(u(`/api/notifications/${id}/delete/`), { method: "DELETE" }),
+
     registerToken: (token: string) =>
       fetchWithAuth(u("/api/notifications/fcm-token/"), {
         method: "POST",

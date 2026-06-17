@@ -1,12 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Bell, CheckCheck, X, ExternalLink,
+  Bell, CheckCheck, X, ExternalLink, Pin, PinOff, Trash2,
   CheckCircle, XCircle, AlertTriangle, Calendar, Ban, Wallet,
   AlarmClock, Package, ShoppingBag, Tag, Store, FileText, MessageCircle,
 } from "lucide-react";
@@ -83,16 +82,32 @@ function timeAgo(iso: string) {
   return new Date(iso).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" });
 }
 
+const PINS_KEY = "notif:pinned";
+const getPinned = (): number[] => {
+  try { return JSON.parse(localStorage.getItem(PINS_KEY) || "[]"); } catch { return []; }
+};
+const savePinned = (ids: number[]) => localStorage.setItem(PINS_KEY, JSON.stringify(ids));
+
 export default function NotificationsPage() {
   const router = useRouter();
   const { isLoggedIn, isHydrated } = useAuth();
 
-  const [selected, setSelected] = useState<Notification | null>(null);
+  const [detailNotif, setDetailNotif] = useState<Notification | null>(null);
+  const [actionNotif, setActionNotif] = useState<Notification | null>(null);
+  const [pinnedIds, setPinnedIds] = useState<number[]>([]);
+  const [deleting, setDeleting] = useState(false);
   const queryClient = useQueryClient();
+
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressFired = useRef(false);
 
   useEffect(() => {
     if (isHydrated && !isLoggedIn) router.push("/auth");
   }, [isHydrated, isLoggedIn, router]);
+
+  useEffect(() => {
+    if (isHydrated) setPinnedIds(getPinned());
+  }, [isHydrated]);
 
   const { data, isPending } = useQuery({
     queryKey: ["notifications-list"],
@@ -109,17 +124,29 @@ export default function NotificationsPage() {
   const notifications = data?.notifications ?? [];
   const unreadCount = data?.unread_count ?? 0;
 
-  const markAllRead = async () => {
-    try {
-      await api.notifications.markAllRead();
-      queryClient.setQueryData<{ notifications: Notification[]; unread_count: number }>(
-        ["notifications-list"],
-        old => old ? { ...old, notifications: old.notifications.map(n => ({ ...n, is_read: true })), unread_count: 0 } : old
-      );
-    } catch {}
-  };
+  const isPinned = (id: number) => pinnedIds.includes(id);
 
-  const handleClick = async (n: Notification) => {
+  const sorted = [...notifications].sort((a, b) => {
+    const ap = isPinned(a.id) ? 1 : 0;
+    const bp = isPinned(b.id) ? 1 : 0;
+    return bp - ap;
+  });
+
+  const startLongPress = useCallback((n: Notification) => {
+    longPressFired.current = false;
+    longPressTimer.current = setTimeout(() => {
+      longPressFired.current = true;
+      setActionNotif(n);
+      if (navigator.vibrate) navigator.vibrate(40);
+    }, 500);
+  }, []);
+
+  const cancelLongPress = useCallback(() => {
+    if (longPressTimer.current) clearTimeout(longPressTimer.current);
+  }, []);
+
+  const handleTap = async (n: Notification) => {
+    if (longPressFired.current) { longPressFired.current = false; return; }
     if (!n.is_read) {
       try {
         await api.notifications.markRead(n.id);
@@ -133,10 +160,46 @@ export default function NotificationsPage() {
         );
       } catch {}
     }
-    setSelected({ ...n, is_read: true });
+    setDetailNotif({ ...n, is_read: true });
   };
 
-  const closeDetail = () => setSelected(null);
+  const markAllRead = async () => {
+    try {
+      await api.notifications.markAllRead();
+      queryClient.setQueryData<{ notifications: Notification[]; unread_count: number }>(
+        ["notifications-list"],
+        old => old ? { ...old, notifications: old.notifications.map(n => ({ ...n, is_read: true })), unread_count: 0 } : old
+      );
+    } catch {}
+  };
+
+  const handlePin = () => {
+    if (!actionNotif) return;
+    const next = isPinned(actionNotif.id)
+      ? pinnedIds.filter(id => id !== actionNotif.id)
+      : [...pinnedIds, actionNotif.id];
+    setPinnedIds(next);
+    savePinned(next);
+    setActionNotif(null);
+  };
+
+  const handleDelete = async () => {
+    if (!actionNotif) return;
+    setDeleting(true);
+    try {
+      await api.notifications.delete(actionNotif.id);
+      queryClient.setQueryData<{ notifications: Notification[]; unread_count: number }>(
+        ["notifications-list"],
+        old => old ? {
+          notifications: old.notifications.filter(n => n.id !== actionNotif.id),
+          unread_count: !actionNotif.is_read ? Math.max(0, old.unread_count - 1) : old.unread_count,
+        } : old
+      );
+      setPinnedIds(prev => { const next = prev.filter(id => id !== actionNotif.id); savePinned(next); return next; });
+    } catch {}
+    setDeleting(false);
+    setActionNotif(null);
+  };
 
   if (!isHydrated || isPending) {
     return (
@@ -150,11 +213,11 @@ export default function NotificationsPage() {
     <>
       {/* ── DETAIL MODAL ── */}
       <AnimatePresence>
-        {selected && (
+        {detailNotif && (
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9999] flex items-center justify-center p-4"
-            onClick={closeDetail}
+            onClick={() => setDetailNotif(null)}
           >
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
@@ -164,39 +227,114 @@ export default function NotificationsPage() {
               <div className="flex items-center justify-between px-5 py-4 border-b border-stone-100">
                 <div className="flex items-center gap-2">
                   {(() => {
-                    const { Icon, color, bg } = getNotifIcon(selected.type);
+                    const { Icon, color, bg } = getNotifIcon(detailNotif.type);
                     return (
                       <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: bg }}>
                         <Icon style={{ color, width: 18, height: 18 }} />
                       </div>
                     );
                   })()}
-                  <h3 className="font-bold text-stone-900 text-sm" style={SERIF}>{selected.title}</h3>
+                  <h3 className="font-bold text-stone-900 text-sm" style={SERIF}>{detailNotif.title}</h3>
                 </div>
-                <button onClick={closeDetail} className="w-8 h-8 rounded-full bg-stone-100 flex items-center justify-center text-stone-500 hover:bg-stone-200 transition">
+                <button onClick={() => setDetailNotif(null)} className="w-8 h-8 rounded-full bg-stone-100 flex items-center justify-center text-stone-500 hover:bg-stone-200 transition">
                   <X className="w-4 h-4" />
                 </button>
               </div>
               <div className="px-5 py-4 space-y-3">
-                <p className="text-stone-600 text-sm leading-relaxed">{selected.message}</p>
-                <p className="text-xs text-stone-400">{new Date(selected.created_at).toLocaleDateString("en-NG", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })}</p>
+                <p className="text-stone-600 text-sm leading-relaxed">{detailNotif.message}</p>
+                <p className="text-xs text-stone-400">{new Date(detailNotif.created_at).toLocaleDateString("en-NG", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })}</p>
               </div>
               <div className="px-5 pb-5 flex gap-3">
-                {selected.action_url && !selected.action_url.includes("/seller") && !selected.action_url.includes("/auth") && (
+                {detailNotif.action_url && !detailNotif.action_url.includes("/seller") && !detailNotif.action_url.includes("/auth") && (
                   <motion.button
                     whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
-                    onClick={() => { closeDetail(); router.push(selected.action_url); }}
+                    onClick={() => { setDetailNotif(null); router.push(detailNotif.action_url); }}
                     className="flex-1 py-3 rounded-full text-white text-sm font-semibold shadow-lg"
                     style={{ background: GRAD }}
                   >
                     Go There
                   </motion.button>
                 )}
-                <button onClick={closeDetail} className="flex-1 py-3 rounded-full border border-stone-200 text-stone-600 text-sm font-medium hover:bg-stone-50 transition">
+                <button onClick={() => setDetailNotif(null)} className="flex-1 py-3 rounded-full border border-stone-200 text-stone-600 text-sm font-medium hover:bg-stone-50 transition">
                   Close
                 </button>
               </div>
             </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── LONG-PRESS BACKDROP ── */}
+      <AnimatePresence>
+        {actionNotif && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
+            onClick={() => setActionNotif(null)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* ── ACTION SHEET ── */}
+      <AnimatePresence>
+        {actionNotif && (
+          <motion.div
+            initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
+            transition={{ type: "spring", damping: 28, stiffness: 320 }}
+            className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-3xl shadow-2xl px-4 pt-3 pb-10 max-w-lg mx-auto"
+            style={{ fontFamily: "'DM Sans', sans-serif" }}
+          >
+            <div className="w-10 h-1 bg-stone-200 rounded-full mx-auto mb-4" />
+
+            {/* Notification preview */}
+            <div className="flex items-center gap-3 px-1 mb-5">
+              {(() => {
+                const { Icon, color, bg } = getNotifIcon(actionNotif.type);
+                return (
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: bg }}>
+                    <Icon style={{ color, width: 20, height: 20 }} />
+                  </div>
+                );
+              })()}
+              <div className="min-w-0">
+                <p className="font-bold text-stone-900 text-sm truncate">{actionNotif.title}</p>
+                <p className="text-xs text-stone-400 truncate">{timeAgo(actionNotif.created_at)}</p>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              {/* Pin / Unpin */}
+              <button onClick={handlePin}
+                className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl bg-stone-50 hover:bg-teal-50 transition text-left">
+                {isPinned(actionNotif.id)
+                  ? <PinOff className="w-5 h-5 text-stone-500 flex-shrink-0" />
+                  : <Pin className="w-5 h-5 text-teal-600 flex-shrink-0" />}
+                <div>
+                  <p className="font-semibold text-stone-900 text-sm">
+                    {isPinned(actionNotif.id) ? "Unpin notification" : "Pin to top"}
+                  </p>
+                  <p className="text-xs text-stone-400">
+                    {isPinned(actionNotif.id) ? "Remove from pinned" : "Keep this notification at the top"}
+                  </p>
+                </div>
+              </button>
+
+              {/* Delete */}
+              <button onClick={handleDelete} disabled={deleting}
+                className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl bg-red-50 hover:bg-red-100 transition text-left disabled:opacity-50">
+                <Trash2 className="w-5 h-5 text-red-500 flex-shrink-0" />
+                <div>
+                  <p className="font-semibold text-red-600 text-sm">{deleting ? "Deleting…" : "Delete notification"}</p>
+                  <p className="text-xs text-red-400">Permanently remove this notification</p>
+                </div>
+              </button>
+
+              {/* Cancel */}
+              <button onClick={() => setActionNotif(null)}
+                className="w-full py-3.5 rounded-2xl bg-stone-100 text-stone-600 font-semibold text-sm transition hover:bg-stone-200">
+                Cancel
+              </button>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -218,7 +356,7 @@ export default function NotificationsPage() {
 
         <div className="max-w-2xl mx-auto px-4 pt-4 pb-32 space-y-2">
 
-          {notifications.length === 0 ? (
+          {sorted.length === 0 ? (
             <motion.div
               initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
               className="flex flex-col items-center justify-center py-24 text-center"
@@ -230,44 +368,56 @@ export default function NotificationsPage() {
               <p className="text-stone-400 text-sm mt-1">No notifications yet</p>
             </motion.div>
           ) : (
-            notifications.map((n, i) => (
-              <motion.button
-                key={n.id}
-                initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => handleClick(n)}
-                className={`w-full text-left rounded-2xl border p-4 flex items-start gap-3 shadow-sm transition-all ${
-                  !n.is_read
-                    ? "bg-teal-50/60 border-teal-200 hover:border-teal-300"
-                    : "bg-white border-stone-100 hover:border-stone-200"
-                }`}
-              >
-                {/* Icon */}
-                {(() => {
-                  const { Icon, color, bg } = getNotifIcon(n.type);
-                  return (
-                    <div className="flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: bg }}>
-                      <Icon style={{ color, width: 20, height: 20 }} />
-                    </div>
-                  );
-                })()}
+            sorted.map((n, i) => {
+              const pinned = isPinned(n.id);
+              const isActive = actionNotif?.id === n.id;
+              return (
+                <motion.div
+                  key={n.id}
+                  initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}
+                  onPointerDown={() => startLongPress(n)}
+                  onPointerUp={cancelLongPress}
+                  onPointerCancel={cancelLongPress}
+                  onPointerLeave={cancelLongPress}
+                  onClick={() => handleTap(n)}
+                  className={`w-full text-left rounded-2xl border p-4 flex items-start gap-3 shadow-sm transition-all cursor-pointer select-none ${
+                    isActive
+                      ? "border-teal-400 ring-2 ring-teal-400/25 bg-teal-50/40"
+                      : !n.is_read
+                      ? "bg-teal-50/60 border-teal-200 hover:border-teal-300"
+                      : "bg-white border-stone-100 hover:border-stone-200"
+                  }`}
+                >
+                  {/* Icon */}
+                  {(() => {
+                    const { Icon, color, bg } = getNotifIcon(n.type);
+                    return (
+                      <div className="flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: bg }}>
+                        <Icon style={{ color, width: 20, height: 20 }} />
+                      </div>
+                    );
+                  })()}
 
-                {/* Content */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between gap-2">
-                    <p className={`text-sm leading-snug ${!n.is_read ? "font-bold text-stone-900" : "font-semibold text-stone-700"}`}>
-                      {n.title}
-                    </p>
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
-                      {!n.is_read && <span className="w-2 h-2 bg-teal-500 rounded-full" />}
-                      {n.action_url && <ExternalLink className="w-3 h-3 text-stone-300" />}
+                  {/* Content */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        {pinned && <Pin className="w-3 h-3 text-teal-500 flex-shrink-0" />}
+                        <p className={`text-sm leading-snug truncate ${!n.is_read ? "font-bold text-stone-900" : "font-semibold text-stone-700"}`}>
+                          {n.title}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        {!n.is_read && <span className="w-2 h-2 bg-teal-500 rounded-full" />}
+                        {n.action_url && <ExternalLink className="w-3 h-3 text-stone-300" />}
+                      </div>
                     </div>
+                    <p className="text-xs text-stone-500 mt-0.5 line-clamp-2 leading-relaxed">{n.message}</p>
+                    <p className="text-xs text-stone-500 mt-1.5">{timeAgo(n.created_at)}</p>
                   </div>
-                  <p className="text-xs text-stone-500 mt-0.5 line-clamp-2 leading-relaxed">{n.message}</p>
-                  <p className="text-xs text-stone-500 mt-1.5">{timeAgo(n.created_at)}</p>
-                </div>
-              </motion.button>
-            ))
+                </motion.div>
+              );
+            })
           )}
 
         </div>

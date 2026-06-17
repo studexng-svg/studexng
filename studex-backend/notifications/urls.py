@@ -10,6 +10,7 @@ urlpatterns = [
     # Standard notification REST endpoints
     path('', views.my_notifications, name='my-notifications'),
     path('<int:notification_id>/read/', views.mark_notification_read, name='mark-read'),
+    path('<int:notification_id>/delete/', views.delete_notification, name='delete-notification'),
     path('read-all/', views.mark_all_read, name='mark-all-read'),
 
     # FCM push notification token registration

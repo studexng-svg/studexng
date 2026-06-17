@@ -149,6 +149,17 @@ def mark_notification_read(request, notification_id):
         return Response({'error': 'Not found'}, status=404)
 
 
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_notification(request, notification_id):
+    from notifications.models import Notification
+    try:
+        Notification.objects.get(id=notification_id, recipient=request.user).delete()
+        return Response(status=204)
+    except Notification.DoesNotExist:
+        return Response({'error': 'Not found'}, status=404)
+
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def mark_all_read(request):
