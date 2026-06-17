@@ -113,6 +113,9 @@ class DisputeSerializer(serializers.ModelSerializer):
             'filer', 'status', 'assigned_to', 'admin_decision', 'resolved_at',
             'resolved_by', 'provider_responded_at', 'appealed_at', 'created_at', 'updated_at'
         ]
+        extra_kwargs = {
+            'filed_by': {'required': False},
+        }
 
     def create(self, validated_data):
         validated_data['filer'] = self.context['request'].user
