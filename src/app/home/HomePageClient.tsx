@@ -172,8 +172,8 @@ export default function HomePageClient({ initialVendors, initialListings, initia
 
   useEffect(() => {
     setMounted(true);
-    const saved = localStorage.getItem("home:viewMode");
-    if (saved === "list" || saved === "scroll") setViewMode(saved);
+    const savedViewMode = localStorage.getItem("home:viewMode");
+    if (savedViewMode === "list" || savedViewMode === "scroll") setViewMode(savedViewMode);
     const c = document.cookie.split(";").find(s => s.trim().startsWith("studex_campus="))?.split("=")?.[1]?.toLowerCase();
     if (c === "pau" || c === "futo" || c === "imsu") setCurrentCampus(c as "pau" | "futo" | "imsu");
 
