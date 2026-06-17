@@ -847,7 +847,8 @@ try:
                                 _dn(order.buyer, 'order_update',
                                     '✅ Dispute Resolved — Refund Initiated',
                                     f'Your dispute for "{order.listing.title}" was resolved in your favour. '
-                                    f'A refund of ₦{txn.amount:,.0f} has been initiated to your original payment method and will arrive within 3–5 business days.',
+                                    f'A refund of ₦{txn.amount:,.0f} has been initiated to your original payment method. '
+                                    f'Please allow at least 24 hours before checking — it can take up to 3–5 business days to reflect depending on your bank.',
                                     f'/account/orders/{order.id}')
                             _dn(order.listing.vendor, 'order_update',
                                 f'Dispute Resolved — {order.listing.title}',
