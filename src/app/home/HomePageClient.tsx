@@ -141,11 +141,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
   const [minPrice, setMinPrice]         = useState<string>("");
   const [maxPrice, setMaxPrice]         = useState<string>("");
   const [heroIndex, setHeroIndex]       = useState(0);
-  const [viewMode, setViewMode]         = useState<"grid" | "list" | "scroll">(() => {
-    if (typeof window === "undefined") return "grid";
-    const saved = localStorage.getItem("home:viewMode");
-    return (saved === "list" || saved === "scroll") ? saved : "grid";
-  });
+  const [viewMode, setViewMode]         = useState<"grid" | "list" | "scroll">("grid");
   const [deals, setDeals]               = useState<any[]>([]);
 
   const fetchDeals = useCallback(async (campus: string) => {
@@ -176,6 +172,8 @@ export default function HomePageClient({ initialVendors, initialListings, initia
 
   useEffect(() => {
     setMounted(true);
+    const saved = localStorage.getItem("home:viewMode");
+    if (saved === "list" || saved === "scroll") setViewMode(saved);
     const c = document.cookie.split(";").find(s => s.trim().startsWith("studex_campus="))?.split("=")?.[1]?.toLowerCase();
     if (c === "pau" || c === "futo" || c === "imsu") setCurrentCampus(c as "pau" | "futo" | "imsu");
 
