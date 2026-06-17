@@ -4,7 +4,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
   Search, ArrowRight, Heart, X, Sparkles, Star,
-  ChevronRight, ChevronDown, Clock, Plus, Trophy, ShoppingCart, User, LayoutGrid, List, MapPin,
+  ChevronRight, ChevronDown, Clock, Plus, Trophy, ShoppingCart, User, LayoutGrid, List, GalleryHorizontal, MapPin,
   Share2, ShieldCheck, Tag, Zap, Headphones,
   Shirt, Monitor, Home, BookOpen, Car,
   UtensilsCrossed, Smartphone, Scissors, WashingMachine,
@@ -138,7 +138,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
   const [minPrice, setMinPrice]         = useState<string>("");
   const [maxPrice, setMaxPrice]         = useState<string>("");
   const [heroIndex, setHeroIndex]       = useState(0);
-  const [viewMode, setViewMode]         = useState<"grid" | "list">("grid");
+  const [viewMode, setViewMode]         = useState<"grid" | "list" | "scroll">("grid");
   const [deals, setDeals]               = useState<any[]>([]);
 
   const fetchDeals = useCallback(async (campus: string) => {
@@ -351,9 +351,16 @@ export default function HomePageClient({ initialVendors, initialListings, initia
 
   const gridClass = viewMode === "grid"
     ? "grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4"
+    : viewMode === "scroll"
+    ? "flex gap-3 overflow-x-auto pb-2 -mx-4 px-4"
     : "space-y-2";
+  const gridStyle: React.CSSProperties = viewMode === "scroll"
+    ? { scrollbarWidth: "none", msOverflowStyle: "none" }
+    : {};
   const renderItem = (l: any, i: number) =>
-    viewMode === "grid" ? renderListingCard(l, i) : renderListingRow(l, i);
+    viewMode === "list" ? renderListingRow(l, i) :
+    viewMode === "scroll" ? <div key={l.id} className="flex-shrink-0 w-44">{renderListingCard(l, i)}</div> :
+    renderListingCard(l, i);
 
   const catSlug = (l: any) => (typeof l.category === "object" ? l.category?.slug : l.category) ?? "";
 
@@ -1057,6 +1064,10 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                       className={`p-1.5 rounded-md transition-all ${viewMode === "list" ? "bg-white shadow-sm text-stone-700" : "text-stone-400 hover:text-stone-600"}`}>
                       <List className="w-3.5 h-3.5" />
                     </button>
+                    <button onClick={() => setViewMode("scroll")}
+                      className={`p-1.5 rounded-md transition-all ${viewMode === "scroll" ? "bg-white shadow-sm text-stone-700" : "text-stone-400 hover:text-stone-600"}`}>
+                      <GalleryHorizontal className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                 )}
                 <button onClick={() => handleFilter("All")}
@@ -1124,29 +1135,62 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                   <div className="space-y-10">
                     {[0, 1].map(section => (
                       <div key={section}>
-                        {/* Section header skeleton */}
                         <div className="animate-pulse mb-4">
                           <div className="h-2.5 bg-stone-200 rounded w-16 mb-1.5" />
                           <div className="h-5 bg-stone-200 rounded w-32" />
                         </div>
-                        <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                          {[0,1,2,3].map(i => (
-                            <div key={i} className="bg-white rounded-xl border border-stone-100 overflow-hidden animate-pulse">
-                              <div className="aspect-square bg-stone-100" />
-                              <div className="p-3 space-y-2">
-                                <div className="h-3 bg-stone-100 rounded w-3/4" />
-                                <div className="h-2.5 bg-stone-100 rounded w-1/2" />
-                                <div className="h-2.5 bg-stone-100 rounded w-2/3" />
-                                <div className="h-2.5 bg-stone-100 rounded w-1/3" />
-                                <div className="h-4 bg-stone-100 rounded w-1/3 mt-1" />
-                                <div className="flex gap-1.5 pt-1">
-                                  <div className="flex-1 h-8 bg-stone-100 rounded-xl" />
-                                  <div className="w-8 h-8 bg-stone-100 rounded-xl" />
+                        {viewMode === "scroll" ? (
+                          <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4" style={{ scrollbarWidth: "none" }}>
+                            {[0,1,2,3,4].map(i => (
+                              <div key={i} className="flex-shrink-0 w-44 bg-white rounded-xl border border-stone-100 overflow-hidden animate-pulse">
+                                <div className="aspect-square bg-stone-100" />
+                                <div className="p-3 space-y-2">
+                                  <div className="h-3 bg-stone-100 rounded w-3/4" />
+                                  <div className="h-2.5 bg-stone-100 rounded w-1/2" />
+                                  <div className="h-2.5 bg-stone-100 rounded w-2/3" />
+                                  <div className="h-2.5 bg-stone-100 rounded w-1/3" />
+                                  <div className="h-4 bg-stone-100 rounded w-1/3 mt-1" />
+                                  <div className="flex gap-1.5 pt-1">
+                                    <div className="flex-1 h-8 bg-stone-100 rounded-xl" />
+                                    <div className="w-8 h-8 bg-stone-100 rounded-xl" />
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          ))}
-                        </div>
+                            ))}
+                          </div>
+                        ) : viewMode === "list" ? (
+                          <div className="space-y-2">
+                            {[0,1,2,3].map(i => (
+                              <div key={i} className="bg-white rounded-xl border border-stone-100 overflow-hidden animate-pulse flex gap-3 p-3">
+                                <div className="w-16 h-16 bg-stone-100 rounded-lg flex-shrink-0" />
+                                <div className="flex-1 space-y-2 py-1">
+                                  <div className="h-3 bg-stone-100 rounded w-3/4" />
+                                  <div className="h-2.5 bg-stone-100 rounded w-1/2" />
+                                  <div className="h-4 bg-stone-100 rounded w-1/3" />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                            {[0,1,2,3].map(i => (
+                              <div key={i} className="bg-white rounded-xl border border-stone-100 overflow-hidden animate-pulse">
+                                <div className="aspect-square bg-stone-100" />
+                                <div className="p-3 space-y-2">
+                                  <div className="h-3 bg-stone-100 rounded w-3/4" />
+                                  <div className="h-2.5 bg-stone-100 rounded w-1/2" />
+                                  <div className="h-2.5 bg-stone-100 rounded w-2/3" />
+                                  <div className="h-2.5 bg-stone-100 rounded w-1/3" />
+                                  <div className="h-4 bg-stone-100 rounded w-1/3 mt-1" />
+                                  <div className="flex gap-1.5 pt-1">
+                                    <div className="flex-1 h-8 bg-stone-100 rounded-xl" />
+                                    <div className="w-8 h-8 bg-stone-100 rounded-xl" />
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -1168,7 +1212,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                               <h3 className="text-lg font-bold text-stone-900 mt-0.5">New Arrivals</h3>
                             </div>
                           </div>
-                          <div className={gridClass}>
+                          <div className={gridClass} style={gridStyle}>
                             {newArrivals.map((l, i) => renderItem(l, i))}
                           </div>
                         </div>
@@ -1186,7 +1230,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                               </button>
                             )}
                           </div>
-                          <div className={gridClass}>
+                          <div className={gridClass} style={gridStyle}>
                             {section.items.map((l, i) => renderItem(l, i))}
                           </div>
                         </div>
@@ -1202,7 +1246,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                         <p className="text-stone-400 text-sm mt-1">No listings in this category.</p>
                       </div>
                     ) : (
-                      <div className={gridClass}>
+                      <div className={gridClass} style={gridStyle}>
                         {filteredListings.map((l, i) => renderItem(l, i))}
                       </div>
                     )}
