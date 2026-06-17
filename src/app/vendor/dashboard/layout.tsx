@@ -8,7 +8,7 @@ import { GRAD, GRAD_DARK } from "@/lib/tokens";
 import { api } from "@/lib/api";
 import {
   MessageCircle, Calendar, DollarSign, Package, ShoppingBag,
-  Star, ArrowLeft, Link2, Share2, Check, History, MessageSquare,
+  Star, ArrowLeft, Link2, Share2, Check, History, MessageSquare, AlertCircle,
 } from "lucide-react";
 
 const TABS = [
@@ -16,6 +16,7 @@ const TABS = [
   { id: "bookings",  label: "Bookings",  icon: Calendar,      href: "/vendor/dashboard/bookings"  },
   { id: "listings",  label: "Listings",  icon: Package,       href: "/vendor/dashboard/listings"  },
   { id: "orders",    label: "Orders",    icon: ShoppingBag,   href: "/vendor/dashboard/orders"    },
+  { id: "disputes",  label: "Disputes",  icon: AlertCircle,   href: "/vendor/dashboard/disputes"  },
   { id: "history",   label: "History",   icon: History,       href: "/vendor/dashboard/history"   },
   { id: "earnings",  label: "Earnings",  icon: DollarSign,    href: "/vendor/dashboard/earnings"  },
   { id: "reviews",   label: "Reviews",   icon: Star,          href: "/vendor/dashboard/reviews"   },
@@ -29,6 +30,7 @@ export default function VendorDashboardLayout({ children }: { children: React.Re
   const [linkCopied, setLinkCopied] = useState(false);
   const [msgBadge, setMsgBadge] = useState(0);
   const [bookingBadge, setBookingBadge] = useState(0);
+  const [disputeBadge, setDisputeBadge] = useState(0);
 
   useEffect(() => {
     if (!isHydrated) return;
@@ -53,9 +55,16 @@ export default function VendorDashboardLayout({ children }: { children: React.Re
         const vendorOnly = list.filter((b: any) => b.vendor_username === user?.username);
         setBookingBadge(vendorOnly.filter((b: any) => b.status === "pending").length);
       }).catch(() => {});
+    api.orders.disputes()
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (!d) return;
+        const list = Array.isArray(d) ? d : (d.results || []);
+        setDisputeBadge(list.filter((dp: any) => !dp.provider_response).length);
+      }).catch(() => {});
   }, [user]);
 
-  const badges: Record<string, number> = { messages: msgBadge, bookings: bookingBadge };
+  const badges: Record<string, number> = { messages: msgBadge, bookings: bookingBadge, disputes: disputeBadge };
 
   return (
     <div className="min-h-screen bg-[#F5F5F5] flex flex-col" style={{ fontFamily: "'DM Sans', sans-serif" }}>

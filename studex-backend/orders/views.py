@@ -382,6 +382,87 @@ class DisputeViewSet(viewsets.ModelViewSet):
 
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
+    @action(detail=True, methods=['post'])
+    def respond(self, request, pk=None):
+        dispute = self.get_object()
+        vendor = dispute.order.listing.vendor if dispute.order.listing else None
+
+        if request.user != vendor:
+            return Response({'error': 'Only the vendor can respond to this dispute.'}, status=403)
+        if dispute.provider_response:
+            return Response({'error': 'You have already submitted a response.'}, status=400)
+        if dispute.status == 'resolved':
+            return Response({'error': 'This dispute is already resolved.'}, status=400)
+
+        from .serializers import DisputeResponseSerializer
+        serializer = DisputeResponseSerializer(dispute, data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        self._send_response_notifications(dispute)
+
+        return Response({'success': True, 'status': dispute.status})
+
+    def _send_response_notifications(self, dispute):
+        try:
+            order = dispute.order
+            vendor = order.listing.vendor if order.listing else None
+            buyer = order.buyer
+
+            # Notify the buyer
+            _notify(
+                recipient=buyer,
+                notification_type='dispute_response',
+                title=f'Vendor responded to your dispute — Order #{order.reference}',
+                message=(
+                    f'{vendor.username if vendor else "The vendor"} has submitted their side of the story '
+                    f'on dispute #{dispute.id}. Our support team is now reviewing both sides.'
+                ),
+                action_url=f'/account/orders/{order.id}',
+            )
+
+            # Email admin
+            from django.conf import settings as _settings
+            from studex.email import send_email, _html_wrapper
+            admin_email = getattr(_settings, 'ADMIN_EMAIL', '')
+            if not admin_email:
+                return
+
+            reason_label = dict(Dispute.REASON_CHOICES).get(dispute.reason, dispute.reason)
+            django_admin_url = f"https://studex.com.ng/admin/orders/dispute/{dispute.id}/change/"
+            body = f"""
+            <p style="font-size:15px;color:#44403C;line-height:1.7;margin:0 0 12px;">
+              The vendor has submitted their response. This dispute is now <strong>under review</strong>.
+            </p>
+            <table style="width:100%;border-collapse:collapse;font-size:14px;color:#44403C;">
+              <tr><td style="padding:6px 0;font-weight:600;width:140px;">Dispute</td>
+                  <td>#{dispute.id}</td></tr>
+              <tr><td style="padding:6px 0;font-weight:600;">Order</td>
+                  <td>#{order.reference}</td></tr>
+              <tr><td style="padding:6px 0;font-weight:600;">Reason</td>
+                  <td>{reason_label}</td></tr>
+              <tr><td style="padding:6px 0;font-weight:600;">Buyer complaint</td>
+                  <td>{dispute.complaint}</td></tr>
+              <tr><td style="padding:6px 0;font-weight:600;">Vendor response</td>
+                  <td>{dispute.provider_response}</td></tr>
+            </table>
+            <a href="{django_admin_url}"
+               style="display:inline-block;margin-top:20px;padding:12px 24px;
+                      background:linear-gradient(135deg,#0D9488,#7C3AED);
+                      color:#ffffff;text-decoration:none;border-radius:10px;
+                      font-size:14px;font-weight:600;">
+              Resolve in Admin
+            </a>
+            """
+            send_email(
+                to=admin_email,
+                subject=f'[StudEx] Vendor responded to Dispute #{dispute.id} — ready for review',
+                html=_html_wrapper(f'Vendor Response Received — Dispute #{dispute.id}', body),
+            )
+        except Exception as e:
+            import logging as _logging
+            _logging.getLogger(__name__).error(f"dispute response notification failed: {e}")
+
     def _send_dispute_notifications(self, dispute):
         import logging as _logging
         _logger = _logging.getLogger(__name__)

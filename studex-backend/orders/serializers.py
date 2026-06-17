@@ -20,6 +20,25 @@ class OrderSerializer(serializers.ModelSerializer):
     listing_id = serializers.IntegerField(write_only=True)
     buyer = serializers.ReadOnlyField(source='buyer.username')
     buyer_id = serializers.ReadOnlyField(source='buyer.id')
+    dispute = serializers.SerializerMethodField()
+
+    def get_dispute(self, obj):
+        d = obj.disputes.first()
+        if not d:
+            return None
+        return {
+            'id': d.id,
+            'reason': d.reason,
+            'complaint': d.complaint,
+            'evidence': d.evidence,
+            'evidence_image_1': d.evidence_image_1,
+            'evidence_image_2': d.evidence_image_2,
+            'filer_username': d.filer.username,
+            'provider_response': d.provider_response,
+            'provider_responded_at': d.provider_responded_at.isoformat() if d.provider_responded_at else None,
+            'status': d.status,
+            'created_at': d.created_at.isoformat(),
+        }
 
     class Meta:
         model = Order
@@ -27,7 +46,7 @@ class OrderSerializer(serializers.ModelSerializer):
             'id', 'reference', 'listing', 'listing_id', 'buyer', 'buyer_id',
             'amount', 'status', 'current_status', 'estimated_time',
             'delivery_location', 'created_at', 'paid_at', 'seller_completed_at',
-            'delivery_proof_1', 'delivery_proof_2',
+            'delivery_proof_1', 'delivery_proof_2', 'dispute',
         ]
         read_only_fields = [
             'reference', 'amount', 'status', 'current_status', 'estimated_time',
@@ -76,13 +95,14 @@ class OrderSerializer(serializers.ModelSerializer):
 class DisputeSerializer(serializers.ModelSerializer):
     filer_username = serializers.ReadOnlyField(source='filer.username')
     order_reference = serializers.ReadOnlyField(source='order.reference')
+    order_listing_title = serializers.ReadOnlyField(source='order.listing.title')
     assigned_to_username = serializers.ReadOnlyField(source='assigned_to.username')
     resolved_by_username = serializers.ReadOnlyField(source='resolved_by.username')
 
     class Meta:
         model = Dispute
         fields = [
-            'id', 'order', 'order_reference', 'filed_by', 'filer', 'filer_username',
+            'id', 'order', 'order_reference', 'order_listing_title', 'filed_by', 'filer', 'filer_username',
             'reason', 'complaint', 'evidence', 'evidence_image_1', 'evidence_image_2',
             'provider_response', 'provider_responded_at',
             'status', 'resolution', 'assigned_to', 'assigned_to_username',

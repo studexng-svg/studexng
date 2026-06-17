@@ -286,6 +286,14 @@ export const api = {
         method: "POST",
         body: body instanceof FormData ? body : s(body),
       }),
+
+    disputes: () => fetchWithAuth(u("/api/orders/disputes/")),
+
+    respondToDispute: (id: number | string, response: string) =>
+      fetchWithAuth(u(`/api/orders/disputes/${id}/respond/`), {
+        method: "POST",
+        body: s({ provider_response: response }),
+      }),
   },
 
   // ─── Payments ─────────────────────────────────────────────────────────────
