@@ -109,8 +109,24 @@ export default function AdminDisputeDetail() {
           <p className="text-stone-700 text-sm leading-relaxed">{dispute.complaint}</p>
           {dispute.evidence && (
             <div className="mt-3 pt-3 border-t border-stone-100">
-              <p className="text-stone-500 text-xs font-semibold mb-1">Evidence</p>
+              <p className="text-stone-500 text-xs font-semibold mb-1">Evidence description</p>
               <p className="text-stone-600 text-sm">{dispute.evidence}</p>
+            </div>
+          )}
+          {(dispute.evidence_image_1 || dispute.evidence_image_2) && (
+            <div className="mt-3 pt-3 border-t border-stone-100">
+              <p className="text-stone-500 text-xs font-semibold mb-2">Evidence photos</p>
+              <div className="flex gap-3">
+                {[dispute.evidence_image_1, dispute.evidence_image_2].filter(Boolean).map((url: string, i: number) => (
+                  <a key={i} href={url} target="_blank" rel="noopener noreferrer"
+                    className="relative w-28 h-28 rounded-xl overflow-hidden border border-stone-200 block shrink-0 group">
+                    <img src={url} alt={`Evidence ${i + 1}`} className="w-full h-full object-cover" />
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition flex items-center justify-center">
+                      <span className="text-white text-xs font-semibold opacity-0 group-hover:opacity-100 transition">Open</span>
+                    </div>
+                  </a>
+                ))}
+              </div>
             </div>
           )}
         </div>
