@@ -162,25 +162,25 @@ export default function AdminDisputeDetail() {
             />
 
             {dispute.status === "open" && (
-              <button onClick={markUnderReview} disabled={saving}
-                className="w-full py-3 bg-amber-100 text-amber-700 font-semibold rounded-xl text-sm disabled:opacity-50 hover:bg-amber-200 transition">
+              <button onClick={markUnderReview} disabled={saving || !decision.trim()}
+                className="w-full py-3 bg-amber-100 text-amber-700 font-semibold rounded-xl text-sm disabled:opacity-40 disabled:cursor-not-allowed hover:enabled:bg-amber-200 transition">
                 {saving ? "Updating…" : "Mark Under Review"}
               </button>
             )}
 
-            <button onClick={() => resolve("release_to_provider")} disabled={saving}
-              className="w-full py-3 text-white font-semibold rounded-xl text-sm disabled:opacity-50 transition"
+            <button onClick={() => resolve("release_to_provider")} disabled={saving || !decision.trim()}
+              className="w-full py-3 text-white font-semibold rounded-xl text-sm disabled:opacity-40 disabled:cursor-not-allowed transition"
               style={{ background: GRAD }}>
               {saving ? "Resolving…" : "Resolve — Release to Seller"}
             </button>
 
-            <button onClick={() => resolve("refund_customer")} disabled={saving}
-              className="w-full py-3 bg-red-100 text-red-700 font-semibold rounded-xl text-sm disabled:opacity-50 hover:bg-red-200 transition">
+            <button onClick={() => resolve("refund_customer")} disabled={saving || !decision.trim()}
+              className="w-full py-3 bg-red-100 text-red-700 font-semibold rounded-xl text-sm disabled:opacity-40 disabled:cursor-not-allowed hover:enabled:bg-red-200 transition">
               {saving ? "Resolving…" : "Resolve — Refund Buyer"}
             </button>
 
-            <button onClick={() => resolve("hold_pending")} disabled={saving}
-              className="w-full py-3 bg-stone-100 text-stone-700 font-semibold rounded-xl text-sm disabled:opacity-50 hover:bg-stone-200 transition">
+            <button onClick={() => resolve("hold_pending")} disabled={saving || !decision.trim()}
+              className="w-full py-3 bg-stone-100 text-stone-700 font-semibold rounded-xl text-sm disabled:opacity-40 disabled:cursor-not-allowed hover:enabled:bg-stone-200 transition">
               {saving ? "Updating…" : "Hold Pending Investigation"}
             </button>
           </div>
