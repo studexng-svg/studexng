@@ -530,25 +530,37 @@ export default function OrderDetailPage() {
       {/* DISPUTE MODAL */}
       {showDisputeModal && (
         <div
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 pb-24 sm:pb-4 animate-fadeIn"
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end justify-center animate-fadeIn"
           onClick={() => { if (!disputing) { resetDisputeModal(); setShowDisputeModal(false); } }}
         >
           <div
-            className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl border border-stone-100 animate-fadeUp max-h-[90vh] overflow-y-auto"
+            className="bg-white rounded-t-2xl w-full max-w-md shadow-2xl flex flex-col animate-fadeUp"
+            style={{ maxHeight: "calc(100dvh - 5rem)" }}
             onClick={e => e.stopPropagation()}
           >
-            <h3 className="text-xl font-bold text-stone-900 mb-1">Report an Issue</h3>
-            <p className="text-stone-500 text-sm mb-5">
-              Describe the problem with your order. Our team will review and follow up.
-            </p>
-
-            {disputeError && (
-              <div className="mb-4 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-600 font-medium">
-                {disputeError}
+            {/* Fixed header */}
+            <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-stone-100 shrink-0">
+              <div>
+                <h3 className="text-lg font-bold text-stone-900 leading-tight">Report an Issue</h3>
+                <p className="text-stone-400 text-xs mt-0.5">Our team will review and follow up.</p>
               </div>
-            )}
+              <button
+                onClick={() => { resetDisputeModal(); setShowDisputeModal(false); }}
+                disabled={disputing}
+                className="p-2 rounded-full text-stone-400 hover:text-stone-600 hover:bg-stone-100 transition disabled:opacity-40"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
-            <div className="space-y-3">
+            {/* Scrollable body */}
+            <div className="overflow-y-auto flex-1 px-5 py-4 space-y-3">
+              {disputeError && (
+                <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-600 font-medium">
+                  {disputeError}
+                </div>
+              )}
+
               <div>
                 <label className="text-xs font-semibold text-stone-500 mb-1.5 block">Reason</label>
                 <select
@@ -575,7 +587,7 @@ export default function OrderDetailPage() {
                   value={disputeComplaint}
                   onChange={e => setDisputeComplaint(e.target.value)}
                   disabled={disputing}
-                  rows={4}
+                  rows={3}
                   placeholder="What happened? Be as specific as possible..."
                   className="w-full px-4 py-3 rounded-xl border border-stone-200 text-stone-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 bg-white placeholder:text-stone-400 resize-none transition disabled:opacity-50"
                 />
@@ -636,22 +648,23 @@ export default function OrderDetailPage() {
               </div>
             </div>
 
-            <div className="flex gap-3 mt-5">
+            {/* Pinned action buttons — always above nav */}
+            <div className="px-5 pt-3 pb-6 border-t border-stone-100 flex gap-3 shrink-0">
               <button
                 onClick={() => { resetDisputeModal(); setShowDisputeModal(false); }}
                 disabled={disputing}
-                className="flex-1 py-3 bg-stone-100 text-stone-700 rounded-full font-semibold disabled:opacity-50"
+                className="flex-1 py-3 bg-stone-100 text-stone-700 rounded-full font-semibold text-sm disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 onClick={handleDisputeSubmit}
                 disabled={disputing || !disputeComplaint.trim()}
-                className="flex-1 py-3 bg-red-500 text-white rounded-full font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
+                className="flex-1 py-3 bg-red-500 text-white rounded-full font-semibold text-sm disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {disputing
                   ? <div className="animate-spin"><Clock className="w-5 h-5" /></div>
-                  : <><AlertCircle className="w-5 h-5" /> Submit Dispute</>}
+                  : <><AlertCircle className="w-4 h-4" /> Submit Dispute</>}
               </button>
             </div>
           </div>
