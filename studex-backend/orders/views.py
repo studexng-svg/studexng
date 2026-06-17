@@ -376,7 +376,84 @@ class DisputeViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         self.perform_create(serializer)
         headers = self.get_success_headers(serializer.data)
+
+        dispute = serializer.instance
+        self._send_dispute_notifications(dispute)
+
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
+    def _send_dispute_notifications(self, dispute):
+        import logging as _logging
+        _logger = _logging.getLogger(__name__)
+        try:
+            order = dispute.order
+            filer = dispute.filer
+            vendor = order.listing.vendor if order.listing else None
+            reason_label = dict(Dispute.REASON_CHOICES).get(dispute.reason, dispute.reason)
+
+            # ── Notify the vendor ────────────────────────────────────────────
+            if vendor and vendor != filer:
+                _notify(
+                    recipient=vendor,
+                    notification_type='dispute_filed',
+                    title=f'⚠️ Dispute Filed — Order #{order.reference}',
+                    message=(
+                        f'{filer.username} has opened a dispute on order #{order.reference} '
+                        f'({reason_label}). Our support team will contact you. '
+                        f'Please do not attempt to contact the buyer directly.'
+                    ),
+                    action_url='/vendor/dashboard',
+                )
+
+            # ── Email the admin ──────────────────────────────────────────────
+            from django.conf import settings as _settings
+            from studex.email import send_email, _html_wrapper
+            frontend_base = getattr(_settings, 'FRONTEND_BASE_URL', 'https://studex.com.ng')
+            admin_email = getattr(_settings, 'ADMIN_EMAIL', '')
+            if not admin_email:
+                return
+
+            django_admin_url = f"{frontend_base.rstrip('/')}/admin/orders/dispute/{dispute.id}/change/"
+            img_links = ""
+            if dispute.evidence_image_1:
+                img_links += f'<br><a href="{dispute.evidence_image_1}" style="color:#0D9488;">Evidence Photo 1</a>'
+            if dispute.evidence_image_2:
+                img_links += f'<br><a href="{dispute.evidence_image_2}" style="color:#0D9488;">Evidence Photo 2</a>'
+
+            body = f"""
+            <p style="font-size:15px;color:#44403C;line-height:1.7;margin:0 0 12px;">
+              A new dispute has been filed and requires your attention.
+            </p>
+            <table style="width:100%;border-collapse:collapse;font-size:14px;color:#44403C;">
+              <tr><td style="padding:6px 0;font-weight:600;width:140px;">Order</td>
+                  <td>#{order.reference}</td></tr>
+              <tr><td style="padding:6px 0;font-weight:600;">Filed by</td>
+                  <td>{filer.username} ({filer.email})</td></tr>
+              <tr><td style="padding:6px 0;font-weight:600;">Vendor</td>
+                  <td>{vendor.username if vendor else 'N/A'}</td></tr>
+              <tr><td style="padding:6px 0;font-weight:600;">Reason</td>
+                  <td>{reason_label}</td></tr>
+              <tr><td style="padding:6px 0;font-weight:600;">Complaint</td>
+                  <td>{dispute.complaint}</td></tr>
+              {"<tr><td style='padding:6px 0;font-weight:600;'>Evidence text</td><td>" + dispute.evidence + "</td></tr>" if dispute.evidence else ""}
+            </table>
+            {img_links}
+            <a href="{django_admin_url}"
+               style="display:inline-block;margin-top:20px;padding:12px 24px;
+                      background:linear-gradient(135deg,#0D9488,#7C3AED);
+                      color:#ffffff;text-decoration:none;border-radius:10px;
+                      font-size:14px;font-weight:600;">
+              Review in Admin
+            </a>
+            """
+            send_email(
+                to=admin_email,
+                subject=f'[StudEx] New Dispute #{dispute.id} — Order #{order.reference}',
+                html=_html_wrapper(f'New Dispute Filed — #{dispute.id}', body),
+            )
+        except Exception as e:
+            import logging as _logging
+            _logging.getLogger(__name__).error(f"dispute notification failed: {e}")
 
 
 class BookingViewSet(viewsets.ModelViewSet):
