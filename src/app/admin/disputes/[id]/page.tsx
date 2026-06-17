@@ -155,7 +155,7 @@ export default function AdminDisputeDetail() {
 
             <textarea
               rows={3}
-              className="w-full border border-stone-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
+              className="w-full bg-white text-stone-900 border border-stone-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400 placeholder:text-stone-400"
               placeholder="Admin decision note (required to resolve)…"
               value={decision}
               onChange={e => setDecision(e.target.value)}
