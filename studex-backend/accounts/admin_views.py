@@ -1467,16 +1467,24 @@ try:
         permission_classes = [IsAdminUser]
 
         def get(self, request):
-            cats = Category.objects.all().order_by('title')
+            cats = Category.objects.annotate(listing_count=Count('listings')).order_by('title')
             data = []
             for c in cats:
+                if c.is_pau and c.is_futo and c.is_imsu:
+                    campus = 'all'
+                elif c.is_futo:
+                    campus = 'futo'
+                elif c.is_imsu:
+                    campus = 'imsu'
+                else:
+                    campus = 'pau'
                 data.append({
                     'id': c.id,
                     'title': c.title,
                     'slug': c.slug,
                     'image': c.image,
-                    'campus': c.campus,
-                    'listing_count': c.listings.count(),
+                    'campus': campus,
+                    'listing_count': c.listing_count,
                 })
             return Response(data)
 
@@ -1488,9 +1496,16 @@ try:
             slug = slugify(title)
             campus = request.data.get('campus', 'pau')
             image = request.data.get('image', '')
+            is_pau  = campus in ('pau', 'all')
+            is_futo = campus in ('futo', 'all')
+            is_imsu = campus in ('imsu', 'all')
             try:
-                cat = Category.objects.create(title=title, slug=slug, campus=campus, image=image or None)
-                return Response({'id': cat.id, 'title': cat.title, 'slug': cat.slug, 'campus': cat.campus, 'image': cat.image}, status=status.HTTP_201_CREATED)
+                cat = Category.objects.create(
+                    title=title, slug=slug, image=image or None,
+                    is_pau=is_pau, is_futo=is_futo, is_imsu=is_imsu,
+                )
+                campus_out = 'all' if (cat.is_pau and cat.is_futo and cat.is_imsu) else campus
+                return Response({'id': cat.id, 'title': cat.title, 'slug': cat.slug, 'campus': campus_out, 'image': cat.image}, status=status.HTTP_201_CREATED)
             except Exception as e:
                 return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -1504,11 +1519,22 @@ try:
                 if 'title' in request.data:
                     cat.title = request.data['title']
                 if 'campus' in request.data:
-                    cat.campus = request.data['campus']
+                    campus = request.data['campus']
+                    cat.is_pau  = campus in ('pau', 'all')
+                    cat.is_futo = campus in ('futo', 'all')
+                    cat.is_imsu = campus in ('imsu', 'all')
                 if 'image' in request.data:
                     cat.image = request.data['image'] or None
                 cat.save()
-                return Response({'id': cat.id, 'title': cat.title, 'slug': cat.slug, 'campus': cat.campus, 'image': cat.image})
+                if cat.is_pau and cat.is_futo and cat.is_imsu:
+                    campus_out = 'all'
+                elif cat.is_futo:
+                    campus_out = 'futo'
+                elif cat.is_imsu:
+                    campus_out = 'imsu'
+                else:
+                    campus_out = 'pau'
+                return Response({'id': cat.id, 'title': cat.title, 'slug': cat.slug, 'campus': campus_out, 'image': cat.image})
             except Category.DoesNotExist:
                 return Response({'error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
 
