@@ -1,72 +1,22 @@
 "use client";
 
-import { motion, AnimatePresence } from "framer-motion";
-import Link from "next/link";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Search, Sparkles, Heart, Star, ShoppingCart, X,
-  ChevronRight, ArrowRight, Shield, Clock,
+  ArrowLeft, LayoutGrid, List, GalleryHorizontal,
+  Sparkles, Heart, ShoppingCart, Share2, MapPin, Star, Clock,
 } from "lucide-react";
-import TopNav from "@/components/layout/TopNav";
-import { useState, useEffect } from "react";
-import { useAuth } from "@/lib/authStore";
-import { useQueryClient } from "@tanstack/react-query";
+import Link from "next/link";
+import { motion } from "framer-motion";
 import { api } from "@/lib/api";
+import { useAuth } from "@/lib/authStore";
 import { useWishlistStore } from "@/lib/wishlistStore";
-import ChatWindow from "@/components/ChatWindow";
-import { GRAD, SERIF } from "@/lib/tokens";
-import { useScrollRestoration } from "@/hooks/useScrollRestoration";
+import { useCart } from "@/lib/cartStore";
+import { GRAD } from "@/lib/tokens";
 
-interface Listing {
-  id: number;
-  title: string;
-  description: string;
-  price: number;
-  image: string;
-  vendor: {
-    id: number;
-    username: string;
-    business_name?: string;
-    profile?: {
-      vendor_badge: "none" | "rising" | "trusted" | "top";
-      completion_rate: number;
-      rating: number;
-      total_reviews: number;
-    };
-  };
-  category: { id: number; title: string };
-  is_available: boolean;
-  is_reserved?: boolean;
-  listing_type?: string;
-  track_inventory?: boolean;
-  stock_quantity?: number;
+function slugToTitle(slug: string) {
+  return slug.split("-").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
 }
-
-interface ActiveChat {
-  sellerId: number;
-  sellerName: string;
-  listingId: number;
-  productName: string;
-  originalPrice: number;
-}
-
-interface Props {
-  slug: string;
-  initialListings: Listing[];
-  initialNextPage?: string | null;
-}
-
-const BADGE_LABELS: Record<string, string> = {
-  top: "⭐ Top Vendor",
-  trusted: "✓ Trusted",
-  rising: "↑ Rising",
-};
-
-const BADGE_STYLES: Record<string, string> = {
-  top: "bg-amber-50 text-amber-700 border border-amber-200",
-  trusted: "bg-teal-50 text-teal-700 border border-teal-200",
-  rising: "bg-purple-50 text-purple-700 border border-purple-200",
-};
 
 function SafeImage({ src, alt }: { src: string | null | undefined; alt: string }) {
   const [error, setError] = useState(false);
@@ -77,510 +27,361 @@ function SafeImage({ src, alt }: { src: string | null | undefined; alt: string }
       </div>
     );
   }
-  return (
-    <img
-      src={src}
-      alt={alt}
-      loading="lazy"
-      decoding="async"
-      className="w-full h-full object-cover"
-      onError={() => setError(true)}
-    />
-  );
+  return <img src={src} alt={alt} loading="lazy" className="w-full h-full object-cover" onError={() => setError(true)} />;
 }
 
-function ListingSkeletons() {
-  return (
-    <div className="space-y-4 lg:space-y-0 lg:grid lg:grid-cols-2 lg:gap-4">
-      {[0, 1, 2, 3].map(i => (
-        <div key={i} className="bg-white rounded-2xl border border-stone-100 overflow-hidden animate-pulse">
-          <div className="w-full h-48 bg-stone-100" />
-          <div className="px-4 pt-3 pb-4 space-y-2.5">
-            <div className="h-4 bg-stone-100 rounded-full w-3/4" />
-            <div className="h-3 bg-stone-100 rounded-full w-1/2" />
-            <div className="flex justify-between items-center mt-2">
-              <div className="h-7 bg-stone-100 rounded-full w-20" />
-              <div className="h-9 bg-stone-100 rounded-full w-24" />
-            </div>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
+const BADGE_LABELS: Record<string, string> = {
+  rising: "⚡ Rising",
+  trusted: "✅ Trusted",
+  top: "🏆 Top Vendor",
+};
+
+interface Props {
+  slug: string;
+  initialListings: any[];
+  initialNextPage: string | null;
 }
 
 export default function CategoryPageClient({ slug, initialListings, initialNextPage }: Props) {
   const router = useRouter();
-  const queryClient = useQueryClient();
-  const { isLoggedIn, user, isHydrated } = useAuth();
+  const { user } = useAuth();
   const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlistStore();
+  const { addToCart, cart } = useCart();
 
-  useScrollRestoration(`category-${slug}`, ["/listing/"]);
+  const [listings, setListings] = useState<any[]>(initialListings);
   const [mounted, setMounted] = useState(false);
-  const [campusReady, setCampusReady] = useState(false);
-  const [listings, setListings] = useState<Listing[]>(initialListings);
-  const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(initialListings.length === 0);
   const [toast, setToast] = useState("");
-  const [activeChat, setActiveChat] = useState<ActiveChat | null>(null);
-  const [lightboxImage, setLightboxImage] = useState<{ src: string; title: string } | null>(null);
-  const [nextPage, setNextPage] = useState<string | null>(initialNextPage || null);
-  const [loadingMore, setLoadingMore] = useState(false);
+  const [viewMode, setViewMode] = useState<"grid" | "list" | "scroll">("grid");
+  const [minPrice, setMinPrice] = useState("");
+  const [maxPrice, setMaxPrice] = useState("");
 
-  const categoryName = slug.split('-').map(w => w[0].toUpperCase() + w.slice(1)).join(' ');
+  const title = slugToTitle(slug);
 
-  useEffect(() => setMounted(true), []);
+  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 2000); };
 
   useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setLightboxImage(null);
-    };
-    window.addEventListener("keydown", handleKey);
-    return () => window.removeEventListener("keydown", handleKey);
-  }, []);
+    setMounted(true);
+    const campus = document.cookie.split(";").find(s => s.trim().startsWith("studex_campus="))?.split("=")?.[1] || "pau";
+    api.pub.listings({ campus, category: slug, page_size: "100" })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) setListings(d.results || d || []); })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [slug]);
 
-  // Hold listings behind a skeleton until campus is confirmed.
-  // SSR may have fetched PAU listings; FUTO users need a refetch.
-  useEffect(() => {
-    if (!isHydrated) return;
-
-    if (!isLoggedIn || !user) {
-      setCampusReady(true);
-      return;
-    }
-
-    const userSchool = ((user as any).school || '').toLowerCase();
-    // Admin users have no school — trust the existing cookie, don't override it
-    if (userSchool !== 'pau' && userSchool !== 'futo' && userSchool !== 'imsu') {
-      setCampusReady(true);
-      return;
-    }
-
-    const cookieCampus =
-      document.cookie
-        .split(';')
-        .find(c => c.trim().startsWith('studex_campus='))
-        ?.split('=')?.[1]
-        ?.toLowerCase() || 'pau';
-
-    if (cookieCampus === userSchool) {
-      setCampusReady(true);
-      return;
-    }
-
-    const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
-    document.cookie = `studex_campus=${userSchool}; path=/; max-age=31536000; SameSite=Lax${isHttps ? '; Secure' : ''}`;
-    api.services.listingsAuth({ category: slug, campus: userSchool, page_size: "100" })
-      .then(async (res) => {
-        if (res.ok) {
-          const data = await res.json();
-          setListings(Array.isArray(data.results) ? data.results : data || []);
-          setNextPage(data.next || null);
-        }
-      })
-      .catch(() => { setListings([]); setNextPage(null); })
-      .finally(() => setCampusReady(true));
-  }, [isHydrated, isLoggedIn, (user as any)?.school, slug]);
-
-  const showToast = (msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(""), 2000);
-  };
-
-  const loadMoreListings = async () => {
-    if (!nextPage || loadingMore) return;
-    setLoadingMore(true);
-    try {
-      const res = await fetch(nextPage);
-      if (res.ok) {
-        const data = await res.json();
-        setListings(prev => [...prev, ...(data.results || [])]);
-        setNextPage(data.next || null);
-      }
-    } catch {
-      // silently fail, user can try again
-    } finally {
-      setLoadingMore(false);
-    }
-  };
-
-  // Intersection observer for infinite scroll
-  useEffect(() => {
-    if (!mounted || !nextPage) return;
-    const sentinel = document.getElementById('listings-sentinel');
-    if (!sentinel) return;
-
-    const observer = new IntersectionObserver(
-      entries => {
-        if (entries[0].isIntersecting && !loadingMore) {
-          loadMoreListings();
-        }
-      },
-      { threshold: 0.1 }
-    );
-
-    observer.observe(sentinel);
-    return () => observer.disconnect();
-  }, [nextPage, loadingMore, mounted, isLoggedIn]);
-
-  const handleAddToCart = async (listing: Listing) => {
-    if (!isLoggedIn) { router.push("/auth"); return; }
-
-    try {
-      const res = await api.cart.add({ listing_id: listing.id, quantity: 1 });
-
-      if (!res.ok) {
-        const data = await res.json();
-        const msg: string = data.error || data.detail || "Could not add to cart";
-        if (msg.toLowerCase().includes("reserved")) {
-          setListings(prev => prev.map(l => l.id === listing.id ? { ...l, is_reserved: true } : l));
-          showToast("This item is currently reserved by another user");
-        } else {
-          showToast(msg);
-        }
-        return;
-      }
-
-      const isSingleStock = listing.track_inventory && listing.stock_quantity === 1;
-      showToast(isSingleStock ? "Item reserved for 10 minutes!" : "Added to cart!");
-      try { sessionStorage.setItem("cart-referrer", window.location.pathname); } catch {}
-      queryClient.invalidateQueries({ queryKey: ["cart"] });
-    } catch {
-      showToast("Could not add to cart. Please try again.");
-    }
-  };
-
-  const handleOpenChat = (listing: Listing) => {
-    if (!isLoggedIn) { router.push("/auth"); return; }
-    setActiveChat({
-      sellerId: listing.vendor.id,
-      sellerName: listing.vendor.business_name || listing.vendor.username,
-      listingId: listing.id,
-      productName: listing.title,
-      originalPrice: listing.price,
+  const applyPriceFilter = (items: any[]) => {
+    const min = parseFloat(minPrice);
+    const max = parseFloat(maxPrice);
+    return items.filter(l => {
+      const p = Number(l.price);
+      if (!isNaN(min) && p < min) return false;
+      if (!isNaN(max) && p > max) return false;
+      return true;
     });
   };
 
-  const filteredListings = listings.filter(l =>
-    l.title.toLowerCase().includes(search.toLowerCase()) ||
-    l.description.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredListings = applyPriceFilter(listings);
 
-  const BADGE_WEIGHT = { top: 3, trusted: 2, rising: 1, none: 0 };
-  const sortedListings = [...filteredListings].sort((a, b) => {
-    const aBadge = BADGE_WEIGHT[a.vendor.profile?.vendor_badge || 'none'];
-    const bBadge = BADGE_WEIGHT[b.vendor.profile?.vendor_badge || 'none'];
-    if (bBadge !== aBadge) return bBadge - aBadge;
-    return (b.vendor.profile?.completion_rate || 0) - (a.vendor.profile?.completion_rate || 0);
-  });
+  const renderListingCard = (listing: any, i: number) => {
+    const badge         = listing.vendor?.profile?.vendor_badge;
+    const rating        = listing.vendor?.profile?.rating;
+    const totalReviews  = listing.vendor?.profile?.total_reviews;
+    const wishlisted    = mounted && isInWishlist(listing.id);
+    const isService     = (listing.listing_type || "").toLowerCase() === "service";
+    const isOwn         = !!(user?.id && user.id === listing.vendor?.id);
+    const isReserved    = !isService && !isOwn && !!listing.is_reserved;
+    const inCart        = cart.some(ci => ci.id === listing.id);
+    const discountPct   = listing.discount_percent || 0;
+    const effectivePrice = discountPct > 0
+      ? Math.round(Number(listing.price) * (1 - discountPct / 100))
+      : Number(listing.price);
+
+    return (
+      <div key={listing.id}
+        className="animate-fadeUp bg-white rounded-xl border border-stone-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow"
+        style={{ animationDelay: `${Math.min(i * 0.04, 0.2)}s` }}>
+        <Link href={`/listing/${listing.id}`} className="block">
+          <div className="relative w-full aspect-square overflow-hidden bg-stone-50">
+            <SafeImage src={listing.image?.startsWith("http") ? listing.image : null} alt={listing.title} />
+            {!listing.is_available && (
+              <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                <span className="text-white font-bold bg-red-500 px-3 py-1 rounded-full text-xs">Unavailable</span>
+              </div>
+            )}
+            {discountPct > 0 ? (
+              <div className="absolute top-2.5 left-2.5 z-10 bg-red-500 text-white px-2 py-0.5 rounded-md text-xs font-black">
+                -{discountPct}% OFF
+              </div>
+            ) : badge && badge !== "none" ? (
+              <div className="absolute top-2.5 left-2.5 z-10 px-2 py-0.5 rounded-md text-xs font-bold text-white" style={{ background: GRAD }}>
+                {BADGE_LABELS[badge]}
+              </div>
+            ) : null}
+            <motion.button onClick={e => {
+              e.preventDefault(); e.stopPropagation();
+              const item = { id: listing.id, title: listing.title, price: effectivePrice, img: listing.image };
+              if (wishlisted) { removeFromWishlist(listing.id); showToast("Removed from Wishlist"); }
+              else { addToWishlist(item); showToast("Added to Wishlist ❤️"); }
+            }} whileTap={{ scale: 0.85 }}
+              className="absolute top-2.5 right-2.5 z-10 w-7 h-7 bg-white rounded-full shadow-sm flex items-center justify-center">
+              <Heart className={`w-3.5 h-3.5 ${wishlisted ? "fill-red-500 text-red-500" : "text-stone-400"}`} />
+            </motion.button>
+          </div>
+          <div className="p-3">
+            <p className="font-bold text-stone-900 text-sm line-clamp-1">{listing.title}</p>
+            <p className="text-stone-400 text-xs mt-0.5 truncate">@{listing.vendor?.username || listing.vendor}</p>
+            {listing.vendor?.hostel && (
+              <div className="flex items-center gap-0.5 mt-0.5">
+                <MapPin className="w-3 h-3 text-teal-400 flex-shrink-0" />
+                <span className="text-xs text-stone-400 truncate">{listing.vendor.hostel}</span>
+              </div>
+            )}
+            {(totalReviews ?? 0) > 0 && (
+              <div className="flex items-center gap-0.5 mt-1.5">
+                <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                <span className="text-xs text-stone-600 font-medium">{rating}</span>
+                <span className="text-xs text-stone-400">({totalReviews})</span>
+              </div>
+            )}
+            <div className="mt-2 space-y-2">
+              {discountPct > 0 ? (
+                <div className="flex items-center gap-1.5">
+                  <p className="font-bold text-stone-400 text-xs line-through">₦{Number(listing.price).toLocaleString()}</p>
+                  <p className="font-bold text-red-600 text-sm">₦{effectivePrice.toLocaleString()}</p>
+                </div>
+              ) : (
+                <p className="font-bold text-stone-900 text-sm">₦{Number(listing.price).toLocaleString()}</p>
+              )}
+              {isReserved ? (
+                <span className="text-xs text-stone-400 font-semibold flex items-center gap-0.5">
+                  <Clock className="w-3 h-3" /> Reserved
+                </span>
+              ) : (
+                <div className="flex gap-1.5">
+                  <button
+                    onClick={e => {
+                      if (isOwn) { e.preventDefault(); e.stopPropagation(); router.push('/vendor/dashboard/listings'); return; }
+                      if (isService) return;
+                      e.preventDefault(); e.stopPropagation();
+                      addToCart({
+                        id: listing.id, title: listing.title,
+                        price: effectivePrice,
+                        original_price: discountPct > 0 ? Number(listing.price) : undefined,
+                        deal_discount_percent: discountPct > 0 ? discountPct : undefined,
+                        img: listing.image || "",
+                      });
+                      showToast(inCart ? "Added again (+1)" : "Added to cart");
+                    }}
+                    className="flex-1 py-2 rounded-xl text-white text-xs font-bold flex items-center justify-center gap-1.5 hover:opacity-90 transition-opacity"
+                    style={{ background: "linear-gradient(135deg,#2DD4BF 0%,#0D9488 100%)" }}>
+                    <ShoppingCart className="w-3.5 h-3.5" />
+                    {isOwn ? "Manage" : isService ? "Book Now" : "Add to Cart"}
+                  </button>
+                  <button
+                    onClick={async e => {
+                      e.preventDefault(); e.stopPropagation();
+                      const url = `${window.location.origin}/listing/${listing.id}`;
+                      if (navigator.share) { await navigator.share({ title: listing.title, url }).catch(() => {}); }
+                      else { await navigator.clipboard.writeText(url); showToast("Link copied!"); }
+                    }}
+                    className="p-2 rounded-xl bg-stone-100 hover:bg-stone-200 transition flex items-center justify-center flex-shrink-0">
+                    <Share2 className="w-3.5 h-3.5 text-stone-500" />
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </Link>
+      </div>
+    );
+  };
+
+  const renderListingRow = (listing: any, i: number) => {
+    const rating        = listing.vendor?.profile?.rating;
+    const totalReviews  = listing.vendor?.profile?.total_reviews;
+    const isService     = (listing.listing_type || "").toLowerCase() === "service";
+    const isOwn         = !!(user?.id && user.id === listing.vendor?.id);
+    const isReserved    = !isService && !isOwn && !!listing.is_reserved;
+    const inCart        = cart.some(ci => ci.id === listing.id);
+    return (
+      <div key={listing.id}
+        className="animate-fadeUp bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow flex items-center gap-4 p-4"
+        style={{ animationDelay: `${Math.min(i * 0.02, 0.1)}s` }}>
+        <Link href={`/listing/${listing.id}`} className="flex items-center gap-4 flex-1 min-w-0">
+          <div className="w-24 h-24 rounded-xl overflow-hidden flex-shrink-0 bg-stone-50 relative">
+            <SafeImage src={listing.image?.startsWith("http") ? listing.image : null} alt={listing.title} />
+            {!listing.is_available && (
+              <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                <span className="text-white text-xs font-bold">Unavailable</span>
+              </div>
+            )}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-bold text-stone-900 text-base truncate">{listing.title}</p>
+            <p className="text-stone-400 text-sm mt-0.5 truncate">@{listing.vendor?.username || listing.vendor}</p>
+            {listing.vendor?.hostel && (
+              <div className="flex items-center gap-0.5 mt-0.5">
+                <MapPin className="w-3.5 h-3.5 text-teal-400 flex-shrink-0" />
+                <span className="text-sm text-stone-400 truncate">{listing.vendor.hostel}</span>
+              </div>
+            )}
+            {(totalReviews ?? 0) > 0 && (
+              <div className="flex items-center gap-1 mt-1.5">
+                <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                <span className="text-sm text-stone-600 font-medium">{rating}</span>
+                <span className="text-sm text-stone-400">({totalReviews})</span>
+              </div>
+            )}
+            <p className="font-bold text-stone-900 text-base mt-1.5">₦{Number(listing.price).toLocaleString()}</p>
+          </div>
+        </Link>
+        {!isOwn && listing.is_available && !isReserved && (
+          <button
+            onClick={() => {
+              if (!isService) { addToCart({ id: listing.id, title: listing.title, price: listing.price, img: listing.image || "" }); showToast(inCart ? "Added again (+1)" : "Added to cart"); }
+              else { router.push(`/listing/${listing.id}`); }
+            }}
+            className="flex-shrink-0 px-4 py-3 text-white text-sm font-bold rounded-xl"
+            style={{ background: "linear-gradient(135deg,#2DD4BF 0%,#0D9488 100%)" }}>
+            {isService ? "Book" : "Cart"}
+          </button>
+        )}
+      </div>
+    );
+  };
+
+  const gridClass = viewMode === "grid"
+    ? "grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4"
+    : viewMode === "scroll"
+    ? "flex gap-3 overflow-x-auto pb-2 -mx-4 px-4"
+    : "space-y-2";
+  const gridStyle: React.CSSProperties = viewMode === "scroll"
+    ? { scrollbarWidth: "none", msOverflowStyle: "none" }
+    : {};
+  const renderItem = (l: any, i: number) =>
+    viewMode === "list" ? renderListingRow(l, i) :
+    viewMode === "scroll" ? <div key={l.id} className="flex-shrink-0 w-44">{renderListingCard(l, i)}</div> :
+    renderListingCard(l, i);
+
+  const btnCls = (mode: string) =>
+    `p-1.5 rounded-md transition-all ${viewMode === mode ? "bg-white shadow-sm text-stone-700" : "text-stone-400 hover:text-stone-600"}`;
 
   return (
-    <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
-
-      {/* Toast */}
+    <>
       {toast && (
-        <motion.div
-          initial={{ y: -50, opacity: 0 }}
-          animate={{ y: 60, opacity: 1 }}
+        <motion.div initial={{ y: -50, opacity: 0 }} animate={{ y: 60, opacity: 1 }}
           className="fixed top-4 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full shadow-lg z-50 font-medium text-sm text-white"
           style={{ background: GRAD }}>
           {toast}
         </motion.div>
       )}
 
-      {/* Chat window */}
-      {activeChat && (
-        <ChatWindow
-          sellerId={activeChat.sellerId}
-          sellerName={activeChat.sellerName}
-          listingId={activeChat.listingId}
-          productName={activeChat.productName}
-          originalPrice={activeChat.originalPrice}
-          onClose={() => setActiveChat(null)}
-        />
-      )}
+      <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
 
-      {/* Lightbox */}
-      <AnimatePresence>
-        {lightboxImage && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setLightboxImage(null)}
-            className="fixed inset-0 bg-black/95 z-[9999] flex items-center justify-center p-4">
-            <button
-              onClick={() => setLightboxImage(null)}
-              className="absolute top-4 right-4 z-10 bg-white/10 hover:bg-white/20 text-white rounded-full p-3 transition">
-              <X className="w-6 h-6" />
-            </button>
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              transition={{ type: "spring", damping: 25, stiffness: 300 }}
-              onClick={e => e.stopPropagation()}
-              className="relative w-full max-w-3xl"
-              style={{ maxHeight: "90dvh" }}>
-              <img
-                src={lightboxImage.src}
-                alt={lightboxImage.title}
-                className="w-full h-auto rounded-2xl object-contain"
-                style={{ maxHeight: "85dvh" }}
-              />
-              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent rounded-b-2xl p-4">
-                <p className="text-white font-bold text-center">{lightboxImage.title}</p>
-                <p className="text-white/60 text-xs text-center mt-0.5">Tap outside to close</p>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <TopNav showBack activeNav="services" />
-
-      {/* ── SEARCH SUB-BAR ── */}
-      <div className="bg-white border-b border-stone-100">
-        <div className="max-w-6xl mx-auto px-4 py-2.5 flex items-center gap-3">
-          <span className="hidden lg:block font-bold text-stone-900 text-sm flex-shrink-0">{categoryName}</span>
-          <div className="relative flex-1 max-w-xl">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 pointer-events-none" />
-            <input
-              type="text"
-              placeholder={`Search ${categoryName.toLowerCase()}...`}
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 bg-stone-50 border border-stone-200 rounded-full text-sm focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-100 transition"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* ── MAIN CONTENT ── */}
-      <div className="max-w-6xl mx-auto px-4 pt-6 pb-32">
-        <div className="lg:grid lg:grid-cols-[1fr_300px] lg:gap-10 lg:items-start">
-
-          {/* ── LEFT / MAIN COLUMN ── */}
-          <div>
-            {/* Section heading */}
-            <div className="flex items-end justify-between mb-4">
-              <div>
-                <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-bold">Available Now</p>
-                <h1
-                  className="text-2xl font-black italic tracking-tighter uppercase text-stone-900 mt-0.5"
-                  style={{ fontFamily: "var(--font-jakarta), 'Plus Jakarta Sans', sans-serif" }}>
-                  {categoryName}
-                </h1>
-              </div>
-              {campusReady && sortedListings.length > 0 && (
-                <span className="text-stone-400 text-sm font-medium pb-0.5">
-                  {sortedListings.length} listing{sortedListings.length !== 1 ? 's' : ''}
-                </span>
-              )}
-            </div>
-
-            {/* Listings */}
-            {mounted && !campusReady ? (
-              <ListingSkeletons />
-            ) : sortedListings.length === 0 ? (
-              <motion.div
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="bg-white rounded-2xl p-12 text-center border border-stone-100 shadow-sm">
-                <Sparkles className="w-12 h-12 text-stone-200 mx-auto mb-3" />
-                <h3 className="text-lg font-bold text-stone-400" style={SERIF}>
-                  {search ? "No results found" : "No listings yet"}
-                </h3>
-                <p className="text-stone-400 text-sm mt-1">
-                  {search
-                    ? `No ${categoryName.toLowerCase()} listings match "${search}"`
-                    : `No ${categoryName.toLowerCase()} listings available yet. Check back soon!`}
-                </p>
-                <Link href="/categories">
-                  <motion.button
-                    whileHover={{ scale: 1.03 }}
-                    whileTap={{ scale: 0.97 }}
-                    className="mt-6 px-6 py-2.5 text-white rounded-full font-semibold text-sm inline-flex items-center gap-1.5"
-                    style={{ background: GRAD }}>
-                    Browse all categories <ChevronRight className="w-4 h-4" />
-                  </motion.button>
-                </Link>
-              </motion.div>
-            ) : (
-              <>
-                <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4">
-                  {sortedListings.map((listing, i) => {
-                  const badge = listing.vendor.profile?.vendor_badge;
-                  const rating = listing.vendor.profile?.rating;
-                  const totalReviews = listing.vendor.profile?.total_reviews;
-                  const isService = (listing.listing_type || "").toLowerCase() === "service";
-                  const isOwnListing = !!(user?.id && user.id === listing.vendor.id);
-                  const isReserved = !isService && !isOwnListing && !!listing.is_reserved;
-                  const wishlisted = mounted && isInWishlist(listing.id);
-                  const imageUrl = listing.image?.startsWith("http") ? listing.image : null;
-
-                  return (
-                    <motion.div
-                      key={listing.id}
-                      initial={{ opacity: 0, y: 12 }}
-                      whileInView={{ opacity: 1, y: 0 }}
-                      viewport={{ once: true }}
-                      transition={{ delay: Math.min(i * 0.04, 0.2) }}
-                      className="bg-white rounded-xl border border-stone-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow group">
-
-                      <Link href={`/listing/${listing.id}`} className="block">
-                        {/* Square image */}
-                        <div className="relative w-full aspect-square overflow-hidden bg-stone-50">
-                          <SafeImage src={imageUrl} alt={listing.title} />
-
-                          {!listing.is_available && (
-                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                              <span className="text-white font-bold bg-red-500 px-3 py-1 rounded-full text-xs">Unavailable</span>
-                            </div>
-                          )}
-
-                          {badge && badge !== "none" && (
-                            <div className="absolute top-2.5 left-2.5 z-10 px-2 py-0.5 rounded-md text-xs font-bold text-white" style={{ background: GRAD }}>
-                              {BADGE_LABELS[badge]}
-                            </div>
-                          )}
-
-                          <motion.button
-                            onClick={e => {
-                              e.preventDefault(); e.stopPropagation();
-                              const item = { id: listing.id, title: listing.title, price: listing.price, img: listing.image };
-                              if (wishlisted) { removeFromWishlist(listing.id); showToast("Removed from Wishlist"); }
-                              else { addToWishlist(item); showToast("Added to Wishlist"); }
-                            }}
-                            whileTap={{ scale: 0.85 }}
-                            className="absolute top-2.5 right-2.5 z-10 w-7 h-7 bg-white rounded-full shadow-sm flex items-center justify-center">
-                            <Heart className={`w-3.5 h-3.5 ${wishlisted ? "fill-red-500 text-red-500" : "text-stone-400"}`} />
-                          </motion.button>
-                        </div>
-
-                        <div className="p-3">
-                          <p className="font-bold text-stone-900 text-sm line-clamp-1">{listing.title}</p>
-                          <p className="text-stone-400 text-xs mt-0.5 truncate">@{listing.vendor.business_name || listing.vendor.username}</p>
-
-                          {(totalReviews ?? 0) > 0 && (
-                            <div className="flex items-center gap-0.5 mt-1.5">
-                              <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
-                              <span className="text-xs text-stone-600 font-medium">{rating}</span>
-                              <span className="text-xs text-stone-400">({totalReviews})</span>
-                            </div>
-                          )}
-
-                          <div className="mt-2 space-y-2">
-                            <p className="font-bold text-stone-900 text-sm">₦{Number(listing.price).toLocaleString()}</p>
-                            {isReserved ? (
-                              <span className="text-xs text-stone-400 font-semibold flex items-center gap-0.5">
-                                <Clock className="w-3 h-3" /> Reserved
-                              </span>
-                            ) : (
-                              <button
-                                onClick={e => {
-                                  e.preventDefault(); e.stopPropagation();
-                                  if (!isOwnListing) handleAddToCart(listing);
-                                }}
-                                className="w-full py-2 rounded-xl text-white text-xs font-bold flex items-center justify-center gap-1.5 hover:opacity-90 transition-opacity"
-                                style={{ background: "linear-gradient(135deg,#2DD4BF 0%,#0D9488 100%)" }}>
-                                <ShoppingCart className="w-3.5 h-3.5" />
-                                {isOwnListing ? "Manage" : isService ? "Book Now" : "Add to Cart"}
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      </Link>
-
-                    </motion.div>
-                  );
-                })}
-                </div>
-                {nextPage && (
-                  <div id="listings-sentinel" className="flex justify-center py-8">
-                    {loadingMore ? (
-                      <div className="flex items-center gap-2 text-stone-400">
-                        <div className="w-4 h-4 rounded-full border-2 border-stone-200 border-t-teal-500 animate-spin" />
-                        <span className="text-sm">Loading more...</span>
-                      </div>
-                    ) : (
-                      <span className="text-xs text-stone-300">Scroll for more</span>
-                    )}
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-
-          {/* ── RIGHT SIDEBAR (desktop only) ── */}
-          <div className="hidden lg:flex flex-col gap-5 sticky" style={{ top: "80px" }}>
-
-            {/* Category info card */}
-            <motion.div
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-              className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden">
-              <div
-                className="h-24 flex items-center justify-center relative"
-                style={{ background: GRAD }}>
-                <div className="absolute inset-0 bg-white/10 blur-2xl" />
-                <h2
-                  className="relative text-white font-black italic tracking-tighter uppercase text-2xl text-center px-4"
-                  style={{ fontFamily: "var(--font-jakarta), 'Plus Jakarta Sans', sans-serif" }}>
-                  {categoryName}
-                </h2>
-              </div>
-              <div className="p-4">
-                {campusReady ? (
-                  <p className="text-stone-500 text-sm text-center">
-                    {sortedListings.length > 0
-                      ? <><span className="font-bold text-stone-900">{sortedListings.length}</span> listing{sortedListings.length !== 1 ? 's' : ''} available</>
-                      : "No listings available yet"}
+        {/* Sticky top bar */}
+        <div className="sticky top-0 bg-white z-40 border-b border-stone-200 shadow-sm">
+          <div className="flex items-center justify-between px-4 py-3 max-w-2xl mx-auto gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <button onClick={() => router.back()} className="w-9 h-9 rounded-xl bg-stone-100 flex items-center justify-center flex-shrink-0">
+                <ArrowLeft className="w-4 h-4 text-stone-700" />
+              </button>
+              <div className="min-w-0">
+                <h1 className="font-bold text-stone-900 text-base truncate">{title}</h1>
+                {!loading && (
+                  <p className="text-xs text-stone-400">
+                    {filteredListings.length} listing{filteredListings.length !== 1 ? "s" : ""}
                   </p>
-                ) : (
-                  <div className="h-4 bg-stone-100 rounded-full w-2/3 mx-auto animate-pulse" />
                 )}
-                <Link href="/categories">
-                  <motion.div
-                    whileHover={{ x: 3 }}
-                    className="mt-3 flex items-center justify-center gap-1 text-teal-600 text-sm font-semibold cursor-pointer">
-                    Browse all categories <ChevronRight className="w-4 h-4" />
-                  </motion.div>
-                </Link>
               </div>
-            </motion.div>
-
-            {/* Guest CTA */}
-            {!isLoggedIn && (
-              <motion.div
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.15 }}
-                className="bg-white border border-stone-200 rounded-2xl p-6 text-center shadow-sm">
-                <Shield className="w-8 h-8 mx-auto mb-3 text-teal-600" />
-                <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-bold mb-1">Safe & Secure</p>
-                <h3
-                  className="text-xl font-black italic tracking-tighter uppercase text-stone-900 mb-1"
-                  style={{ fontFamily: "var(--font-jakarta), 'Plus Jakarta Sans', sans-serif" }}>
-                  Ready to book?
-                </h3>
-                <p className="text-stone-400 text-sm mb-4">Create a free account to book any service.</p>
-                <Link href="/auth">
-                  <motion.button
-                    whileHover={{ scale: 1.03 }}
-                    whileTap={{ scale: 0.97 }}
-                    className="w-full py-3 text-white font-semibold rounded-full text-sm shadow-lg shadow-teal-200/60 inline-flex items-center justify-center gap-2"
-                    style={{ background: GRAD }}>
-                    Create Account <ArrowRight className="w-4 h-4" />
-                  </motion.button>
-                </Link>
-              </motion.div>
-            )}
-
+            </div>
+            <div className="flex bg-stone-100 rounded-lg p-0.5 gap-0.5 flex-shrink-0">
+              <button onClick={() => setViewMode("grid")} className={btnCls("grid")} title="Grid"><LayoutGrid className="w-3.5 h-3.5" /></button>
+              <button onClick={() => setViewMode("list")} className={btnCls("list")} title="List"><List className="w-3.5 h-3.5" /></button>
+              <button onClick={() => setViewMode("scroll")} className={btnCls("scroll")} title="Scroll"><GalleryHorizontal className="w-3.5 h-3.5" /></button>
+            </div>
           </div>
 
+          {/* Price filter */}
+          <div className="flex gap-2 px-4 pb-3 max-w-2xl mx-auto">
+            <input type="number" placeholder="Min ₦" value={minPrice} onChange={e => setMinPrice(e.target.value)}
+              className="flex-1 bg-stone-50 border border-stone-200 rounded-xl px-3 py-2 text-xs text-stone-700 focus:outline-none focus:ring-1 focus:ring-teal-400 placeholder:text-stone-400" />
+            <input type="number" placeholder="Max ₦" value={maxPrice} onChange={e => setMaxPrice(e.target.value)}
+              className="flex-1 bg-stone-50 border border-stone-200 rounded-xl px-3 py-2 text-xs text-stone-700 focus:outline-none focus:ring-1 focus:ring-teal-400 placeholder:text-stone-400" />
+          </div>
+        </div>
+
+        <div className="px-4 pt-5 pb-28 max-w-2xl mx-auto">
+          {loading ? (
+            viewMode === "scroll" ? (
+              <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4" style={{ scrollbarWidth: "none" }}>
+                {[0,1,2,3,4].map(i => (
+                  <div key={i} className="flex-shrink-0 w-44 bg-white rounded-xl border border-stone-100 overflow-hidden animate-pulse">
+                    <div className="aspect-square bg-stone-100" />
+                    <div className="p-3 space-y-2">
+                      <div className="h-3 bg-stone-100 rounded w-3/4" />
+                      <div className="h-2.5 bg-stone-100 rounded w-1/2" />
+                      <div className="h-2.5 bg-stone-100 rounded w-2/3" />
+                      <div className="h-4 bg-stone-100 rounded w-1/3 mt-1" />
+                      <div className="flex gap-1.5 pt-1">
+                        <div className="flex-1 h-8 bg-stone-100 rounded-xl" />
+                        <div className="w-8 h-8 bg-stone-100 rounded-xl" />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : viewMode === "list" ? (
+              <div className="space-y-2">
+                {[0,1,2,3,4].map(i => (
+                  <div key={i} className="bg-white rounded-2xl border border-stone-100 overflow-hidden animate-pulse flex gap-3 p-4">
+                    <div className="w-24 h-24 bg-stone-100 rounded-xl flex-shrink-0" />
+                    <div className="flex-1 space-y-2 py-1">
+                      <div className="h-3.5 bg-stone-100 rounded w-3/4" />
+                      <div className="h-3 bg-stone-100 rounded w-1/2" />
+                      <div className="h-3 bg-stone-100 rounded w-1/3" />
+                      <div className="h-4 bg-stone-100 rounded w-1/4 mt-2" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                {[0,1,2,3,5].map(i => (
+                  <div key={i} className="bg-white rounded-xl border border-stone-100 overflow-hidden animate-pulse">
+                    <div className="aspect-square bg-stone-100" />
+                    <div className="p-3 space-y-2">
+                      <div className="h-3 bg-stone-100 rounded w-3/4" />
+                      <div className="h-2.5 bg-stone-100 rounded w-1/2" />
+                      <div className="h-2.5 bg-stone-100 rounded w-2/3" />
+                      <div className="h-4 bg-stone-100 rounded w-1/3 mt-1" />
+                      <div className="flex gap-1.5 pt-1">
+                        <div className="flex-1 h-8 bg-stone-100 rounded-xl" />
+                        <div className="w-8 h-8 bg-stone-100 rounded-xl" />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )
+          ) : filteredListings.length === 0 ? (
+            <div className="bg-white rounded-2xl p-16 text-center border border-stone-100 shadow-sm mt-4">
+              <Sparkles className="w-12 h-12 text-stone-200 mx-auto mb-3" />
+              <h3 className="text-lg font-bold text-stone-400">No listings yet</h3>
+              <p className="text-stone-400 text-sm mt-1">Nothing in {title} on your campus right now.</p>
+              <Link href="/home">
+                <button className="mt-5 px-5 py-2.5 text-white text-sm font-bold rounded-xl" style={{ background: GRAD }}>
+                  Browse All
+                </button>
+              </Link>
+            </div>
+          ) : (
+            <div className={gridClass} style={gridStyle}>
+              {filteredListings.map((l, i) => renderItem(l, i))}
+            </div>
+          )}
         </div>
       </div>
-    </div>
+    </>
   );
 }

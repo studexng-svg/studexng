@@ -1225,9 +1225,9 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                               <h3 className="text-lg font-bold text-stone-900 mt-0.5">{section.title}</h3>
                             </div>
                             {section.slug !== "__other__" && (
-                              <button onClick={() => handleFilter(section.slug)} className="text-teal-600 text-sm font-semibold flex items-center gap-1">
+                              <Link href={`/category/${section.slug}`} className="text-teal-600 text-sm font-semibold flex items-center gap-1 hover:text-teal-700 transition">
                                 View All <ChevronRight className="w-4 h-4" />
-                              </button>
+                              </Link>
                             )}
                           </div>
                           <div className={gridClass} style={gridStyle}>
