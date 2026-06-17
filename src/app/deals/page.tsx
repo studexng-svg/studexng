@@ -1,188 +1,193 @@
-// src/app/deals/page.tsx
 "use client";
 
-import { Zap, Plus, Heart } from "lucide-react";
-import Link from "next/link";
-import Image from "next/image";
-import { motion } from "framer-motion";
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useCartStore } from "@/lib/cartStore";
+import { ArrowLeft, Sparkles, Heart, ShoppingCart, Share2, MapPin, Star } from "lucide-react";
+import Link from "next/link";
+import { motion } from "framer-motion";
+import { api } from "@/lib/api";
+import { useAuth } from "@/lib/authStore";
 import { useWishlistStore } from "@/lib/wishlistStore";
+import { useCart } from "@/lib/cartStore";
+import { GRAD } from "@/lib/tokens";
 
-const allDeals = [
-  { id: 1, title: "Jollof Rice + Chicken", old: 1800, new: 1200, img: "deal-food-1.jpg", time: "15 mins" },
-  { id: 2, title: "Shawarma Wrap", old: 1500, new: 1000, img: "deal-food-2.jpg", time: "12 mins" },
-  { id: 3, title: "Indomie + Egg", old: 800, new: 500, img: "deal-food-3.jpg", time: "10 mins" },
-  { id: 4, title: "Suya + Bread", old: 2200, new: 1600, img: "deal-food-4.jpg", time: "18 mins" },
-  { id: 5, title: "Burger + Coke", old: 2500, new: 1800, img: "deal-food-5.jpg", time: "20 mins" },
-  { id: 6, title: "Pounded Yam + Egusi", old: 3000, new: 2200, img: "deal-food-6.jpg", time: "25 mins" },
-  { id: 7, title: "Fried Rice + Salad", old: 1900, new: 1300, img: "deal-food-7.jpg", time: "15 mins" },
-];
-
-const getTimeLeft = () => {
-  const now = new Date();
-  const end = new Date(now.getTime() + 2 * 60 * 60 * 1000);
-  const diff = end.getTime() - now.getTime();
-  const hours = Math.floor(diff / (1000 * 60 * 60));
-  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-  const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-  return { hours, minutes, seconds };
-};
+function SafeImage({ src, alt }: { src: string | null | undefined; alt: string }) {
+  const [error, setError] = useState(false);
+  if (!src || error || !src.startsWith("http")) {
+    return (
+      <div className="w-full h-full bg-gradient-to-br from-teal-50 to-purple-50 flex items-center justify-center">
+        <Sparkles className="w-6 h-6 text-stone-300" />
+      </div>
+    );
+  }
+  return <img src={src} alt={alt} loading="lazy" className="w-full h-full object-cover" onError={() => setError(true)} />;
+}
 
 export default function DealsPage() {
   const router = useRouter();
-  const addToCart = useCartStore((state) => state.addToCart);
+  const { user, isLoggedIn } = useAuth();
   const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlistStore();
+  const { addToCart, cart } = useCart();
 
-  const [timeLeft, setTimeLeft] = useState(getTimeLeft());
+  const [deals, setDeals] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState("");
+  const [mounted, setMounted] = useState(false);
+
+  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 2000); };
 
   useEffect(() => {
-    const timer = setInterval(() => setTimeLeft(getTimeLeft()), 1000);
-    return () => clearInterval(timer);
+    setMounted(true);
+    const campus = document.cookie.split(";").find(s => s.trim().startsWith("studex_campus="))?.split("=")?.[1] || "pau";
+    api.pub.deals(campus)
+      .then(r => r.ok ? r.json() : [])
+      .then(d => setDeals(Array.isArray(d) ? d : []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, []);
-
-  const showToast = (msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(""), 2000);
-  };
 
   return (
     <>
-      {/* TOAST — GREEN OR RED */}
       {toast && (
-        <motion.div
-          initial={{ y: -50, opacity: 0 }}
-          animate={{ y: 60, opacity: 1 }}
-          className={`fixed top-4 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full shadow-lg z-50 font-medium text-sm text-white ${
-            toast.includes("Wishlist") ? "bg-red-500" : "bg-green-500"
-          }`}
-        >
+        <motion.div initial={{ y: -50, opacity: 0 }} animate={{ y: 60, opacity: 1 }}
+          className="fixed top-4 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full shadow-lg z-50 font-medium text-sm text-white"
+          style={{ background: GRAD }}>
           {toast}
         </motion.div>
       )}
 
-      {/* URGENCY BANNER */}
-      <motion.div
-        initial={{ y: -50 }}
-        animate={{ y: 0 }}
-        className="bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold text-center py-2.5 px-4 shadow-md sticky top-0 z-40"
-      >
-        <div className="flex items-center justify-center gap-2 text-sm">
-          <Zap className="w-4 h-4 animate-pulse" />
-          <span>
-            LIMITED: {timeLeft.hours}h {timeLeft.minutes}m {timeLeft.seconds}s LEFT —{" "}
-            <span className="underline">GRAB NOW!</span>
-          </span>
-          <Zap className="w-4 h-4 animate-pulse" />
+      <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+
+        {/* Top bar */}
+        <div className="sticky top-0 bg-white z-40 border-b border-stone-200 shadow-sm">
+          <div className="flex items-center gap-3 px-4 py-3 max-w-2xl mx-auto">
+            <button onClick={() => router.back()} className="w-9 h-9 rounded-xl bg-stone-100 flex items-center justify-center flex-shrink-0">
+              <ArrowLeft className="w-4 h-4 text-stone-700" />
+            </button>
+            <div>
+              <h1 className="font-bold text-stone-900 text-base">Hot Deals</h1>
+              {!loading && <p className="text-xs text-stone-400">{deals.length} deal{deals.length !== 1 ? "s" : ""} available</p>}
+            </div>
+          </div>
         </div>
-      </motion.div>
 
-      {/* TOP BAR */}
-      <div className="sticky top-11 bg-white z-40 border-b">
-        <div className="flex items-center justify-between p-4">
-          <button onClick={() => router.back()} className="text-black">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
-          <h1 className="text-xl font-bold text-black">Flash Deals</h1>
-          <div />
-        </div>
-      </div>
+        <div className="px-4 pt-5 pb-28 max-w-2xl mx-auto">
 
-      {/* DEALS GRID */}
-      <div className="p-4 pb-24">
-        <div className="grid grid-cols-2 gap-4">
-          {allDeals.map((deal, i) => (
-            <motion.div
-              key={deal.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.06 }}
-            >
-              <Link href={`/deals/${deal.id}`}>
-                <motion.div
-                  whileHover={{ y: -3 }}
-                  className="bg-surface rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 border border-transparent hover:border-amber-300 relative pb-8"
-                >
-                  {/* IMAGE */}
-                  <div className="relative h-44">
-                    <Image
-                      src={`/images/${deal.img}`}
-                      alt={deal.title}
-                      fill
-                      className="object-cover hover:scale-105 transition-transform duration-300"
-                    />
+          {loading ? (
+            <div className="grid grid-cols-2 gap-4">
+              {[0,1,2,3].map(i => (
+                <div key={i} className="bg-white rounded-xl border border-stone-100 overflow-hidden animate-pulse">
+                  <div className="aspect-square bg-stone-100" />
+                  <div className="p-3 space-y-2">
+                    <div className="h-3 bg-stone-100 rounded w-3/4" />
+                    <div className="h-2.5 bg-stone-100 rounded w-1/2" />
+                    <div className="h-4 bg-stone-100 rounded w-1/3" />
                   </div>
-
-                  {/* + BUTTON (TOP RIGHT) */}
-                  <motion.button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      addToCart({ id: deal.id, title: deal.title, price: deal.new, img: deal.img });
-                      showToast("Added to Cart!");
-                    }}
-                    whileHover={{ scale: 1.2 }}
-                    whileTap={{ scale: 0.9 }}
-                    className="absolute top-2 right-2 p-1.5 bg-white rounded-full shadow"
-                  >
-                    <Plus className="w-4 h-4 text-primary" />
-                  </motion.button>
-
-                  {/* LIKE BUTTON (BOTTOM RIGHT) */}
-                  <motion.button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      const item = { id: deal.id, title: deal.title, price: deal.new, img: deal.img };
-                      if (isInWishlist(deal.id)) {
-                        removeFromWishlist(deal.id);
-                        showToast("Removed from Wishlist!");
-                      } else {
-                        addToWishlist(item);
-                        showToast("Added to Wishlist!");
-                      }
-                    }}
-                    whileHover={{ scale: 1.2 }}
-                    whileTap={{ scale: 0.9 }}
-                    className="absolute bottom-2 right-2 p-1.5 bg-white rounded-full shadow"
-                  >
-                    <Heart
-                      className={`w-4 h-4 transition-all ${
-                        isInWishlist(deal.id) ? "fill-red-500 text-red-500" : "text-gray-400"
-                      }`}
-                    />
-                  </motion.button>
-
-                  {/* TIME BADGE */}
-                  <div className="absolute bottom-1 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded-full">
-                    {deal.time}
-                  </div>
-
-                  {/* TEXT */}
-                  <div className="p-3 space-y-1">
-                    <p className="font-medium text-black text-sm line-clamp-2">{deal.title}</p>
-                    <p className="text-xs text-black/60 line-through">₦{deal.old.toLocaleString()}</p>
-                    <p className="text-lg font-bold text-red-500">₦{deal.new.toLocaleString()}</p>
-                  </div>
-                </motion.div>
+                </div>
+              ))}
+            </div>
+          ) : deals.length === 0 ? (
+            <div className="bg-white rounded-2xl p-16 text-center border border-stone-100 shadow-sm mt-4">
+              <Sparkles className="w-12 h-12 text-stone-200 mx-auto mb-3" />
+              <h3 className="text-lg font-bold text-stone-400">No deals right now</h3>
+              <p className="text-stone-400 text-sm mt-1">Check back soon for discounts!</p>
+              <Link href="/home">
+                <button className="mt-5 px-5 py-2.5 text-white text-sm font-bold rounded-xl" style={{ background: GRAD }}>
+                  Browse Listings
+                </button>
               </Link>
-            </motion.div>
-          ))}
-        </div>
-      </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-4">
+              {deals.map((deal, i) => {
+                const listing    = deal.listing;
+                const wishlisted = mounted && isInWishlist(listing.id);
+                const inCart     = cart.some(ci => ci.id === listing.id);
+                const isService  = (listing.listing_type || "").toLowerCase() === "service";
+                const isOwn      = !!(user?.id && user.id === listing.vendor?.id);
+                const dealPrice  = Number(deal.discounted_price);
+                const rating     = listing.vendor?.profile?.rating;
+                const reviews    = listing.vendor?.profile?.total_reviews;
 
-      {/* BOTTOM NAV */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t z-50 shadow-lg">
-        <div className="flex justify-around py-2">
-          <Link href="/" className="text-black/60"><span className="text-xs">Home</span></Link>
-          <Link href="/categories" className="text-black/60"><span className="text-xs">Categories</span></Link>
-          <Link href="/cart" className="text-black/60"><span className="text-xs">Cart</span></Link>
-          <Link href="/wishlist" className="text-primary font-bold"><span className="text-xs">Wishlist</span></Link>
-          <Link href="/account" className="text-black/60"><span className="text-xs">Account</span></Link>
+                return (
+                  <div key={listing.id} className="bg-white rounded-xl border border-stone-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow relative">
+
+                    <div className="absolute top-2.5 left-2.5 z-20 bg-red-500 text-white px-2 py-0.5 rounded-md text-xs font-black">
+                      -{deal.discount_percent}% OFF
+                    </div>
+
+                    <Link href={`/listing/${listing.id}`} className="block">
+                      <div className="relative w-full aspect-square overflow-hidden bg-stone-50">
+                        <SafeImage src={listing.image?.startsWith("http") ? listing.image : null} alt={listing.title} />
+                        {!listing.is_available && (
+                          <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                            <span className="text-white font-bold bg-red-500 px-3 py-1 rounded-full text-xs">Unavailable</span>
+                          </div>
+                        )}
+                        <motion.button onClick={e => {
+                          e.preventDefault(); e.stopPropagation();
+                          if (wishlisted) { removeFromWishlist(listing.id); showToast("Removed from Wishlist"); }
+                          else { addToWishlist({ id: listing.id, title: listing.title, price: dealPrice, img: listing.image }); showToast("Added to Wishlist ❤️"); }
+                        }} whileTap={{ scale: 0.85 }}
+                          className="absolute top-2.5 right-2.5 z-10 w-7 h-7 bg-white rounded-full shadow-sm flex items-center justify-center">
+                          <Heart className={`w-3.5 h-3.5 ${wishlisted ? "fill-red-500 text-red-500" : "text-stone-400"}`} />
+                        </motion.button>
+                      </div>
+
+                      <div className="p-3">
+                        <p className="font-bold text-stone-900 text-sm line-clamp-1">{listing.title}</p>
+                        <p className="text-stone-400 text-xs mt-0.5 truncate">@{listing.vendor?.username || listing.vendor}</p>
+                        {listing.vendor?.hostel && (
+                          <div className="flex items-center gap-0.5 mt-0.5">
+                            <MapPin className="w-3 h-3 text-teal-400 flex-shrink-0" />
+                            <span className="text-xs text-stone-400 truncate">{listing.vendor.hostel}</span>
+                          </div>
+                        )}
+                        {(reviews ?? 0) > 0 && (
+                          <div className="flex items-center gap-0.5 mt-1">
+                            <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                            <span className="text-xs text-stone-600 font-medium">{rating}</span>
+                            <span className="text-xs text-stone-400">({reviews})</span>
+                          </div>
+                        )}
+                        <div className="flex items-center gap-1.5 mt-2">
+                          <p className="font-bold text-stone-400 text-xs line-through">₦{Number(listing.price).toLocaleString()}</p>
+                          <p className="font-bold text-red-600 text-sm">₦{dealPrice.toLocaleString()}</p>
+                        </div>
+
+                        <div className="flex gap-1.5 mt-2">
+                          {!isOwn && listing.is_available && (
+                            <button
+                              onClick={e => {
+                                if (isService) return;
+                                e.preventDefault(); e.stopPropagation();
+                                addToCart({ id: listing.id, title: listing.title, price: dealPrice, img: listing.image || "" });
+                                showToast(inCart ? "Added again (+1)" : "Added to cart");
+                              }}
+                              className="flex-1 py-2 rounded-xl text-white text-xs font-bold flex items-center justify-center gap-1 hover:opacity-90 transition-opacity"
+                              style={{ background: "linear-gradient(135deg,#2DD4BF 0%,#0D9488 100%)" }}>
+                              <ShoppingCart className="w-3.5 h-3.5" />
+                              {isService ? "Book Now" : inCart ? "In Cart" : "Add to Cart"}
+                            </button>
+                          )}
+                          <button
+                            onClick={async e => {
+                              e.preventDefault(); e.stopPropagation();
+                              const url = `${window.location.origin}/listing/${listing.id}`;
+                              if (navigator.share) { await navigator.share({ title: listing.title, url }).catch(() => {}); }
+                              else { await navigator.clipboard.writeText(url); showToast("Link copied!"); }
+                            }}
+                            className="p-2 rounded-xl bg-stone-100 hover:bg-stone-200 transition flex items-center justify-center flex-shrink-0">
+                            <Share2 className="w-3.5 h-3.5 text-stone-500" />
+                          </button>
+                        </div>
+                      </div>
+                    </Link>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
     </>
