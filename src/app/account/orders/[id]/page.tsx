@@ -530,12 +530,12 @@ export default function OrderDetailPage() {
       {/* DISPUTE MODAL */}
       {showDisputeModal && (
         <div
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end justify-center animate-fadeIn"
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center px-4 py-20 animate-fadeIn"
           onClick={() => { if (!disputing) { resetDisputeModal(); setShowDisputeModal(false); } }}
         >
           <div
-            className="bg-white rounded-t-2xl w-full max-w-md shadow-2xl flex flex-col animate-fadeUp"
-            style={{ maxHeight: "calc(100dvh - 5rem)" }}
+            className="bg-white rounded-2xl w-full max-w-md shadow-2xl flex flex-col overflow-hidden animate-fadeUp"
+            style={{ maxHeight: "calc(100dvh - 10rem)" }}
             onClick={e => e.stopPropagation()}
           >
             {/* Fixed header */}
