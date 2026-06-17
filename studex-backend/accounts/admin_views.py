@@ -732,20 +732,31 @@ try:
                 new_status = request.data.get('status')
                 resolution = dispute.resolution  # may have just been set above
 
+                order = dispute.order
+
+                def _dn(recipient, ntype, title, message, url=""):
+                    try:
+                        from accounts.utils import send_notification
+                        send_notification(recipient=recipient, notification_type=ntype,
+                                          title=title, message=message, action_url=url)
+                    except Exception:
+                        pass
+
+                if new_status == 'under_review':
+                    listing_title = order.listing.title if order and order.listing else 'your order'
+                    _dn(order.buyer, 'order_update',
+                        f'Dispute Under Review — {listing_title}',
+                        f'Your dispute for "{listing_title}" is now being reviewed by our support team. We will notify you once a decision is made.',
+                        f'/account/orders/{order.id}')
+                    _dn(order.listing.vendor, 'order_update',
+                        f'Dispute Under Review — {listing_title}',
+                        f'The dispute on "{listing_title}" is now under review by our support team. We will notify you of the outcome.',
+                        '/vendor/dashboard/disputes')
+
                 if new_status == 'resolved':
                     from django.utils import timezone as tz
                     dispute.resolved_at = tz.now()
                     dispute.resolved_by = request.user
-
-                    order = dispute.order
-
-                    def _dn(recipient, ntype, title, message, url=""):
-                        try:
-                            from accounts.utils import send_notification
-                            send_notification(recipient=recipient, notification_type=ntype,
-                                              title=title, message=message, action_url=url)
-                        except Exception:
-                            pass
 
                     if resolution == 'release_to_provider':
                         try:
@@ -825,8 +836,12 @@ try:
                     else:
                         _dn(order.buyer, 'order_update',
                             f'Dispute Update — {order.listing.title}',
-                            f'Your dispute for "{order.listing.title}" has been reviewed. Our team will follow up shortly.',
+                            f'Your dispute for "{order.listing.title}" is being held for further investigation. Our team will follow up with you shortly.',
                             f'/account/orders/{order.id}')
+                        _dn(order.listing.vendor, 'order_update',
+                            f'Dispute Update — {order.listing.title}',
+                            f'The dispute on "{order.listing.title}" is being held for further investigation. Our team will be in touch.',
+                            '/vendor/dashboard/disputes')
 
                 dispute.save()
                 data = DisputeSerializer(dispute).data
