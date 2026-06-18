@@ -169,7 +169,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
   useEffect(() => { activeTabRef.current = activeTab; }, [activeTab]);
   useEffect(() => { activeFilterRef.current = activeFilter; }, [activeFilter]);
   useEffect(() => {
-    if (isHydrated && isLoggedIn && user?.profile?.disclaimer_accepted === false) {
+    if (isHydrated && isLoggedIn && user && user?.profile?.disclaimer_accepted !== true) {
       setShowDisclaimer(true);
     }
   }, [isHydrated, isLoggedIn, user]);
