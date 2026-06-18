@@ -182,10 +182,10 @@ class UserAdmin(BaseUserAdmin):
 
 @admin.register(Profile)
 class ProfileAdmin(admin.ModelAdmin):
-    list_display = ['user', 'total_orders', 'total_sales', 'rating', 'total_reviews', 'notifications_enabled']
+    list_display = ['user', 'total_orders', 'total_sales', 'rating', 'total_reviews', 'notifications_enabled', 'disclaimer_accepted', 'disclaimer_accepted_at']
     search_fields = ['user__username', 'user__email', 'user__business_name']
-    list_filter = ['notifications_enabled', 'email_notifications']
-    readonly_fields = ['total_orders', 'total_sales', 'rating', 'total_reviews']
+    list_filter = ['notifications_enabled', 'email_notifications', 'disclaimer_accepted']
+    readonly_fields = ['total_orders', 'total_sales', 'rating', 'total_reviews', 'disclaimer_accepted_at']
     ordering = ['-total_orders']
 
     def changelist_view(self, request, extra_context=None):
