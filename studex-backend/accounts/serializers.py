@@ -279,6 +279,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
                 'gender': profile.gender or '',
                 'department': profile.department or '',
                 'level': profile.level or '',
+                'disclaimer_accepted': profile.disclaimer_accepted,
             }
         except Profile.DoesNotExist:
             return None

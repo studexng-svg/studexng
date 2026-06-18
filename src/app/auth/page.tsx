@@ -159,6 +159,8 @@ export default function AuthPage() {
   const [loginError, setLoginError] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
 
+  const [disclaimerAccepted, setDisclaimerAccepted] = useState(false);
+  const [disclaimerOpen, setDisclaimerOpen] = useState(false);
   const [signupCategory, setSignupCategory] = useState<"student" | "non_student">("student");
   const [signupForm, setSignupForm] = useState({ username: "", email: "", phone: "", hostel: "", password: "", school: "", matric_number: "", nin: "" });
   const [touched, setTouched] = useState({ username: false, email: false, phone: false, hostel: false, password: false, school: false });
@@ -228,7 +230,7 @@ export default function AuthPage() {
   const isIMSU = signupForm.school === "IMSU";
   const schoolOk = !!signupForm.school;
   const step1Valid = usernameVal.ok && usernameAvailable !== false && emailVal.ok &&
-    phoneVal.ok && hostelOk && passwordVal.ok && schoolOk &&
+    phoneVal.ok && hostelOk && passwordVal.ok && schoolOk && disclaimerAccepted &&
     (isNonStudent ? ninVal.ok : isFUTO ? matricVal.ok : isIMSU ? imsuIdVal.ok : true);
 
   const handleSignupChange = (e: any) => {
@@ -838,6 +840,47 @@ export default function AuthPage() {
                     }} className="text-teal-600 font-medium underline text-sm w-full text-center">
                       Resend Code
                     </button>
+                  </div>
+                )}
+
+                {/* ── Disclaimer ── */}
+                {step === 1 && (
+                  <div className="rounded-2xl border border-amber-200 bg-amber-50 overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => setDisclaimerOpen(o => !o)}
+                      className="w-full flex items-center justify-between px-4 py-3 text-left"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-base">⚠️</span>
+                        <span className="text-xs font-semibold text-amber-800">Disclaimer — tap to read</span>
+                      </div>
+                      <span className="text-amber-600 text-xs">{disclaimerOpen ? "▲" : "▼"}</span>
+                    </button>
+                    <AnimatePresence>
+                      {disclaimerOpen && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }}
+                          className="overflow-hidden"
+                        >
+                          <div className="px-4 pb-3 text-xs text-amber-900 leading-relaxed space-y-2 border-t border-amber-200">
+                            <p className="pt-3">StudEx is a marketplace platform that connects student buyers and vendors on campus. We do not manufacture, own, or directly control the quality, safety, or accuracy of products and services listed by vendors.</p>
+                            <p>All transactions are between the buyer and the vendor. While we verify vendors and provide secure payments, StudEx is not liable for disputes, damages, delays, or dissatisfaction arising from a vendor's product or service. We encourage buyers to confirm order details before making payment and confirm receipt only after they're satisfied.</p>
+                            <p>If you experience an issue with an order, please contact our support team and we'll do our best to help mediate.</p>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                    <label className="flex items-center gap-3 px-4 py-3 border-t border-amber-200 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={disclaimerAccepted}
+                        onChange={e => setDisclaimerAccepted(e.target.checked)}
+                        className="w-4 h-4 accent-teal-600 rounded"
+                      />
+                      <span className="text-xs font-medium text-amber-900">I have read and agree to the disclaimer</span>
+                    </label>
                   </div>
                 )}
 

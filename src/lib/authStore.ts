@@ -22,6 +22,7 @@ interface UserProfile {
     vendor_badge?: string;
     rating?: string;
     total_reviews?: number;
+    disclaimer_accepted?: boolean;
     [key: string]: unknown;
   };
 }

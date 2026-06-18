@@ -126,12 +126,13 @@ interface Props {
 }
 
 export default function HomePageClient({ initialVendors, initialListings, initialCategories, vendorOfMonth = null, initialDeals = [] }: Props) {
-  const { isLoggedIn, user, isHydrated } = useAuth();
+  const { isLoggedIn, user, isHydrated, updateUser } = useAuth();
   const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlistStore();
   const { addToCart, cart } = useCart();
   const router = useRouter();
 
   const [mounted, setMounted]           = useState(false);
+  const [showDisclaimer, setShowDisclaimer] = useState(false);
   const [campusReady, setCampusReady]   = useState(initialListings.length > 0);
   const [dealsReady, setDealsReady]     = useState(false);
   const [toast, setToast]               = useState("");
@@ -167,6 +168,11 @@ export default function HomePageClient({ initialVendors, initialListings, initia
 
   useEffect(() => { activeTabRef.current = activeTab; }, [activeTab]);
   useEffect(() => { activeFilterRef.current = activeFilter; }, [activeFilter]);
+  useEffect(() => {
+    if (isHydrated && isLoggedIn && user?.profile?.disclaimer_accepted === false) {
+      setShowDisclaimer(true);
+    }
+  }, [isHydrated, isLoggedIn, user]);
   // Only persist after mount so the initial "grid" default doesn't overwrite a saved value
   useEffect(() => { if (mounted) localStorage.setItem("home:viewMode", viewMode); }, [viewMode, mounted]);
   useEffect(() => { if (mounted) localStorage.setItem("home:activeTab", activeTab); }, [activeTab, mounted]);
@@ -694,6 +700,54 @@ export default function HomePageClient({ initialVendors, initialListings, initia
     <>
       <VendorOfMonthModal vendor={vendorOfMonth} />
       <WhatsAppGroupModal />
+
+      {/* ── Disclaimer modal for existing users ── */}
+      <AnimatePresence>
+        {showDisclaimer && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-end sm:items-center justify-center p-4"
+          >
+            <motion.div
+              initial={{ y: 80, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 80, opacity: 0 }}
+              transition={{ type: "spring", damping: 28, stiffness: 300 }}
+              className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden"
+              style={{ fontFamily: "'DM Sans', sans-serif" }}
+            >
+              <div className="px-6 pt-6 pb-2">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-11 h-11 rounded-2xl bg-amber-100 flex items-center justify-center text-xl flex-shrink-0">⚠️</div>
+                  <div>
+                    <h3 className="font-bold text-stone-900 text-base" style={SERIF}>StudEx Disclaimer</h3>
+                    <p className="text-xs text-stone-400">Please read and accept to continue</p>
+                  </div>
+                </div>
+                <div className="text-sm text-stone-600 leading-relaxed space-y-3 max-h-52 overflow-y-auto pr-1">
+                  <p>StudEx is a marketplace platform that connects student buyers and vendors on campus. We do not manufacture, own, or directly control the quality, safety, or accuracy of products and services listed by vendors.</p>
+                  <p>All transactions are between the buyer and the vendor. While we verify vendors and provide secure payments, StudEx is not liable for disputes, damages, delays, or dissatisfaction arising from a vendor's product or service. We encourage buyers to confirm order details before making payment and confirm receipt only after they're satisfied.</p>
+                  <p>If you experience an issue with an order, please contact our support team and we'll do our best to help mediate.</p>
+                </div>
+              </div>
+              <div className="px-6 py-5">
+                <motion.button
+                  whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
+                  onClick={async () => {
+                    try {
+                      await api.auth.updateProfile({ disclaimer_accepted: true });
+                      updateUser({ profile: { ...(user?.profile || {}), disclaimer_accepted: true } });
+                    } catch {}
+                    setShowDisclaimer(false);
+                  }}
+                  className="w-full py-3.5 rounded-full text-white font-semibold text-sm shadow-lg"
+                  style={{ background: GRAD }}
+                >
+                  I Understand & Accept
+                </motion.button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {toast && (
         <motion.div initial={{ y: -50, opacity: 0 }} animate={{ y: 60, opacity: 1 }}
