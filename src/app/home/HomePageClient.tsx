@@ -726,6 +726,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                   <p>StudEx is a marketplace platform that connects student buyers and vendors on campus. We do not manufacture, own, or directly control the quality, safety, or accuracy of products and services listed by vendors.</p>
                   <p>All transactions are between the buyer and the vendor. While we verify vendors and provide secure payments, StudEx is not liable for disputes, damages, delays, or dissatisfaction arising from a vendor's product or service. We encourage buyers to confirm order details before making payment and confirm receipt only after they're satisfied.</p>
                   <p>If you experience an issue with an order, please contact our support team and we'll do our best to help mediate.</p>
+                  <p>© {new Date().getFullYear()} StudEx. All rights reserved. The StudEx name, logo, platform design, and all associated content are the intellectual property of StudEx and may not be copied, reproduced, or distributed without express written permission. The official StudEx platform is available exclusively at <span className="font-semibold text-teal-700">studex.com.ng</span>.</p>
                 </div>
               </div>
               <div className="px-6 py-5">
