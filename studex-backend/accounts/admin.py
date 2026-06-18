@@ -56,7 +56,7 @@ class UserAdmin(BaseUserAdmin):
         (None, {'fields': ('username', 'password')}),
         ('Personal Info', {'fields': ('first_name', 'last_name', 'email', 'phone', 'bio', 'profile_image')}),
         ('StudEx Role', {'fields': ('user_type',)}),
-        ('Student Info', {'fields': ('school', 'verification_type', 'matric_number', 'nin_display', 'hostel')}),
+        ('Student Info', {'fields': ('school', 'verification_type', 'matric_number', 'nin', 'hostel')}),
         ('Vendor Info', {'fields': ('business_name', 'is_verified_vendor')}),
         ('Wallet', {'fields': ('wallet_balance',)}),
         ('Permissions', {'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions')}),

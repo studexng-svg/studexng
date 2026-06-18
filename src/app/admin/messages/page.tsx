@@ -171,10 +171,9 @@ function SingleUserCompose() {
 // ─── Broadcast section ────────────────────────────────────────────────────────
 
 const SCHOOL_OPTIONS = [
-  { value: "",     label: "All Campuses" },
-  { value: "pau",  label: "PAU only" },
-  { value: "futo", label: "FUTO only" },
-  { value: "imsu", label: "IMSU only" },
+  { value: "pau",  label: "PAU" },
+  { value: "futo", label: "FUTO" },
+  { value: "imsu", label: "IMSU" },
 ];
 
 const TYPE_OPTIONS = [
@@ -200,7 +199,7 @@ function typeOptionLabel(value: string, label: string, counts: BroadcastCounts):
 function BroadcastCompose() {
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
-  const [school, setSchool] = useState("");
+  const [schools, setSchools] = useState<string[]>([]);
   const [userType, setUserType] = useState("");
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<{ sent: number } | null>(null);
@@ -216,14 +215,14 @@ function BroadcastCompose() {
   useEffect(() => {
     let cancelled = false;
     setCountsLoading(true);
-    const qs = school ? `?school=${encodeURIComponent(school)}` : "";
+    const qs = schools.length === 1 ? `?school=${encodeURIComponent(schools[0])}` : "";
     api.admin.broadcastCounts(qs)
       .then(r => r.json())
       .then(data => { if (!cancelled) setCounts(data); })
       .catch(() => {})
       .finally(() => { if (!cancelled) setCountsLoading(false); });
     return () => { cancelled = true; };
-  }, [school]);
+  }, [schools]);
 
   const preview = async () => {
     if (!title.trim() || !message.trim()) return;
@@ -232,7 +231,7 @@ function BroadcastCompose() {
       const res = await api.admin.broadcastPreview({
         title: title.trim(),
         message: message.trim(),
-        school: school || undefined,
+        school: schools.length === 1 ? schools[0] : undefined,
         user_type: userType || undefined,
       });
       const data = await res.json();
@@ -253,15 +252,20 @@ function BroadcastCompose() {
     setError("");
     setResult(null);
     try {
-      const res = await api.admin.notifyAll({
-        title: title.trim(),
-        message: message.trim(),
-        school: school || undefined,
-        user_type: userType || undefined,
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed");
-      setResult(data);
+      const targets = schools.length > 0 ? schools : [undefined];
+      let totalSent = 0;
+      for (const s of targets) {
+        const res = await api.admin.notifyAll({
+          title: title.trim(),
+          message: message.trim(),
+          school: s,
+          user_type: userType || undefined,
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed");
+        totalSent += data.sent ?? 0;
+      }
+      setResult({ sent: totalSent });
       setTitle("");
       setMessage("");
     } catch (e: any) {
@@ -272,6 +276,7 @@ function BroadcastCompose() {
   };
 
   const selectedLabel = TYPE_OPTIONS.find(o => o.value === userType)?.label ?? "users";
+  const schoolLabel = schools.length === 0 ? "all campuses" : schools.join(", ").toUpperCase();
 
   return (
     <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm space-y-4">
@@ -292,13 +297,29 @@ function BroadcastCompose() {
       {/* Audience filters */}
       <div className="grid grid-cols-2 gap-3">
         <Field label="Campus">
-          <select
-            value={school}
-            onChange={e => { setSchool(e.target.value); setConfirmed(false); }}
-            className="w-full px-3 py-2.5 bg-stone-50 border border-stone-200 rounded-xl text-sm text-stone-900 focus:outline-none focus:border-teal-400"
-          >
-            {SCHOOL_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
+          <div className="flex gap-2">
+            {SCHOOL_OPTIONS.map(o => {
+              const active = schools.includes(o.value);
+              return (
+                <button
+                  key={o.value}
+                  type="button"
+                  onClick={() => {
+                    setSchools(prev => prev.includes(o.value) ? prev.filter(s => s !== o.value) : [...prev, o.value]);
+                    setConfirmed(false);
+                  }}
+                  className={`flex-1 py-2 rounded-xl text-xs font-semibold border transition-all ${
+                    active
+                      ? "bg-teal-600 text-white border-teal-600"
+                      : "bg-stone-50 text-stone-500 border-stone-200 hover:border-teal-400"
+                  }`}
+                >
+                  {o.label}
+                </button>
+              );
+            })}
+          </div>
+          {schools.length === 0 && <p className="text-xs text-stone-400 mt-1">None selected = all campuses</p>}
         </Field>
         <Field label="User Type">
           <div className="relative">
