@@ -174,6 +174,7 @@ const SCHOOL_OPTIONS = [
   { value: "",     label: "All Campuses" },
   { value: "pau",  label: "PAU only" },
   { value: "futo", label: "FUTO only" },
+  { value: "imsu", label: "IMSU only" },
 ];
 
 const TYPE_OPTIONS = [
