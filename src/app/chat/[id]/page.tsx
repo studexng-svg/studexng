@@ -70,6 +70,7 @@ export default function ChatRoomPage() {
   const [listingTitle, setListingTitle] = useState("");
   const [otherUserLastSeen, setOtherUserLastSeen] = useState<string | null>(null);
   const [otherUserOnline, setOtherUserOnline] = useState(false);
+  const [otherUserTyping, setOtherUserTyping] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -83,6 +84,7 @@ export default function ChatRoomPage() {
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const editInputRef = useRef<HTMLInputElement>(null);
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -145,6 +147,29 @@ export default function ChatRoomPage() {
     }, 15000);
     return () => clearInterval(interval);
   }, [conversationId]);
+
+  // Poll typing status every 2s
+  useEffect(() => {
+    if (!conversationId) return;
+    const interval = setInterval(async () => {
+      try {
+        const res = await api.chat.typingStatus(conversationId as string);
+        if (res.ok) {
+          const d = await res.json();
+          setOtherUserTyping(d.is_typing || false);
+        }
+      } catch {}
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [conversationId]);
+
+  const handleTyping = (value: string) => {
+    setInput(value);
+    if (!conversationId) return;
+    if (typingTimer.current) clearTimeout(typingTimer.current);
+    api.chat.sendTyping(conversationId as string).catch(() => {});
+    typingTimer.current = setTimeout(() => {}, 3000);
+  };
 
   const formatLastSeen = (lastSeen: string | null): string => {
     if (!lastSeen) return '';
@@ -451,7 +476,16 @@ export default function ChatRoomPage() {
         )}
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-stone-900">@{otherUser}</p>
-          {otherUserOnline ? (
+          {otherUserTyping ? (
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <div className="flex gap-0.5 items-end h-3">
+                <motion.div animate={{ scaleY: [1, 1.8, 1] }} transition={{ repeat: Infinity, duration: 0.6, delay: 0 }} className="w-1 h-1.5 bg-teal-500 rounded-full origin-bottom" />
+                <motion.div animate={{ scaleY: [1, 1.8, 1] }} transition={{ repeat: Infinity, duration: 0.6, delay: 0.15 }} className="w-1 h-1.5 bg-teal-500 rounded-full origin-bottom" />
+                <motion.div animate={{ scaleY: [1, 1.8, 1] }} transition={{ repeat: Infinity, duration: 0.6, delay: 0.3 }} className="w-1 h-1.5 bg-teal-500 rounded-full origin-bottom" />
+              </div>
+              <p className="text-xs text-teal-600 font-medium">typing...</p>
+            </div>
+          ) : otherUserOnline ? (
             <div className="flex items-center gap-1 mt-0.5">
               <div className="w-1.5 h-1.5 rounded-full bg-teal-500" />
               <p className="text-xs text-teal-600 font-medium">Online</p>
@@ -784,7 +818,7 @@ export default function ChatRoomPage() {
           </button>
           <input
             value={input}
-            onChange={e => setInput(e.target.value)}
+            onChange={e => handleTyping(e.target.value)}
             onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
             placeholder={imageFile ? "Add a caption (optional)..." : replyingTo ? "Write your reply..." : "Type a message..."}
             className="flex-1 px-4 py-2.5 bg-stone-50 text-stone-900 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/30 border border-stone-200 placeholder-stone-400"

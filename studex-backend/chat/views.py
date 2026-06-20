@@ -98,6 +98,27 @@ class ConversationViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(conversation)
         return Response(serializer.data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
 
+    @action(detail=True, methods=['post'], url_path='typing')
+    def typing(self, request, pk=None):
+        """
+        POST /api/chat/conversations/<id>/typing/
+        Stores a typing timestamp in cache for 6 seconds.
+        GET /api/chat/conversations/<id>/typing/ returns whether the other user is typing.
+        """
+        conversation = self.get_object()
+        from django.core.cache import cache
+        cache.set(f'typing_{conversation.id}_{request.user.id}', True, 6)
+        return Response({'ok': True})
+
+    @action(detail=True, methods=['get'], url_path='typing')
+    def typing_status(self, request, pk=None):
+        conversation = self.get_object()
+        user = request.user
+        other = conversation.seller if user == conversation.buyer else conversation.buyer
+        from django.core.cache import cache
+        is_typing = bool(cache.get(f'typing_{conversation.id}_{other.id}'))
+        return Response({'is_typing': is_typing})
+
     @action(detail=False, methods=['post'], url_path='for-order')
     def for_order(self, request):
         """

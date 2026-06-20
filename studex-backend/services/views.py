@@ -150,7 +150,7 @@ class ListingViewSet(viewsets.ModelViewSet):
         # Public vendor profile filter — bypass all other logic
         vendor_username = self.request.query_params.get('vendor_username')
         if vendor_username:
-            qs = Listing.objects.filter(vendor__username=vendor_username)
+            qs = Listing.objects.filter(vendor__username__iexact=vendor_username, is_available=True)
             return qs.select_related('vendor', 'category').prefetch_related('vendor__profile')
 
         # For retrieve/update/delete — no campus filter so any listing is accessible

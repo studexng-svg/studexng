@@ -375,6 +375,12 @@ export const api = {
     forOrder: (orderId: number | string) =>
       fetchWithAuth(u("/api/chat/conversations/for-order/"), { method: "POST", body: s({ order_id: orderId }) }),
 
+    sendTyping: (id: number | string) =>
+      fetchWithAuth(u(`/api/chat/conversations/${id}/typing/`), { method: "POST" }),
+
+    typingStatus: (id: number | string) =>
+      fetchWithAuth(u(`/api/chat/conversations/${id}/typing/`)),
+
     messages: (id: number | string) =>
       fetchWithAuth(u(`/api/chat/conversations/${id}/messages/`)),
 
