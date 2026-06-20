@@ -98,6 +98,32 @@ class ConversationViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(conversation)
         return Response(serializer.data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
 
+    @action(detail=False, methods=['post'], url_path='for-order')
+    def for_order(self, request):
+        """
+        POST /api/chat/conversations/for-order/
+        Vendor-side: get or create the conversation for a paid order.
+        """
+        order_id = request.data.get('order_id')
+        if not order_id:
+            return Response({'error': 'order_id is required'}, status=400)
+        try:
+            from orders.models import Order
+            order = Order.objects.select_related('buyer', 'listing', 'listing__vendor').get(id=order_id)
+        except Exception:
+            return Response({'error': 'Order not found'}, status=404)
+
+        if order.listing.vendor != request.user and order.buyer != request.user:
+            return Response({'error': 'Not a participant in this order'}, status=403)
+
+        conversation, _ = Conversation.objects.get_or_create(
+            buyer=order.buyer,
+            seller=order.listing.vendor,
+            listing=order.listing,
+        )
+        serializer = self.get_serializer(conversation)
+        return Response(serializer.data)
+
     @action(detail=False, methods=['post'], url_path='for-booking')
     def for_booking(self, request):
         """

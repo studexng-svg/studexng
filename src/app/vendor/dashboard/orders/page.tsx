@@ -2,8 +2,9 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import { GRAD, toArray } from "@/lib/tokens";
-import { ShoppingBag, MapPin, Camera, X, ImagePlus, Clock } from "lucide-react";
+import { ShoppingBag, MapPin, Camera, X, ImagePlus, Clock, MessageCircle } from "lucide-react";
 import { StatusBadge, EmptyState, LoadingSpinner, HEADING_FONT } from "../_shared";
 import { api } from "@/lib/api";
 
@@ -128,9 +129,20 @@ function ProofModal({ order, onSuccess, onClose }: {
 
 export default function OrdersPage() {
   const queryClient = useQueryClient();
+  const router = useRouter();
   const [error, setError] = useState("");
   const [proofOrder, setProofOrder] = useState<any | null>(null);
   const [tick, setTick] = useState(0);
+  const [chatLoading, setChatLoading] = useState<number | null>(null);
+
+  const handleMessageBuyer = async (order: any) => {
+    setChatLoading(order.id);
+    try {
+      const res = await api.chat.forOrder(order.id);
+      const conv = await res.json();
+      router.push(`/chat/${conv.id}`);
+    } catch {} finally { setChatLoading(null); }
+  };
 
   useEffect(() => {
     const t = setInterval(() => setTick(n => n + 1), 1000);
@@ -231,6 +243,16 @@ export default function OrdersPage() {
                   Waiting for buyer to confirm
                 </div>
               )}
+              <button
+                onClick={() => handleMessageBuyer(order)}
+                disabled={chatLoading === order.id}
+                className="w-full mt-3 py-2.5 bg-white border border-teal-300 text-teal-700 disabled:opacity-50 rounded-xl text-sm font-semibold transition flex items-center justify-center gap-2 hover:bg-teal-50 active:scale-[0.98]"
+              >
+                {chatLoading === order.id
+                  ? <div className="w-4 h-4 border-2 border-teal-400/40 border-t-teal-600 rounded-full animate-spin" />
+                  : <MessageCircle className="w-4 h-4" />}
+                Message Buyer
+              </button>
             </div>
           ))}
         </div>

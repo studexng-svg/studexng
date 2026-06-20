@@ -372,6 +372,9 @@ export const api = {
     forBooking: (bookingId: number | string) =>
       fetchWithAuth(u("/api/chat/conversations/for-booking/"), { method: "POST", body: s({ booking_id: bookingId }) }),
 
+    forOrder: (orderId: number | string) =>
+      fetchWithAuth(u("/api/chat/conversations/for-order/"), { method: "POST", body: s({ order_id: orderId }) }),
+
     messages: (id: number | string) =>
       fetchWithAuth(u(`/api/chat/conversations/${id}/messages/`)),
 
