@@ -227,19 +227,21 @@ class DisputeAppealSerializer(serializers.Serializer):
 
 class BookingSerializer(serializers.ModelSerializer):
     buyer_username = serializers.CharField(source='buyer.username', read_only=True)
+    buyer_id = serializers.IntegerField(source='buyer.id', read_only=True)
     vendor_username = serializers.CharField(source='listing.vendor.username', read_only=True)
     listing_title = serializers.CharField(source='listing.title', read_only=True)
     listing_price = serializers.DecimalField(source='listing.price', max_digits=10, decimal_places=2, read_only=True)
+    listing_id = serializers.IntegerField(source='listing.id', read_only=True)
     vendor_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Booking
         fields = [
-            'id', 'buyer_username', 'vendor_username', 'listing', 'listing_title',
-            'listing_price', 'vendor_name',
+            'id', 'buyer_username', 'buyer_id', 'vendor_username', 'listing', 'listing_id',
+            'listing_title', 'listing_price', 'vendor_name',
             'scheduled_date', 'scheduled_time', 'note', 'status', 'created_at',
         ]
-        read_only_fields = ['id', 'buyer_username', 'vendor_username', 'listing_title', 'listing_price', 'vendor_name', 'status', 'created_at']
+        read_only_fields = ['id', 'buyer_username', 'buyer_id', 'vendor_username', 'listing_title', 'listing_id', 'listing_price', 'vendor_name', 'status', 'created_at']
 
     def get_vendor_name(self, obj):
         vendor = obj.listing.vendor

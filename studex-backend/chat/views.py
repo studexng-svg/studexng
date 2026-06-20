@@ -98,6 +98,33 @@ class ConversationViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(conversation)
         return Response(serializer.data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
 
+    @action(detail=False, methods=['post'], url_path='for-booking')
+    def for_booking(self, request):
+        """
+        POST /api/chat/conversations/for-booking/
+        Vendor-side: get or create the conversation for a confirmed booking.
+        Preserves correct buyer/seller roles regardless of who initiates.
+        """
+        booking_id = request.data.get('booking_id')
+        if not booking_id:
+            return Response({'error': 'booking_id is required'}, status=400)
+        try:
+            from orders.models import Booking
+            booking = Booking.objects.select_related('buyer', 'listing', 'listing__vendor').get(id=booking_id)
+        except Exception:
+            return Response({'error': 'Booking not found'}, status=404)
+
+        if booking.listing.vendor != request.user and booking.buyer != request.user:
+            return Response({'error': 'Not a participant in this booking'}, status=403)
+
+        conversation, _ = Conversation.objects.get_or_create(
+            buyer=booking.buyer,
+            seller=booking.listing.vendor,
+            listing=booking.listing,
+        )
+        serializer = self.get_serializer(conversation)
+        return Response(serializer.data)
+
     def destroy(self, request, *args, **kwargs):
         conversation = self.get_object()
         conversation.delete()

@@ -2,17 +2,29 @@
 
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/authStore";
 import { GRAD, toArray } from "@/lib/tokens";
-import { Calendar, Check, X, Loader } from "lucide-react";
+import { Calendar, Check, X, Loader, MessageCircle } from "lucide-react";
 import { StatusBadge, EmptyState, LoadingSpinner, HEADING_FONT } from "../_shared";
 import { api } from "@/lib/api";
 
 export default function BookingsPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const router = useRouter();
   const [filter, setFilter] = useState<"pending" | "confirmed" | "all">("pending");
   const [actionLoading, setActionLoading] = useState<number | null>(null);
+  const [chatLoading, setChatLoading] = useState<number | null>(null);
+
+  const handleMessageBuyer = async (booking: any) => {
+    setChatLoading(booking.id);
+    try {
+      const res = await api.chat.forBooking(booking.id);
+      const conv = await res.json();
+      router.push(`/chat/${conv.id}`);
+    } catch {} finally { setChatLoading(null); }
+  };
 
   const { data: bookingsData, isPending: loading } = useQuery({
     queryKey: ["vendor-bookings"],
@@ -121,6 +133,17 @@ export default function BookingsPage() {
                     Decline
                   </button>
                 </div>
+              )}
+
+              {booking.status === "confirmed" && (
+                <button
+                  onClick={() => handleMessageBuyer(booking)}
+                  disabled={chatLoading === booking.id}
+                  className="w-full mt-4 py-2.5 bg-white border border-teal-300 text-teal-700 disabled:opacity-50 rounded-full font-semibold text-sm transition flex items-center justify-center gap-2 hover:bg-teal-50 active:scale-[0.98]"
+                >
+                  {chatLoading === booking.id ? <Loader className="w-4 h-4 animate-spin" /> : <MessageCircle className="w-4 h-4" />}
+                  Message Buyer
+                </button>
               )}
             </div>
           ))}

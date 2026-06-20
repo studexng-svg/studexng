@@ -369,6 +369,9 @@ export const api = {
     start: (body: Record<string, unknown>) =>
       fetchWithAuth(u("/api/chat/conversations/"), { method: "POST", body: s(body) }),
 
+    forBooking: (bookingId: number | string) =>
+      fetchWithAuth(u("/api/chat/conversations/for-booking/"), { method: "POST", body: s({ booking_id: bookingId }) }),
+
     messages: (id: number | string) =>
       fetchWithAuth(u(`/api/chat/conversations/${id}/messages/`)),
 
