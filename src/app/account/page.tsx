@@ -67,7 +67,7 @@ function CanvasCrop({
     const image = new Image();
     image.onload = () => {
       setImg(image);
-      const s = Math.max(SIZE / image.width, SIZE / image.height);
+      const s = Math.min(SIZE / image.width, SIZE / image.height);
       setScale(s);
       setOffset({ x: (SIZE - image.width * s) / 2, y: (SIZE - image.height * s) / 2 });
     };
