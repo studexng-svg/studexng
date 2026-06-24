@@ -172,6 +172,7 @@ def send_groq_notifications(
                 title=title,
                 message=message,
                 action_url=action_url,
+                send_email=False,
             )
             sent += 1
         except Exception as e:

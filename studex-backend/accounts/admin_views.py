@@ -1697,6 +1697,7 @@ try:
                             f'Complete your purchase before they sell out!'
                         ),
                         action_url='/cart',
+                        send_email=False,
                     )
                     sent += 1
                 except Exception as e:

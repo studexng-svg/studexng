@@ -107,6 +107,7 @@ class Listing(models.Model):
                         f'marked as unavailable. Restock and update your quantity to make it live again.'
                     ),
                     action_url='/seller',
+                    send_email=False,
                 )
             except Exception:
                 pass

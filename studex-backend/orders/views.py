@@ -186,6 +186,7 @@ class OrderViewSet(viewsets.ModelViewSet):
                     title=notif[0],
                     message=notif[1],
                     action_url=f'/account/orders/{order.id}',
+                    send_email=new_status == 'cancelled',
                 )
             except Exception as e:
                 logger.warning(f"Tracking notification failed: {e}")

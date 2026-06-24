@@ -449,6 +449,7 @@ class SellerApplicationViewSet(viewsets.ModelViewSet):
             title='📋 Application Submitted!',
             message='Your seller application has been submitted and is under review. You will be notified when it is reviewed.',
             action_url='/account',
+            send_email=False,
         )
 
         try:
