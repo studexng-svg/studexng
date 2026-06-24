@@ -280,6 +280,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
                 'department': profile.department or '',
                 'level': profile.level or '',
                 'disclaimer_accepted': profile.disclaimer_accepted,
+                'email_notifications': profile.email_notifications,
             }
         except Profile.DoesNotExist:
             return None
@@ -304,6 +305,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
         department = validated_data.pop('department', None)
         level = validated_data.pop('level', None)
         validated_data.pop('disclaimer_accepted', None)  # handled in view against Profile
+        email_notifications = validated_data.pop('email_notifications', None)
 
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
@@ -329,6 +331,8 @@ class UserProfileSerializer(serializers.ModelSerializer):
                 profile.department = department
             if level is not None:
                 profile.level = level
+            if email_notifications is not None:
+                profile.email_notifications = email_notifications
             profile.save()
         except Profile.DoesNotExist:
             Profile.objects.create(

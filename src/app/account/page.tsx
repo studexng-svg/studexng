@@ -153,6 +153,8 @@ export default function AccountPage() {
   const [cropModalOpen, setCropModalOpen] = useState(false);
   const [rawSrc, setRawSrc] = useState<string>("");
   const [viewModalOpen, setViewModalOpen] = useState(false);
+  const [emailNotifs, setEmailNotifs] = useState<boolean>(true);
+  const [emailNotifsLoading, setEmailNotifsLoading] = useState(false);
   const [selectedNotif, setSelectedNotif] = useState<any>(null);
   const [showNotifDetail, setShowNotifDetail] = useState(false);
 
@@ -163,6 +165,7 @@ export default function AccountPage() {
 
   useEffect(() => { if (isHydrated && !isLoggedIn) router.push("/auth"); }, [isHydrated, isLoggedIn, router]);
   useEffect(() => { if (user?.profile_image) setProfilePic(user.profile_image); }, [user]);
+  useEffect(() => { if (user?.profile?.email_notifications !== undefined) setEmailNotifs(user.profile.email_notifications); }, [user]);
 
   const showToast = (msg: string, duration = 3000) => { setToast(msg); setTimeout(() => setToast(""), duration); };
 
@@ -268,6 +271,17 @@ export default function AccountPage() {
       showToast("Profile photo removed");
     } catch { showToast("Could not remove photo — try again"); }
     finally { setUploading(false); }
+  };
+
+  const handleEmailNotifsToggle = async () => {
+    const next = !emailNotifs;
+    setEmailNotifs(next);
+    setEmailNotifsLoading(true);
+    try {
+      const res = await api.auth.updateProfile({ email_notifications: next });
+      if (!res.ok) { setEmailNotifs(!next); showToast("Could not update preference"); }
+    } catch { setEmailNotifs(!next); showToast("Could not update preference"); }
+    finally { setEmailNotifsLoading(false); }
   };
 
   const getNotifIcon = (type: string) => ({
@@ -672,6 +686,25 @@ export default function AccountPage() {
                   </div>
                 </motion.div>
               )}
+
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.55 }}
+                className="bg-white border border-stone-200 rounded-2xl p-4 shadow-sm">
+                <p className="text-xs font-semibold text-stone-500 uppercase tracking-wide mb-3">Notification Preferences</p>
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-stone-800">Email Notifications</p>
+                    <p className="text-xs text-stone-400 mt-0.5">Order updates, alerts &amp; announcements</p>
+                  </div>
+                  <button
+                    onClick={handleEmailNotifsToggle}
+                    disabled={emailNotifsLoading}
+                    aria-label={emailNotifs ? "Disable email notifications" : "Enable email notifications"}
+                    className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors duration-200 focus:outline-none disabled:opacity-50 ${emailNotifs ? "bg-teal-500" : "bg-stone-300"}`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-200 ${emailNotifs ? "translate-x-6" : "translate-x-1"}`} />
+                  </button>
+                </div>
+              </motion.div>
 
               <motion.button initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }}
                 whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={handleLogout}
