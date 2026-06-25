@@ -81,14 +81,7 @@ export default function BuyerBookingsPage() {
   const [useCredits, setUseCredits] = useState(false);
   const [paystackReady, setPaystackReady] = useState(false);
   const [verifying, setVerifying] = useState(false);
-
-  // Pre-fetched Paystack init data (populated when the modal opens)
-  const [paymentInit, setPaymentInit] = useState<{
-    access_code: string; authorization_url: string;
-    reference: string; amount_kobo: number; credits_applied: number;
-  } | null>(null);
-  const [paymentInitLoading, setPaymentInitLoading] = useState(false);
-  const [paymentInitError, setPaymentInitError] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // Load Paystack script on mount
   useEffect(() => {
@@ -149,50 +142,6 @@ export default function BuyerBookingsPage() {
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Pre-fetch Paystack access_code as soon as the payment modal opens.
-  // This ensures openIframe() can fire synchronously from the button click,
-  // with no await in between — which is what mobile browsers require to allow popups.
-  useEffect(() => {
-    if (!payingId) {
-      setPaymentInit(null);
-      setPaymentInitError(null);
-      setPaymentInitLoading(false);
-      return;
-    }
-
-    const booking = bookings.find(b => b.id === payingId);
-    if (!booking) return;
-
-    const price = parseFloat(booking.listing_price);
-    const full = price + calcServiceFee(price);
-    const creds = useCredits ? Math.min(loyaltyBalance, full) : 0;
-    const fullyCovered = useCredits && creds >= full && full > 0;
-    if (fullyCovered) { setPaymentInit(null); return; } // credits-only path, no Paystack needed
-
-    let cancelled = false;
-    setPaymentInitLoading(true);
-    setPaymentInitError(null);
-    setPaymentInit(null);
-
-    api.payments.initialize({
-      listing_id: booking.listing,
-      callback_url: `${window.location.origin}/account/bookings`,
-      ...(useCredits && creds > 0 ? { use_credits: true } : {}),
-    }).then(async res => {
-      if (cancelled) return;
-      const data = await res.json();
-      if (cancelled) return;
-      if (!res.ok) throw new Error(data.error || "Failed to initialize payment");
-      setPaymentInit(data);
-    }).catch((err: any) => {
-      if (!cancelled) setPaymentInitError(err?.message || "Could not prepare payment");
-    }).finally(() => {
-      if (!cancelled) setPaymentInitLoading(false);
-    });
-
-    return () => { cancelled = true; };
-  }, [payingId, useCredits]); // eslint-disable-line react-hooks/exhaustive-deps
-
   const { data: bookingsData, isPending: isBookingsPending, isError } = useQuery<Booking[]>({
     queryKey: ["bookings"],
     queryFn: async () => {
@@ -247,109 +196,97 @@ export default function BuyerBookingsPage() {
   const serviceFee = isFullyCoveredByCredits ? 0 : calcServiceFee(amountAfterCredits);
   const totalWithFee = isFullyCoveredByCredits ? 0 : amountAfterCredits + serviceFee;
 
-  // Synchronous — no await before openIframe(), preserving the user-gesture context
-  // so mobile browsers don't block the Paystack popup.
-  const proceedToPaystack = () => {
+  const proceedToPaystack = async () => {
     if (!activeBooking) return;
+    if (!isFullyCoveredByCredits && !(window as any).PaystackPop) {
+      showToast("Payment system not ready. Please refresh and try again.", false);
+      return;
+    }
+
+    const paystackKey = (process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || "").trim();
+    setIsProcessing(true);
 
     // Full credits coverage — skip Paystack entirely
     if (isFullyCoveredByCredits) {
-      setPayingId(null);
-      setVerifying(true);
-      api.payments.payWithCredits({ listing_id: activeBooking.listing })
-        .then(async res => {
-          const data = await res.json();
-          if (res.ok && data.order_id) {
-            setVerifying(false);
-            showToast("Order placed with loyalty credits!");
-            queryClient.invalidateQueries({ queryKey: ["bookings"] });
-            queryClient.invalidateQueries({ queryKey: ["loyalty-status"] });
-            router.push(`/order-confirmation/${data.order_id}`);
-          } else {
-            setVerifying(false);
-            showToast(data.error || "Payment failed. Try again.", false);
-          }
-        })
-        .catch(() => { setVerifying(false); showToast("Payment failed. Try again.", false); });
+      try {
+        const res = await api.payments.payWithCredits({ listing_id: activeBooking.listing });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Payment failed");
+        setPayingId(null);
+        showToast("Order placed with loyalty credits!");
+        queryClient.invalidateQueries({ queryKey: ["bookings"] });
+        queryClient.invalidateQueries({ queryKey: ["loyalty-status"] });
+        router.push(`/order-confirmation/${data.order_id}`);
+      } catch (err: any) {
+        showToast(err.message || "Payment failed. Try again.", false);
+        setIsProcessing(false);
+      }
       return;
     }
-
-    if (paymentInitLoading) { showToast("Still preparing payment, please wait a moment.", false); return; }
-    if (paymentInitError || !paymentInit) {
-      showToast(paymentInitError || "Payment not ready. Please close and try again.", false);
-      return;
-    }
-
-    const PaystackPop = (window as any).PaystackPop;
-    if (!PaystackPop) { showToast("Payment system not ready. Please refresh and try again.", false); return; }
 
     const bookingToCharge = activeBooking;
-    const { access_code, authorization_url, reference, amount_kobo, credits_applied: appliedCredits } = paymentInit;
 
-    setPayingId(null); // close modal
+    try {
+      const initRes = await api.payments.initialize({
+        listing_id: bookingToCharge.listing,
+        ...(useCredits && creditsToApply > 0 ? { use_credits: true } : {}),
+      });
+      const initData = await initRes.json();
+      if (!initRes.ok) throw new Error(initData.error || "Failed to initialize payment");
 
-    // openIframe() fires synchronously from this user-click context — no await above this line
-    const handler = PaystackPop.setup({
-      key: (process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || "").trim(),
-      access_code,
-      email: (user?.email || "").trim(),
-      amount: amount_kobo,
-      currency: "NGN",
-      ref: reference,
-      callback: async (response: any) => {
-        try { sessionStorage.removeItem("pendingBookingPayment"); } catch { /* ignore */ }
-        if (response.status === "success") {
-          setVerifying(true);
-          try {
-            const res = await api.payments.verify({
-              reference: response.reference,
-              transaction_id: response.reference,
-              listing_id: bookingToCharge.listing,
-              order_type: "service",
-              use_credits: appliedCredits > 0,
-              credits_applied: appliedCredits,
-            });
-            const data = await res.json();
-            if (res.ok && data.order_id) {
-              queryClient.invalidateQueries({ queryKey: ["bookings"] });
-              router.push(`/order-confirmation/${data.order_id}`);
-            } else {
+      const { access_code, reference, amount_kobo, credits_applied: serverCredits } = initData;
+      if (!access_code) throw new Error("Payment initialization failed. Please try again.");
+
+      const appliedCredits = serverCredits ?? 0;
+
+      const handler = (window as any).PaystackPop.setup({
+        key: paystackKey,
+        access_code,
+        email: user?.email || "",
+        amount: amount_kobo ?? Math.round(totalWithFee * 100),
+        currency: "NGN",
+        ref: reference,
+        callback: async (response: any) => {
+          if (response.status === "success") {
+            setPayingId(null);
+            setIsProcessing(false);
+            setVerifying(true);
+            try {
+              const res = await api.payments.verify({
+                reference: response.reference,
+                transaction_id: response.reference,
+                listing_id: bookingToCharge.listing,
+                order_type: "service",
+                use_credits: appliedCredits > 0,
+                credits_applied: appliedCredits,
+              });
+              const data = await res.json();
+              if (res.ok && data.order_id) {
+                queryClient.invalidateQueries({ queryKey: ["bookings"] });
+                router.push(`/order-confirmation/${data.order_id}`);
+              } else {
+                setVerifying(false);
+                showToast(data.error || `Payment received. Save reference: ${response.reference}`, true);
+                queryClient.invalidateQueries({ queryKey: ["bookings"] });
+              }
+            } catch {
               setVerifying(false);
-              showToast(data.error || `Payment received. Save this reference: ${response.reference}`, true);
+              showToast(`Payment received. Save reference: ${response.reference}`, true);
               queryClient.invalidateQueries({ queryKey: ["bookings"] });
             }
-          } catch {
-            setVerifying(false);
-            showToast(`Payment received. Save this reference: ${response.reference}`, true);
-            queryClient.invalidateQueries({ queryKey: ["bookings"] });
+          } else {
+            setIsProcessing(false);
           }
-        } else {
-          setVerifying(false);
-        }
-      },
-      onClose: () => {
-        try { sessionStorage.removeItem("pendingBookingPayment"); } catch { /* ignore */ }
-        setVerifying(false);
-      },
-    });
-    handler.openIframe();
-
-    // Fallback: if the popup was still blocked (some strict browsers), redirect instead
-    setTimeout(() => {
-      const opened = !!(
-        document.querySelector('iframe[src*="paystack.com"]') ||
-        document.querySelector('iframe[src*="paystack"]') ||
-        document.querySelector(".paystack-container")
-      );
-      if (!opened && authorization_url) {
-        try {
-          sessionStorage.setItem("pendingBookingPayment", JSON.stringify({
-            listing_id: bookingToCharge.listing, applied_credits: appliedCredits, reference,
-          }));
-        } catch { /* ignore */ }
-        window.location.href = authorization_url;
-      }
-    }, 700);
+        },
+        onClose: () => {
+          setIsProcessing(false);
+        },
+      });
+      handler.openIframe();
+    } catch (err: any) {
+      showToast(err.message || "Could not start payment. Try again.", false);
+      setIsProcessing(false);
+    }
   };
 
   const handlePay = (bookingId: number) => { setUseCredits(false); setPayingId(bookingId); };
@@ -481,14 +418,11 @@ export default function BuyerBookingsPage() {
                   className="flex-1 py-3 bg-stone-100 rounded-full font-semibold text-stone-600 text-sm">
                   Cancel
                 </button>
-                <button onClick={proceedToPaystack}
-                  disabled={!isFullyCoveredByCredits && (paymentInitLoading || !!paymentInitError)}
-                  className="flex-1 py-3 text-white rounded-full font-semibold text-sm flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-transform disabled:opacity-60 disabled:cursor-not-allowed"
+                <button onClick={proceedToPaystack} disabled={isProcessing}
+                  className="flex-1 py-3 text-white rounded-full font-semibold text-sm flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-transform disabled:opacity-70"
                   style={{ background: GRAD }}>
-                  {paymentInitLoading && !isFullyCoveredByCredits
-                    ? <><Loader className="w-4 h-4 animate-spin" /> Preparing...</>
-                    : paymentInitError && !isFullyCoveredByCredits
-                    ? "Retry"
+                  {isProcessing
+                    ? <><Loader className="w-4 h-4 animate-spin" /> Processing...</>
                     : <><CreditCard className="w-4 h-4" />{isFullyCoveredByCredits ? "Pay with Credits" : `Pay ₦${totalWithFee.toLocaleString()}`}</>
                   }
                 </button>
