@@ -246,20 +246,19 @@ export default function BuyerBookingsPage() {
         amount: amount_kobo ?? Math.round(totalWithFee * 100),
         currency: "NGN",
         ref: reference,
-        callback: async (response: any) => {
+        callback: function(response: any) {
           if (response.status === "success") {
             setPayingId(null);
             setIsProcessing(false);
             setVerifying(true);
-            try {
-              const res = await api.payments.verify({
-                reference: response.reference,
-                transaction_id: response.reference,
-                listing_id: bookingToCharge.listing,
-                order_type: "service",
-                use_credits: appliedCredits > 0,
-                credits_applied: appliedCredits,
-              });
+            api.payments.verify({
+              reference: response.reference,
+              transaction_id: response.reference,
+              listing_id: bookingToCharge.listing,
+              order_type: "service",
+              use_credits: appliedCredits > 0,
+              credits_applied: appliedCredits,
+            }).then(async (res) => {
               const data = await res.json();
               if (res.ok && data.order_id) {
                 queryClient.invalidateQueries({ queryKey: ["bookings"] });
@@ -269,16 +268,16 @@ export default function BuyerBookingsPage() {
                 showToast(data.error || `Payment received. Save reference: ${response.reference}`, true);
                 queryClient.invalidateQueries({ queryKey: ["bookings"] });
               }
-            } catch {
+            }).catch(() => {
               setVerifying(false);
               showToast(`Payment received. Save reference: ${response.reference}`, true);
               queryClient.invalidateQueries({ queryKey: ["bookings"] });
-            }
+            });
           } else {
             setIsProcessing(false);
           }
         },
-        onClose: () => {
+        onClose: function() {
           setIsProcessing(false);
         },
       });
