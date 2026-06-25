@@ -230,7 +230,7 @@ class BookingSerializer(serializers.ModelSerializer):
     buyer_id = serializers.IntegerField(source='buyer.id', read_only=True)
     vendor_username = serializers.CharField(source='listing.vendor.username', read_only=True)
     listing_title = serializers.CharField(source='listing.title', read_only=True)
-    listing_price = serializers.DecimalField(source='listing.price', max_digits=10, decimal_places=2, read_only=True)
+    listing_price = serializers.SerializerMethodField()
     listing_id = serializers.IntegerField(source='listing.id', read_only=True)
     vendor_name = serializers.SerializerMethodField()
 
@@ -242,6 +242,20 @@ class BookingSerializer(serializers.ModelSerializer):
             'scheduled_date', 'scheduled_time', 'note', 'status', 'created_at',
         ]
         read_only_fields = ['id', 'buyer_username', 'buyer_id', 'vendor_username', 'listing_title', 'listing_id', 'listing_price', 'vendor_name', 'status', 'created_at']
+
+    def get_listing_price(self, obj):
+        from decimal import Decimal
+        price = Decimal(str(obj.listing.price))
+        try:
+            deal = obj.listing.deal
+            if deal.is_active:
+                return str(deal.discounted_price)
+        except Exception:
+            vd = getattr(obj.listing, 'discount_percent', 0) or 0
+            if vd > 0:
+                effective = price - price * Decimal(vd) / 100
+                return str(effective.quantize(Decimal('0.01')))
+        return str(price)
 
     def get_vendor_name(self, obj):
         vendor = obj.listing.vendor

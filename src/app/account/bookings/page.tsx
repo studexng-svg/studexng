@@ -100,6 +100,47 @@ export default function BuyerBookingsPage() {
     if (isHydrated && !isLoggedIn) router.push("/auth");
   }, [isHydrated, isLoggedIn, router]);
 
+  // Handle return from Paystack redirect flow (mobile fallback)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get("reference") || params.get("trxref");
+    if (!ref) return;
+
+    let pending: { listing_id: number; applied_credits: number; reference: string } | null = null;
+    try { pending = JSON.parse(sessionStorage.getItem("pendingBookingPayment") || "null"); } catch { /* ignore */ }
+    if (!pending || pending.reference !== ref) {
+      window.history.replaceState({}, "", "/account/bookings");
+      return;
+    }
+
+    sessionStorage.removeItem("pendingBookingPayment");
+    window.history.replaceState({}, "", "/account/bookings");
+
+    setVerifying(true);
+    api.payments.verify({
+      reference: ref,
+      transaction_id: ref,
+      listing_id: pending.listing_id,
+      order_type: "service",
+      use_credits: pending.applied_credits > 0,
+      credits_applied: pending.applied_credits,
+    }).then(async res => {
+      const data = await res.json();
+      if (res.ok && data.order_id) {
+        queryClient.invalidateQueries({ queryKey: ["bookings"] });
+        router.push(`/order-confirmation/${data.order_id}`);
+      } else {
+        setVerifying(false);
+        showToast(data.error || `Payment received. Save reference: ${ref}`, true);
+        queryClient.invalidateQueries({ queryKey: ["bookings"] });
+      }
+    }).catch(() => {
+      setVerifying(false);
+      showToast(`Payment received. Save this reference: ${ref}`, true);
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const { data: bookingsData, isPending: isBookingsPending, isError } = useQuery<Booking[]>({
     queryKey: ["bookings"],
     queryFn: async () => {
@@ -191,17 +232,19 @@ export default function BuyerBookingsPage() {
     const bookingToCharge = activeBooking;
     setPayingId(null);
 
-    // Initialize payment via backend to get access_code (same as checkout page)
+    // Initialize payment via backend to get access_code
     setVerifying(true);
-    let accessCode: string, reference: string, amountKobo: number, appliedCredits = 0;
+    let accessCode: string, reference: string, amountKobo: number, appliedCredits = 0, authorizationUrl = "";
     try {
       const initRes = await api.payments.initialize({
         listing_id: bookingToCharge.listing,
+        callback_url: `${window.location.origin}/account/bookings`,
         ...(useCredits && creditsToApply > 0 ? { use_credits: true } : {}),
       });
       const initData = await initRes.json();
       if (!initRes.ok) throw new Error(initData.error || "Failed to initialize payment");
       accessCode = initData.access_code;
+      authorizationUrl = initData.authorization_url || "";
       reference = initData.reference;
       amountKobo = initData.amount_kobo;
       appliedCredits = initData.credits_applied ?? 0;
@@ -212,8 +255,17 @@ export default function BuyerBookingsPage() {
       return;
     }
 
+    // Store context so the redirect-callback handler can verify on return
+    sessionStorage.setItem("pendingBookingPayment", JSON.stringify({
+      listing_id: bookingToCharge.listing,
+      applied_credits: appliedCredits,
+      reference,
+    }));
+
     // Hide the verifying overlay while the Paystack iframe is open
     setVerifying(false);
+
+    let fallbackTimer: ReturnType<typeof setTimeout> | null = null;
 
     const handler = PaystackPop.setup({
       key: (process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || "").trim(),
@@ -223,8 +275,10 @@ export default function BuyerBookingsPage() {
       currency: "NGN",
       ref: reference,
       callback: async (response: any) => {
+        if (fallbackTimer) { clearTimeout(fallbackTimer); fallbackTimer = null; }
+        sessionStorage.removeItem("pendingBookingPayment");
         if (response.status === "success") {
-          // Payment successful — verify and create the order (same as checkout page)
+          // Payment successful — verify and create the order
           setVerifying(true);
           try {
             const res = await api.payments.verify({
@@ -250,16 +304,35 @@ export default function BuyerBookingsPage() {
             queryClient.invalidateQueries({ queryKey: ["bookings"] });
           }
         } else {
-          // Payment was not completed (e.g. card declined) — stop loading
           setVerifying(false);
         }
       },
       onClose: () => {
-        // User closed/cancelled the Paystack modal — just stop loading, no polling
+        if (fallbackTimer) { clearTimeout(fallbackTimer); fallbackTimer = null; }
+        sessionStorage.removeItem("pendingBookingPayment");
         setVerifying(false);
       },
     });
     handler.openIframe();
+
+    // If Paystack popup was blocked by the browser (common on mobile after async init),
+    // detect the missing iframe and fall back to the redirect-based checkout.
+    fallbackTimer = setTimeout(() => {
+      fallbackTimer = null;
+      const paystackOpened = !!(
+        document.querySelector('iframe[src*="paystack.com"]') ||
+        document.querySelector('iframe[src*="paystack"]') ||
+        document.querySelector(".paystack-container")
+      );
+      if (!paystackOpened) {
+        if (authorizationUrl) {
+          window.location.href = authorizationUrl;
+        } else {
+          sessionStorage.removeItem("pendingBookingPayment");
+          showToast("Could not open payment. Please try again.", false);
+        }
+      }
+    }, 700);
   };
 
   const handlePay = (bookingId: number) => setPayingId(bookingId);
