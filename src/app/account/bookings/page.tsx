@@ -114,7 +114,7 @@ export default function BuyerBookingsPage() {
       return;
     }
 
-    sessionStorage.removeItem("pendingBookingPayment");
+    try { sessionStorage.removeItem("pendingBookingPayment"); } catch { /* ignore */ }
     window.history.replaceState({}, "", "/account/bookings");
 
     setVerifying(true);
@@ -255,12 +255,14 @@ export default function BuyerBookingsPage() {
       return;
     }
 
-    // Store context so the redirect-callback handler can verify on return
-    sessionStorage.setItem("pendingBookingPayment", JSON.stringify({
-      listing_id: bookingToCharge.listing,
-      applied_credits: appliedCredits,
-      reference,
-    }));
+    // Store context for redirect fallback (may be unavailable in private browsing — that's OK)
+    try {
+      sessionStorage.setItem("pendingBookingPayment", JSON.stringify({
+        listing_id: bookingToCharge.listing,
+        applied_credits: appliedCredits,
+        reference,
+      }));
+    } catch { /* sessionStorage unavailable */ }
 
     // Hide the verifying overlay while the Paystack iframe is open
     setVerifying(false);
@@ -276,7 +278,7 @@ export default function BuyerBookingsPage() {
       ref: reference,
       callback: async (response: any) => {
         if (fallbackTimer) { clearTimeout(fallbackTimer); fallbackTimer = null; }
-        sessionStorage.removeItem("pendingBookingPayment");
+        try { sessionStorage.removeItem("pendingBookingPayment"); } catch { /* ignore */ }
         if (response.status === "success") {
           // Payment successful — verify and create the order
           setVerifying(true);
@@ -309,7 +311,7 @@ export default function BuyerBookingsPage() {
       },
       onClose: () => {
         if (fallbackTimer) { clearTimeout(fallbackTimer); fallbackTimer = null; }
-        sessionStorage.removeItem("pendingBookingPayment");
+        try { sessionStorage.removeItem("pendingBookingPayment"); } catch { /* ignore */ }
         setVerifying(false);
       },
     });
@@ -328,7 +330,7 @@ export default function BuyerBookingsPage() {
         if (authorizationUrl) {
           window.location.href = authorizationUrl;
         } else {
-          sessionStorage.removeItem("pendingBookingPayment");
+          try { sessionStorage.removeItem("pendingBookingPayment"); } catch { /* ignore */ }
           showToast("Could not open payment. Please try again.", false);
         }
       }
