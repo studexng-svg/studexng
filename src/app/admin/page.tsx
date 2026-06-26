@@ -106,7 +106,7 @@ export default function AdminDashboard() {
     <div className="min-h-full" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       <AdminTopBar title="Admin Dashboard" back="/home" />
 
-      <div className="px-4 pt-5 pb-28 max-w-4xl space-y-5">
+      <div className="px-6 pt-5 pb-28 space-y-5">
 
         {/* Header */}
         <div>

@@ -117,7 +117,7 @@ export default function AdminUserDetail() {
     <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       <AdminTopBar title="User Detail" back="/admin/users" />
 
-      <div className="px-4 pt-5 pb-28 max-w-2xl mx-auto space-y-4">
+      <div className="px-6 pt-5 pb-28 space-y-4">
 
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-2xl text-sm font-medium flex items-center justify-between">

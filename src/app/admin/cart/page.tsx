@@ -119,7 +119,7 @@ export default function AdminCartPage() {
         )}
       </AnimatePresence>
 
-      <div className="px-4 pt-4 pb-28 max-w-2xl mx-auto space-y-4">
+      <div className="px-6 pt-5 pb-28 space-y-4">
 
         {/* Tab switcher */}
         <div className="flex bg-stone-100 rounded-full p-1 gap-1">

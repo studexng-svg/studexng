@@ -13,7 +13,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     <AdminGuard>
       <div className="flex h-screen overflow-hidden bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
         <AdminSidebar />
-        <main className="flex-1 overflow-y-auto min-w-0">
+        <main className="flex-1 overflow-y-auto min-w-0 bg-[#F5F5F5]">
           {children}
         </main>
       </div>

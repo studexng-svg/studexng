@@ -96,7 +96,7 @@ export default function AdminDisputeDetail() {
     <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       <AdminTopBar title={`Dispute #${dispute.id}`} back="/admin/disputes" />
 
-      <div className="px-4 pt-5 pb-28 max-w-2xl mx-auto space-y-4">
+      <div className="px-6 pt-5 pb-28 space-y-4">
 
         {/* Status */}
         <div className="bg-white border border-stone-200 rounded-2xl p-4 shadow-sm flex items-center justify-between">

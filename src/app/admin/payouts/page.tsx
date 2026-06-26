@@ -10,7 +10,7 @@ export default function AdminPayoutsPage() {
     <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       <AdminTopBar title="Payouts" back="/admin" />
 
-      <div className="px-4 pt-5 pb-28 max-w-2xl mx-auto space-y-3">
+      <div className="px-6 pt-5 pb-28 space-y-3">
         <p className="text-teal-600 text-xs tracking-[0.2em] uppercase font-semibold">Payout Management</p>
 
         <Link href="/admin/payments">

@@ -100,7 +100,7 @@ export default function AdminCategoriesPage() {
     <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       <AdminTopBar title="Categories" back="/admin" />
 
-      <div className="px-4 pt-4 pb-28 max-w-2xl mx-auto space-y-3">
+      <div className="px-6 pt-5 pb-28 space-y-3">
 
         {/* Add new */}
         {showAdd ? (

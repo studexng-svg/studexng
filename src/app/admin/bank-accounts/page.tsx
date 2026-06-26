@@ -42,7 +42,7 @@ export default function AdminBankAccountsPage() {
     <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       <AdminTopBar title="Bank Accounts" back="/admin" />
 
-      <div className="px-4 pt-4 pb-28 max-w-2xl mx-auto space-y-3">
+      <div className="px-6 pt-5 pb-28 space-y-3">
 
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
