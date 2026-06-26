@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import {
   Star, Sparkles, MapPin, Shield, BellRing, UserX, X as XIcon,
   Clock, Share2, MessageCircle, Zap, ShoppingCart,
-  Calendar, Package, CheckCircle2, CheckCircle,
+  Calendar, Package, CheckCircle2,
 } from "lucide-react";
 import TopNav from "@/components/layout/TopNav";
 import Link from "next/link";
@@ -28,14 +28,16 @@ function SafeImg({ src, alt, className }: { src?: string | null; alt: string; cl
   return <img src={src} alt={alt} loading="lazy" onError={() => setErr(true)} className={`w-full h-full object-cover ${className ?? ""}`} />;
 }
 
-const BADGE_MAP: Record<string, { label: string; emoji: string; cls: string }> = {
-  top:     { label: "Top Vendor",     emoji: "🏆", cls: "bg-amber-500/20 text-amber-300 border border-amber-500/30" },
-  trusted: { label: "Trusted Vendor", emoji: "✅", cls: "bg-teal-500/20  text-teal-300  border border-teal-500/30"  },
-  rising:  { label: "Rising Star",    emoji: "⭐", cls: "bg-purple-500/20 text-purple-300 border border-purple-500/30" },
+const BADGE_MAP: Record<string, { label: string; emoji: string }> = {
+  top:     { label: "Top Vendor",     emoji: "🏆" },
+  trusted: { label: "Trusted Vendor", emoji: "✅" },
+  rising:  { label: "Rising Star",    emoji: "⭐" },
 };
 
 const DAYS    = ["mon","tue","wed","thu","fri","sat","sun"] as const;
 const DAY_LBL = { mon:"M", tue:"T", wed:"W", thu:"T", fri:"F", sat:"S", sun:"S" } as const;
+
+type Tab = "listings" | "reviews" | "about";
 
 /* ── page ───────────────────────────────────────────────────────────────── */
 
@@ -50,6 +52,8 @@ export default function VendorProfilePage() {
   const [listings, setListings] = useState<any[]>([]);
   const [reviews,  setReviews]  = useState<any[]>([]);
   const [loading,  setLoading]  = useState(true);
+  const [tab,      setTab]      = useState<Tab>("listings");
+
   const [toast,        setToast]        = useState("");
   const [adminToast,   setAdminToast]   = useState("");
   const [adminLoading, setAdminLoading] = useState<string | null>(null);
@@ -127,11 +131,18 @@ export default function VendorProfilePage() {
   if (loading) return (
     <div className="min-h-screen bg-white" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       <TopNav showBack activeNav="vendors" />
-      <div className="h-32 animate-pulse bg-stone-100 border-b border-stone-100" />
-      <div className="max-w-6xl mx-auto px-4 lg:px-8 pt-8">
-        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3 lg:gap-4">
-          {[...Array(8)].map((_, i) => (
-            <div key={i} className="bg-white rounded-2xl overflow-hidden animate-pulse border border-stone-100 shadow-sm">
+      <div className="max-w-6xl mx-auto px-6 lg:px-8 pt-10">
+        <div className="flex gap-8 mb-10">
+          <div className="w-48 h-48 rounded-3xl bg-stone-100 animate-pulse flex-shrink-0" />
+          <div className="flex-1 space-y-3 pt-2">
+            <div className="h-8 bg-stone-100 rounded-xl w-56 animate-pulse" />
+            <div className="h-4 bg-stone-100 rounded-lg w-32 animate-pulse" />
+            <div className="h-4 bg-stone-100 rounded-lg w-72 animate-pulse" />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="rounded-2xl overflow-hidden animate-pulse border border-stone-100">
               <div className="aspect-[3/4] bg-stone-100" />
               <div className="p-3 space-y-2"><div className="h-3 bg-stone-100 rounded" /><div className="h-3 bg-stone-100 rounded w-2/3" /></div>
             </div>
@@ -149,19 +160,16 @@ export default function VendorProfilePage() {
     </div>
   );
 
-  const badge       = vendor.vendor_badge && vendor.vendor_badge !== "none" ? BADGE_MAP[vendor.vendor_badge] : null;
-  const initials    = (vendor.business_name || vendor.username || "??").slice(0, 2).toUpperCase();
-  const respMins    = vendor.avg_response_minutes ?? null;
-  const respLabel   = respMins === null ? null : respMins < 60 ? `~${respMins}m` : respMins < 1440 ? `~${Math.round(respMins / 60)}h` : `~${Math.round(respMins / 1440)}d`;
+  const badge        = vendor.vendor_badge && vendor.vendor_badge !== "none" ? BADGE_MAP[vendor.vendor_badge] : null;
+  const initials     = (vendor.business_name || vendor.username || "??").slice(0, 2).toUpperCase();
+  const respMins     = vendor.avg_response_minutes ?? null;
+  const respLabel    = respMins === null ? null : respMins < 60 ? `~${respMins}m` : respMins < 1440 ? `~${Math.round(respMins / 60)}h` : `~${Math.round(respMins / 1440)}d`;
   const availDays: string[] = vendor.available_days || [];
-  const sorted      = [...listings.filter(l => l.is_available), ...listings.filter(l => !l.is_available)];
+  const sorted       = [...listings.filter(l => l.is_available), ...listings.filter(l => !l.is_available)];
   const vendorRating = Number(vendor.rating) || 0;
   const totalReviews = Number(vendor.total_reviews) || 0;
-
-  /* rating breakdown */
   const ratingCounts = [5,4,3,2,1].map(n => ({ n, count: reviews.filter((r:any) => r.rating === n).length }));
 
-  /* day matching — API may return "Monday", "monday", "mon", "1", etc. */
   const DAY_FULL = ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"];
   const isDayOpen = (d: typeof DAYS[number]) => {
     if (!availDays.length) return false;
@@ -171,6 +179,12 @@ export default function VendorProfilePage() {
       return v === d || v === DAY_FULL[idx] || v.startsWith(d) || v === String(idx) || v === String(idx + 1);
     });
   };
+
+  const TABS: { id: Tab; label: string; count?: number }[] = [
+    { id: "listings", label: "Listings", count: sorted.length },
+    { id: "reviews",  label: "Reviews",  count: totalReviews  },
+    { id: "about",    label: "About"                          },
+  ];
 
   /* ══════════════════════════════════════════════════════════════════════ */
   return (
@@ -208,252 +222,144 @@ export default function VendorProfilePage() {
         </div>
       )}
 
-      {/* ══════════ TWO-PANEL ══════════ */}
-      <div className="lg:flex">
+      {/* ══════════ HERO ══════════ */}
+      <div className="relative overflow-hidden border-b border-stone-100">
+        {/* Teal gradient blob */}
+        <div className="absolute inset-0 pointer-events-none">
+          <div style={{
+            position: "absolute", top: "-30%", left: "-10%",
+            width: "55%", height: "200%",
+            background: "radial-gradient(ellipse, rgba(13,148,136,0.07) 0%, transparent 65%)",
+            borderRadius: "50%",
+          }} />
+          <div style={{
+            position: "absolute", top: "-20%", right: "5%",
+            width: "35%", height: "140%",
+            background: "radial-gradient(ellipse, rgba(13,148,136,0.04) 0%, transparent 60%)",
+            borderRadius: "50%",
+          }} />
+        </div>
 
-        {/* ─── SIDEBAR — sticky, stays in view as page scrolls ─── */}
-        <aside className="hidden lg:flex flex-col w-[260px] flex-shrink-0 gap-3 px-4 pt-6 pb-10 sticky top-0 h-screen overflow-y-auto self-start" style={{ scrollbarWidth: "none" }}>
+        <div className="relative max-w-6xl mx-auto px-6 lg:px-8 py-10 lg:py-14">
+          <div className="flex flex-col lg:flex-row items-start gap-8 lg:gap-12">
 
-          {/* About */}
-          {vendor.bio && (
-            <div className="bg-stone-50 rounded-2xl border border-stone-100 p-4 shadow-sm">
-              <p className="text-teal-600 text-[10px] tracking-[0.18em] uppercase font-bold mb-2">About</p>
-              <p className="text-stone-600 text-sm leading-relaxed">{vendor.bio}</p>
-            </div>
-          )}
-
-          {/* Hours & Availability */}
-          {(availDays.length > 0 || vendor.opening_time) && (
-            <div className="bg-stone-50 rounded-2xl border border-stone-100 p-4 shadow-sm">
-              <p className="text-teal-600 text-[10px] tracking-[0.18em] uppercase font-bold mb-3">Hours & Availability</p>
-              {availDays.length > 0 && (
-                <div className="flex gap-1.5 flex-wrap mb-3">
-                  {DAYS.map(d => (
-                    <div key={d} className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold transition-colors ${
-                      isDayOpen(d) ? "bg-teal-500 text-white shadow-sm shadow-teal-200" : "bg-stone-100 text-stone-300"
-                    }`}>
-                      {DAY_LBL[d]}
-                    </div>
-                  ))}
-                </div>
-              )}
-              {vendor.opening_time && vendor.closing_time && (
-                <div className="flex items-center gap-1.5 text-xs text-stone-500 font-medium">
-                  <Clock className="w-3.5 h-3.5 text-teal-500 flex-shrink-0" />
-                  {vendor.opening_time} – {vendor.closing_time}
-                </div>
+            {/* ── Large avatar ── */}
+            <div className="relative flex-shrink-0">
+              <div className="w-36 h-36 lg:w-52 lg:h-52 rounded-3xl overflow-hidden shadow-xl ring-4 ring-white">
+                {vendor.profile_picture
+                  ? <img src={vendor.profile_picture} alt={vendor.username} className="w-full h-full object-cover object-top" />
+                  : <div className="w-full h-full flex items-center justify-center text-white font-black text-4xl" style={{ background: GRAD }}>{initials}</div>
+                }
+              </div>
+              {vendor.is_online && (
+                <span className="absolute bottom-2 right-2 w-5 h-5 bg-green-400 rounded-full border-[3px] border-white shadow-md" />
               )}
             </div>
-          )}
 
-          {/* Reviews summary */}
-          {reviews.length > 0 && (
-            <div className="bg-stone-50 rounded-2xl border border-stone-100 p-4 shadow-sm">
-              <p className="text-teal-600 text-[10px] tracking-[0.18em] uppercase font-bold mb-3">Reviews</p>
-              <div className="flex items-start gap-3">
-                <div className="flex-shrink-0">
-                  <p className="text-4xl font-black text-stone-900 leading-none">{vendorRating.toFixed(1)}</p>
-                  <div className="flex gap-0.5 mt-1.5">
-                    {[1,2,3,4,5].map(n => <Star key={n} className={`w-3 h-3 ${n<=Math.round(vendorRating)?"fill-amber-400 text-amber-400":"fill-stone-200 text-stone-200"}`} />)}
-                  </div>
-                  <p className="text-[11px] text-stone-400 mt-1">{totalReviews} review{totalReviews!==1?"s":""}</p>
-                </div>
-                <div className="flex-1 space-y-1.5 pt-0.5">
-                  {ratingCounts.map(({ n, count }) => {
-                    const pct = totalReviews > 0 ? Math.round((count/totalReviews)*100) : 0;
-                    return (
-                      <div key={n} className="flex items-center gap-1.5">
-                        <span className="text-[10px] text-stone-400 w-2.5 flex-shrink-0">{n}</span>
-                        <Star className="w-2 h-2 fill-amber-400 text-amber-400 flex-shrink-0" />
-                        <div className="flex-1 h-1.5 bg-stone-200 rounded-full overflow-hidden">
-                          <div className="h-full bg-amber-400 rounded-full" style={{ width:`${pct}%` }} />
-                        </div>
-                        <span className="text-[10px] text-stone-400 w-3 flex-shrink-0 text-right">{count}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          )}
+            {/* ── Info + stats ── */}
+            <div className="flex-1 min-w-0 flex flex-col lg:flex-row items-start gap-8 lg:gap-12 justify-between">
 
-          {/* Admin */}
-          {isAdmin && (
-            <div className="bg-purple-50 rounded-2xl border border-purple-100 p-4 shadow-sm">
-              <div className="flex items-center gap-1.5 mb-3">
-                <Shield className="w-3.5 h-3.5 text-purple-500" />
-                <p className="text-purple-600 text-[10px] tracking-[0.18em] uppercase font-bold">Admin</p>
-              </div>
-              <div className="text-xs text-stone-600 space-y-1 mb-3">
-                {vendor.email     && <p><span className="font-semibold">Email:</span> {vendor.email}</p>}
-                {vendor.school    && <p><span className="font-semibold">School:</span> {vendor.school.toUpperCase()}</p>}
-                {vendor.user_type && <p><span className="font-semibold">Type:</span> {vendor.user_type}</p>}
-                {vendor.is_active !== undefined && (
-                  <p><span className="font-semibold">Status:</span>{" "}
-                    <span className={vendor.is_active ? "text-teal-600 font-semibold" : "text-red-500 font-semibold"}>
-                      {vendor.is_active ? "Active" : "Deactivated"}
+              {/* Name / bio / actions */}
+              <div className="min-w-0">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <h1 className="text-3xl lg:text-4xl font-black text-stone-900 [overflow-wrap:anywhere] leading-tight" style={SERIF}>
+                    {vendor.business_name || vendor.username}
+                  </h1>
+                  {badge && (
+                    <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-teal-50 text-teal-700 border border-teal-200 flex-shrink-0">
+                      {badge.emoji} {badge.label}
                     </span>
-                  </p>
+                  )}
+                </div>
+                <p className="text-stone-400 text-sm mt-1.5">@{vendor.username}</p>
+
+                {vendor.bio && (
+                  <p className="text-stone-600 mt-3 text-sm leading-relaxed max-w-sm">{vendor.bio}</p>
                 )}
-              </div>
-              <div className="flex gap-2">
-                <button onClick={() => setNotifyOpen(true)}
-                  className="flex-1 flex items-center justify-center gap-1 py-2 rounded-xl text-xs font-bold bg-purple-100 text-purple-700 hover:bg-purple-200 transition">
-                  <BellRing className="w-3 h-3" /> Notify
-                </button>
-                <button onClick={handleRevoke} disabled={!!adminLoading}
-                  className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-xl text-xs font-bold transition disabled:opacity-50 ${confirmRevoke ? "bg-red-500 text-white" : "bg-red-100 text-red-700 hover:bg-red-200"}`}>
-                  <UserX className="w-3 h-3" />
-                  {adminLoading === "revoke" ? "…" : confirmRevoke ? "Confirm?" : "Revoke"}
-                </button>
-              </div>
-            </div>
-          )}
 
-        </aside>
-
-        {/* ─── MAIN — normal flow ─── */}
-        <div className="flex-1 min-w-0">
-
-          {/* Hero strip */}
-          <div className="bg-white border-b border-stone-100 px-5 lg:px-8 pt-7 pb-6">
-            <div className="flex items-start gap-5">
-
-              {/* Avatar */}
-              <div className="relative flex-shrink-0">
-                <div className="w-16 h-16 lg:w-20 lg:h-20 rounded-2xl overflow-hidden"
-                  style={{ boxShadow: "0 0 0 3px #fff, 0 0 0 5px rgba(13,148,136,0.35)" }}>
-                  {vendor.profile_picture
-                    ? <img src={vendor.profile_picture} alt={vendor.username} className="w-full h-full object-cover object-top" />
-                    : <div className="w-full h-full flex items-center justify-center text-white font-black text-xl" style={{ background: GRAD }}>{initials}</div>
-                  }
+                <div className="flex flex-wrap gap-2 mt-3">
+                  {vendor.hostel && (
+                    <span className="flex items-center gap-1 text-xs text-stone-500 bg-stone-100 px-2.5 py-1 rounded-full">
+                      <MapPin className="w-3 h-3 text-teal-500" />{vendor.hostel}
+                    </span>
+                  )}
+                  {respLabel && (
+                    <span className="flex items-center gap-1 text-xs text-stone-500 bg-stone-100 px-2.5 py-1 rounded-full">
+                      <Zap className="w-3 h-3 text-teal-500" />{respLabel} reply
+                    </span>
+                  )}
+                  {totalReviews > 0 && (
+                    <span className="flex items-center gap-1 text-xs text-stone-500 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-100">
+                      <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                      {vendorRating.toFixed(1)} · {totalReviews} review{totalReviews !== 1 ? "s" : ""}
+                    </span>
+                  )}
                 </div>
-                {vendor.is_online && <span className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-green-400 rounded-full border-2 border-white shadow" />}
-              </div>
 
-              {/* Info */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-start justify-between gap-3 flex-wrap">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h1 className="text-xl lg:text-2xl font-black text-stone-900 leading-tight [overflow-wrap:anywhere]" style={SERIF}>
-                        {vendor.business_name || vendor.username}
-                      </h1>
-                      {badge && (
-                        <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200 flex-shrink-0">
-                          {badge.emoji} {badge.label}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-stone-400 text-sm mt-0.5">@{vendor.username}</p>
-                    {totalReviews > 0 && (
-                      <div className="flex items-center gap-1.5 mt-2">
-                        <div className="flex gap-0.5">
-                          {[1,2,3,4,5].map(n => <Star key={n} className={`w-3.5 h-3.5 ${n<=Math.round(vendorRating)?"fill-amber-400 text-amber-400":"fill-stone-200 text-stone-200"}`} />)}
-                        </div>
-                        <span className="text-stone-700 font-bold text-sm">{vendorRating.toFixed(1)}</span>
-                        <span className="text-stone-400 text-xs">({totalReviews} reviews)</span>
-                      </div>
-                    )}
-                    <div className="flex flex-wrap gap-2 mt-2.5">
-                      {vendor.hostel && (
-                        <span className="flex items-center gap-1 text-xs text-stone-500 bg-stone-100 px-2.5 py-1 rounded-full">
-                          <MapPin className="w-3 h-3 text-teal-500" />{vendor.hostel}
-                        </span>
-                      )}
-                      {respLabel && (
-                        <span className="flex items-center gap-1 text-xs text-stone-500 bg-stone-100 px-2.5 py-1 rounded-full">
-                          <Zap className="w-3 h-3 text-teal-500" />{respLabel} reply
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <button onClick={handleShare}
-                      className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white hover:bg-stone-50 border border-stone-200 text-stone-600 text-sm font-semibold transition">
-                      <Share2 className="w-3.5 h-3.5" /><span className="hidden sm:inline">Share</span>
+                <div className="flex items-center gap-3 mt-6">
+                  <button onClick={handleShare}
+                    className="px-5 py-2.5 rounded-2xl border border-stone-200 bg-white text-stone-800 text-sm font-semibold hover:bg-stone-50 active:scale-95 transition-all flex items-center gap-1.5 shadow-sm">
+                    <Share2 className="w-4 h-4" /> Share
+                  </button>
+                  <Link href={`/chat?vendor=${vendor.username}`}>
+                    <button className="px-5 py-2.5 rounded-2xl text-white text-sm font-semibold hover:opacity-90 active:scale-95 transition-all flex items-center gap-1.5 shadow-md"
+                      style={{ background: "#0d9488" }}>
+                      <MessageCircle className="w-4 h-4" /> Chat
                     </button>
-                    <Link href={`/chat?vendor=${vendor.username}`}>
-                      <button className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-white text-sm font-semibold hover:opacity-90 transition" style={{ background: GRAD }}>
-                        <MessageCircle className="w-3.5 h-3.5" /> Chat
-                      </button>
-                    </Link>
-                  </div>
+                  </Link>
                 </div>
               </div>
-            </div>
 
-            {/* Stats */}
-            <div className="mt-5 pt-5 border-t border-stone-100 flex items-center gap-0">
-              {[
-                { value: vendor.completed_order_count || 0,             label: "Orders",     icon: ShoppingCart },
-                { value: `${Math.round(vendor.completion_rate || 0)}%`, label: "Completion", icon: CheckCircle2 },
-                { value: vendor.total_listings || listings.length,       label: "Listings",   icon: Package      },
-              ].map(({ value, label, icon: Icon }, i) => (
-                <div key={label} className={`flex items-center gap-3 ${i > 0 ? "ml-6 pl-6 border-l border-stone-200" : ""}`}>
-                  <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-teal-50 flex-shrink-0">
-                    <Icon className="w-4 h-4 text-teal-600" />
+              {/* Stats block */}
+              <div className="flex gap-8 lg:gap-12 flex-shrink-0 lg:pt-2">
+                {[
+                  { value: vendor.completed_order_count || 0,             label: "Orders"     },
+                  { value: `${Math.round(vendor.completion_rate || 0)}%`, label: "Completion" },
+                  { value: vendor.total_listings || listings.length,       label: "Listings"   },
+                ].map(({ value, label }) => (
+                  <div key={label} className="text-center">
+                    <p className="text-xs text-stone-400 font-semibold tracking-wide uppercase">{label}</p>
+                    <p className="text-3xl lg:text-4xl font-black text-stone-900 mt-1 leading-none">{value}</p>
                   </div>
-                  <div>
-                    <p className="text-stone-900 font-black text-lg leading-none">{value}</p>
-                    <p className="text-stone-400 text-xs mt-0.5">{label}</p>
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </div>
+        </div>
+      </div>
 
-          {/* Scrollable body */}
-          <div className="px-5 lg:px-8 pt-6 pb-28">
+      {/* ══════════ TAB BAR ══════════ */}
+      <div className="sticky top-0 z-20 bg-white/95 backdrop-blur-sm border-b border-stone-100">
+        <div className="max-w-6xl mx-auto px-6 lg:px-8">
+          <div className="flex gap-1">
+            {TABS.map(t => (
+              <button key={t.id} onClick={() => setTab(t.id)}
+                className={`relative px-4 py-4 text-sm font-semibold transition-colors ${
+                  tab === t.id ? "text-stone-900" : "text-stone-400 hover:text-stone-600"
+                }`}>
+                {t.label}{t.count !== undefined ? ` ${t.count}` : ""}
+                {tab === t.id && (
+                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-teal-500 rounded-t-full" />
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
 
-            {/* Mobile info cards */}
-            <div className="lg:hidden space-y-3 mb-6">
-              {vendor.bio && (
-                <div className="bg-stone-50 rounded-2xl border border-stone-100 p-4">
-                  <p className="text-teal-600 text-xs tracking-[0.2em] uppercase font-bold mb-1.5">About</p>
-                  <p className="text-stone-600 text-sm leading-relaxed">{vendor.bio}</p>
-                </div>
-              )}
-              {(availDays.length > 0 || vendor.opening_time) && (
-                <div className="bg-stone-50 rounded-2xl border border-stone-100 p-4">
-                  <p className="text-teal-600 text-xs tracking-[0.2em] uppercase font-bold mb-2">Hours & Availability</p>
-                  {availDays.length > 0 && (
-                    <div className="flex gap-1.5 flex-wrap mb-2">
-                      {DAYS.map(d => (
-                        <div key={d} className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold ${
-                          isDayOpen(d) ? "bg-teal-500 text-white" : "bg-stone-100 text-stone-300"
-                        }`}>{DAY_LBL[d]}</div>
-                      ))}
-                    </div>
-                  )}
-                  {vendor.opening_time && vendor.closing_time && (
-                    <div className="flex items-center gap-1.5 text-sm text-stone-600 font-medium">
-                      <Clock className="w-3.5 h-3.5 text-teal-500 flex-shrink-0" />
-                      {vendor.opening_time} – {vendor.closing_time}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+      {/* ══════════ TAB CONTENT ══════════ */}
+      <div className="max-w-6xl mx-auto px-6 lg:px-8 pt-8 pb-28">
 
-            {/* Grid header */}
-            <div className="flex items-center justify-between mb-5">
-              <h2 className="text-xl font-black text-stone-900" style={SERIF}>
-                {vendor.business_name ? `${vendor.business_name}'s Listings` : "Listings"}
-              </h2>
-              {sorted.length > 0 && (
-                <span className="text-xs text-stone-400 font-semibold">{sorted.length} item{sorted.length !== 1 ? "s" : ""}</span>
-              )}
-            </div>
-
-            {/* Product grid */}
+        {/* ── Listings tab ── */}
+        {tab === "listings" && (
+          <>
             {sorted.length === 0 ? (
               <div className="bg-stone-50 rounded-2xl p-16 text-center border border-stone-100">
                 <Sparkles className="w-10 h-10 text-stone-200 mx-auto mb-3" />
                 <p className="text-stone-400 font-semibold text-sm">No listings yet</p>
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 gap-3 lg:gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 lg:gap-4">
                 {sorted.map((listing, i) => {
                   const isService = (listing.listing_type || "").toLowerCase() === "service";
                   const isOwn     = !!(user?.id && user.id === listing.vendor?.id);
@@ -531,27 +437,36 @@ export default function VendorProfilePage() {
                 })}
               </div>
             )}
+          </>
+        )}
 
-            {/* Reviews (below grid) */}
-            {reviews.length > 0 && (
-              <section className="mt-14">
-                <h2 className="text-xl font-black text-stone-900 mb-6" style={SERIF}>Customer Reviews</h2>
+        {/* ── Reviews tab ── */}
+        {tab === "reviews" && (
+          <>
+            {reviews.length === 0 ? (
+              <div className="bg-stone-50 rounded-2xl p-16 text-center border border-stone-100">
+                <Star className="w-10 h-10 text-stone-200 mx-auto mb-3" />
+                <p className="text-stone-400 font-semibold text-sm">No reviews yet</p>
+              </div>
+            ) : (
+              <motion.div initial={{ opacity:0, y:8 }} animate={{ opacity:1, y:0 }} transition={{ duration:0.2 }}>
+                {/* Rating summary */}
                 <div className="flex flex-col sm:flex-row items-start gap-8 mb-8 p-6 bg-stone-50 rounded-2xl border border-stone-100">
                   <div className="flex-shrink-0 text-center">
-                    <p className="text-5xl font-black text-stone-900 leading-none">{vendorRating.toFixed(1)}</p>
+                    <p className="text-6xl font-black text-stone-900 leading-none">{vendorRating.toFixed(1)}</p>
                     <div className="flex gap-0.5 justify-center mt-2">
                       {[1,2,3,4,5].map(n => <Star key={n} className={`w-4 h-4 ${n<=Math.round(vendorRating)?"fill-amber-400 text-amber-400":"fill-stone-200 text-stone-200"}`} />)}
                     </div>
-                    <p className="text-xs text-stone-400 mt-1">{totalReviews} review{totalReviews!==1?"s":""}</p>
+                    <p className="text-xs text-stone-400 mt-1.5">{totalReviews} review{totalReviews!==1?"s":""}</p>
                   </div>
-                  <div className="flex-1 w-full space-y-1.5">
+                  <div className="flex-1 w-full space-y-2">
                     {ratingCounts.map(({ n, count }) => {
                       const pct = totalReviews > 0 ? Math.round((count/totalReviews)*100) : 0;
                       return (
-                        <div key={n} className="flex items-center gap-2.5">
-                          <span className="text-xs text-stone-500 w-4 text-right flex-shrink-0">{n}</span>
+                        <div key={n} className="flex items-center gap-3">
+                          <span className="text-xs text-stone-500 w-3 text-right flex-shrink-0">{n}</span>
                           <Star className="w-3 h-3 fill-amber-400 text-amber-400 flex-shrink-0" />
-                          <div className="flex-1 h-1.5 bg-stone-200 rounded-full overflow-hidden">
+                          <div className="flex-1 h-2 bg-stone-200 rounded-full overflow-hidden">
                             <div className="h-full bg-amber-400 rounded-full transition-all" style={{ width:`${pct}%` }} />
                           </div>
                           <span className="text-xs text-stone-400 w-5 flex-shrink-0">{count}</span>
@@ -560,17 +475,19 @@ export default function VendorProfilePage() {
                     })}
                   </div>
                 </div>
+
+                {/* Review cards */}
                 <div className="space-y-5">
                   {reviews.map((r: any) => (
                     <div key={r.id} className="pb-5 border-b border-stone-100 last:border-0 last:pb-0">
                       <div className="flex items-start justify-between gap-3 mb-2">
                         <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-full text-white text-sm font-bold flex items-center justify-center flex-shrink-0" style={{ background: GRAD }}>
+                          <div className="w-9 h-9 rounded-full text-white text-sm font-bold flex items-center justify-center flex-shrink-0" style={{ background: GRAD }}>
                             {(r.reviewer_username || "?")[0].toUpperCase()}
                           </div>
                           <div>
                             <p className="text-sm font-semibold text-stone-900">@{r.reviewer_username}</p>
-                            {r.listing_title && <p className="text-xs text-stone-400 truncate max-w-[180px]">{r.listing_title}</p>}
+                            {r.listing_title && <p className="text-xs text-stone-400 truncate max-w-[200px]">{r.listing_title}</p>}
                           </div>
                         </div>
                         <div className="flex items-center gap-2 flex-shrink-0">
@@ -580,23 +497,66 @@ export default function VendorProfilePage() {
                           <span className="text-xs text-stone-400">{new Date(r.created_at).toLocaleDateString("en-NG",{day:"numeric",month:"short",year:"numeric"})}</span>
                         </div>
                       </div>
-                      {r.comment && <p className="text-sm text-stone-500 leading-relaxed pl-10">{r.comment}</p>}
+                      {r.comment && <p className="text-sm text-stone-500 leading-relaxed pl-11">{r.comment}</p>}
                     </div>
                   ))}
                 </div>
-              </section>
+              </motion.div>
+            )}
+          </>
+        )}
+
+        {/* ── About tab ── */}
+        {tab === "about" && (
+          <motion.div initial={{ opacity:0, y:8 }} animate={{ opacity:1, y:0 }} transition={{ duration:0.2 }}
+            className="max-w-xl space-y-4">
+
+            {vendor.bio && (
+              <div className="bg-stone-50 rounded-2xl border border-stone-100 p-5">
+                <p className="text-teal-600 text-[10px] tracking-[0.18em] uppercase font-bold mb-2">About</p>
+                <p className="text-stone-600 text-sm leading-relaxed">{vendor.bio}</p>
+              </div>
             )}
 
-            {/* Mobile admin */}
+            {(availDays.length > 0 || vendor.opening_time) && (
+              <div className="bg-stone-50 rounded-2xl border border-stone-100 p-5">
+                <p className="text-teal-600 text-[10px] tracking-[0.18em] uppercase font-bold mb-3">Hours & Availability</p>
+                {availDays.length > 0 && (
+                  <div className="flex gap-1.5 flex-wrap mb-3">
+                    {DAYS.map(d => (
+                      <div key={d} className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold transition-colors ${
+                        isDayOpen(d) ? "bg-teal-500 text-white shadow-sm shadow-teal-200" : "bg-stone-100 text-stone-300"
+                      }`}>
+                        {DAY_LBL[d]}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {vendor.opening_time && vendor.closing_time && (
+                  <div className="flex items-center gap-1.5 text-sm text-stone-600 font-medium">
+                    <Clock className="w-4 h-4 text-teal-500 flex-shrink-0" />
+                    {vendor.opening_time} – {vendor.closing_time}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {vendor.school && (
+              <div className="bg-stone-50 rounded-2xl border border-stone-100 p-5">
+                <p className="text-teal-600 text-[10px] tracking-[0.18em] uppercase font-bold mb-2">School</p>
+                <p className="text-stone-700 font-semibold text-sm">{vendor.school.toUpperCase()}</p>
+              </div>
+            )}
+
+            {/* Admin section */}
             {isAdmin && (
-              <div className="lg:hidden mt-8 bg-purple-50 border border-purple-200 rounded-2xl p-5 space-y-3">
-                <div className="flex items-center gap-2">
-                  <Shield className="w-4 h-4 text-purple-600" />
-                  <p className="text-purple-700 text-xs tracking-[0.2em] uppercase font-semibold">Admin Controls</p>
+              <div className="bg-purple-50 rounded-2xl border border-purple-100 p-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <Shield className="w-4 h-4 text-purple-500" />
+                  <p className="text-purple-600 text-[10px] tracking-[0.18em] uppercase font-bold">Admin</p>
                 </div>
-                <div className="text-xs text-stone-600 space-y-1">
+                <div className="text-sm text-stone-600 space-y-1.5 mb-4">
                   {vendor.email     && <p><span className="font-semibold">Email:</span> {vendor.email}</p>}
-                  {vendor.school    && <p><span className="font-semibold">School:</span> {vendor.school.toUpperCase()}</p>}
                   {vendor.user_type && <p><span className="font-semibold">Type:</span> {vendor.user_type}</p>}
                   {vendor.is_active !== undefined && (
                     <p><span className="font-semibold">Status:</span>{" "}
@@ -608,20 +568,21 @@ export default function VendorProfilePage() {
                 </div>
                 <div className="flex gap-2">
                   <button onClick={() => setNotifyOpen(true)}
-                    className="flex-1 flex items-center justify-center gap-1 py-2.5 rounded-xl text-xs font-bold bg-purple-100 text-purple-700 hover:bg-purple-200 transition">
-                    <BellRing className="w-3 h-3" /> Notify
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-bold bg-purple-100 text-purple-700 hover:bg-purple-200 transition">
+                    <BellRing className="w-3.5 h-3.5" /> Notify
                   </button>
                   <button onClick={handleRevoke} disabled={!!adminLoading}
-                    className={`flex-1 flex items-center justify-center gap-1 py-2.5 rounded-xl text-xs font-bold transition disabled:opacity-50 ${confirmRevoke ? "bg-red-500 text-white" : "bg-red-100 text-red-700 hover:bg-red-200"}`}>
-                    <UserX className="w-3 h-3" />
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-bold transition disabled:opacity-50 ${confirmRevoke ? "bg-red-500 text-white" : "bg-red-100 text-red-700 hover:bg-red-200"}`}>
+                    <UserX className="w-3.5 h-3.5" />
                     {adminLoading === "revoke" ? "…" : confirmRevoke ? "Confirm?" : "Revoke"}
                   </button>
                 </div>
               </div>
             )}
 
-          </div>
-        </div>
+          </motion.div>
+        )}
+
       </div>
     </div>
   );
