@@ -75,6 +75,7 @@ export default function ChatRoomPage() {
   const [imageFile, setImageFile]         = useState<File | null>(null);
   const [imagePreview, setImagePreview]   = useState<string | null>(null);
   const [error, setError]                 = useState("");
+  const flash = (m: string) => { setError(m); setTimeout(() => setError(""), 2500); };
   const [actionMenu, setActionMenu]       = useState<ActionMenu | null>(null);
   const [editingId, setEditingId]         = useState<number | null>(null);
   const [editContent, setEditContent]     = useState("");
@@ -723,7 +724,8 @@ export default function ChatRoomPage() {
           </div>
 
           {/* Mic */}
-          <button className="w-11 h-11 rounded-full bg-stone-100 flex items-center justify-center text-stone-500 hover:bg-stone-200 transition active:scale-95 flex-shrink-0">
+          <button onClick={() => flash("Voice messages coming soon")}
+            className="w-11 h-11 rounded-full bg-stone-100 flex items-center justify-center text-stone-500 hover:bg-stone-200 transition active:scale-95 flex-shrink-0">
             <Mic className="w-5 h-5" />
           </button>
 

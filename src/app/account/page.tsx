@@ -2,9 +2,10 @@
 
 import {
   Package, Heart, Settings, HelpCircle, LogOut, ChevronRight,
-  Store, Clock, ArrowRight, Banknote, LayoutDashboard,
+  Store, Clock, Banknote, LayoutDashboard,
   Calendar, Gift, Bell, X, CheckCheck, ExternalLink, Camera,
-  Trash2, ZoomIn, Move, MessageCircle, ArrowUpRight
+  Trash2, ZoomIn, Move, MessageCircle, ArrowUpRight, Pencil,
+  ShieldCheck, KeyRound,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -16,49 +17,24 @@ import { api } from "@/lib/api";
 
 function VerifiedTick({ color, label }: { color: string; label: string }) {
   return (
-    <span
-      className="inline-flex items-center justify-center w-5 h-5 rounded-full flex-shrink-0"
-      style={{ background: color }}
-      title={label}
-    >
+    <span className="inline-flex items-center justify-center w-5 h-5 rounded-full flex-shrink-0" style={{ background: color }} title={label}>
       <svg viewBox="0 0 12 12" className="w-3 h-3" fill="none">
         <path d="M2.5 6L4.5 8.5L9.5 3.5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     </span>
   );
 }
+
 const POLL_INTERVAL = 30_000;
-
 const isApprovedVendor = (u: any) => !!u?.is_verified_vendor;
-const isPendingVendor = (u: any) =>
-  u?.vendor_application_pending || (u?.user_type === "vendor" && !u?.is_verified_vendor);
+const isPendingVendor  = (u: any) => u?.vendor_application_pending || (u?.user_type === "vendor" && !u?.is_verified_vendor);
 
-// ── Menu config ───────────────────────────────────────────────────────────────
-const MENU_ITEMS = [
-  { href: "/account/orders",         icon: Package,       label: "My Orders",        sub: "Track your purchases",       bg: "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)" },
-  { href: "/account/bookings",       icon: Calendar,      label: "My Bookings",      sub: "View upcoming appointments", bg: "linear-gradient(135deg, #0D9488 0%, #059669 100%)" },
-  { href: "/chat",                   icon: MessageCircle, label: "Messages",         sub: "Your conversations",         bg: GRAD },
-  { href: "/account/notifications",  icon: Bell,          label: "Notifications",    sub: "Your activity & alerts",     bg: "linear-gradient(135deg, #f59e0b 0%, #ef4444 100%)" },
-  { href: "/account/loyalty",        icon: Gift,          label: "Loyalty Rewards",  sub: "Points & exclusive deals",   bg: "linear-gradient(135deg, #10b981 0%, #059669 100%)" },
-  { href: "/wishlist",               icon: Heart,         label: "Wishlist",         sub: "Saved items",                bg: "linear-gradient(135deg, #ec4899 0%, #f43f5e 100%)" },
-  { href: "/account/address",        icon: Settings,      label: "Address Book",     sub: "Manage delivery addresses",  bg: "linear-gradient(135deg, #3b82f6 0%, #6366f1 100%)" },
-  { href: "/faq",                    icon: HelpCircle,    label: "Help & Support",   sub: "FAQs and contact",           bg: "linear-gradient(135deg, #14b8a6 0%, #0ea5e9 100%)" },
-];
-
-// ── Simple Canvas Crop Component ──────────────────────────────────────────────
-function CanvasCrop({
-  src,
-  onCrop,
-  onCancel,
-}: {
-  src: string;
-  onCrop: (blob: Blob) => void;
-  onCancel: () => void;
-}) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+/* ── CanvasCrop (unchanged) ─────────────────────────────────────────────── */
+function CanvasCrop({ src, onCrop, onCancel }: { src: string; onCrop: (blob: Blob) => void; onCancel: () => void }) {
+  const canvasRef  = useRef<HTMLCanvasElement>(null);
   const [img, setImg] = useState<HTMLImageElement | null>(null);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
-  const [scale, setScale] = useState(1);
+  const [scale, setScale]   = useState(1);
   const [dragging, setDragging] = useState(false);
   const dragStart = useRef({ x: 0, y: 0, ox: 0, oy: 0 });
   const SIZE = 280;
@@ -78,14 +54,9 @@ function CanvasCrop({
     if (!img || !canvasRef.current) return;
     const ctx = canvasRef.current.getContext("2d")!;
     ctx.clearRect(0, 0, SIZE, SIZE);
-    // Dimmed background
     ctx.drawImage(img, offset.x, offset.y, img.width * scale, img.height * scale);
-    ctx.fillStyle = "rgba(0,0,0,0.45)";
-    ctx.fillRect(0, 0, SIZE, SIZE);
-    // Clear the square crop area so it shows the image clearly
     ctx.clearRect(0, 0, SIZE, SIZE);
     ctx.drawImage(img, offset.x, offset.y, img.width * scale, img.height * scale);
-    // Square border
     ctx.strokeStyle = "rgba(255,255,255,0.8)";
     ctx.lineWidth = 2;
     ctx.strokeRect(1, 1, SIZE - 2, SIZE - 2);
@@ -93,10 +64,10 @@ function CanvasCrop({
 
   const onMouseDown = (e: React.MouseEvent) => { setDragging(true); dragStart.current = { x: e.clientX, y: e.clientY, ox: offset.x, oy: offset.y }; };
   const onMouseMove = (e: React.MouseEvent) => { if (!dragging) return; setOffset({ x: dragStart.current.ox + (e.clientX - dragStart.current.x), y: dragStart.current.oy + (e.clientY - dragStart.current.y) }); };
-  const onMouseUp = () => setDragging(false);
+  const onMouseUp   = () => setDragging(false);
   const onTouchStart = (e: React.TouchEvent) => { const t = e.touches[0]; setDragging(true); dragStart.current = { x: t.clientX, y: t.clientY, ox: offset.x, oy: offset.y }; };
-  const onTouchMove = (e: React.TouchEvent) => { if (!dragging) return; const t = e.touches[0]; setOffset({ x: dragStart.current.ox + (t.clientX - dragStart.current.x), y: dragStart.current.oy + (t.clientY - dragStart.current.y) }); };
-  const onTouchEnd = () => setDragging(false);
+  const onTouchMove  = (e: React.TouchEvent) => { if (!dragging) return; const t = e.touches[0]; setOffset({ x: dragStart.current.ox + (t.clientX - dragStart.current.x), y: dragStart.current.oy + (t.clientY - dragStart.current.y) }); };
+  const onTouchEnd   = () => setDragging(false);
 
   const handleDone = () => {
     if (!canvasRef.current || !img) return;
@@ -132,40 +103,71 @@ function CanvasCrop({
   );
 }
 
-// ── Main Page ─────────────────────────────────────────────────────────────────
+/* ── Row component ──────────────────────────────────────────────────────── */
+function Row({ href, icon: Icon, iconColor = "#0d9488", label, badge, toggle, onToggle, toggleLoading, last = false }: {
+  href?: string; icon: React.ElementType; iconColor?: string;
+  label: string; badge?: number; toggle?: boolean;
+  onToggle?: () => void; toggleLoading?: boolean; last?: boolean;
+}) {
+  const inner = (
+    <div className={`flex items-center gap-3.5 px-4 py-3.5 active:bg-stone-50 transition-colors ${!last ? "border-b border-stone-100" : ""}`}>
+      <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: iconColor + "18" }}>
+        <Icon className="w-4.5 h-4.5 flex-shrink-0" style={{ color: iconColor }} />
+      </div>
+      <p className="flex-1 text-sm font-medium text-stone-800">{label}</p>
+      {badge !== undefined && badge > 0 && (
+        <span className="bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 flex-shrink-0">
+          {badge > 99 ? "99+" : badge}
+        </span>
+      )}
+      {toggle !== undefined ? (
+        <button onClick={e => { e.preventDefault(); onToggle?.(); }} disabled={toggleLoading}
+          className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors duration-200 focus:outline-none disabled:opacity-50 ${toggle ? "bg-teal-500" : "bg-stone-300"}`}>
+          <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-200 ${toggle ? "translate-x-6" : "translate-x-1"}`} />
+        </button>
+      ) : (
+        <ChevronRight className="w-4 h-4 text-stone-300 flex-shrink-0" />
+      )}
+    </div>
+  );
+  if (href) return <Link href={href}>{inner}</Link>;
+  return <div>{inner}</div>;
+}
+
+/* ── Main Page ─────────────────────────────────────────────────────────── */
 export default function AccountPage() {
   const router = useRouter();
   const { user, isLoggedIn, isHydrated, logout } = useAuth();
 
-  const [loading, setLoading] = useState(true);
-  const [hasBankAccount, setHasBankAccount] = useState(false);
+  const [loading, setLoading]                 = useState(true);
+  const [hasBankAccount, setHasBankAccount]   = useState(false);
   const [pendingBookings, setPendingBookings] = useState(0);
-  const [unreadMessages, setUnreadMessages] = useState(0);
-  const [pendingOrders, setPendingOrders] = useState(0);
-  const [notifications, setNotifications] = useState<any[]>([]);
+  const [unreadMessages, setUnreadMessages]   = useState(0);
+  const [pendingOrders, setPendingOrders]     = useState(0);
+  const [notifications, setNotifications]     = useState<any[]>([]);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
-  const [showNotifications, setShowNotifications] = useState(false);
+  const [showNotifications, setShowNotifications]     = useState(false);
 
   const [profilePic, setProfilePic] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [toast, setToast] = useState("");
+  const [uploading, setUploading]   = useState(false);
+  const [toast, setToast]           = useState("");
 
   const [cropModalOpen, setCropModalOpen] = useState(false);
-  const [rawSrc, setRawSrc] = useState<string>("");
+  const [rawSrc, setRawSrc]               = useState<string>("");
   const [viewModalOpen, setViewModalOpen] = useState(false);
-  const [emailNotifs, setEmailNotifs] = useState<boolean>(true);
+  const [emailNotifs, setEmailNotifs]           = useState<boolean>(true);
   const [emailNotifsLoading, setEmailNotifsLoading] = useState(false);
-  const [selectedNotif, setSelectedNotif] = useState<any>(null);
+  const [selectedNotif, setSelectedNotif]   = useState<any>(null);
   const [showNotifDetail, setShowNotifDetail] = useState(false);
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const isNavigating = useRef(false);
-  const prevVendorStatus = useRef<boolean | null>(null);
-  const pollTimer = useRef<NodeJS.Timeout | null>(null);
+  const fileInputRef      = useRef<HTMLInputElement>(null);
+  const isNavigating      = useRef(false);
+  const prevVendorStatus  = useRef<boolean | null>(null);
+  const pollTimer         = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => { if (isHydrated && !isLoggedIn) router.push("/auth"); }, [isHydrated, isLoggedIn, router]);
   useEffect(() => { if (user?.profile_image) setProfilePic(user.profile_image); }, [user]);
-  useEffect(() => { if (user?.profile?.email_notifications !== undefined) setEmailNotifs(user.profile.email_notifications); }, [user]);
+  useEffect(() => { if (user?.profile?.email_notifications !== undefined) setEmailNotifs(!!user.profile.email_notifications); }, [user]);
 
   const showToast = (msg: string, duration = 3000) => { setToast(msg); setTimeout(() => setToast(""), duration); };
 
@@ -292,30 +294,23 @@ export default function AccountPage() {
 
   if (!isHydrated || loading) {
     return (
-      <div className="min-h-screen bg-[#F5F5F5] flex items-center justify-center">
+      <div className="min-h-screen bg-[#F4F5F7] flex items-center justify-center">
         <div className="w-10 h-10 border-4 border-stone-200 border-t-teal-500 rounded-full animate-spin" />
       </div>
     );
   }
 
-  const currentUser = useAuth.getState().user ?? user;
+  const currentUser    = useAuth.getState().user ?? user;
   const vendorApproved = isApprovedVendor(currentUser);
-  const vendorPending = isPendingVendor(currentUser);
-  const isAdmin = currentUser?.email === "studex.ng@gmail.com";
-  const initials = (currentUser?.username?.[0] || currentUser?.email?.[0] || "U").toUpperCase();
+  const vendorPending  = isPendingVendor(currentUser);
+  const isAdmin        = currentUser?.email === "studex.ng@gmail.com";
+  const initials       = (currentUser?.username?.[0] || currentUser?.email?.[0] || "U").toUpperCase();
+  const pic            = profilePic ?? user?.profile_image;
 
-  const menuItems = MENU_ITEMS.map(item => ({
-    ...item,
-    badge: item.href === "/account/orders" ? pendingOrders
-         : item.href === "/account/bookings" && !vendorApproved ? pendingBookings
-         : item.href === "/chat" ? unreadMessages
-         : item.href === "/account/notifications" ? unreadNotifications
-         : 0,
-  }));
-
+  /* ══════════════════════════════════════════════════════════════════════ */
   return (
     <>
-      {/* ── TOAST ── */}
+      {/* Toast */}
       <AnimatePresence>
         {toast && (
           <motion.div initial={{ y: -50, opacity: 0 }} animate={{ y: 60, opacity: 1 }} exit={{ opacity: 0 }}
@@ -329,18 +324,18 @@ export default function AccountPage() {
 
       <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileSelect} />
 
-      {/* ── NOTIFICATION DETAIL MODAL ── */}
+      {/* Notification detail modal */}
       <AnimatePresence>
         {showNotifDetail && selectedNotif && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9999] flex items-center justify-center px-4 pb-24 pt-4 sm:p-4"
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9999] flex items-center justify-center px-4 pb-24 pt-4"
             onClick={() => setShowNotifDetail(false)}>
             <motion.div initial={{ scale: 0.92, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.92, opacity: 0 }}
               className="bg-white rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
               <div className="flex items-center justify-between px-5 py-4 border-b border-stone-100">
                 <div className="flex items-center gap-2">
                   <span className="text-xl">{getNotifIcon(selectedNotif.type)}</span>
-                  <h3 className="font-bold text-stone-900 text-sm" style={SERIF}>{selectedNotif.title}</h3>
+                  <h3 className="font-bold text-stone-900 text-sm">{selectedNotif.title}</h3>
                 </div>
                 <button onClick={() => setShowNotifDetail(false)} className="w-8 h-8 rounded-full bg-stone-100 flex items-center justify-center text-stone-500 hover:bg-stone-200 transition">
                   <X className="w-4 h-4" />
@@ -365,7 +360,7 @@ export default function AccountPage() {
         )}
       </AnimatePresence>
 
-      {/* ── CROP MODAL ── */}
+      {/* Crop modal */}
       <AnimatePresence>
         {cropModalOpen && rawSrc && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -373,7 +368,7 @@ export default function AccountPage() {
             <motion.div initial={{ scale: 0.92, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.92, opacity: 0 }}
               className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl">
               <div className="flex items-center justify-between px-5 py-4 border-b border-stone-100">
-                <h3 className="font-bold text-stone-900" style={SERIF}>Adjust Photo</h3>
+                <h3 className="font-bold text-stone-900">Adjust Photo</h3>
                 <button onClick={() => { setCropModalOpen(false); setRawSrc(""); }} className="w-8 h-8 rounded-full bg-stone-100 flex items-center justify-center text-stone-500 hover:bg-stone-200 transition">
                   <X className="w-4 h-4" />
                 </button>
@@ -386,7 +381,7 @@ export default function AccountPage() {
         )}
       </AnimatePresence>
 
-      {/* ── VIEW MODAL ── */}
+      {/* View modal */}
       <AnimatePresence>
         {viewModalOpen && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -395,9 +390,8 @@ export default function AccountPage() {
             <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
               className="w-full max-w-xs" onClick={e => e.stopPropagation()}>
               <div className="w-64 h-64 mx-auto rounded-2xl overflow-hidden shadow-2xl ring-4 ring-white/20">
-                {(profilePic ?? user?.profile_image) ? <img src={(profilePic ?? user?.profile_image)!} alt="Profile" className="w-full h-full object-cover block" /> : (
-                  <div className="w-full h-full flex items-center justify-center text-white text-6xl font-bold" style={{ background: GRAD }}>{initials}</div>
-                )}
+                {pic ? <img src={pic} alt="Profile" className="w-full h-full object-cover block" />
+                     : <div className="w-full h-full flex items-center justify-center text-white text-6xl font-bold" style={{ background: GRAD }}>{initials}</div>}
               </div>
               <div className="flex gap-3 mt-6 justify-center flex-wrap">
                 <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
@@ -405,7 +399,7 @@ export default function AccountPage() {
                   className="px-6 py-3 rounded-full text-white text-sm font-semibold shadow-lg flex items-center gap-2" style={{ background: GRAD }}>
                   <Camera className="w-4 h-4" /> Change Photo
                 </motion.button>
-                {profilePic && (
+                {pic && (
                   <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} onClick={handleDeletePic}
                     className="px-6 py-3 rounded-full bg-white text-red-500 text-sm font-semibold shadow-lg border border-red-100 flex items-center gap-2">
                     <Trash2 className="w-4 h-4" /> Remove
@@ -418,303 +412,215 @@ export default function AccountPage() {
         )}
       </AnimatePresence>
 
-      <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+      {/* ══════════ PAGE ══════════ */}
+      <div className="min-h-screen bg-[#F4F5F7]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
 
-        {/* ── STICKY HEADER ── */}
-        <div className="sticky top-0 bg-white z-40 border-b border-stone-200 shadow-sm">
-          <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-4">
-            <Link href="/home" className="flex items-center gap-2 flex-shrink-0">
-              <div className="w-9 h-9 rounded-xl overflow-hidden border border-stone-100 shadow-sm flex items-center justify-center p-1 bg-white">
-                <img src="/images/logo-1.jpg" alt="StudEx" loading="lazy" className="w-full h-full object-contain" />
-              </div>
-              <span className="font-black text-lg text-stone-900 hidden sm:block" style={SERIF}>
-                Stud<span className="text-transparent bg-clip-text" style={{ backgroundImage: GRAD }}>Ex</span>
-              </span>
-            </Link>
-            <nav className="hidden lg:flex items-center gap-6 flex-shrink-0">
-              <Link href="/home" className="text-sm font-medium text-stone-500 hover:text-stone-700 transition">New Arrivals</Link>
-              <Link href="/categories" className="text-sm font-medium text-stone-500 hover:text-stone-700 transition">Services</Link>
-              <Link href="/home" className="text-sm font-medium text-stone-500 hover:text-stone-700 transition">Vendors</Link>
-            </nav>
-            <div className="flex-1" />
-            <div className="relative">
-                <button onClick={() => setShowNotifications(v => !v)}
-                  className="relative w-9 h-9 bg-stone-100 hover:bg-stone-200 rounded-full flex items-center justify-center transition-colors">
-                  <Bell className="w-4 h-4 text-stone-600" />
-                  {unreadNotifications > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-1">
-                      {unreadNotifications > 99 ? "99+" : unreadNotifications}
-                    </span>
-                  )}
-                </button>
-                <AnimatePresence>
-                  {showNotifications && (
-                    <motion.div initial={{ opacity: 0, y: -8, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
-                      className="absolute right-0 top-12 w-80 bg-white rounded-2xl shadow-xl border border-stone-100 z-50 overflow-hidden">
-                      <div className="flex items-center justify-between p-4 border-b border-stone-100">
-                        <h3 className="font-bold text-stone-900 text-sm" style={SERIF}>Notifications</h3>
-                        <div className="flex items-center gap-2">
-                          {unreadNotifications > 0 && (
-                            <button onClick={markAllRead} className="text-xs text-teal-600 hover:underline flex items-center gap-1">
-                              <CheckCheck className="w-3 h-3" /> Mark all read
-                            </button>
-                          )}
-                          <button onClick={() => setShowNotifications(false)} className="text-stone-400 hover:text-stone-600"><X className="w-4 h-4" /></button>
-                        </div>
-                      </div>
-                      <div className="max-h-80 overflow-y-auto">
-                        {notifications.length === 0 ? (
-                          <div className="p-6 text-center text-stone-400 text-sm">No notifications yet</div>
-                        ) : notifications.map((n: any) => (
-                          <div key={n.id} onClick={() => handleNotifClick(n)}
-                            className={`p-4 border-b border-stone-50 last:border-0 cursor-pointer hover:bg-stone-50 transition ${!n.is_read ? "bg-teal-50/50" : ""}`}>
-                            <div className="flex items-start gap-3">
-                              <span className="text-base flex-shrink-0 mt-0.5">{getNotifIcon(n.type)}</span>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center justify-between gap-2">
-                                  <p className="font-semibold text-sm text-stone-900 truncate">{n.title}</p>
-                                  {!n.is_read && <span className="w-2 h-2 bg-teal-500 rounded-full flex-shrink-0" />}
-                                </div>
-                                <p className="text-xs text-stone-500 mt-0.5 line-clamp-2">{n.message}</p>
-                                <div className="flex items-center justify-between mt-1">
-                                  <p className="text-xs text-stone-400">{new Date(n.created_at).toLocaleDateString("en-NG", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</p>
-                                  {n.action_url && <span className="text-xs text-teal-600 flex items-center gap-0.5">View <ExternalLink className="w-3 h-3" /></span>}
-                                </div>
+        {/* ── HEADER ── */}
+        <div className="bg-[#F4F5F7] px-4 pt-5 pb-2 flex items-center justify-between">
+          <Link href="/home">
+            <button className="w-9 h-9 rounded-full bg-white shadow-sm flex items-center justify-center">
+              <svg className="w-4 h-4 text-stone-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+          </Link>
+          <h1 className="text-base font-bold text-stone-900">Profile & Settings</h1>
+          <div className="relative">
+            <button onClick={() => setShowNotifications(v => !v)}
+              className="w-9 h-9 bg-white shadow-sm rounded-full flex items-center justify-center">
+              <Bell className="w-4 h-4 text-stone-600" />
+              {unreadNotifications > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-bold rounded-full min-w-[15px] h-[15px] flex items-center justify-center px-0.5">
+                  {unreadNotifications > 9 ? "9+" : unreadNotifications}
+                </span>
+              )}
+            </button>
+            <AnimatePresence>
+              {showNotifications && (
+                <motion.div initial={{ opacity: 0, y: -8, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
+                  className="absolute right-0 top-12 w-80 bg-white rounded-2xl shadow-xl border border-stone-100 z-50 overflow-hidden">
+                  <div className="flex items-center justify-between p-4 border-b border-stone-100">
+                    <h3 className="font-bold text-stone-900 text-sm">Notifications</h3>
+                    <div className="flex items-center gap-2">
+                      {unreadNotifications > 0 && (
+                        <button onClick={markAllRead} className="text-xs text-teal-600 hover:underline flex items-center gap-1">
+                          <CheckCheck className="w-3 h-3" /> Mark all read
+                        </button>
+                      )}
+                      <button onClick={() => setShowNotifications(false)} className="text-stone-400 hover:text-stone-600"><X className="w-4 h-4" /></button>
+                    </div>
+                  </div>
+                  <div className="max-h-72 overflow-y-auto">
+                    {notifications.length === 0
+                      ? <div className="p-6 text-center text-stone-400 text-sm">No notifications yet</div>
+                      : notifications.map((n: any) => (
+                        <div key={n.id} onClick={() => handleNotifClick(n)}
+                          className={`p-4 border-b border-stone-50 last:border-0 cursor-pointer hover:bg-stone-50 transition ${!n.is_read ? "bg-teal-50/50" : ""}`}>
+                          <div className="flex items-start gap-3">
+                            <span className="text-base flex-shrink-0 mt-0.5">{getNotifIcon(n.type)}</span>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between gap-2">
+                                <p className="font-semibold text-sm text-stone-900 truncate">{n.title}</p>
+                                {!n.is_read && <span className="w-2 h-2 bg-teal-500 rounded-full flex-shrink-0" />}
+                              </div>
+                              <p className="text-xs text-stone-500 mt-0.5 line-clamp-2">{n.message}</p>
+                              <div className="flex items-center justify-between mt-1">
+                                <p className="text-xs text-stone-400">{new Date(n.created_at).toLocaleDateString("en-NG", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</p>
+                                {n.action_url && <span className="text-xs text-teal-600 flex items-center gap-0.5">View <ExternalLink className="w-3 h-3" /></span>}
                               </div>
                             </div>
                           </div>
-                        ))}
+                        </div>
+                      ))
+                    }
+                  </div>
+                  <div className="border-t border-stone-100">
+                    <Link href="/account/notifications" onClick={() => setShowNotifications(false)}>
+                      <div className="flex items-center justify-center gap-1.5 py-3 text-xs font-semibold text-teal-600 hover:bg-teal-50 transition">
+                        See all <ArrowUpRight className="w-3 h-3" />
                       </div>
-                      <div className="border-t border-stone-100">
-                        <Link href="/account/notifications" onClick={() => setShowNotifications(false)}>
-                          <div className="flex items-center justify-center gap-1.5 py-3 text-xs font-semibold text-teal-600 hover:bg-teal-50 transition">
-                            See all notifications <ArrowUpRight className="w-3 h-3" />
-                          </div>
-                        </Link>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-            </div>
+                    </Link>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </div>
 
-        <div className="px-4 pt-6 pb-32 max-w-6xl mx-auto space-y-6">
+        <div className="px-4 pb-32 max-w-lg mx-auto space-y-1">
 
-          {/* ── PROFILE CARD — full width ── */}
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-            className="bg-white border border-stone-200 rounded-2xl shadow-sm relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-48 h-48 rounded-full bg-teal-50/80 blur-3xl pointer-events-none" />
-            <div className="absolute bottom-0 left-0 w-48 h-48 rounded-full bg-purple-50/80 blur-3xl pointer-events-none" />
-            <div className="relative z-10 flex flex-col sm:flex-row sm:items-center gap-6 p-6">
-              <div className="relative flex-shrink-0 self-center sm:self-auto">
-                <motion.button whileTap={{ scale: 0.96 }} onClick={() => setViewModalOpen(true)} className="relative block">
-                  <div className="w-24 h-24 rounded-full overflow-hidden shadow-md ring-2 ring-stone-100">
-                    {uploading ? (
-                      <div className="w-full h-full flex items-center justify-center" style={{ background: GRAD }}>
-                        <div className="w-6 h-6 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                      </div>
-                    ) : (profilePic ?? user?.profile_image) ? (
-                      <img src={(profilePic ?? user?.profile_image)!} alt="Profile" className="w-full h-full object-cover block" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-white text-3xl font-bold" style={{ background: GRAD }}>{initials}</div>
-                    )}
-                  </div>
-                  <div className="absolute inset-0 rounded-full bg-black/0 hover:bg-black/20 transition-colors flex items-center justify-center group">
-                    <ZoomIn className="w-5 h-5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-                  </div>
-                </motion.button>
-                <motion.button whileTap={{ scale: 0.9 }} onClick={() => fileInputRef.current?.click()} disabled={uploading}
-                  className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full border-2 border-white shadow-md flex items-center justify-center"
-                  style={{ background: GRAD }}>
-                  <Camera className="w-3 h-3 text-white" />
-                </motion.button>
-              </div>
-              <div className="flex-1 min-w-0 text-center sm:text-left">
-                <div className="flex items-center gap-1.5 justify-center sm:justify-start">
-                  <h2 className="text-2xl font-black italic tracking-tight uppercase text-stone-900 pr-1"
-                    style={{ fontFamily: "var(--font-jakarta), 'Plus Jakarta Sans', sans-serif" }}>
-                    {currentUser?.username || "Campus User"}
-                  </h2>
-                  {isAdmin && <VerifiedTick color="#F59E0B" label="StudEx Administrator" />}
-                  {!isAdmin && vendorApproved && <VerifiedTick color="#10b981" label="Verified Vendor" />}
-                </div>
-                <p className="text-sm text-stone-400 mt-0.5 truncate">{currentUser?.email}</p>
-                <div className="mt-2 flex flex-wrap gap-2 justify-center sm:justify-start">
-                  {vendorPending && <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">⏳ Pending Approval</span>}
-                </div>
-                <button onClick={() => setViewModalOpen(true)} className="mt-2 text-xs text-teal-600 hover:underline font-medium">
-                  {uploading ? "Uploading..." : "View / change photo"}
-                </button>
-              </div>
-            </div>
-          </motion.div>
-
-          {/* ── TWO-COLUMN BODY ── */}
-          <div className="lg:grid lg:grid-cols-[1fr_300px] lg:gap-10 lg:items-start">
-
-            {/* ── LEFT: section label + menu grid ── */}
-            <div className="space-y-4">
-              <div>
-                <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-bold mb-1">Quick Access</p>
-                <h2 className="text-2xl font-black italic tracking-tighter uppercase text-stone-900"
-                  style={{ fontFamily: "var(--font-jakarta), 'Plus Jakarta Sans', sans-serif" }}>Your Space</h2>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {menuItems.map((item, i) => (
-                  <motion.div key={item.href} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 + i * 0.06 }}>
-                    <Link href={item.href}>
-                      <motion.div whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }}
-                        className="bg-white border border-stone-200 hover:border-teal-300 rounded-2xl p-4 flex items-center justify-between shadow-sm hover:shadow-md transition-all h-full">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm" style={{ background: item.bg }}>
-                            <item.icon className="w-4 h-4 text-white" />
-                          </div>
-                          <div>
-                            <p className="font-bold text-stone-900 text-sm">{item.label}</p>
-                            <p className="text-xs text-stone-400">{item.sub}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {(item as any).badge > 0 && (
-                            <span className="bg-red-500 text-white text-xs font-bold rounded-full min-w-[18px] h-5 flex items-center justify-center px-1.5">
-                              {(item as any).badge > 99 ? "99+" : (item as any).badge}
-                            </span>
-                          )}
-                          <ChevronRight className="w-4 h-4 text-stone-300" />
-                        </div>
-                      </motion.div>
-                    </Link>
-                  </motion.div>
-                ))}
-              </div>
-            </div>
-
-            {/* ── RIGHT SIDEBAR: vendor cards + CTA + logout ── */}
-            <div className="mt-4 lg:mt-0 lg:pt-[68px] space-y-4 lg:sticky lg:top-[72px]">
-
-              {vendorApproved && (
-                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}>
-                  <Link href="/vendor/dashboard">
-                    <motion.div whileHover={{ y: -2 }} whileTap={{ scale: 0.98 }}
-                      className="flex items-center justify-between p-4 rounded-2xl shadow-sm border cursor-pointer"
-                      style={{ background: GRAD, borderColor: "rgba(255,255,255,0.15)" }}>
-                      <div className="flex items-center gap-3">
-                        <div className="w-11 h-11 rounded-xl flex items-center justify-center shadow-md bg-white/20">
-                          <LayoutDashboard className="w-5 h-5 text-white" />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <p className="font-black italic tracking-tight uppercase text-white text-sm"
-                              style={{ fontFamily: "var(--font-jakarta), 'Plus Jakarta Sans', sans-serif" }}>Vendor Hub</p>
-                            {(unreadMessages > 0 || pendingBookings > 0) && (
-                              <span className="bg-red-500 text-white text-xs font-bold rounded-full min-w-[18px] h-4 flex items-center justify-center px-1">
-                                {unreadMessages + pendingBookings}
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-xs text-white/80">Messages, bookings, earnings & listings</p>
-                        </div>
-                      </div>
-                      <ChevronRight className="w-5 h-5 text-white/60" />
-                    </motion.div>
-                  </Link>
-                </motion.div>
-              )}
-
-              {vendorApproved && (
-                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
-                  className={`rounded-2xl p-4 border ${hasBankAccount ? "bg-teal-50 border-teal-200" : "bg-amber-50 border-amber-200"}`}>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3 flex-1">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${hasBankAccount ? "bg-teal-100" : "bg-amber-100"}`}>
-                        <Banknote className={`w-5 h-5 ${hasBankAccount ? "text-teal-600" : "text-amber-600"}`} />
-                      </div>
-                      <div>
-                        <p className={`font-semibold text-sm ${hasBankAccount ? "text-teal-800" : "text-amber-800"}`}>
-                          {hasBankAccount ? "Payout Account Set" : "Payout Account Required"}
-                        </p>
-                        <p className={`text-xs ${hasBankAccount ? "text-teal-600" : "text-amber-600"}`}>
-                          {hasBankAccount ? "Your earnings will be sent here" : "Add your bank account to receive payments"}
-                        </p>
-                      </div>
+          {/* ── PROFILE ROW ── */}
+          <div className="bg-white rounded-2xl px-4 py-4 flex items-center gap-3 mt-3 shadow-sm">
+            <motion.button whileTap={{ scale: 0.95 }} onClick={() => setViewModalOpen(true)} className="relative flex-shrink-0">
+              <div className="w-14 h-14 rounded-full overflow-hidden ring-2 ring-stone-100 shadow-sm">
+                {uploading
+                  ? <div className="w-full h-full flex items-center justify-center" style={{ background: GRAD }}>
+                      <div className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
                     </div>
-                    <Link href="/account/bank-account">
-                      <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
-                        className="px-4 py-2 rounded-full text-xs font-semibold text-white shadow-sm" style={{ background: GRAD }}>
-                        {hasBankAccount ? "Update" : "Add"}
-                      </motion.button>
-                    </Link>
-                  </div>
-                </motion.div>
-              )}
+                  : pic
+                    ? <img src={pic} alt="Profile" className="w-full h-full object-cover" />
+                    : <div className="w-full h-full flex items-center justify-center text-white text-xl font-bold" style={{ background: GRAD }}>{initials}</div>
+                }
+              </div>
+              <div className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full border-2 border-white shadow flex items-center justify-center" style={{ background: "#0d9488" }}>
+                <Camera className="w-2.5 h-2.5 text-white" />
+              </div>
+            </motion.button>
 
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <p className="font-bold text-stone-900 text-base leading-tight">{currentUser?.username || "Campus User"}</p>
+                {isAdmin && <VerifiedTick color="#F59E0B" label="StudEx Administrator" />}
+                {!isAdmin && vendorApproved && <VerifiedTick color="#10b981" label="Verified Vendor" />}
+              </div>
+              <p className="text-xs text-stone-400 truncate mt-0.5">{currentUser?.email}</p>
               {vendorPending && (
-                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
-                  className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center gap-3">
-                  <Clock className="w-8 h-8 text-amber-500 flex-shrink-0 animate-pulse" />
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 mt-1 inline-block">⏳ Pending Approval</span>
+              )}
+            </div>
+
+            <button onClick={() => setViewModalOpen(true)} className="w-9 h-9 rounded-full bg-stone-100 flex items-center justify-center flex-shrink-0 hover:bg-stone-200 transition">
+              <Pencil className="w-4 h-4 text-stone-500" />
+            </button>
+          </div>
+
+          {/* ── VENDOR / PLAN CARD ── */}
+          {vendorApproved ? (
+            <Link href="/vendor/dashboard">
+              <motion.div whileTap={{ scale: 0.98 }}
+                className="relative rounded-2xl p-5 overflow-hidden shadow-md mt-4"
+                style={{ background: "linear-gradient(135deg, #0d9488 0%, #0f766e 100%)" }}>
+                <div className="absolute top-0 right-0 w-28 h-28 rounded-full bg-white/10 blur-2xl pointer-events-none" />
+                <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="font-semibold text-amber-800 text-sm">Vendor Application Pending</p>
-                    <p className="text-xs text-amber-600 mt-0.5">We're reviewing your application. You'll be notified once approved!</p>
-                  </div>
-                </motion.div>
-              )}
-
-              {!vendorApproved && !vendorPending && (
-                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}>
-                  <div className="relative rounded-2xl p-5 overflow-hidden shadow-md" style={{ background: GRAD }}>
-                    <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-white/10 blur-2xl pointer-events-none" />
-                    <div className="absolute bottom-0 left-0 w-32 h-32 rounded-full bg-white/10 blur-2xl pointer-events-none" />
-                    <div className="relative z-10 flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-11 h-11 rounded-xl flex items-center justify-center bg-white/20 border border-white/20">
-                          <Store className="w-5 h-5 text-white" />
-                        </div>
-                        <div>
-                          <p className="font-black italic tracking-tight uppercase text-white text-sm"
-                            style={{ fontFamily: "var(--font-jakarta), 'Plus Jakarta Sans', sans-serif" }}>Become a Vendor</p>
-                          <p className="text-xs text-white/80">Earn on campus. List now.</p>
-                        </div>
-                      </div>
-                      <Link href="/vendor/apply">
-                        <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
-                          className="px-4 py-2 bg-white text-stone-900 rounded-full text-xs font-semibold shadow-sm flex items-center gap-1.5">
-                          Start <ArrowRight className="w-3.5 h-3.5" />
-                        </motion.button>
-                      </Link>
+                    <div className="flex items-center gap-2 mb-1">
+                      <p className="font-black text-white text-lg leading-tight" style={SERIF}>StudEx</p>
+                      <span className="bg-white/20 text-white text-[10px] font-bold px-2 py-0.5 rounded-full border border-white/30">VENDOR</span>
                     </div>
+                    <p className="text-white/80 text-xs leading-relaxed">Manage your listings, bookings, and earnings all in one place.</p>
                   </div>
-                </motion.div>
-              )}
-
-              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.55 }}
-                className="bg-white border border-stone-200 rounded-2xl p-4 shadow-sm">
-                <p className="text-xs font-semibold text-stone-500 uppercase tracking-wide mb-3">Notification Preferences</p>
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold text-stone-800">Email Notifications</p>
-                    <p className="text-xs text-stone-400 mt-0.5">Order updates, alerts &amp; announcements</p>
-                  </div>
-                  <button
-                    onClick={handleEmailNotifsToggle}
-                    disabled={emailNotifsLoading}
-                    aria-label={emailNotifs ? "Disable email notifications" : "Enable email notifications"}
-                    className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors duration-200 focus:outline-none disabled:opacity-50 ${emailNotifs ? "bg-teal-500" : "bg-stone-300"}`}
-                  >
-                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-200 ${emailNotifs ? "translate-x-6" : "translate-x-1"}`} />
-                  </button>
+                  <ShieldCheck className="w-10 h-10 text-white/40 flex-shrink-0 mt-0.5" />
+                </div>
+                <div className="mt-4 bg-white/15 rounded-xl py-2.5 text-center">
+                  <p className="text-white text-sm font-semibold">Go to Vendor Dashboard →</p>
                 </div>
               </motion.div>
-
-              <motion.button initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }}
-                whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={handleLogout}
-                className="w-full py-4 bg-white border border-red-100 hover:border-red-300 text-red-500 hover:text-red-600 rounded-2xl font-semibold text-sm shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-2">
-                <LogOut className="w-4 h-4" />
-                Log Out
-              </motion.button>
-
+            </Link>
+          ) : vendorPending ? (
+            <div className="relative rounded-2xl p-5 overflow-hidden shadow-sm mt-4 bg-amber-50 border border-amber-200">
+              <div className="flex items-center gap-3">
+                <Clock className="w-9 h-9 text-amber-400 flex-shrink-0 animate-pulse" />
+                <div>
+                  <p className="font-bold text-amber-800 text-sm">Application Under Review</p>
+                  <p className="text-xs text-amber-600 mt-0.5">We're reviewing your vendor application. You'll be notified once approved.</p>
+                </div>
+              </div>
             </div>
+          ) : (
+            <div className="relative rounded-2xl p-5 overflow-hidden shadow-md mt-4" style={{ background: "linear-gradient(135deg, #0d9488 0%, #0f766e 100%)" }}>
+              <div className="absolute top-0 right-0 w-28 h-28 rounded-full bg-white/10 blur-2xl pointer-events-none" />
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <p className="font-black text-white text-lg leading-tight" style={SERIF}>StudEx</p>
+                    <span className="bg-white/20 text-white text-[10px] font-bold px-2 py-0.5 rounded-full border border-white/30">VENDOR</span>
+                  </div>
+                  <p className="text-white/80 text-xs leading-relaxed">Sell on campus. Earn from your skills, products & services.</p>
+                </div>
+                <Store className="w-10 h-10 text-white/40 flex-shrink-0 mt-0.5" />
+              </div>
+              <Link href="/vendor/apply">
+                <div className="mt-4 bg-white rounded-xl py-2.5 text-center">
+                  <p className="text-stone-800 text-sm font-semibold">Apply to become a vendor</p>
+                </div>
+              </Link>
+            </div>
+          )}
+
+          {/* ── SECTION: My Account ── */}
+          <p className="text-xs font-semibold text-stone-500 pt-5 pb-2 px-1">My Account</p>
+          <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
+            <Row href="/account/orders"        icon={Package}       iconColor="#6366f1" label="My Orders"       badge={pendingOrders} />
+            <Row href="/account/bookings"       icon={Calendar}      iconColor="#0d9488" label="My Bookings"     badge={vendorApproved ? 0 : pendingBookings} />
+            <Row href="/chat"                   icon={MessageCircle} iconColor="#0d9488" label="Messages"        badge={unreadMessages} />
+            <Row href="/account/notifications"  icon={Bell}          iconColor="#f59e0b" label="Notifications"   badge={unreadNotifications} />
+            <Row href="/account/loyalty"        icon={Gift}          iconColor="#10b981" label="Loyalty Rewards" />
+            <Row href="/wishlist"               icon={Heart}         iconColor="#ec4899" label="Wishlist"        last />
           </div>
+
+          {/* ── SECTION: Vendor (if approved) ── */}
+          {vendorApproved && (
+            <>
+              <p className="text-xs font-semibold text-stone-500 pt-5 pb-2 px-1">Vendor Tools</p>
+              <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
+                <Row href="/vendor/dashboard"   icon={LayoutDashboard} iconColor="#0d9488" label="Vendor Dashboard" />
+                <Row href="/account/bank-account" icon={Banknote}       iconColor={hasBankAccount ? "#10b981" : "#f59e0b"} label={hasBankAccount ? "Payout Account" : "Add Payout Account"} last />
+              </div>
+            </>
+          )}
+
+          {/* ── SECTION: Settings ── */}
+          <p className="text-xs font-semibold text-stone-500 pt-5 pb-2 px-1">Settings</p>
+          <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
+            <Row href="/account/address"        icon={Settings}  iconColor="#3b82f6" label="Address Book" />
+            <Row href="/account/change-password" icon={KeyRound} iconColor="#8b5cf6" label="Change Password" />
+            <Row icon={Bell} iconColor="#0d9488" label="Email Notifications"
+              toggle={emailNotifs} onToggle={handleEmailNotifsToggle} toggleLoading={emailNotifsLoading} last />
+          </div>
+
+          {/* ── SECTION: Support ── */}
+          <p className="text-xs font-semibold text-stone-500 pt-5 pb-2 px-1">Help & Support</p>
+          <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
+            <Row href="/faq" icon={HelpCircle} iconColor="#14b8a6" label="FAQs & Help Center" last />
+          </div>
+
+          {/* ── LOGOUT ── */}
+          <motion.button whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}
+            onClick={handleLogout}
+            className="w-full mt-5 py-3.5 bg-white border border-red-100 hover:border-red-200 text-red-500 rounded-2xl font-semibold text-sm shadow-sm hover:shadow transition-all flex items-center justify-center gap-2">
+            <LogOut className="w-4 h-4" />
+            Log Out
+          </motion.button>
 
         </div>
       </div>
