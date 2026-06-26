@@ -63,7 +63,7 @@ export default function VendorOverviewPage() {
         .then(r => r.ok ? r.json() : [])
         .then(d => Array.isArray(d) ? d : (d.results || []))
         .catch(() => []),
-      api.services.listingsAuth({ page_size: "100" })
+      api.services.listingsAuth({ vendor_username: user.username, page_size: "100" })
         .then(r => r.ok ? r.json() : [])
         .then(d => Array.isArray(d) ? d : (d.results || []))
         .catch(() => []),

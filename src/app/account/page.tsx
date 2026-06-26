@@ -134,6 +134,28 @@ function Row({ href, icon: Icon, iconColor = "#0d9488", label, badge, toggle, on
   return <div>{inner}</div>;
 }
 
+/* ── SidebarNavItem (desktop account sidebar) ───────────────────────── */
+function SidebarNavItem({ href, icon: Icon, iconColor = "#0d9488", label, badge }: {
+  href: string; icon: React.ElementType; iconColor?: string; label: string; badge?: number;
+}) {
+  return (
+    <Link href={href}>
+      <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-stone-50 transition-colors group">
+        <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: iconColor + "18" }}>
+          <Icon className="w-4 h-4 flex-shrink-0" style={{ color: iconColor }} />
+        </div>
+        <span className="flex-1 text-sm font-medium text-stone-700 group-hover:text-stone-900 truncate">{label}</span>
+        {badge !== undefined && badge > 0 && (
+          <span className="bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 flex-shrink-0">
+            {badge > 99 ? "99+" : badge}
+          </span>
+        )}
+        <ChevronRight className="w-3.5 h-3.5 text-stone-300 flex-shrink-0 group-hover:text-stone-500" />
+      </div>
+    </Link>
+  );
+}
+
 /* ── Main Page ─────────────────────────────────────────────────────────── */
 export default function AccountPage() {
   const router = useRouter();
@@ -412,8 +434,8 @@ export default function AccountPage() {
         )}
       </AnimatePresence>
 
-      {/* ══════════ PAGE ══════════ */}
-      <div className="min-h-screen bg-[#F4F5F7]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+      {/* ══════════ PAGE – MOBILE ══════════ */}
+      <div className="lg:hidden min-h-screen bg-[#F4F5F7]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
 
         {/* ── HEADER ── */}
         <div className="lg:hidden bg-[#F4F5F7] px-4 pt-5 pb-2 flex items-center justify-between">
@@ -636,6 +658,184 @@ export default function AccountPage() {
         </div>
       </div>
     </div>
+      </div>
+
+      {/* ══════════ PAGE – DESKTOP SIDEBAR ══════════ */}
+      <div className="hidden lg:flex min-h-screen bg-[#F4F5F7]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+
+        {/* ── LEFT SIDEBAR ── */}
+        <aside className="w-72 flex-shrink-0 bg-white border-r border-stone-100 flex flex-col sticky top-0 h-screen overflow-hidden">
+
+          {/* Profile */}
+          <div className="p-5 border-b border-stone-100 flex-shrink-0">
+            <div className="flex items-center gap-3">
+              <motion.button whileTap={{ scale: 0.95 }} onClick={() => setViewModalOpen(true)} className="relative flex-shrink-0">
+                <div className="w-12 h-12 rounded-2xl overflow-hidden ring-2 ring-stone-100 shadow-sm">
+                  {uploading
+                    ? <div className="w-full h-full flex items-center justify-center" style={{ background: GRAD }}><div className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin" /></div>
+                    : pic
+                      ? <img src={pic} alt="Profile" className="w-full h-full object-cover" />
+                      : <div className="w-full h-full flex items-center justify-center text-white text-base font-bold" style={{ background: GRAD }}>{initials}</div>
+                  }
+                </div>
+                <div className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full border-2 border-white shadow flex items-center justify-center" style={{ background: "#0d9488" }}>
+                  <Camera className="w-2.5 h-2.5 text-white" />
+                </div>
+              </motion.button>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <p className="font-bold text-stone-900 text-sm leading-tight truncate">{currentUser?.username || "Campus User"}</p>
+                  {isAdmin && <VerifiedTick color="#F59E0B" label="StudEx Administrator" />}
+                  {!isAdmin && vendorApproved && <VerifiedTick color="#10b981" label="Verified Vendor" />}
+                </div>
+                <p className="text-xs text-stone-400 truncate mt-0.5">{currentUser?.email}</p>
+                {vendorPending && (
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 mt-1 inline-block">⏳ Pending</span>
+                )}
+              </div>
+              <button onClick={() => setViewModalOpen(true)} className="w-8 h-8 rounded-full bg-stone-100 flex items-center justify-center flex-shrink-0 hover:bg-stone-200 transition">
+                <Pencil className="w-3.5 h-3.5 text-stone-500" />
+              </button>
+            </div>
+          </div>
+
+          {/* Nav groups — scrollable */}
+          <nav className="flex-1 overflow-y-auto hide-scrollbar p-3 space-y-0.5">
+            <p className="text-[10px] font-bold tracking-widest uppercase text-stone-400 px-3 pt-2 pb-1">My Account</p>
+            <SidebarNavItem href="/account/orders"        icon={Package}       iconColor="#6366f1" label="My Orders"       badge={pendingOrders} />
+            <SidebarNavItem href="/account/bookings"      icon={Calendar}      iconColor="#0d9488" label="My Bookings"     badge={vendorApproved ? 0 : pendingBookings} />
+            <SidebarNavItem href="/chat"                  icon={MessageCircle} iconColor="#0d9488" label="Messages"        badge={unreadMessages} />
+            <SidebarNavItem href="/account/notifications" icon={Bell}          iconColor="#f59e0b" label="Notifications"   badge={unreadNotifications} />
+            <SidebarNavItem href="/account/loyalty"       icon={Gift}          iconColor="#10b981" label="Loyalty Rewards" />
+            <SidebarNavItem href="/wishlist"              icon={Heart}         iconColor="#ec4899" label="Wishlist" />
+
+            {vendorApproved && (
+              <>
+                <p className="text-[10px] font-bold tracking-widest uppercase text-stone-400 px-3 pt-4 pb-1">Vendor Tools</p>
+                <SidebarNavItem href="/vendor/dashboard"     icon={LayoutDashboard} iconColor="#0d9488"                                label="Vendor Dashboard" />
+                <SidebarNavItem href="/account/bank-account" icon={Banknote}        iconColor={hasBankAccount ? "#10b981" : "#f59e0b"} label={hasBankAccount ? "Payout Account" : "Add Payout Account"} />
+              </>
+            )}
+
+            <p className="text-[10px] font-bold tracking-widest uppercase text-stone-400 px-3 pt-4 pb-1">Settings</p>
+            <SidebarNavItem href="/account/address"        icon={Settings}  iconColor="#3b82f6" label="Address Book" />
+            <SidebarNavItem href="/account/change-password" icon={KeyRound} iconColor="#8b5cf6" label="Change Password" />
+            <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-stone-50 transition-colors">
+              <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "#0d9488" + "18" }}>
+                <Bell className="w-4 h-4 flex-shrink-0" style={{ color: "#0d9488" }} />
+              </div>
+              <span className="flex-1 text-sm font-medium text-stone-700 truncate">Email Notifications</span>
+              <button onClick={handleEmailNotifsToggle} disabled={emailNotifsLoading}
+                className={`relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors duration-200 focus:outline-none disabled:opacity-50 ${emailNotifs ? "bg-teal-500" : "bg-stone-300"}`}>
+                <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform duration-200 ${emailNotifs ? "translate-x-4" : "translate-x-0.5"}`} />
+              </button>
+            </div>
+
+            <p className="text-[10px] font-bold tracking-widest uppercase text-stone-400 px-3 pt-4 pb-1">Help & Support</p>
+            <SidebarNavItem href="/faq" icon={HelpCircle} iconColor="#14b8a6" label="FAQs & Help Center" />
+          </nav>
+
+          {/* Logout */}
+          <div className="p-3 border-t border-stone-100 flex-shrink-0">
+            <motion.button whileTap={{ scale: 0.98 }} onClick={handleLogout}
+              className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm font-semibold text-red-500 hover:bg-red-50 transition-all">
+              <div className="w-8 h-8 rounded-xl bg-red-50 flex items-center justify-center flex-shrink-0">
+                <LogOut className="w-4 h-4 text-red-500" />
+              </div>
+              Log Out
+            </motion.button>
+          </div>
+        </aside>
+
+        {/* ── MAIN AREA ── */}
+        <main className="flex-1 p-8 overflow-y-auto">
+          <h1 className="text-2xl font-black text-stone-900 mb-6">Profile & Settings</h1>
+
+          {/* Profile card */}
+          <div className="bg-white rounded-2xl p-6 shadow-sm mb-5 flex items-center gap-5 max-w-lg">
+            <motion.button whileTap={{ scale: 0.95 }} onClick={() => setViewModalOpen(true)} className="relative flex-shrink-0">
+              <div className="w-20 h-20 rounded-3xl overflow-hidden ring-2 ring-stone-100 shadow-md">
+                {uploading
+                  ? <div className="w-full h-full flex items-center justify-center" style={{ background: GRAD }}><div className="w-6 h-6 border-2 border-white/40 border-t-white rounded-full animate-spin" /></div>
+                  : pic
+                    ? <img src={pic} alt="Profile" className="w-full h-full object-cover" />
+                    : <div className="w-full h-full flex items-center justify-center text-white text-2xl font-black" style={{ background: GRAD }}>{initials}</div>
+                }
+              </div>
+              <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full border-2 border-white shadow flex items-center justify-center" style={{ background: "#0d9488" }}>
+                <Camera className="w-3 h-3 text-white" />
+              </div>
+            </motion.button>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap mb-1">
+                <p className="font-black text-stone-900 text-xl leading-tight">{currentUser?.username || "Campus User"}</p>
+                {isAdmin && <VerifiedTick color="#F59E0B" label="StudEx Administrator" />}
+                {!isAdmin && vendorApproved && <VerifiedTick color="#10b981" label="Verified Vendor" />}
+              </div>
+              <p className="text-sm text-stone-400">{currentUser?.email}</p>
+              {vendorPending && (
+                <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 mt-2 inline-block">⏳ Vendor Application Pending</span>
+              )}
+            </div>
+            <button onClick={() => setViewModalOpen(true)}
+              className="w-10 h-10 rounded-full bg-stone-100 flex items-center justify-center flex-shrink-0 hover:bg-stone-200 transition">
+              <Pencil className="w-4 h-4 text-stone-500" />
+            </button>
+          </div>
+
+          {/* Vendor card */}
+          {vendorApproved ? (
+            <Link href="/vendor/dashboard">
+              <motion.div whileTap={{ scale: 0.98 }}
+                className="relative rounded-2xl p-6 overflow-hidden shadow-md max-w-lg"
+                style={{ background: GRAD }}>
+                <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-white/10 blur-2xl pointer-events-none" />
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <p className="font-black text-white text-xl leading-tight" style={SERIF}>StudEx</p>
+                      <span className="bg-white/20 text-white text-xs font-bold px-2.5 py-0.5 rounded-full border border-white/30">VENDOR</span>
+                    </div>
+                    <p className="text-white/80 text-sm leading-relaxed">Manage your listings, bookings, and earnings all in one place.</p>
+                  </div>
+                  <ShieldCheck className="w-12 h-12 text-white/40 flex-shrink-0 mt-0.5" />
+                </div>
+                <div className="mt-5 bg-white/15 rounded-xl py-3 text-center">
+                  <p className="text-white text-sm font-semibold">Go to Vendor Dashboard →</p>
+                </div>
+              </motion.div>
+            </Link>
+          ) : vendorPending ? (
+            <div className="relative rounded-2xl p-6 overflow-hidden shadow-sm bg-amber-50 border border-amber-200 max-w-lg">
+              <div className="flex items-center gap-4">
+                <Clock className="w-10 h-10 text-amber-400 flex-shrink-0 animate-pulse" />
+                <div>
+                  <p className="font-bold text-amber-800">Application Under Review</p>
+                  <p className="text-sm text-amber-600 mt-0.5">We&apos;re reviewing your vendor application. You&apos;ll be notified once approved.</p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="relative rounded-2xl p-6 overflow-hidden shadow-md max-w-lg" style={{ background: GRAD }}>
+              <div className="absolute top-0 right-0 w-32 h-32 rounded-full bg-white/10 blur-2xl pointer-events-none" />
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <p className="font-black text-white text-xl leading-tight" style={SERIF}>StudEx</p>
+                    <span className="bg-white/20 text-white text-xs font-bold px-2.5 py-0.5 rounded-full border border-white/30">VENDOR</span>
+                  </div>
+                  <p className="text-white/80 text-sm leading-relaxed">Sell on campus. Earn from your skills, products & services.</p>
+                </div>
+                <Store className="w-12 h-12 text-white/40 flex-shrink-0 mt-0.5" />
+              </div>
+              <Link href="/vendor/apply">
+                <div className="mt-5 bg-white rounded-xl py-3 text-center">
+                  <p className="text-stone-800 text-sm font-semibold">Apply to become a vendor</p>
+                </div>
+              </Link>
+            </div>
+          )}
+        </main>
       </div>
     </>
   );

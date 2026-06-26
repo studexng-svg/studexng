@@ -161,11 +161,7 @@ export default function LayoutClient({ children }: { children: React.ReactNode }
             {children}
           </main>
 
-          {!hideNav && (
-            <div className="fixed inset-x-0 bottom-0 z-50">
-              <BottomNav />
-            </div>
-          )}
+          {!hideNav && <BottomNav />}
 
           <DraggableAdminShield />
           <CookieConsent />
