@@ -187,7 +187,7 @@ export default function VendorDashboardLayout({ children }: { children: React.Re
 
       {/* ── MOBILE SIDEBAR OVERLAY ── */}
       {sidebarOpen && (
-        <div className="lg:hidden fixed inset-0 z-50 flex">
+        <div className="lg:hidden fixed inset-0 z-[60] flex">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setSidebarOpen(false)} />
           <aside className="relative w-72 bg-white shadow-2xl flex flex-col h-full">
             <button
