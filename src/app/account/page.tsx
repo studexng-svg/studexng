@@ -487,7 +487,9 @@ export default function AccountPage() {
           </div>
         </div>
 
-        <div className="px-4 pb-32 max-w-lg mx-auto space-y-1">
+        <div className="px-4 pb-32 max-w-lg lg:max-w-4xl mx-auto">
+          <div className="lg:grid lg:grid-cols-[1fr_320px] lg:gap-6 lg:items-start">
+          <div className="space-y-1">
 
           {/* ── PROFILE ROW ── */}
           <div className="bg-white rounded-2xl px-4 py-4 flex items-center gap-3 mt-3 shadow-sm">
@@ -599,8 +601,11 @@ export default function AccountPage() {
             </>
           )}
 
+          </div>{/* end left col */}
+          <div className="space-y-1 mt-4 lg:mt-6 lg:sticky lg:top-20">
+
           {/* ── SECTION: Settings ── */}
-          <p className="text-xs font-semibold text-stone-500 pt-5 pb-2 px-1">Settings</p>
+          <p className="text-xs font-semibold text-stone-500 pt-5 lg:pt-0 pb-2 px-1">Settings</p>
           <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
             <Row href="/account/address"        icon={Settings}  iconColor="#3b82f6" label="Address Book" />
             <Row href="/account/change-password" icon={KeyRound} iconColor="#8b5cf6" label="Change Password" />
@@ -623,6 +628,8 @@ export default function AccountPage() {
           </motion.button>
 
         </div>
+      </div>
+    </div>
       </div>
     </>
   );
