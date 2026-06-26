@@ -262,8 +262,38 @@ export default function LandingClient({ initialListings }: { initialListings: an
             </div>
           </motion.div>
 
+          {/* ── Mobile image strips (full-height columns left + right) ── */}
+          <div className="lg:hidden absolute inset-y-0 left-0 w-[62px] flex flex-col gap-1.5 py-3 px-1.5 z-0">
+            {[l[0], l[1], l[2], l[3]].map((listing, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.25 + i * 0.08, duration: 0.5 }}
+                className="rounded-xl overflow-hidden flex-1 shadow-md border border-stone-100 min-h-0"
+              >
+                {listing?.image
+                  ? <img src={listing.image} alt="" className="w-full h-full object-cover" />
+                  : <div className="w-full h-full bg-stone-200 animate-pulse" />}
+              </motion.div>
+            ))}
+          </div>
+          <div className="lg:hidden absolute inset-y-0 right-0 w-[62px] flex flex-col gap-1.5 py-3 px-1.5 z-0">
+            {[l[4], l[5], l[6], l[7]].map((listing, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.25 + i * 0.08, duration: 0.5 }}
+                className="rounded-xl overflow-hidden flex-1 shadow-md border border-stone-100 min-h-0"
+              >
+                {listing?.image
+                  ? <img src={listing.image} alt="" className="w-full h-full object-cover" />
+                  : <div className="w-full h-full bg-stone-200 animate-pulse" />}
+              </motion.div>
+            ))}
+          </div>
+
           {/* ── Center content ── */}
-          <div className="relative z-10 max-w-2xl mx-auto text-center">
+          <div className="relative z-10 w-full max-w-2xl mx-auto text-center px-[46px] lg:px-0">
 
             {/* Logo badge */}
             <motion.div
@@ -280,7 +310,7 @@ export default function LandingClient({ initialListings }: { initialListings: an
             <motion.h1
               initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.05 }}
-              className="text-5xl md:text-7xl font-extrabold leading-tight tracking-tight mb-4"
+              className="text-[1.9rem] leading-snug lg:text-7xl font-extrabold tracking-tight mb-4"
               style={JK}
             >
               <span className="text-stone-900">Buy, book &amp; order</span>
@@ -304,12 +334,12 @@ export default function LandingClient({ initialListings }: { initialListings: an
               className="flex flex-wrap justify-center gap-3 mb-8"
             >
               <Link href="/auth">
-                <button className="px-7 py-3.5 text-white font-semibold rounded-full shadow-md hover:opacity-90 transition" style={{ background: GRAD }}>
+                <button className="px-5 py-3 lg:px-7 lg:py-3.5 text-white font-semibold rounded-full shadow-md hover:opacity-90 transition text-sm lg:text-base" style={{ background: GRAD }}>
                   Start Ordering
                 </button>
               </Link>
               <Link href="/home">
-                <button className="px-7 py-3.5 text-stone-700 font-semibold rounded-full border border-stone-300 bg-white hover:bg-stone-50 transition">
+                <button className="px-5 py-3 lg:px-7 lg:py-3.5 text-stone-700 font-semibold rounded-full border border-stone-300 bg-white hover:bg-stone-50 transition text-sm lg:text-base">
                   Browse Services
                 </button>
               </Link>
@@ -328,23 +358,6 @@ export default function LandingClient({ initialListings }: { initialListings: an
               ))}
             </motion.div>
 
-          </div>
-        </section>
-
-        {/* ── MOBILE LISTING STRIP ──────────────────────────── */}
-        <section className="lg:hidden bg-white border-b border-stone-100 py-4 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
-          <div className="flex gap-3 px-5 w-max">
-            {(l.length > 0 ? l.slice(0, 8) : Array(8).fill(null)).map((listing: any, i: number) => (
-              <div key={i} className="w-28 flex-shrink-0">
-                <div className="rounded-xl overflow-hidden bg-stone-100 border border-stone-100">
-                  {listing?.image
-                    ? <img src={listing.image} alt={listing.title} className="w-full aspect-square object-cover" />
-                    : <div className="w-full aspect-square bg-stone-200 animate-pulse" />
-                  }
-                </div>
-                <p className="text-[11px] font-semibold text-stone-800 mt-1.5 line-clamp-1 px-0.5">{listing?.title ?? ""}</p>
-              </div>
-            ))}
           </div>
         </section>
 
