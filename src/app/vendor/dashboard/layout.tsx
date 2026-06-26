@@ -85,9 +85,10 @@ export default function VendorDashboardLayout({ children }: { children: React.Re
         onClick={() => setSidebarOpen(false)}
         className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all group ${
           active
-            ? "bg-stone-900 text-white shadow-sm"
+            ? "text-white shadow-sm"
             : "text-stone-500 hover:bg-stone-50 hover:text-stone-800"
         }`}
+      style={active ? { background: GRAD } : {}}
       >
         <Icon className="w-4.5 h-4.5 flex-shrink-0" />
         <span className="flex-1">{tab.label}</span>
@@ -123,7 +124,7 @@ export default function VendorDashboardLayout({ children }: { children: React.Re
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
+      <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto hide-scrollbar">
         {TABS.map(tab => <NavItem key={tab.id} tab={tab} />)}
       </nav>
 

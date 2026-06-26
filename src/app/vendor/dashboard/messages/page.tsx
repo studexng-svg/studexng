@@ -165,7 +165,7 @@ export default function MessagesPage() {
   return (
     <div className="lg:flex lg:gap-3">
       {/* Conversations list */}
-      <div className="w-full lg:w-60 lg:flex-shrink-0 bg-white border border-stone-200 rounded-2xl overflow-hidden shadow-sm">
+      <div className="w-full lg:w-60 lg:flex-shrink-0 bg-white rounded-2xl overflow-hidden shadow-sm">
         <div className="px-4 py-3 border-b border-stone-100">
           <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-bold mb-0.5">Messages</p>
           <h2 className="font-black text-stone-900 text-base tracking-tight">Conversations</h2>
@@ -198,7 +198,7 @@ export default function MessagesPage() {
       </div>
 
       {/* Desktop chat panel */}
-      <div className="hidden lg:flex flex-1 flex-col bg-white border border-stone-200 rounded-2xl overflow-hidden shadow-sm" style={{ height: "calc(100vh - 260px)" }}>
+      <div className="hidden lg:flex flex-1 flex-col bg-white rounded-2xl overflow-hidden shadow-sm" style={{ height: "calc(100vh - 260px)" }}>
         {!activeConv ? (
           <div className="flex-1 flex items-center justify-center text-stone-400">
             <div className="text-center">

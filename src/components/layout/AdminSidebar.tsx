@@ -173,7 +173,7 @@ export default function AdminSidebar() {
       </div>
 
       {/* Nav groups — scrollable */}
-      <nav className="flex-1 overflow-y-auto px-3 py-1 space-y-3">
+      <nav className="flex-1 overflow-y-auto hide-scrollbar px-3 py-1 space-y-3">
         {NAV.map(({ group, items }) => (
           <div key={group}>
             <p className="text-[10px] font-bold tracking-widest uppercase text-stone-400 px-3 py-1">{group}</p>
