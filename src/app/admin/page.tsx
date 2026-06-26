@@ -3,24 +3,15 @@
 
 import {
   Users, Package, DollarSign, Store, FileText, Tag, TrendingUp,
-  ChevronRight, AlertCircle, CheckCircle, Clock,
+  ChevronRight, AlertCircle, CheckCircle,
   CreditCard, Star, AlertTriangle, ArrowUpRight,
-  ShoppingCart, MessageCircle, Send, Radio, Bot, RefreshCw, Percent,
+  ShoppingCart, MessageCircle, Send, Bot, RefreshCw, Percent,
 } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import AdminTopBar from "@/components/layout/AdminTopBar";
-import { SidebarLayout, Sidebar, SidebarCard, SidebarNavItem } from "@/components/layout/Sidebar";
 import { api } from "@/lib/api";
 import { GRAD, SERIF } from "@/lib/tokens";
-
-interface ActivityData {
-  online_count: number;
-  online_vendors: number;
-  online_students: number;
-  online_users: { id: number; username: string; user_type: string; business_name?: string; last_seen: string }[];
-}
 
 interface DashStats {
   users: {
@@ -96,78 +87,6 @@ const QUICK_LINKS = [
   { label: "Rewards",          href: "/admin/rewards",          icon: Star,         desc: "Loyalty credits and 5% discount usage" },
 ];
 
-function LiveActivity() {
-  const [expanded, setExpanded] = useState(false);
-
-  const { data: activity } = useQuery<ActivityData>({
-    queryKey: ["admin-activity"],
-    queryFn: async () => {
-      const r = await api.admin.activity();
-      if (!r.ok) throw new Error("failed");
-      return r.json();
-    },
-    refetchInterval: query =>
-      document.visibilityState === "hidden" ? false : 60_000,
-    staleTime: 30_000,
-  });
-
-  const count = activity?.online_count ?? 0;
-
-  return (
-    <div className="bg-white border border-stone-200 rounded-2xl shadow-sm overflow-hidden">
-      <button
-        onClick={() => setExpanded(e => !e)}
-        className="w-full flex items-center justify-between p-4"
-      >
-        <div className="flex items-center gap-3">
-          <div className="relative w-9 h-9 bg-teal-50 rounded-xl flex items-center justify-center flex-shrink-0">
-            <Radio className="w-4 h-4 text-teal-600" />
-            {count > 0 && (
-              <span className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full flex items-center justify-center text-white text-xs font-bold leading-none">
-                {count > 99 ? "99+" : count}
-              </span>
-            )}
-          </div>
-          <div className="text-left">
-            <p className="font-semibold text-stone-900 text-sm">Live Activity</p>
-            <p className="text-stone-400 text-xs">
-              {activity
-                ? `${count} online — ${activity.online_vendors}v / ${activity.online_students}s`
-                : "Loading…"}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          {count > 0 && <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />}
-          <ChevronRight className={`w-4 h-4 text-stone-400 transition-transform ${expanded ? "rotate-90" : ""}`} />
-        </div>
-      </button>
-
-      {expanded && activity && (
-        <div className="border-t border-stone-100 px-4 pb-4 pt-2 space-y-1">
-          {activity.online_users.length === 0 ? (
-            <p className="text-stone-400 text-xs text-center py-3">No one online right now</p>
-          ) : (
-            activity.online_users.map(u => (
-              <div key={u.id} className="flex items-center gap-2 py-1.5">
-                <span className="w-2 h-2 rounded-full bg-green-400 flex-shrink-0" />
-                <span className="text-sm text-stone-800 font-medium truncate flex-1">
-                  {u.business_name || u.username}
-                </span>
-                <span className={`px-1.5 py-0.5 rounded-full text-xs font-bold flex-shrink-0 ${
-                  u.user_type === "vendor" ? "bg-teal-100 text-teal-700" : "bg-stone-100 text-stone-600"
-                }`}>
-                  {u.user_type === "vendor" ? "V" : "S"}
-                </span>
-              </div>
-            ))
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
 export default function AdminDashboard() {
   const queryClient = useQueryClient();
 
@@ -184,28 +103,13 @@ export default function AdminDashboard() {
   });
 
   return (
-    <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+    <div className="min-h-full" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       <AdminTopBar title="Admin Dashboard" back="/home" />
 
-      <SidebarLayout
-        sidebarWidth="220px"
-        padY={false}
-        className="pt-5 pb-28"
-        sidebar={
-          <Sidebar top="top-16">
-            <SidebarCard title="Navigation" noPad>
-              <div className="px-3 pb-3 space-y-0.5">
-                {QUICK_LINKS.map(({ label, href, icon }) => (
-                  <SidebarNavItem key={href} href={href} icon={icon} label={label} />
-                ))}
-              </div>
-            </SidebarCard>
-            <LiveActivity />
-          </Sidebar>
-        }>
+      <div className="px-4 pt-5 pb-28 max-w-4xl space-y-5">
 
         {/* Header */}
-        <div className="mb-5">
+        <div>
           <p className="text-teal-600 text-xs tracking-[0.2em] uppercase font-semibold">Overview</p>
           <h2 className="text-xl font-bold text-stone-900 mt-0.5" style={SERIF}>StudEx Platform</h2>
         </div>
@@ -370,7 +274,7 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-      </SidebarLayout>
+      </div>
     </div>
   );
 }
