@@ -4,16 +4,17 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useRouter, useParams } from "next/navigation";
 import {
   ChevronLeft, Send, Loader, ImageIcon, X, Pin, Pencil,
-  Trash2, Check, CheckCheck, PinOff, ChevronDown, UserX, Users, CornerDownLeft, Copy
+  Trash2, Check, CheckCheck, PinOff, ChevronDown, UserX, Users,
+  CornerDownLeft, Copy, Mic,
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/lib/authStore";
 import { GRAD } from "@/lib/tokens";
 import { api } from "@/lib/api";
+
 const DELETE_EVERYONE_LIMIT_HOURS = 60;
 
 function stripQuotedMarkup(text: string): string {
-  // Remove nested [quoted:@sender|...] markup (with or without closing bracket)
   return text.replace(/\[quoted:@[^\n]*/g, '').replace(/\s+/g, ' ').trim();
 }
 
@@ -61,37 +62,37 @@ export default function ChatRoomPage() {
   const conversationId = params?.id;
   const { user, isHydrated, isLoggedIn } = useAuth();
 
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [sending, setSending] = useState(false);
-  const [otherUser, setOtherUser] = useState("");
+  const [messages, setMessages]           = useState<Message[]>([]);
+  const [input, setInput]                 = useState("");
+  const [loading, setLoading]             = useState(true);
+  const [sending, setSending]             = useState(false);
+  const [otherUser, setOtherUser]         = useState("");
   const [otherUserPicture, setOtherUserPicture] = useState<string | null>(null);
-  const [listingTitle, setListingTitle] = useState("");
+  const [listingTitle, setListingTitle]   = useState("");
   const [otherUserLastSeen, setOtherUserLastSeen] = useState<string | null>(null);
-  const [otherUserOnline, setOtherUserOnline] = useState(false);
-  const [otherUserTyping, setOtherUserTyping] = useState(false);
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [error, setError] = useState("");
-  const [actionMenu, setActionMenu] = useState<ActionMenu | null>(null);
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [editContent, setEditContent] = useState("");
-  const [pinnedMessages, setPinnedMessages] = useState<Message[]>([]);
+  const [otherUserOnline, setOtherUserOnline]     = useState(false);
+  const [otherUserTyping, setOtherUserTyping]     = useState(false);
+  const [imageFile, setImageFile]         = useState<File | null>(null);
+  const [imagePreview, setImagePreview]   = useState<string | null>(null);
+  const [error, setError]                 = useState("");
+  const [actionMenu, setActionMenu]       = useState<ActionMenu | null>(null);
+  const [editingId, setEditingId]         = useState<number | null>(null);
+  const [editContent, setEditContent]     = useState("");
+  const [pinnedMessages, setPinnedMessages]   = useState<Message[]>([]);
   const [showPinnedBanner, setShowPinnedBanner] = useState(true);
-  const [pinnedIndex, setPinnedIndex] = useState(0);
-  const [replyingTo, setReplyingTo] = useState<Message | null>(null);
-
-  const bottomRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const editInputRef = useRef<HTMLInputElement>(null);
-  const longPressTimer = useRef<NodeJS.Timeout | null>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const swipeTouchStart = useRef<{ x: number; y: number; id: number } | null>(null);
-  const isSwipe = useRef(false);
-  const hasScrolled = useRef(false);
+  const [pinnedIndex, setPinnedIndex]     = useState(0);
+  const [replyingTo, setReplyingTo]       = useState<Message | null>(null);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
+
+  const bottomRef      = useRef<HTMLDivElement>(null);
+  const fileInputRef   = useRef<HTMLInputElement>(null);
+  const typingTimer    = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const editInputRef   = useRef<HTMLInputElement>(null);
+  const longPressTimer = useRef<NodeJS.Timeout | null>(null);
+  const menuRef        = useRef<HTMLDivElement>(null);
+  const swipeTouchStart = useRef<{ x: number; y: number; id: number } | null>(null);
+  const isSwipe        = useRef(false);
+  const hasScrolled    = useRef(false);
 
   useEffect(() => {
     if (isHydrated && !isLoggedIn) { router.push("/auth"); return; }
@@ -101,15 +102,12 @@ export default function ChatRoomPage() {
     return () => clearInterval(interval);
   }, [isHydrated, isLoggedIn, conversationId]);
 
-  // Scroll to bottom — instant on first load, smooth for new messages
   useEffect(() => {
     if (!bottomRef.current || messages.length === 0) return;
     bottomRef.current.scrollIntoView({ behavior: hasScrolled.current ? "smooth" : "instant" });
     hasScrolled.current = true;
   }, [messages]);
 
-  // Show scroll-to-bottom button when user scrolls up
-  // Depends on `loading` so it sets up AFTER the spinner goes away and bottomRef is in the DOM
   useEffect(() => {
     if (loading) return;
     const el = bottomRef.current;
@@ -148,7 +146,6 @@ export default function ChatRoomPage() {
     return () => clearInterval(interval);
   }, [conversationId]);
 
-  // Poll typing status every 2s
   useEffect(() => {
     if (!conversationId) return;
     const interval = setInterval(async () => {
@@ -187,12 +184,8 @@ export default function ChatRoomPage() {
     if (date >= todayStart) return `Last seen today at ${time}`;
     if (date >= yesterdayStart) return `Last seen yesterday at ${time}`;
     const diffDays = Math.floor((todayStart.getTime() - date.getTime()) / 86400000) + 1;
-    if (diffDays < 7) {
-      const day = date.toLocaleDateString('en-US', { weekday: 'long' });
-      return `Last seen ${day} at ${time}`;
-    }
-    const dateStr = date.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
-    return `Last seen ${dateStr} at ${time}`;
+    if (diffDays < 7) return `Last seen ${date.toLocaleDateString('en-US', { weekday: 'long' })} at ${time}`;
+    return `Last seen ${date.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })} at ${time}`;
   };
 
   const loadAll = async () => {
@@ -202,7 +195,6 @@ export default function ChatRoomPage() {
         const convRes = await api.chat.conversation(conversationId as string);
         if (convRes.ok) convData = await convRes.json();
       } catch {}
-
       if (!convData) {
         const listRes = await api.chat.conversations();
         if (listRes.ok) {
@@ -211,7 +203,6 @@ export default function ChatRoomPage() {
           convData = list.find((c: any) => c.id === Number(conversationId));
         }
       }
-
       if (convData) {
         setOtherUser(convData.other_user?.username || convData.buyer_username || convData.seller_username || "");
         setOtherUserPicture(convData.other_user?.profile_picture || null);
@@ -219,7 +210,6 @@ export default function ChatRoomPage() {
         setOtherUserLastSeen(convData.other_user?.last_seen || null);
         setOtherUserOnline(convData.other_user?.is_online || false);
       }
-
       await loadMessages();
       await loadPinned();
     } catch (e) {
@@ -253,23 +243,11 @@ export default function ChatRoomPage() {
       const clientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
       const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
       const menuY = clientY > window.innerHeight * 0.65 ? clientY - 220 : clientY - 10;
-
-      setActionMenu({
-        messageId: msg.id,
-        x: clientX,
-        y: menuY,
-        is_mine: msg.is_mine,
-        message_type: msg.message_type,
-        is_pinned: msg.is_pinned,
-        created_at: msg.created_at,
-        showDeleteOptions: false,
-      });
+      setActionMenu({ messageId: msg.id, x: clientX, y: menuY, is_mine: msg.is_mine, message_type: msg.message_type, is_pinned: msg.is_pinned, created_at: msg.created_at, showDeleteOptions: false });
     }, 500);
   };
 
-  const handlePressEnd = () => {
-    if (longPressTimer.current) clearTimeout(longPressTimer.current);
-  };
+  const handlePressEnd = () => { if (longPressTimer.current) clearTimeout(longPressTimer.current); };
 
   const handleMsgTouchStart = (e: React.TouchEvent, msg: Message) => {
     const t = e.touches[0];
@@ -283,10 +261,7 @@ export default function ChatRoomPage() {
     const t = e.touches[0];
     const dx = Math.abs(t.clientX - swipeTouchStart.current.x);
     const dy = Math.abs(t.clientY - swipeTouchStart.current.y);
-    if (dx > 15 && dx > dy) {
-      isSwipe.current = true;
-      handlePressEnd();
-    }
+    if (dx > 15 && dx > dy) { isSwipe.current = true; handlePressEnd(); }
   };
 
   const handleMsgTouchEnd = (e: React.TouchEvent, msg: Message) => {
@@ -299,42 +274,23 @@ export default function ChatRoomPage() {
     isSwipe.current = false;
   };
 
-  const canDeleteForEveryone = (createdAt: string) => {
-    const msgTime = new Date(createdAt).getTime();
-    const limitMs = DELETE_EVERYONE_LIMIT_HOURS * 60 * 60 * 1000;
-    return Date.now() - msgTime < limitMs;
-  };
+  const canDeleteForEveryone = (createdAt: string) => Date.now() - new Date(createdAt).getTime() < DELETE_EVERYONE_LIMIT_HOURS * 3600000;
 
   const deleteForMe = async (id: number) => {
     setActionMenu(null);
     try {
       const res = await api.chat.deleteForMe(id);
-      if (res.ok) {
-        setMessages(prev => prev.filter(m => m.id !== id));
-        setPinnedMessages(prev => prev.filter(m => m.id !== id));
-      }
-    } catch {
-      setError("Failed to delete message");
-      setTimeout(() => setError(""), 3000);
-    }
+      if (res.ok) { setMessages(p => p.filter(m => m.id !== id)); setPinnedMessages(p => p.filter(m => m.id !== id)); }
+    } catch { setError("Failed to delete message"); setTimeout(() => setError(""), 3000); }
   };
 
   const deleteForEveryone = async (id: number) => {
     setActionMenu(null);
     try {
       const res = await api.chat.deleteForEveryone(id);
-      if (res.ok) {
-        setMessages(prev => prev.filter(m => m.id !== id));
-        setPinnedMessages(prev => prev.filter(m => m.id !== id));
-      } else {
-        const data = await res.json();
-        setError(data.error || "Failed to delete for everyone");
-        setTimeout(() => setError(""), 4000);
-      }
-    } catch {
-      setError("Failed to delete message");
-      setTimeout(() => setError(""), 3000);
-    }
+      if (res.ok) { setMessages(p => p.filter(m => m.id !== id)); setPinnedMessages(p => p.filter(m => m.id !== id)); }
+      else { const d = await res.json(); setError(d.error || "Failed"); setTimeout(() => setError(""), 4000); }
+    } catch { setError("Failed to delete message"); setTimeout(() => setError(""), 3000); }
   };
 
   const startEdit = (msg: Message) => {
@@ -358,15 +314,10 @@ export default function ChatRoomPage() {
       const res = await api.chat.editMessage(id, { content: newContent });
       if (res.ok) {
         const updated = await res.json();
-        setMessages(prev => prev.map(m => m.id === id ? { ...m, ...updated, is_mine: m.is_mine } : m));
+        setMessages(p => p.map(m => m.id === id ? { ...m, ...updated, is_mine: m.is_mine } : m));
       }
-    } catch {
-      setError("Failed to edit message");
-      setTimeout(() => setError(""), 3000);
-    } finally {
-      setEditingId(null);
-      setEditContent("");
-    }
+    } catch { setError("Failed to edit"); setTimeout(() => setError(""), 3000); }
+    finally { setEditingId(null); setEditContent(""); }
   };
 
   const togglePin = async (id: number) => {
@@ -375,14 +326,11 @@ export default function ChatRoomPage() {
       const res = await api.chat.pinMessage(id);
       if (res.ok) {
         const data = await res.json();
-        setMessages(prev => prev.map(m => m.id === id ? { ...m, is_pinned: data.is_pinned } : m));
+        setMessages(p => p.map(m => m.id === id ? { ...m, is_pinned: data.is_pinned } : m));
         await loadPinned();
         if (data.is_pinned) setShowPinnedBanner(true);
       }
-    } catch {
-      setError("Failed to pin message");
-      setTimeout(() => setError(""), 3000);
-    }
+    } catch { setError("Failed to pin"); setTimeout(() => setError(""), 3000); }
   };
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -409,27 +357,21 @@ export default function ChatRoomPage() {
         fd.append("message_type", "image");
         if (input.trim()) fd.append("content", input.trim());
         const res = await api.chat.sendImage(conversationId as string, fd);
-        if (!res.ok) throw new Error("Send failed");
+        if (!res.ok) throw new Error();
         cancelImage();
       } else {
         let content = input.trim();
         if (replyingTo) {
           const mainText = parseQuoted(replyingTo.content || '').main || '📷 Image';
-          const quotedText = mainText.substring(0, 100);
-          content = `[quoted:@${replyingTo.sender_username}|${quotedText}]\n${content}`;
+          content = `[quoted:@${replyingTo.sender_username}|${mainText.substring(0, 100)}]\n${content}`;
         }
         const res = await api.chat.send(conversationId as string, { content, message_type: "text" });
-        if (!res.ok) throw new Error("Send failed");
+        if (!res.ok) throw new Error();
       }
-      setInput("");
-      setReplyingTo(null);
+      setInput(""); setReplyingTo(null);
       await loadMessages();
-    } catch {
-      setError("Failed to send. Try again.");
-      setTimeout(() => setError(""), 3000);
-    } finally {
-      setSending(false);
-    }
+    } catch { setError("Failed to send. Try again."); setTimeout(() => setError(""), 3000); }
+    finally { setSending(false); }
   };
 
   const scrollToPinned = (index: number) => {
@@ -439,56 +381,51 @@ export default function ChatRoomPage() {
     setPinnedIndex(index);
   };
 
-  if (loading) return (
-    <div className="flex justify-center items-center min-h-screen bg-[#F5F5F5]">
-      <Loader className="w-8 h-8 text-teal-600 animate-spin" />
-    </div>
-  );
-
   function getDateLabel(iso: string): string {
     const d = new Date(iso);
     const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(today.getDate() - 1);
+    const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
     if (d.toDateString() === today.toDateString()) return 'Today';
     if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
     return d.toLocaleDateString('en-NG', { weekday: 'long', day: 'numeric', month: 'long' });
   }
 
-  return (
-    <div className="flex flex-col bg-[#F5F5F5]" style={{ height: "100dvh", paddingBottom: "5rem", fontFamily: "'DM Sans', sans-serif" }}>
+  function fmtTime(iso: string) {
+    return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  }
 
-      {/* HEADER */}
-      <div className="bg-white border-b border-stone-100 px-4 py-3 flex items-center gap-3 flex-shrink-0 shadow-sm">
-        <button
-          onClick={() => router.back()}
-          className="p-2 bg-stone-100 hover:bg-stone-200 rounded-full transition-all active:scale-95 flex-shrink-0"
-        >
-          <ChevronLeft className="w-5 h-5 text-stone-600" />
+  if (loading) return (
+    <div className="flex justify-center items-center min-h-screen" style={{ background: "#F4F5F7" }}>
+      <Loader className="w-8 h-8 text-teal-600 animate-spin" />
+    </div>
+  );
+
+  /* ══════════════════════════════════════════════════════════════════════ */
+  return (
+    <div className="flex flex-col" style={{ height: "100dvh", background: "#F4F5F7", paddingBottom: "5rem", fontFamily: "'DM Sans', sans-serif" }}>
+
+      {/* ── HEADER ── */}
+      <div className="bg-white px-4 py-3 flex items-center gap-3 flex-shrink-0 shadow-sm">
+        <button onClick={() => router.back()}
+          className="w-9 h-9 rounded-full bg-stone-100 hover:bg-stone-200 transition flex items-center justify-center flex-shrink-0 active:scale-95">
+          <ChevronLeft className="w-5 h-5 text-stone-700" />
         </button>
-        {otherUserPicture ? (
-          <img src={otherUserPicture} alt={otherUser} className="w-10 h-10 rounded-full object-cover flex-shrink-0 shadow-sm" />
-        ) : (
-          <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-base flex-shrink-0 shadow-sm"
-            style={{ background: GRAD }}>
-            {otherUser?.[0]?.toUpperCase() || "?"}
-          </div>
-        )}
-        <div className="flex-1 min-w-0">
-          <p className="font-semibold text-stone-900">@{otherUser}</p>
-          {otherUserTyping ? (
-            <div className="flex items-center gap-1.5 mt-0.5">
-              <div className="flex gap-0.5 items-end h-3">
-                <motion.div animate={{ scaleY: [1, 1.8, 1] }} transition={{ repeat: Infinity, duration: 0.6, delay: 0 }} className="w-1 h-1.5 bg-teal-500 rounded-full origin-bottom" />
-                <motion.div animate={{ scaleY: [1, 1.8, 1] }} transition={{ repeat: Infinity, duration: 0.6, delay: 0.15 }} className="w-1 h-1.5 bg-teal-500 rounded-full origin-bottom" />
-                <motion.div animate={{ scaleY: [1, 1.8, 1] }} transition={{ repeat: Infinity, duration: 0.6, delay: 0.3 }} className="w-1 h-1.5 bg-teal-500 rounded-full origin-bottom" />
-              </div>
-              <p className="text-xs text-teal-600 font-medium">typing...</p>
+
+        {otherUserPicture
+          ? <img src={otherUserPicture} alt={otherUser} className="w-11 h-11 rounded-full object-cover flex-shrink-0 ring-2 ring-white shadow-sm" />
+          : <div className="w-11 h-11 rounded-full flex items-center justify-center text-white font-bold text-base flex-shrink-0 shadow-sm" style={{ background: GRAD }}>
+              {otherUser?.[0]?.toUpperCase() || "?"}
             </div>
+        }
+
+        <div className="flex-1 min-w-0">
+          <p className="font-bold text-stone-900 text-[15px] leading-tight">@{otherUser}</p>
+          {otherUserTyping ? (
+            <p className="text-xs text-teal-600 font-medium mt-0.5">typing...</p>
           ) : otherUserOnline ? (
             <div className="flex items-center gap-1 mt-0.5">
-              <div className="w-1.5 h-1.5 rounded-full bg-teal-500" />
-              <p className="text-xs text-teal-600 font-medium">Online</p>
+              <div className="w-1.5 h-1.5 rounded-full bg-green-400" />
+              <p className="text-xs text-stone-500">Online</p>
             </div>
           ) : otherUserLastSeen ? (
             <p className="text-xs text-stone-400 mt-0.5">{formatLastSeen(otherUserLastSeen)}</p>
@@ -496,31 +433,25 @@ export default function ChatRoomPage() {
         </div>
       </div>
 
-      {/* PINNED BANNER */}
+      {/* ── PINNED BANNER ── */}
       <AnimatePresence>
         {pinnedMessages.length > 0 && showPinnedBanner && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="bg-teal-50 border-b border-teal-100 flex-shrink-0 overflow-hidden"
-          >
+          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
+            className="bg-teal-50 border-b border-teal-100 flex-shrink-0 overflow-hidden">
             <div className="flex items-center gap-2 px-4 py-2">
               <Pin className="w-3.5 h-3.5 text-teal-500 flex-shrink-0" />
               <button onClick={() => scrollToPinned(pinnedIndex)} className="flex-1 min-w-0 text-left">
                 <p className="text-xs font-semibold text-teal-600">
-                  Pinned Message {pinnedMessages.length > 1 ? `(${pinnedIndex + 1}/${pinnedMessages.length})` : ''}
+                  Pinned{pinnedMessages.length > 1 ? ` (${pinnedIndex + 1}/${pinnedMessages.length})` : ''}
                 </p>
-                <p className="text-xs text-stone-500 truncate">
-                  {pinnedMessages[pinnedIndex]?.content || '📷 Image'}
-                </p>
+                <p className="text-xs text-stone-500 truncate">{pinnedMessages[pinnedIndex]?.content || '📷 Image'}</p>
               </button>
               {pinnedMessages.length > 1 && (
-                <button onClick={() => scrollToPinned((pinnedIndex + 1) % pinnedMessages.length)} aria-label="Next pinned message" className="p-2 text-teal-400 hover:text-teal-600">
+                <button onClick={() => scrollToPinned((pinnedIndex + 1) % pinnedMessages.length)} className="p-2 text-teal-400 hover:text-teal-600">
                   <ChevronDown className="w-4 h-4" />
                 </button>
               )}
-              <button onClick={() => setShowPinnedBanner(false)} aria-label="Hide pinned message" className="p-2 text-stone-400 hover:text-stone-600">
+              <button onClick={() => setShowPinnedBanner(false)} className="p-2 text-stone-400 hover:text-stone-600">
                 <X className="w-3.5 h-3.5" />
               </button>
             </div>
@@ -528,239 +459,204 @@ export default function ChatRoomPage() {
         )}
       </AnimatePresence>
 
-      {/* ERROR */}
+      {/* ── ERROR ── */}
       {error && (
-        <div className="bg-red-500 text-white text-xs px-4 py-2 text-center font-semibold flex-shrink-0">
-          {error}
-        </div>
+        <div className="bg-red-500 text-white text-xs px-4 py-2 text-center font-semibold flex-shrink-0">{error}</div>
       )}
 
-      {/* MESSAGES */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-1">
+      {/* ── MESSAGES ── */}
+      <div className="flex-1 overflow-y-auto px-4 pt-5 pb-3 space-y-0.5">
         {messages.length === 0 && (
-          <p className="text-center text-stone-600 text-sm py-10">No messages yet. Say hello! 👋</p>
+          <p className="text-center text-stone-400 text-sm py-16">No messages yet. Say hello! 👋</p>
         )}
 
         {messages.map((msg, idx) => {
-          const msgDate = new Date(msg.created_at).toDateString();
+          const msgDate  = new Date(msg.created_at).toDateString();
           const prevDate = idx > 0 ? new Date(messages[idx - 1].created_at).toDateString() : null;
           const showDate = msgDate !== prevDate;
+
           return (
             <div key={msg.id}>
               {showDate && (
-                <div className="flex items-center justify-center my-3">
-                  <span className="bg-stone-200/80 text-stone-500 text-xs px-3 py-1 rounded-full font-medium">
+                <div className="flex items-center justify-center my-4">
+                  <span className="bg-white text-stone-400 text-xs px-3 py-1 rounded-full font-medium shadow-sm border border-stone-100">
                     {getDateLabel(msg.created_at)}
                   </span>
                 </div>
               )}
-              <div id={`msg-${msg.id}`} data-message className={`flex ${msg.is_mine ? "justify-end" : "justify-start"}`}>
-            <div
-              onMouseDown={(e) => handlePressStart(e, msg)}
-              onMouseUp={handlePressEnd}
-              onMouseLeave={handlePressEnd}
-              onTouchStart={(e) => handleMsgTouchStart(e, msg)}
-              onTouchMove={handleMsgTouchMove}
-              onTouchEnd={(e) => handleMsgTouchEnd(e, msg)}
-              onContextMenu={(e) => { e.preventDefault(); handlePressStart(e, msg); }}
-              className="relative max-w-[75%] select-none"
-            >
-              {msg.is_pinned && (
-                <div className={`flex items-center gap-1 mb-0.5 ${msg.is_mine ? 'justify-end' : 'justify-start'}`}>
-                  <Pin className="w-3 h-3 text-teal-400" />
-                  <span className="text-xs text-teal-400">Pinned</span>
-                </div>
-              )}
 
-              <motion.div
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                className={`rounded-2xl px-4 py-2.5 ${
-                  msg.is_mine
-                    ? "text-white rounded-br-sm"
-                    : "bg-white text-stone-900 shadow-sm rounded-bl-sm border border-stone-100"
-                } ${msg.is_pinned ? 'ring-2 ring-teal-400/40' : ''}`}
-                style={msg.is_mine ? { background: GRAD } : {}}
-              >
-                {!msg.is_mine && <p className="text-xs font-semibold text-teal-600 mb-1">{msg.sender_username}</p>}
+              <div id={`msg-${msg.id}`}
+                className={`flex ${msg.is_mine ? "justify-end" : "justify-start"} mb-2`}>
+                <div className="max-w-[78%]"
+                  onMouseDown={e => handlePressStart(e, msg)}
+                  onMouseUp={handlePressEnd}
+                  onMouseLeave={handlePressEnd}
+                  onTouchStart={e => handleMsgTouchStart(e, msg)}
+                  onTouchMove={handleMsgTouchMove}
+                  onTouchEnd={e => handleMsgTouchEnd(e, msg)}
+                  onContextMenu={e => { e.preventDefault(); handlePressStart(e, msg); }}>
 
-                {editingId === msg.id ? (
-                  <div className="flex items-center gap-2 min-w-[180px]">
-                    <input
-                      ref={editInputRef}
-                      value={editContent}
-                      onChange={e => setEditContent(e.target.value)}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') submitEdit(msg.id);
-                        if (e.key === 'Escape') { setEditingId(null); setEditContent(""); }
-                      }}
-                      className="flex-1 bg-white/20 text-white placeholder-white/60 rounded-lg px-2 py-1 text-sm outline-none border border-white/40"
-                    />
-                    <button onClick={() => submitEdit(msg.id)} aria-label="Save edit" className="p-2 bg-white/20 rounded-lg hover:bg-white/30">
-                      <Check className="w-4 h-4 text-white" />
-                    </button>
-                    <button onClick={() => { setEditingId(null); setEditContent(""); }} aria-label="Cancel edit" className="p-2 bg-white/10 rounded-lg">
-                      <X className="w-4 h-4 text-white/70" />
-                    </button>
-                  </div>
-                ) : msg.image_url ? (
-                  <div>
-                    <a href={msg.image_url} target="_blank" rel="noopener noreferrer">
-                      <img src={msg.image_url} alt="Shared image" className="rounded-xl max-w-[220px] max-h-[220px] object-cover mb-1 cursor-pointer hover:opacity-90 transition" />
-                    </a>
-                    {msg.content && msg.content !== "📷 Image" && <p className="text-sm mt-1 break-words">{msg.content}</p>}
-                  </div>
-                ) : (() => {
-                  const { quoted, main } = parseQuoted(msg.content);
-                  return (
-                    <>
-                      {quoted && (
-                        <div className={`mb-2 pl-2 border-l-2 rounded-sm py-0.5 ${msg.is_mine ? 'border-white/50 bg-white/10' : 'border-teal-400 bg-teal-50/60'}`}>
-                          <p className={`text-xs font-semibold ${msg.is_mine ? 'text-white/70' : 'text-teal-600'}`}>↩ @{quoted.sender}</p>
-                          <p className={`text-xs truncate ${msg.is_mine ? 'text-white/60' : 'text-stone-500'}`}>{quoted.text}</p>
-                        </div>
-                      )}
-                      <p className="text-sm leading-relaxed break-words">{main}</p>
-                    </>
-                  );
-                })()}
-
-                <div className="flex items-center gap-1.5 mt-1 justify-end">
-                  {msg.is_edited && <span className={`text-xs italic ${msg.is_mine ? 'text-white/50' : 'text-stone-400'}`}>edited</span>}
-                  <p className={`text-xs ${msg.is_mine ? "text-white/60" : "text-stone-400"}`}>
-                    {new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                  </p>
-                  {msg.is_mine && (
-                    msg.is_read
-                      ? <CheckCheck className="w-3.5 h-3.5 text-white/80 flex-shrink-0" />
-                      : <Check className="w-3.5 h-3.5 text-white/40 flex-shrink-0" />
+                  {msg.is_pinned && (
+                    <div className={`flex items-center gap-1 mb-1 ${msg.is_mine ? "justify-end" : "justify-start"}`}>
+                      <Pin className="w-3 h-3 text-teal-400" />
+                      <span className="text-[10px] text-teal-400 font-medium">Pinned</span>
+                    </div>
                   )}
+
+                  {/* Bubble */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className={`px-4 py-3 select-none ${
+                      msg.is_mine
+                        ? "bg-teal-100 text-stone-900 rounded-3xl rounded-tr-lg"
+                        : "bg-white text-stone-900 rounded-3xl rounded-tl-lg shadow-sm border border-stone-100"
+                    } ${msg.is_pinned ? "ring-2 ring-teal-300/50" : ""}`}>
+
+                    {editingId === msg.id ? (
+                      <div className="flex items-center gap-2 min-w-[180px]">
+                        <input
+                          ref={editInputRef}
+                          value={editContent}
+                          onChange={e => setEditContent(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') submitEdit(msg.id);
+                            if (e.key === 'Escape') { setEditingId(null); setEditContent(""); }
+                          }}
+                          className="flex-1 bg-white text-stone-900 rounded-xl px-3 py-1.5 text-sm outline-none border border-teal-300 focus:ring-2 focus:ring-teal-200"
+                        />
+                        <button onClick={() => submitEdit(msg.id)} className="p-1.5 bg-teal-500 rounded-lg hover:bg-teal-600 active:scale-95 transition">
+                          <Check className="w-3.5 h-3.5 text-white" />
+                        </button>
+                        <button onClick={() => { setEditingId(null); setEditContent(""); }} className="p-1.5 bg-stone-200 rounded-lg">
+                          <X className="w-3.5 h-3.5 text-stone-600" />
+                        </button>
+                      </div>
+                    ) : msg.image_url ? (
+                      <div>
+                        <a href={msg.image_url} target="_blank" rel="noopener noreferrer">
+                          <img src={msg.image_url} alt="Shared image" className="rounded-2xl max-w-[220px] max-h-[220px] object-cover mb-1 cursor-pointer hover:opacity-90 transition" />
+                        </a>
+                        {msg.content && msg.content !== "📷 Image" && <p className="text-sm mt-1 break-words">{msg.content}</p>}
+                      </div>
+                    ) : (() => {
+                      const { quoted, main } = parseQuoted(msg.content);
+                      return (
+                        <>
+                          {quoted && (
+                            <div className={`mb-2 pl-2.5 border-l-2 rounded-sm py-0.5 ${
+                              msg.is_mine ? "border-teal-400 bg-teal-50/60" : "border-teal-400 bg-teal-50/60"
+                            }`}>
+                              <p className="text-xs font-semibold text-teal-600">↩ @{quoted.sender}</p>
+                              <p className="text-xs text-stone-500 truncate">{quoted.text}</p>
+                            </div>
+                          )}
+                          <p className="text-sm leading-relaxed break-words">{main}</p>
+                        </>
+                      );
+                    })()}
+
+                    {msg.is_edited && (
+                      <p className="text-[10px] text-stone-400 italic mt-1">edited</p>
+                    )}
+                  </motion.div>
+
+                  {/* Timestamp + read receipt — outside bubble */}
+                  <div className={`flex items-center gap-1 mt-1 px-1 ${msg.is_mine ? "justify-end" : "justify-start"}`}>
+                    <span className="text-[11px] text-stone-400">{fmtTime(msg.created_at)}</span>
+                    {msg.is_mine && (
+                      msg.is_read
+                        ? <CheckCheck className="w-3.5 h-3.5 text-teal-500 flex-shrink-0" />
+                        : <Check className="w-3.5 h-3.5 text-stone-300 flex-shrink-0" />
+                    )}
+                  </div>
                 </div>
-              </motion.div>
-            </div>
-          </div>
+              </div>
             </div>
           );
         })}
+
+        {/* Typing indicator bubble */}
+        <AnimatePresence>
+          {otherUserTyping && (
+            <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+              className="flex justify-start mb-2">
+              <div className="bg-white rounded-3xl rounded-tl-lg px-4 py-3 shadow-sm border border-stone-100 flex items-center gap-2">
+                <p className="text-xs text-stone-500 font-medium">{otherUser} is typing</p>
+                <div className="flex gap-0.5 items-end">
+                  {[0, 0.15, 0.3].map((delay, i) => (
+                    <motion.div key={i} animate={{ y: [0, -4, 0] }} transition={{ repeat: Infinity, duration: 0.7, delay }}
+                      className="w-1 h-1 bg-stone-400 rounded-full" />
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         <div ref={bottomRef} />
       </div>
 
-      {/* ACTION MENU */}
+      {/* ── ACTION MENU ── */}
       <AnimatePresence>
         {actionMenu && (
           <>
             <div className="fixed inset-0 z-40" onClick={() => setActionMenu(null)} />
-            <motion.div
-              ref={menuRef}
-              initial={{ opacity: 0, scale: 0.85 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.85 }}
+            <motion.div ref={menuRef}
+              initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.85 }}
               transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-              style={{
-                position: 'fixed',
-                top: actionMenu.y,
-                left: Math.min(Math.max(actionMenu.x - 90, 8), window.innerWidth - 210),
-                zIndex: 50,
-              }}
-              className="bg-white rounded-2xl shadow-2xl border border-stone-100 overflow-hidden min-w-[200px]"
-            >
-              {/* Reply */}
-              <button
-                onClick={() => {
-                  const msg = messages.find(m => m.id === actionMenu.messageId);
-                  if (msg) setReplyingTo(msg);
-                  setActionMenu(null);
-                }}
-                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-stone-50 transition text-left"
-              >
-                <CornerDownLeft className="w-4 h-4 text-teal-500" />
-                <span className="text-sm font-medium text-stone-800">Reply</span>
+              style={{ position: 'fixed', top: actionMenu.y, left: Math.min(Math.max(actionMenu.x - 90, 8), window.innerWidth - 210), zIndex: 50 }}
+              className="bg-white rounded-2xl shadow-2xl border border-stone-100 overflow-hidden min-w-[200px]">
+
+              <button onClick={() => { const msg = messages.find(m => m.id === actionMenu.messageId); if (msg) setReplyingTo(msg); setActionMenu(null); }}
+                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-stone-50 transition text-left">
+                <CornerDownLeft className="w-4 h-4 text-teal-500" /><span className="text-sm font-medium text-stone-800">Reply</span>
               </button>
 
-              {/* Copy */}
-              <button
-                onClick={() => {
-                  const msg = messages.find(m => m.id === actionMenu.messageId);
-                  if (msg) {
-                    const { main } = parseQuoted(msg.content || '');
-                    navigator.clipboard.writeText(main);
-                  }
-                  setActionMenu(null);
-                }}
-                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-stone-50 transition text-left border-t border-stone-50"
-              >
-                <Copy className="w-4 h-4 text-stone-500" />
-                <span className="text-sm font-medium text-stone-800">Copy</span>
+              <button onClick={() => { const msg = messages.find(m => m.id === actionMenu.messageId); if (msg) { const { main } = parseQuoted(msg.content || ''); navigator.clipboard.writeText(main); } setActionMenu(null); }}
+                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-stone-50 transition text-left border-t border-stone-50">
+                <Copy className="w-4 h-4 text-stone-500" /><span className="text-sm font-medium text-stone-800">Copy</span>
               </button>
 
-              {/* Pin / Unpin */}
-              <button
-                onClick={() => togglePin(actionMenu.messageId)}
-                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-stone-50 transition text-left border-t border-stone-50"
-              >
+              <button onClick={() => togglePin(actionMenu.messageId)}
+                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-stone-50 transition text-left border-t border-stone-50">
                 {actionMenu.is_pinned
                   ? <><PinOff className="w-4 h-4 text-teal-500" /><span className="text-sm font-medium text-stone-800">Unpin</span></>
                   : <><Pin className="w-4 h-4 text-teal-500" /><span className="text-sm font-medium text-stone-800">Pin</span></>
                 }
               </button>
 
-              {/* Edit — only sender, text only */}
               {actionMenu.is_mine && actionMenu.message_type !== 'image' && (
-                <button
-                  onClick={() => {
-                    const msg = messages.find(m => m.id === actionMenu.messageId);
-                    if (msg) startEdit(msg);
-                  }}
-                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-stone-50 transition text-left border-t border-stone-50"
-                >
-                  <Pencil className="w-4 h-4 text-blue-500" />
-                  <span className="text-sm font-medium text-stone-800">Edit</span>
+                <button onClick={() => { const msg = messages.find(m => m.id === actionMenu.messageId); if (msg) startEdit(msg); }}
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-stone-50 transition text-left border-t border-stone-50">
+                  <Pencil className="w-4 h-4 text-blue-500" /><span className="text-sm font-medium text-stone-800">Edit</span>
                 </button>
               )}
 
-              {/* Delete sub-menu */}
               {!actionMenu.showDeleteOptions ? (
-                <button
-                  onClick={() => setActionMenu(prev => prev ? { ...prev, showDeleteOptions: true } : null)}
-                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-red-50 transition text-left border-t border-stone-50"
-                >
-                  <Trash2 className="w-4 h-4 text-red-500" />
-                  <span className="text-sm font-medium text-red-600">Delete</span>
+                <button onClick={() => setActionMenu(p => p ? { ...p, showDeleteOptions: true } : null)}
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-red-50 transition text-left border-t border-stone-50">
+                  <Trash2 className="w-4 h-4 text-red-500" /><span className="text-sm font-medium text-red-600">Delete</span>
                 </button>
               ) : (
                 <>
                   <div className="px-4 py-2 border-t border-stone-50 bg-stone-50">
                     <p className="text-xs font-semibold text-stone-400 uppercase tracking-wide">Delete message</p>
                   </div>
-
-                  <button
-                    onClick={() => deleteForMe(actionMenu.messageId)}
-                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-red-50 transition text-left"
-                  >
+                  <button onClick={() => deleteForMe(actionMenu.messageId)}
+                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-red-50 transition text-left">
                     <UserX className="w-4 h-4 text-orange-500" />
-                    <div>
-                      <p className="text-sm font-medium text-stone-800">Delete for me</p>
-                      <p className="text-xs text-stone-400">Only you won't see this</p>
-                    </div>
+                    <div><p className="text-sm font-medium text-stone-800">Delete for me</p><p className="text-xs text-stone-400">Only you won't see this</p></div>
                   </button>
-
                   {actionMenu.is_mine && canDeleteForEveryone(actionMenu.created_at) && (
-                    <button
-                      onClick={() => deleteForEveryone(actionMenu.messageId)}
-                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-red-50 transition text-left border-t border-stone-50"
-                    >
+                    <button onClick={() => deleteForEveryone(actionMenu.messageId)}
+                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-red-50 transition text-left border-t border-stone-50">
                       <Users className="w-4 h-4 text-red-500" />
-                      <div>
-                        <p className="text-sm font-medium text-red-600">Delete for everyone</p>
-                        <p className="text-xs text-stone-400">Removes for all participants</p>
-                      </div>
+                      <div><p className="text-sm font-medium text-red-600">Delete for everyone</p><p className="text-xs text-stone-400">Removes for all participants</p></div>
                     </button>
                   )}
-
-                  <button
-                    onClick={() => setActionMenu(prev => prev ? { ...prev, showDeleteOptions: false } : null)}
-                    className="w-full flex items-center justify-center px-4 py-2.5 text-xs text-stone-400 hover:text-stone-600 border-t border-stone-50 transition"
-                  >
+                  <button onClick={() => setActionMenu(p => p ? { ...p, showDeleteOptions: false } : null)}
+                    className="w-full flex items-center justify-center px-4 py-2.5 text-xs text-stone-400 hover:text-stone-600 border-t border-stone-50 transition">
                     ← Back
                   </button>
                 </>
@@ -770,17 +666,15 @@ export default function ChatRoomPage() {
         )}
       </AnimatePresence>
 
-      {/* SCROLL TO BOTTOM BUTTON */}
+      {/* ── SCROLL TO BOTTOM ── */}
       {showScrollBtn && (
-        <button
-          onClick={() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' })}
-          className="fixed bottom-24 right-4 z-30 w-10 h-10 bg-white shadow-lg border border-stone-200 rounded-full flex items-center justify-center active:scale-95 transition"
-        >
+        <button onClick={() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' })}
+          className="fixed bottom-28 right-4 z-30 w-10 h-10 bg-white shadow-lg border border-stone-200 rounded-full flex items-center justify-center active:scale-95 transition">
           <ChevronDown className="w-5 h-5 text-stone-600" />
         </button>
       )}
 
-      {/* IMAGE PREVIEW */}
+      {/* ── IMAGE PREVIEW ── */}
       {imagePreview && (
         <div className="flex-shrink-0 bg-white border-t border-stone-100 px-4 py-2 flex items-center gap-3">
           <div className="relative flex-shrink-0">
@@ -793,7 +687,7 @@ export default function ChatRoomPage() {
         </div>
       )}
 
-      {/* INPUT BAR */}
+      {/* ── INPUT BAR ── */}
       <div className="flex-shrink-0 bg-white border-t border-stone-100">
         {/* Reply preview */}
         {replyingTo && (
@@ -803,33 +697,42 @@ export default function ChatRoomPage() {
               <p className="text-xs font-semibold text-teal-600">↩ @{replyingTo.sender_username}</p>
               <p className="text-xs text-stone-400 truncate">{parseQuoted(replyingTo.content || '').main || '📷 Image'}</p>
             </div>
-            <button onClick={() => setReplyingTo(null)} aria-label="Cancel reply" className="p-2 text-stone-400 hover:text-stone-600 flex-shrink-0">
+            <button onClick={() => setReplyingTo(null)} className="p-2 text-stone-400 hover:text-stone-600 flex-shrink-0">
               <X className="w-4 h-4" />
             </button>
           </div>
         )}
+
         <div className="px-4 py-3 flex items-center gap-2">
           <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageSelect} />
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className="p-2.5 bg-teal-50 text-teal-600 rounded-xl hover:bg-teal-100 transition flex-shrink-0"
-          >
-            <ImageIcon className="w-5 h-5" />
+
+          {/* Pill input */}
+          <div className="flex-1 flex items-center bg-stone-100 rounded-full px-4 py-2 gap-2">
+            <input
+              value={input}
+              onChange={e => handleTyping(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+              placeholder={imageFile ? "Add a caption..." : replyingTo ? "Write your reply..." : "Type message..."}
+              className="flex-1 bg-transparent text-stone-900 text-sm focus:outline-none placeholder-stone-400"
+            />
+            {/* Image attach inside pill */}
+            <button onClick={() => fileInputRef.current?.click()}
+              className="text-stone-400 hover:text-teal-500 transition flex-shrink-0">
+              <ImageIcon className="w-4.5 h-4.5" />
+            </button>
+          </div>
+
+          {/* Mic */}
+          <button className="w-11 h-11 rounded-full bg-stone-100 flex items-center justify-center text-stone-500 hover:bg-stone-200 transition active:scale-95 flex-shrink-0">
+            <Mic className="w-5 h-5" />
           </button>
-          <input
-            value={input}
-            onChange={e => handleTyping(e.target.value)}
-            onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-            placeholder={imageFile ? "Add a caption (optional)..." : replyingTo ? "Write your reply..." : "Type a message..."}
-            className="flex-1 px-4 py-2.5 bg-stone-50 text-stone-900 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/30 border border-stone-200 placeholder-stone-400"
-          />
-          <button
-            onClick={handleSend}
+
+          {/* Send */}
+          <button onClick={handleSend}
             disabled={sending || (!input.trim() && !imageFile)}
-            className="p-2.5 text-white rounded-xl disabled:opacity-40 flex-shrink-0 transition active:scale-95"
-            style={{ background: GRAD }}
-          >
-            {sending ? <Loader className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
+            className="w-11 h-11 rounded-full flex items-center justify-center text-white disabled:opacity-40 flex-shrink-0 transition active:scale-95 shadow-md"
+            style={{ background: "#0d9488" }}>
+            {sending ? <Loader className="w-4.5 h-4.5 animate-spin" /> : <Send className="w-4.5 h-4.5" />}
           </button>
         </div>
       </div>
