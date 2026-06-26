@@ -33,6 +33,13 @@ const DOT_BG: React.CSSProperties = {
 
 const JK: React.CSSProperties = { fontFamily: "'Plus Jakarta Sans', sans-serif" };
 
+const GRAD_TEXT: React.CSSProperties = {
+  background: GRAD,
+  WebkitBackgroundClip: "text",
+  WebkitTextFillColor: "transparent",
+  backgroundClip: "text",
+};
+
 /* ─── HELPERS ─────────────────────────────────────────── */
 function Stars({ count }: { count: number }) {
   return (
@@ -46,9 +53,37 @@ function Stars({ count }: { count: number }) {
 
 function SectionPill({ label }: { label: string }) {
   return (
-    <span className="inline-block px-3 py-1 rounded-full text-xs font-semibold border border-stone-300 bg-white text-stone-600 mb-5">
+    <span
+      className="inline-block px-3 py-1 rounded-full text-xs font-semibold border mb-5"
+      style={{ borderColor: "#0D9488", color: "#0D9488", backgroundColor: "rgba(13,148,136,0.06)" }}
+    >
       {label}
     </span>
+  );
+}
+
+/* Mini listing card used inside hero floating panels */
+function MiniListingCard({ listing, size = "md" }: { listing: any; size?: "sm" | "md" }) {
+  const sm = size === "sm";
+  return (
+    <div className={`flex items-center gap-2.5 ${sm ? "p-2" : "p-2.5"}`}>
+      <div className={`${sm ? "w-9 h-9" : "w-11 h-11"} rounded-xl overflow-hidden bg-stone-100 flex-shrink-0`}>
+        {listing?.image
+          ? <img src={listing.image} alt={listing.title} className="w-full h-full object-cover" />
+          : <div className="w-full h-full bg-stone-200 animate-pulse" />
+        }
+      </div>
+      <div className="min-w-0">
+        <p className={`font-semibold text-stone-900 truncate ${sm ? "text-[11px]" : "text-xs"}`}>{listing?.title ?? "Loading..."}</p>
+        <div className="flex items-center gap-1 mt-0.5">
+          <Star className="w-2.5 h-2.5 fill-amber-400 text-amber-400 flex-shrink-0" />
+          <span className="text-[10px] text-stone-500">4.9</span>
+          {listing?.price && (
+            <span className="text-[10px] font-bold ml-1" style={GRAD_TEXT}>₦{Number(listing.price).toLocaleString()}</span>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -63,6 +98,8 @@ export default function LandingClient({ initialListings }: { initialListings: an
 
   const scrollTo = (id: string) =>
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
+
+  const l = initialListings;
 
   return (
     <>
@@ -86,7 +123,7 @@ export default function LandingClient({ initialListings }: { initialListings: an
                 <Image src="/images/logo-1.jpg" alt="StudEx" width={32} height={32} className="w-full h-full object-contain" />
               </div>
               <span className="font-black text-stone-900" style={JK}>
-                Stud<span className="text-transparent bg-clip-text" style={{ backgroundImage: GRAD }}>Ex</span>
+                Stud<span style={GRAD_TEXT}>Ex</span>
               </span>
             </Link>
 
@@ -111,14 +148,128 @@ export default function LandingClient({ initialListings }: { initialListings: an
         </nav>
 
         {/* ── HERO ──────────────────────────────────────────── */}
-        <section style={DOT_BG} className="relative overflow-hidden pt-20 pb-20 px-5">
-          <div className="max-w-3xl mx-auto text-center">
+        <section
+          style={DOT_BG}
+          className="relative overflow-hidden flex items-center justify-center min-h-[680px] md:min-h-[760px] py-16 px-5"
+        >
+          {/* ── Floating cards — absolutely positioned in all 4 corners on desktop ── */}
+
+          {/* TOP-LEFT: listing card stack */}
+          <motion.div
+            initial={{ opacity: 0, x: -30, y: -10 }}
+            animate={{ opacity: 1, x: 0, y: 0 }}
+            transition={{ delay: 0.3, duration: 0.7, ease: "easeOut" }}
+            className="absolute top-10 left-[2%] xl:left-[6%] hidden lg:block w-52"
+            style={{ rotate: "-3deg" } as any}
+          >
+            <div className="bg-white rounded-2xl shadow-lg border border-stone-100 overflow-hidden">
+              <div className="px-3 pt-3 pb-1">
+                <p className="text-[10px] font-bold text-stone-400 uppercase tracking-wide mb-1">Featured</p>
+              </div>
+              {l[0] && <MiniListingCard listing={l[0]} />}
+              {l[1] && <MiniListingCard listing={l[1]} />}
+              <div className="mx-3 mb-3 mt-1">
+                <div className="h-px bg-stone-100 mb-2" />
+                <span className="text-[10px] font-semibold" style={GRAD_TEXT}>View all listings →</span>
+              </div>
+            </div>
+          </motion.div>
+
+          {/* TOP-RIGHT: single listing + vendor badge */}
+          <motion.div
+            initial={{ opacity: 0, x: 30, y: -10 }}
+            animate={{ opacity: 1, x: 0, y: 0 }}
+            transition={{ delay: 0.4, duration: 0.7, ease: "easeOut" }}
+            className="absolute top-10 right-[2%] xl:right-[6%] hidden lg:block w-48"
+            style={{ rotate: "2.5deg" } as any}
+          >
+            {l[2] ? (
+              <div className="bg-white rounded-2xl shadow-lg border border-stone-100 overflow-hidden">
+                <img src={l[2].image} alt={l[2].title} className="w-full h-28 object-cover" />
+                <div className="p-3">
+                  <p className="text-xs font-bold text-stone-900 line-clamp-1">{l[2].title}</p>
+                  <div className="flex items-center justify-between mt-1.5">
+                    <span className="text-[10px] font-semibold" style={GRAD_TEXT}>₦{Number(l[2].price ?? 0).toLocaleString()}</span>
+                    <span className="text-[10px] text-stone-400 flex items-center gap-0.5">
+                      <Star className="w-2.5 h-2.5 fill-amber-400 text-amber-400" /> 4.9
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-white rounded-2xl shadow-lg border border-stone-100 p-3">
+                <div className="w-full h-24 rounded-xl bg-stone-100 animate-pulse mb-2" />
+                <div className="h-3 bg-stone-100 rounded animate-pulse" />
+              </div>
+            )}
+          </motion.div>
+
+          {/* BOTTOM-LEFT: mini listing grid */}
+          <motion.div
+            initial={{ opacity: 0, x: -30, y: 10 }}
+            animate={{ opacity: 1, x: 0, y: 0 }}
+            transition={{ delay: 0.5, duration: 0.7, ease: "easeOut" }}
+            className="absolute bottom-10 left-[2%] xl:left-[6%] hidden lg:block w-52"
+            style={{ rotate: "2deg" } as any}
+          >
+            <div className="bg-white rounded-2xl shadow-lg border border-stone-100 p-3">
+              <p className="text-[10px] font-bold text-stone-400 uppercase tracking-wide mb-2">Just listed</p>
+              <div className="grid grid-cols-2 gap-1.5">
+                {[l[3], l[4], l[5], l[6]].map((listing, i) => (
+                  listing ? (
+                    <div key={i} className="rounded-xl overflow-hidden bg-stone-50 border border-stone-100">
+                      <img src={listing.image} alt={listing.title} className="w-full aspect-square object-cover" />
+                    </div>
+                  ) : (
+                    <div key={i} className="rounded-xl bg-stone-100 animate-pulse aspect-square" />
+                  )
+                ))}
+              </div>
+              <div className="mt-2.5 flex items-center justify-between">
+                <span className="text-[10px] text-stone-400">53+ services available</span>
+                <div className="w-5 h-5 rounded-full flex items-center justify-center" style={{ background: GRAD }}>
+                  <span className="text-white text-[8px] font-bold">→</span>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+
+          {/* BOTTOM-RIGHT: secure payment + campus card */}
+          <motion.div
+            initial={{ opacity: 0, x: 30, y: 10 }}
+            animate={{ opacity: 1, x: 0, y: 0 }}
+            transition={{ delay: 0.6, duration: 0.7, ease: "easeOut" }}
+            className="absolute bottom-10 right-[2%] xl:right-[6%] hidden lg:block w-48"
+            style={{ rotate: "-2deg" } as any}
+          >
+            <div className="bg-white rounded-2xl shadow-lg border border-stone-100 p-3 mb-3">
+              <div className="w-8 h-8 rounded-xl flex items-center justify-center mb-2" style={{ background: GRAD }}>
+                <ShieldCheck className="w-4 h-4 text-white" />
+              </div>
+              <p className="text-xs font-bold text-stone-900">Secure Payment</p>
+              <p className="text-[10px] text-stone-400 mt-0.5 leading-snug">Escrow-protected. Pay only when satisfied.</p>
+            </div>
+            <div className="bg-white rounded-2xl shadow-lg border border-stone-100 p-3">
+              <div className="flex -space-x-2 mb-2">
+                {["/images/pau-logo.png", "/images/futo-logo.png", "/images/imsu-logo.png"].map((src, i) => (
+                  <div key={i} className="w-6 h-6 rounded-full bg-stone-100 border-2 border-white overflow-hidden">
+                    <Image src={src} alt="campus" width={24} height={24} className="w-full h-full object-contain" />
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs font-bold text-stone-900">3 Campuses</p>
+              <p className="text-[10px] text-stone-400">PAU · FUTO · IMSU</p>
+            </div>
+          </motion.div>
+
+          {/* ── Center content ── */}
+          <div className="relative z-10 max-w-2xl mx-auto text-center">
 
             {/* Logo badge */}
             <motion.div
               initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5 }}
-              className="flex justify-center mb-8"
+              className="flex justify-center mb-7"
             >
               <div className="w-16 h-16 rounded-2xl overflow-hidden shadow-md border border-stone-200 bg-white p-1.5">
                 <Image src="/images/logo-1.jpg" alt="StudEx" width={64} height={64} className="w-full h-full object-contain" />
@@ -134,22 +285,23 @@ export default function LandingClient({ initialListings }: { initialListings: an
             >
               <span className="text-stone-900">Buy, book &amp; order</span>
               <br />
-              <span className="text-stone-400">on your campus.</span>
+              <span className="text-stone-400">on your </span>
+              <span style={GRAD_TEXT}>campus.</span>
             </motion.h1>
 
             <motion.p
               initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.1 }}
-              className="text-stone-500 text-lg md:text-xl max-w-xl mx-auto mb-8"
+              className="text-stone-500 text-lg max-w-md mx-auto mb-7"
             >
-              StudEx connects you to verified vendors on campus — food, beauty, laundry, photography and more.
+              Verified vendors on campus — food, beauty, laundry, photography and more.
             </motion.p>
 
             {/* CTAs */}
             <motion.div
               initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.15 }}
-              className="flex flex-wrap justify-center gap-3 mb-10"
+              className="flex flex-wrap justify-center gap-3 mb-8"
             >
               <Link href="/auth">
                 <button className="px-7 py-3.5 text-white font-semibold rounded-full shadow-md hover:opacity-90 transition" style={{ background: GRAD }}>
@@ -167,7 +319,7 @@ export default function LandingClient({ initialListings }: { initialListings: an
             <motion.div
               initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.2 }}
-              className="flex flex-wrap justify-center gap-2 mb-14"
+              className="flex flex-wrap justify-center gap-2"
             >
               {["🍜 Food", "💅 Nails", "🧺 Laundry", "📸 Photography", "👗 Fashion", "💇 Hair", "💄 Makeup", "💪 Fitness"].map(s => (
                 <span key={s} className="px-3 py-1.5 rounded-full bg-white border border-stone-200 text-stone-600 text-xs font-medium shadow-sm">
@@ -176,92 +328,37 @@ export default function LandingClient({ initialListings }: { initialListings: an
               ))}
             </motion.div>
 
-            {/* Floating cards — desktop only */}
-            <div className="hidden lg:block relative h-0">
-              {/* Listing card — top left */}
-              <motion.div
-                initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.35, duration: 0.6 }}
-                className="absolute -left-60 -top-56 w-44 bg-white rounded-2xl shadow-lg border border-stone-100 p-3 text-left"
-              >
-                <div className="text-2xl mb-1">🍛</div>
-                <p className="font-bold text-stone-900 text-sm">Jollof Rice</p>
-                <p className="text-stone-400 text-xs">@chef_ade</p>
-                <div className="flex items-center gap-1 mt-1">
-                  <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
-                  <span className="text-xs text-stone-600 font-medium">4.9</span>
-                </div>
-                <p className="text-teal-600 font-bold text-sm mt-1">₦1,500</p>
-                <button className="mt-2 w-full py-1.5 text-white text-xs font-semibold rounded-full" style={{ background: GRAD }}>
-                  Order Now
-                </button>
-              </motion.div>
+          </div>
+        </section>
 
-              {/* Payment card — top right */}
-              <motion.div
-                initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.4, duration: 0.6 }}
-                className="absolute -right-60 -top-56 w-44 bg-white rounded-2xl shadow-lg border border-stone-100 p-3 text-left"
-              >
-                <div className="w-8 h-8 rounded-xl flex items-center justify-center mb-2" style={{ background: GRAD }}>
-                  <ShieldCheck className="w-4 h-4 text-white" />
+        {/* ── MOBILE LISTING STRIP ──────────────────────────── */}
+        <section className="lg:hidden bg-white border-b border-stone-100 py-4 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
+          <div className="flex gap-3 px-5 w-max">
+            {(l.length > 0 ? l.slice(0, 8) : Array(8).fill(null)).map((listing: any, i: number) => (
+              <div key={i} className="w-28 flex-shrink-0">
+                <div className="rounded-xl overflow-hidden bg-stone-100 border border-stone-100">
+                  {listing?.image
+                    ? <img src={listing.image} alt={listing.title} className="w-full aspect-square object-cover" />
+                    : <div className="w-full aspect-square bg-stone-200 animate-pulse" />
+                  }
                 </div>
-                <p className="font-bold text-stone-900 text-sm">Secure Payment</p>
-                <p className="text-stone-400 text-xs mt-0.5 leading-snug">Escrow-protected. Funds held until you confirm delivery.</p>
-              </motion.div>
-
-              {/* Vendor card — bottom left */}
-              <motion.div
-                initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.5, duration: 0.6 }}
-                className="absolute -left-56 top-6 w-44 bg-white rounded-2xl shadow-lg border border-stone-100 p-3 text-left"
-              >
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0" style={{ background: GRAD }}>N</div>
-                  <div>
-                    <p className="text-xs font-bold text-stone-900">@nail_queen</p>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-600 border border-amber-200 font-semibold">TOP</span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-1">
-                  <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
-                  <span className="text-xs font-medium text-stone-600">4.9</span>
-                </div>
-                <span className="mt-2 inline-block text-[10px] px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200 font-semibold">✓ Verified Vendor</span>
-              </motion.div>
-
-              {/* Campus card — bottom right */}
-              <motion.div
-                initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.6, duration: 0.6 }}
-                className="absolute -right-52 top-8 w-44 bg-white rounded-2xl shadow-lg border border-stone-100 p-3 text-left"
-              >
-                <div className="flex -space-x-2 mb-2">
-                  {["/images/pau-logo.png", "/images/futo-logo.png", "/images/imsu-logo.png"].map((src, i) => (
-                    <div key={i} className="w-7 h-7 rounded-full bg-stone-100 border-2 border-white overflow-hidden flex items-center justify-center">
-                      <Image src={src} alt="campus" width={28} height={28} className="w-full h-full object-contain" />
-                    </div>
-                  ))}
-                </div>
-                <p className="text-xs font-bold text-stone-900">3 Campuses</p>
-                <p className="text-[10px] text-stone-400 mt-0.5">PAU · FUTO · IMSU</p>
-              </motion.div>
-            </div>
-
+                <p className="text-[11px] font-semibold text-stone-800 mt-1.5 line-clamp-1 px-0.5">{listing?.title ?? ""}</p>
+              </div>
+            ))}
           </div>
         </section>
 
         {/* ── STATS BAR ─────────────────────────────────────── */}
-        <section className="bg-white border-y border-stone-200 py-6 px-5">
+        <section className="bg-white border-b border-stone-200 py-6 px-5">
           <div className="max-w-2xl mx-auto grid grid-cols-4 text-center">
             {[
-              { value: "70+",  label: "Vendors"   },
-              { value: "320+", label: "Listings"  },
-              { value: "53+",  label: "Services"  },
-              { value: "3",    label: "Campuses"  },
+              { value: "70+",  label: "Vendors"  },
+              { value: "320+", label: "Listings" },
+              { value: "53+",  label: "Services" },
+              { value: "3",    label: "Campuses" },
             ].map(stat => (
               <div key={stat.label}>
-                <p className="text-2xl font-extrabold text-stone-900" style={JK}>{stat.value}</p>
+                <p className="text-2xl font-extrabold" style={{ ...JK, ...GRAD_TEXT }}>{stat.value}</p>
                 <p className="text-xs text-stone-400 font-medium mt-0.5">{stat.label}</p>
               </div>
             ))}
@@ -278,7 +375,7 @@ export default function LandingClient({ initialListings }: { initialListings: an
             >
               <SectionPill label="Solutions" />
               <h2 className="text-4xl md:text-5xl font-extrabold text-stone-900 tracking-tight" style={JK}>
-                Solve your campus needs
+                Solve your <span style={GRAD_TEXT}>campus</span> needs
               </h2>
             </motion.div>
             <div className="grid md:grid-cols-3 gap-4">
@@ -314,7 +411,7 @@ export default function LandingClient({ initialListings }: { initialListings: an
             >
               <SectionPill label="Product" />
               <h2 className="text-4xl md:text-5xl font-extrabold text-stone-900 tracking-tight" style={JK}>
-                See it in action
+                See it in <span style={GRAD_TEXT}>action</span>
               </h2>
             </motion.div>
 
@@ -337,9 +434,9 @@ export default function LandingClient({ initialListings }: { initialListings: an
 
               {/* Mini listing grid */}
               <div className="bg-[#FFF8F0] p-4">
-                {initialListings.length > 0 ? (
+                {l.length > 0 ? (
                   <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
-                    {initialListings.slice(0, 6).map((listing: any) => (
+                    {l.slice(0, 6).map((listing: any) => (
                       <div key={listing.id} className="rounded-xl overflow-hidden bg-white border border-stone-100 shadow-sm">
                         <img src={listing.image} alt={listing.title} className="w-full aspect-square object-cover" />
                         <div className="p-1.5">
@@ -370,7 +467,7 @@ export default function LandingClient({ initialListings }: { initialListings: an
             >
               <SectionPill label="Features" />
               <h2 className="text-4xl md:text-5xl font-extrabold text-stone-900 tracking-tight" style={JK}>
-                Keep everything in one place
+                Everything in <span style={GRAD_TEXT}>one place</span>
               </h2>
             </motion.div>
 
@@ -379,19 +476,22 @@ export default function LandingClient({ initialListings }: { initialListings: an
               <motion.div
                 initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }} transition={{ duration: 0.5 }}
-                className="md:row-span-2 bg-white rounded-2xl border border-stone-200 p-6 shadow-sm flex flex-col"
+                className="md:row-span-2 rounded-2xl border border-stone-200 shadow-sm flex flex-col overflow-hidden"
+                style={{ background: "linear-gradient(180deg, #ffffff 60%, rgba(13,148,136,0.06) 100%)" }}
               >
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-4" style={{ background: GRAD }}>
-                  <Search className="w-5 h-5 text-white" />
-                </div>
-                <p className="font-bold text-stone-900 text-lg mb-2" style={JK}>Browse &amp; Discover</p>
-                <p className="text-stone-500 text-sm leading-relaxed mb-6">
-                  Explore dozens of categories across campus — all in one beautifully organised marketplace.
-                </p>
-                <div className="flex flex-wrap gap-2 mt-auto">
-                  {["🍜 Food", "💅 Nails", "🧺 Laundry", "📸 Photo", "👗 Fashion", "💇 Hair"].map(s => (
-                    <span key={s} className="px-2.5 py-1 rounded-full text-xs font-medium bg-stone-50 border border-stone-200 text-stone-600">{s}</span>
-                  ))}
+                <div className="p-6 flex-1 flex flex-col">
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-4" style={{ background: GRAD }}>
+                    <Search className="w-5 h-5 text-white" />
+                  </div>
+                  <p className="font-bold text-stone-900 text-lg mb-2" style={JK}>Browse &amp; Discover</p>
+                  <p className="text-stone-500 text-sm leading-relaxed mb-6">
+                    Explore dozens of categories across campus — all in one beautifully organised marketplace.
+                  </p>
+                  <div className="flex flex-wrap gap-2 mt-auto">
+                    {["🍜 Food", "💅 Nails", "🧺 Laundry", "📸 Photo", "👗 Fashion", "💇 Hair"].map(s => (
+                      <span key={s} className="px-2.5 py-1 rounded-full text-xs font-medium bg-stone-50 border border-stone-200 text-stone-600">{s}</span>
+                    ))}
+                  </div>
                 </div>
               </motion.div>
 
@@ -460,7 +560,7 @@ export default function LandingClient({ initialListings }: { initialListings: an
             >
               <SectionPill label="Testimonials" />
               <h2 className="text-4xl md:text-5xl font-extrabold text-stone-900 tracking-tight max-w-lg mx-auto" style={JK}>
-                Students just like you love StudEx
+                Students just like you <span style={GRAD_TEXT}>love StudEx</span>
               </h2>
             </motion.div>
 
@@ -494,7 +594,7 @@ export default function LandingClient({ initialListings }: { initialListings: an
             >
               <SectionPill label="Campuses" />
               <h2 className="text-4xl md:text-5xl font-extrabold text-stone-900 tracking-tight mb-14" style={JK}>
-                Where we operate
+                Where we <span style={GRAD_TEXT}>operate</span>
               </h2>
             </motion.div>
             <div className="flex flex-wrap justify-center gap-10 md:gap-20">
@@ -531,7 +631,7 @@ export default function LandingClient({ initialListings }: { initialListings: an
             >
               <SectionPill label="Get Started" />
               <h2 className="text-4xl md:text-5xl font-extrabold text-stone-900 tracking-tight mb-3" style={JK}>
-                Ready to get started?
+                Ready to get <span style={GRAD_TEXT}>started?</span>
               </h2>
               <p className="text-stone-400 text-sm mb-10">Free to join. No hidden charges.</p>
             </motion.div>
@@ -577,7 +677,7 @@ export default function LandingClient({ initialListings }: { initialListings: an
                     <Image src="/images/logo-1.jpg" alt="StudEx" width={32} height={32} className="w-full h-full object-contain" />
                   </div>
                   <span className="font-black text-stone-900" style={JK}>
-                    Stud<span className="text-transparent bg-clip-text" style={{ backgroundImage: GRAD }}>Ex</span>
+                    Stud<span style={GRAD_TEXT}>Ex</span>
                   </span>
                 </div>
                 <p className="text-stone-400 text-sm leading-relaxed">
