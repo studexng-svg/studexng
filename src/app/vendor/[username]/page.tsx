@@ -127,7 +127,7 @@ export default function VendorProfilePage() {
   if (loading) return (
     <div className="min-h-screen bg-white" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       <TopNav showBack activeNav="vendors" />
-      <div className="h-52 animate-pulse" style={{ background: "linear-gradient(135deg,#061512 0%,#0d1f1c 50%,#0f0818 100%)" }} />
+      <div className="h-40 animate-pulse bg-stone-100 border-b border-stone-200" />
       <div className="max-w-6xl mx-auto px-4 lg:px-8 pt-8">
         <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3 lg:gap-4">
           {[...Array(8)].map((_, i) => (
@@ -198,26 +198,21 @@ export default function VendorProfilePage() {
       )}
 
       {/* ══════════ HERO ══════════ */}
-      <div className="relative overflow-hidden"
-        style={{ background: "linear-gradient(135deg,#061512 0%,#0d1f1c 40%,#160a28 80%,#0f0818 100%)" }}>
-        <div className="absolute inset-0 opacity-[0.07]"
-          style={{ backgroundImage: "radial-gradient(circle, white 1px, transparent 1px)", backgroundSize: "28px 28px" }} />
-        <div className="absolute top-0 left-0 right-0 h-px" style={{ background: GRAD }} />
-
-        <div className="relative max-w-6xl mx-auto px-4 lg:px-8 pt-7 pb-6">
+      <div className="bg-white border-b border-stone-100">
+        <div className="max-w-6xl mx-auto px-4 lg:px-8 pt-7 pb-6">
           <div className="flex items-start gap-5 lg:gap-7">
 
             {/* Avatar */}
             <div className="relative flex-shrink-0">
-              <div className="w-[72px] h-[72px] lg:w-[88px] lg:h-[88px] rounded-2xl overflow-hidden"
-                style={{ boxShadow: "0 0 0 3px rgba(255,255,255,0.12), 0 0 0 6px rgba(13,148,136,0.15)" }}>
+              <div className="w-[72px] h-[72px] lg:w-[88px] lg:h-[88px] rounded-2xl overflow-hidden shadow-sm"
+                style={{ boxShadow: "0 0 0 3px #fff, 0 0 0 5px rgba(13,148,136,0.35)" }}>
                 {vendor.profile_picture
                   ? <img src={vendor.profile_picture} alt={vendor.username} className="w-full h-full object-cover object-top" />
                   : <div className="w-full h-full flex items-center justify-center text-white font-black text-2xl" style={{ background: GRAD }}>{initials}</div>
                 }
               </div>
               {vendor.is_online && (
-                <span className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-green-400 rounded-full border-2 border-zinc-900 shadow" />
+                <span className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-green-400 rounded-full border-2 border-white shadow" />
               )}
             </div>
 
@@ -226,45 +221,45 @@ export default function VendorProfilePage() {
               <div className="flex items-start justify-between gap-3 flex-wrap">
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <h1 className="text-xl lg:text-2xl font-black text-white leading-tight" style={SERIF}>
+                    <h1 className="text-xl lg:text-2xl font-black text-stone-900 leading-tight" style={SERIF}>
                       {vendor.business_name || vendor.username}
                     </h1>
                     {badge && (
-                      <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${badge.cls}`}>
+                      <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200">
                         {badge.emoji} {badge.label}
                       </span>
                     )}
                   </div>
-                  <p className="text-white/40 text-sm mt-0.5">@{vendor.username}</p>
+                  <p className="text-stone-400 text-sm mt-0.5">@{vendor.username}</p>
 
                   {/* Rating */}
                   {totalReviews > 0 && (
                     <div className="flex items-center gap-1.5 mt-2">
                       <div className="flex gap-0.5">
                         {[1,2,3,4,5].map(n => (
-                          <Star key={n} className={`w-3.5 h-3.5 ${n <= Math.round(vendorRating) ? "fill-amber-400 text-amber-400" : "fill-white/10 text-white/10"}`} />
+                          <Star key={n} className={`w-3.5 h-3.5 ${n <= Math.round(vendorRating) ? "fill-amber-400 text-amber-400" : "fill-stone-200 text-stone-200"}`} />
                         ))}
                       </div>
-                      <span className="text-white font-bold text-sm">{vendorRating.toFixed(1)}</span>
-                      <span className="text-white/30 text-xs">({totalReviews} reviews)</span>
+                      <span className="text-stone-700 font-bold text-sm">{vendorRating.toFixed(1)}</span>
+                      <span className="text-stone-400 text-xs">({totalReviews} reviews)</span>
                     </div>
                   )}
 
                   {/* Meta pills */}
                   <div className="flex flex-wrap gap-2 mt-3">
                     {vendor.hostel && (
-                      <span className="flex items-center gap-1 text-xs text-white/60 bg-white/[0.08] px-2.5 py-1 rounded-full">
-                        <MapPin className="w-3 h-3 text-teal-400" />{vendor.hostel}
+                      <span className="flex items-center gap-1 text-xs text-stone-500 bg-stone-100 px-2.5 py-1 rounded-full">
+                        <MapPin className="w-3 h-3 text-teal-500" />{vendor.hostel}
                       </span>
                     )}
                     {vendor.opening_time && vendor.closing_time && (
-                      <span className="flex items-center gap-1 text-xs text-white/60 bg-white/[0.08] px-2.5 py-1 rounded-full">
-                        <Clock className="w-3 h-3 text-teal-400" />{vendor.opening_time}–{vendor.closing_time}
+                      <span className="flex items-center gap-1 text-xs text-stone-500 bg-stone-100 px-2.5 py-1 rounded-full">
+                        <Clock className="w-3 h-3 text-teal-500" />{vendor.opening_time}–{vendor.closing_time}
                       </span>
                     )}
                     {respLabel && (
-                      <span className="flex items-center gap-1 text-xs text-white/60 bg-white/[0.08] px-2.5 py-1 rounded-full">
-                        <Zap className="w-3 h-3 text-teal-400" />{respLabel} reply
+                      <span className="flex items-center gap-1 text-xs text-stone-500 bg-stone-100 px-2.5 py-1 rounded-full">
+                        <Zap className="w-3 h-3 text-teal-500" />{respLabel} reply
                       </span>
                     )}
                   </div>
@@ -273,7 +268,7 @@ export default function VendorProfilePage() {
                 {/* Actions */}
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <button onClick={handleShare}
-                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 text-white text-sm font-semibold transition">
+                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white hover:bg-stone-50 border border-stone-200 text-stone-600 text-sm font-semibold transition">
                     <Share2 className="w-3.5 h-3.5" />
                     <span className="hidden sm:inline">Share</span>
                   </button>
@@ -289,19 +284,19 @@ export default function VendorProfilePage() {
           </div>
 
           {/* Stats row */}
-          <div className="mt-6 pt-5 border-t border-white/10 flex items-center gap-0">
+          <div className="mt-6 pt-5 border-t border-stone-100 flex items-center gap-0">
             {[
               { value: vendor.completed_order_count || 0,              label: "Orders",     icon: ShoppingCart  },
               { value: `${Math.round(vendor.completion_rate || 0)}%`,  label: "Completion", icon: CheckCircle2  },
               { value: vendor.total_listings || listings.length,        label: "Listings",   icon: Package       },
             ].map(({ value, label, icon: Icon }, i) => (
-              <div key={label} className={`flex items-center gap-3 ${i > 0 ? "ml-6 pl-6 border-l border-white/10" : ""}`}>
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/[0.08] flex-shrink-0">
-                  <Icon className="w-4 h-4 text-teal-400" />
+              <div key={label} className={`flex items-center gap-3 ${i > 0 ? "ml-6 pl-6 border-l border-stone-200" : ""}`}>
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-teal-50 flex-shrink-0">
+                  <Icon className="w-4 h-4 text-teal-600" />
                 </div>
                 <div>
-                  <p className="text-white font-black text-lg leading-none">{value}</p>
-                  <p className="text-white/40 text-xs mt-0.5">{label}</p>
+                  <p className="text-stone-900 font-black text-lg leading-none">{value}</p>
+                  <p className="text-stone-400 text-xs mt-0.5">{label}</p>
                 </div>
               </div>
             ))}
