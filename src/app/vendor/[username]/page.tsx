@@ -127,7 +127,7 @@ export default function VendorProfilePage() {
   if (loading) return (
     <div className="min-h-screen bg-white" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       <TopNav showBack activeNav="vendors" />
-      <div className="h-40 animate-pulse bg-stone-100 border-b border-stone-200" />
+      <div className="h-32 animate-pulse bg-stone-100 border-b border-stone-100" />
       <div className="max-w-6xl mx-auto px-4 lg:px-8 pt-8">
         <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3 lg:gap-4">
           {[...Array(8)].map((_, i) => (
@@ -174,7 +174,7 @@ export default function VendorProfilePage() {
 
   /* ══════════════════════════════════════════════════════════════════════ */
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-white" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+    <div className="min-h-screen bg-white" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       <TopNav showBack activeNav="vendors" />
 
       {/* ── Toast ── */}
@@ -208,11 +208,11 @@ export default function VendorProfilePage() {
         </div>
       )}
 
-      {/* ══════════ TWO-PANEL SHELL (sidebar + scrollable main) ══════════ */}
-      <div className="flex flex-1 min-h-0 overflow-hidden">
+      {/* ══════════ TWO-PANEL ══════════ */}
+      <div className="lg:flex">
 
-        {/* ─── SIDEBAR — stationary, never scrolls ─── */}
-        <aside className="hidden lg:flex flex-col w-64 flex-shrink-0 bg-white border-r border-stone-200 overflow-y-auto">
+        {/* ─── SIDEBAR — sticky, stays in view as page scrolls ─── */}
+        <aside className="hidden lg:flex flex-col w-64 flex-shrink-0 bg-white border-r border-stone-200 sticky top-0 h-screen overflow-y-auto self-start">
 
           {/* Vendor mini header */}
           <div className="flex items-center gap-3 px-4 py-4 border-b border-stone-100 flex-shrink-0">
@@ -326,8 +326,8 @@ export default function VendorProfilePage() {
 
         </aside>
 
-        {/* ─── MAIN — scrollable ─── */}
-        <div className="flex-1 overflow-y-auto">
+        {/* ─── MAIN — normal flow ─── */}
+        <div className="flex-1 min-w-0">
 
           {/* Hero strip */}
           <div className="bg-white border-b border-stone-100 px-5 lg:px-8 pt-7 pb-6">
