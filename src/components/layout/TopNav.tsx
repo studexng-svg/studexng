@@ -27,7 +27,7 @@ export default function TopNav({ showBack = false, backHref, activeNav }: TopNav
   };
 
   return (
-    <header className="sticky top-0 bg-white z-40 border-b border-stone-200 shadow-sm">
+    <header className="lg:hidden sticky top-0 bg-white z-40 border-b border-stone-200 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-4">
 
         {showBack && (
