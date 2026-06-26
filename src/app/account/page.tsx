@@ -559,7 +559,7 @@ export default function AccountPage() {
               </div>
             </div>
           ) : (
-            <div className="relative rounded-2xl p-5 overflow-hidden shadow-md mt-4" style={{ background: "linear-gradient(135deg, #0d9488 0%, #0f766e 100%)" }}>
+            <div className="relative rounded-2xl p-5 overflow-hidden shadow-md mt-4" style={{ background: "linear-gradient(135deg, #7c3aed 0%, #0d9488 100%)" }}>
               <div className="absolute top-0 right-0 w-28 h-28 rounded-full bg-white/10 blur-2xl pointer-events-none" />
               <div className="flex items-start justify-between gap-3">
                 <div>

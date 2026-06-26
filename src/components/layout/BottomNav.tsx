@@ -23,11 +23,7 @@ export default function BottomNav() {
   const { isLoggedIn } = useAuth();
   const [unreadCount, setUnreadCount] = useState(0);
 
-  if (pathname === "/" || pathname === "/auth" || pathname.startsWith("/admin") || pathname.startsWith("/chat")) {
-    return null;
-  }
-
-  // Poll unread count every 30s
+  // Poll unread count every 30s — must be before early returns (Rules of Hooks)
   useEffect(() => {
     if (!isLoggedIn) return;
     const fetchUnread = async () => {
@@ -44,6 +40,11 @@ export default function BottomNav() {
     const interval = setInterval(() => { if (document.visibilityState !== 'hidden') fetchUnread(); }, 30000);
     return () => clearInterval(interval);
   }, [isLoggedIn]);
+
+  // Hide on auth/admin pages and individual chat rooms (but show on /chat list)
+  if (pathname === "/" || pathname === "/auth" || pathname.startsWith("/admin") || pathname.startsWith("/chat/")) {
+    return null;
+  }
 
   return (
     <div className="fixed bottom-4 left-4 right-4 rounded-2xl z-50 max-w-lg mx-auto"
