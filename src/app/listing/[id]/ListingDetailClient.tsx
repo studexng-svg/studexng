@@ -8,13 +8,14 @@ import {
   Star, MessageCircle, ShoppingCart, Calendar,
   Clock, FileText, CheckCircle, AlertCircle,
   ChevronDown, ChevronUp, Send, MapPin, Sparkles, ZoomIn, X as XIcon,
-  Shield, Share2, Tag, Truck, Package
+  Shield, Share2, Tag, Truck, Package, Heart, Minus, Plus,
+  BadgeCheck, Zap,
 } from "lucide-react";
 import TopNav from "@/components/layout/TopNav";
 import { useAuth } from "@/lib/authStore";
 import { useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { GRAD, GRAD_TEXT, SERIF } from "@/lib/tokens";
+import { GRAD, SERIF } from "@/lib/tokens";
 import VendorBadge from "@/components/VendorBadge";
 import ChatWindow from "@/components/ChatWindow";
 import { useAdminMode } from "@/hooks/useAdminMode";
@@ -29,11 +30,9 @@ interface Review {
 }
 
 const TIME_SLOTS = [
-  "6:00 AM", "7:00 AM", "8:00 AM", "9:00 AM",
-  "10:00 AM", "11:00 AM", "12:00 PM", "1:00 PM",
-  "2:00 PM", "3:00 PM", "4:00 PM", "5:00 PM",
-  "6:00 PM", "7:00 PM", "8:00 PM", "9:00 PM",
-  "10:00 PM", "11:00 PM", "12:00 AM",
+  "6:00 AM","7:00 AM","8:00 AM","9:00 AM","10:00 AM","11:00 AM",
+  "12:00 PM","1:00 PM","2:00 PM","3:00 PM","4:00 PM","5:00 PM",
+  "6:00 PM","7:00 PM","8:00 PM","9:00 PM","10:00 PM","11:00 PM","12:00 AM",
 ];
 
 interface Listing {
@@ -63,216 +62,162 @@ interface Listing {
   };
 }
 
-function RelatedSkeleton() {
-  return (
-    <div className="flex gap-3 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
-      {[0, 1, 2].map(i => (
-        <div key={i} className="w-40 flex-shrink-0 bg-stone-100 rounded-2xl h-56 animate-pulse" />
-      ))}
-    </div>
-  );
-}
-
+/* ── Related card ──────────────────────────────────────────────────────── */
 function RelatedCard({ item }: { item: any }) {
   const router = useRouter();
   const isService = (item.listing_type || "").toLowerCase() === "service";
   const src = item.image?.startsWith("http") ? item.image : null;
+  const price = Number(item.deal?.discounted_price ?? item.price);
+  const orig  = item.deal ? Number(item.price) : null;
+
   return (
     <div
-      className="w-40 flex-shrink-0 bg-white rounded-2xl overflow-hidden shadow-sm border border-stone-100 cursor-pointer hover:shadow-md transition-shadow"
-      onClick={() => router.push(`/listing/${item.id}`)}
-    >
-      <div className="aspect-square bg-stone-100 overflow-hidden">
-        {src ? (
-          <img src={src} alt={item.title} className="w-full h-full object-cover" loading="lazy" />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center" style={{ background: GRAD }}>
-            <Sparkles className="w-6 h-6 text-white/60" />
-          </div>
-        )}
+      className="w-44 flex-shrink-0 bg-white rounded-2xl overflow-hidden shadow-sm border border-stone-100 cursor-pointer hover:shadow-md hover:border-stone-200 transition-all group"
+      onClick={() => router.push(`/listing/${item.id}`)}>
+      <div className="aspect-[3/4] bg-stone-50 overflow-hidden">
+        {src
+          ? <img src={src} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-400" loading="lazy" />
+          : <div className="w-full h-full flex items-center justify-center"><Sparkles className="w-6 h-6 text-stone-300" /></div>
+        }
       </div>
-      <div className="p-2.5">
-        <p className="text-xs font-semibold text-stone-800 truncate leading-snug">{item.title}</p>
-        <p className="text-sm font-bold text-teal-600 mt-0.5">₦{Number(item.price).toLocaleString()}</p>
-        <button
-          className="mt-2 w-full py-1.5 text-white text-xs font-bold rounded-lg"
-          style={{
-            background: "linear-gradient(135deg, #2DD4BF 0%, #0D9488 55%, #0f766e 100%)",
-            boxShadow: "0 4px 12px rgba(13,148,136,0.35), inset 0 1px 0 rgba(255,255,255,0.25)",
-          }}
-          onClick={e => { e.stopPropagation(); router.push(`/listing/${item.id}`); }}
-        >
-          {isService ? "Book" : "Add to Cart"}
-        </button>
+      <div className="p-3">
+        <p className="text-xs font-semibold text-stone-800 line-clamp-2 leading-snug mb-1.5">{item.title}</p>
+        <div className="flex items-center gap-1.5">
+          <p className="text-sm font-black text-stone-900">₦{price.toLocaleString()}</p>
+          {orig && <p className="text-xs text-stone-400 line-through">₦{orig.toLocaleString()}</p>}
+        </div>
       </div>
+    </div>
+  );
+}
+
+function RelatedSkeleton() {
+  return (
+    <div className="flex gap-3 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
+      {[0,1,2,3].map(i => (
+        <div key={i} className="w-44 flex-shrink-0 bg-white rounded-2xl overflow-hidden animate-pulse">
+          <div className="aspect-[3/4] bg-stone-100" />
+          <div className="p-3 space-y-2"><div className="h-3 bg-stone-100 rounded" /><div className="h-3 bg-stone-100 rounded w-2/3" /></div>
+        </div>
+      ))}
     </div>
   );
 }
 
 function getStockWarning(data: Listing | null): string {
   if (!data) return "";
-  if (data.track_inventory && (data.stock_quantity ?? 0) <= 3 && (data.stock_quantity ?? 0) > 0) {
+  if (data.track_inventory && (data.stock_quantity ?? 0) <= 3 && (data.stock_quantity ?? 0) > 0)
     return `Only ${data.stock_quantity} left in stock!`;
-  }
   if (data.track_inventory && data.stock_quantity === 0) return "Out of stock";
   return "";
 }
 
-interface Props {
-  id: string;
-  initialListing: Listing | null;
-  initialReviews: Review[];
-}
+interface Props { id: string; initialListing: Listing | null; initialReviews: Review[]; }
 
 export default function ListingDetailClient({ id, initialListing, initialReviews }: Props) {
   const router = useRouter();
   const { isLoggedIn } = useAuth();
   const queryClient = useQueryClient();
   const { isAdmin } = useAdminMode();
-  const [adminLoading, setAdminLoading] = useState<string | null>(null);
+
+  const [adminLoading,  setAdminLoading]  = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
-
-  const [listing, setListing] = useState<Listing | null>(initialListing);
-  const [reviews] = useState<Review[]>(initialReviews);
-  const [stockWarning, setStockWarning] = useState(() => getStockWarning(initialListing));
-  const [showChat, setShowChat] = useState(false);
-  const [showBooking, setShowBooking] = useState(false);
-  const [bookingDate, setBookingDate] = useState("");
-  const [bookingTime, setBookingTime] = useState("");
-  const [bookingNote, setBookingNote] = useState("");
+  const [listing,       setListing]       = useState<Listing | null>(initialListing);
+  const [reviews]                         = useState<Review[]>(initialReviews);
+  const [stockWarning,  setStockWarning]  = useState(() => getStockWarning(initialListing));
+  const [showChat,      setShowChat]      = useState(false);
+  const [showBooking,   setShowBooking]   = useState(false);
+  const [bookingDate,   setBookingDate]   = useState("");
+  const [bookingTime,   setBookingTime]   = useState("");
+  const [bookingNote,   setBookingNote]   = useState("");
   const [bookingLocation, setBookingLocation] = useState("");
-  const [bookingStep, setBookingStep] = useState<"form" | "confirming" | "done">("form");
-  const [bookingError, setBookingError] = useState("");
-  const [toast, setToast] = useState("");
-  const [imageOpen, setImageOpen] = useState(false);
-  const [activeImageIdx, setActiveImageIdx] = useState(0);
+  const [bookingStep,   setBookingStep]   = useState<"form"|"confirming"|"done">("form");
+  const [bookingError,  setBookingError]  = useState("");
+  const [toast,         setToast]         = useState("");
+  const [imageOpen,     setImageOpen]     = useState(false);
+  const [activeIdx,     setActiveIdx]     = useState(0);
+  const [qty,           setQty]           = useState(1);
+  const [descExpanded,  setDescExpanded]  = useState(false);
 
-  const [vendorListings, setVendorListings]           = useState<any[]>([]);
-  const [vendorListingsLoading, setVendorListingsLoading] = useState(false);
-  const [similarItems, setSimilarItems]               = useState<any[]>([]);
-  const [similarLoading, setSimilarLoading]           = useState(false);
-  const [alsoLike, setAlsoLike]                       = useState<any[]>([]);
-  const [alsoLikeLoading, setAlsoLikeLoading]         = useState(false);
+  const [vendorListings, setVendorListings]         = useState<any[]>([]);
+  const [vendorLoading,  setVendorLoading]           = useState(false);
+  const [similarItems,   setSimilarItems]            = useState<any[]>([]);
+  const [similarLoading, setSimilarLoading]          = useState(false);
+  const [alsoLike,       setAlsoLike]               = useState<any[]>([]);
+  const [alsoLikeLoading, setAlsoLikeLoading]       = useState(false);
 
-  const showToast = (msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(""), 2500);
-  };
+  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 2500); };
 
-  // ── More from this vendor ─────────────────────────────────────────────────
   useEffect(() => {
     if (!listing?.vendor?.username) return;
-    setVendorListingsLoading(true);
+    setVendorLoading(true);
     api.pub.listings({ vendor_username: listing.vendor.username, page_size: "12" })
       .then(r => r.ok ? r.json() : Promise.reject())
-      .then(d => {
-        const items = (d.results || d || [])
-          .filter((l: any) => l.id !== listing.id && l.is_available !== false)
-          .slice(0, 8);
-        setVendorListings(items);
-      })
-      .catch(() => {})
-      .finally(() => setVendorListingsLoading(false));
+      .then(d => setVendorListings((d.results||d||[]).filter((l:any) => l.id !== listing.id && l.is_available !== false).slice(0,8)))
+      .catch(()=>{}).finally(()=>setVendorLoading(false));
   }, [listing?.vendor?.username, listing?.id]);
 
-  // ── Similar items ─────────────────────────────────────────────────────────
   useEffect(() => {
-    const slug = listing?.category?.slug;
-    const campus = listing?.campus;
+    const slug = listing?.category?.slug, campus = listing?.campus;
     if (!slug || !campus) return;
     setSimilarLoading(true);
     api.pub.listings({ campus, category: slug, page_size: "8" })
       .then(r => r.ok ? r.json() : Promise.reject())
-      .then(d => {
-        const items = (d.results || d || [])
-          .filter((l: any) => l.id !== listing.id && l.vendor?.username !== listing.vendor?.username)
-          .slice(0, 6);
-        setSimilarItems(items);
-      })
-      .catch(() => {})
-      .finally(() => setSimilarLoading(false));
+      .then(d => setSimilarItems((d.results||d||[]).filter((l:any) => l.id !== listing.id && l.vendor?.username !== listing.vendor?.username).slice(0,6)))
+      .catch(()=>{}).finally(()=>setSimilarLoading(false));
   }, [listing?.category?.slug, listing?.campus, listing?.id, listing?.vendor?.username]);
 
-  // ── You might also like ───────────────────────────────────────────────────
   useEffect(() => {
     const campus = listing?.campus;
     if (!campus) return;
     setAlsoLikeLoading(true);
     api.pub.listings({ campus, page_size: "12" })
       .then(r => r.ok ? r.json() : Promise.reject())
-      .then(d => {
-        const all = (d.results || d || []).filter((l: any) => l.id !== listing.id);
-        const shuffled = [...all].sort(() => Math.random() - 0.5).slice(0, 4);
-        setAlsoLike(shuffled);
-      })
-      .catch(() => {})
-      .finally(() => setAlsoLikeLoading(false));
+      .then(d => setAlsoLike([...(d.results||d||[]).filter((l:any)=>l.id!==listing.id)].sort(()=>Math.random()-0.5).slice(0,8)))
+      .catch(()=>{}).finally(()=>setAlsoLikeLoading(false));
   }, [listing?.campus, listing?.id]);
 
   const handleAddToCart = async () => {
     if (!listing) return;
     if (!isLoggedIn) { router.push("/auth"); return; }
-
     try {
-      const res = await api.cart.add({ listing_id: listing.id, quantity: 1 });
-
+      const res = await api.cart.add({ listing_id: listing.id, quantity: qty });
       if (!res.ok) {
         const data = await res.json();
         const msg: string = data.error || data.detail || "Could not add to cart";
         if (msg.toLowerCase().includes("reserved")) {
           setListing(prev => prev ? { ...prev, is_reserved: true } : prev);
           showToast("This item is currently reserved by another user");
-        } else {
-          showToast(msg);
-        }
+        } else showToast(msg);
         return;
       }
-
       const isSingleStock = listing.track_inventory && listing.stock_quantity === 1;
-      showToast(isSingleStock ? "Item reserved for 10 minutes!" : "Added to cart!");
+      showToast(isSingleStock ? "Item reserved for 10 minutes!" : `Added to cart!`);
       try { sessionStorage.setItem("cart-referrer", window.location.pathname); } catch {}
       queryClient.invalidateQueries({ queryKey: ["cart"] });
-    } catch {
-      showToast("Could not add to cart. Please try again.");
-    }
+    } catch { showToast("Could not add to cart. Please try again."); }
   };
 
   const handleBooking = async () => {
     if (!isLoggedIn) { router.push("/auth"); return; }
-    if (!bookingDate) { setBookingError("Please pick a date."); return; }
-    if (!bookingTime) { setBookingError("Please pick a time slot."); return; }
-    if (!bookingLocation.trim()) { setBookingError("Please enter a location."); return; }
-    setBookingError("");
-    setBookingStep("confirming");
-
+    if (!bookingDate)           { setBookingError("Please pick a date."); return; }
+    if (!bookingTime)           { setBookingError("Please pick a time slot."); return; }
+    if (!bookingLocation.trim()){ setBookingError("Please enter a location."); return; }
+    setBookingError(""); setBookingStep("confirming");
     try {
       const freshRes = await api.pub.listing(listing!.id);
       if (freshRes.ok) {
         const fresh = await freshRes.json();
         if (!fresh.is_available || (fresh.track_inventory && fresh.stock_quantity === 0)) {
-          setBookingError("Sorry, this item is no longer available.");
-          setBookingStep("form");
-          setListing(fresh);
-          return;
+          setBookingError("Sorry, this item is no longer available."); setBookingStep("form"); setListing(fresh); return;
         }
       }
     } catch {}
-
     try {
-      const res = await api.orders.createBooking({
-        listing: listing!.id,
-        scheduled_date: bookingDate,
-        scheduled_time: bookingTime,
-        note: bookingNote,
-        location: bookingLocation.trim(),
-      });
+      const res = await api.orders.createBooking({ listing: listing!.id, scheduled_date: bookingDate, scheduled_time: bookingTime, note: bookingNote, location: bookingLocation.trim() });
       if (!res.ok) {
         const data = await res.json();
-        const msg = data.detail || data.scheduled_date?.[0] || data.listing?.[0]
-          || data.scheduled_time?.[0] || data.location?.[0]
-          || data.non_field_errors?.[0]
-          || Object.values(data).flat().join(" ") || "Booking failed";
-        throw new Error(msg);
+        throw new Error(data.detail||data.scheduled_date?.[0]||data.listing?.[0]||data.scheduled_time?.[0]||data.location?.[0]||data.non_field_errors?.[0]||Object.values(data).flat().join(" ")||"Booking failed");
       }
       setBookingStep("done");
     } catch (err: unknown) {
@@ -284,9 +229,7 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
   const openBooking = () => {
     if (!isLoggedIn) { router.push("/auth"); return; }
     setShowBooking(true);
-    setTimeout(() => {
-      document.getElementById("booking-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 150);
+    setTimeout(() => document.getElementById("booking-panel")?.scrollIntoView({ behavior: "smooth", block: "start" }), 150);
   };
 
   const handleAdminToggle = async () => {
@@ -294,15 +237,12 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
     setAdminLoading("toggle");
     try {
       const res = await api.admin.updateListing(listing.id, { is_available: !listing.is_available });
-      if (!res.ok) throw new Error("Failed to update listing");
+      if (!res.ok) throw new Error();
       const updated = await res.json();
       setListing(prev => prev ? { ...prev, is_available: updated.is_available } : prev);
       showToast(updated.is_available ? "Listing approved and live!" : "Listing hidden from marketplace");
-    } catch {
-      showToast("Failed to update listing");
-    } finally {
-      setAdminLoading(null);
-    }
+    } catch { showToast("Failed to update listing"); }
+    finally { setAdminLoading(null); }
   };
 
   const handleAdminDelete = async () => {
@@ -310,294 +250,231 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
     setAdminLoading("delete");
     try {
       const res = await api.admin.deleteListing(listing!.id);
-      if (!res.ok && res.status !== 204) throw new Error("Failed to delete listing");
-      showToast("Listing deleted");
-      setTimeout(() => router.back(), 1200);
-    } catch {
-      showToast("Failed to delete listing");
-      setAdminLoading(null);
-      setConfirmDelete(false);
-    }
+      if (!res.ok && res.status !== 204) throw new Error();
+      showToast("Listing deleted"); setTimeout(() => router.back(), 1200);
+    } catch { showToast("Failed to delete listing"); setAdminLoading(null); setConfirmDelete(false); }
+  };
+
+  const handleShare = async () => {
+    const url = window.location.href;
+    const effectivePrice = listing?.deal?.discounted_price ?? listing?.sale_price ?? listing?.price;
+    if (navigator.share) await navigator.share({ title: `${listing?.title} — ₦${Number(effectivePrice).toLocaleString()}`, url }).catch(()=>{});
+    else { await navigator.clipboard.writeText(url); showToast("Link copied!"); }
   };
 
   const today = new Date().toISOString().split("T")[0];
   const isService = (listing?.listing_type || "").toLowerCase() === "service";
 
-  // ── NOT FOUND ──────────────────────────────────────────────────────────────
+  /* ── not found ── */
   if (!listing) return (
-    <div className="min-h-screen bg-[#F5F5F5] flex items-center justify-center p-6"
-      style={{ fontFamily: "'DM Sans', sans-serif" }}>
+    <div className="min-h-screen bg-white flex items-center justify-center p-6" style={{ fontFamily:"'DM Sans',sans-serif" }}>
       <div className="text-center">
-        <div className="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center bg-red-50">
-          <AlertCircle className="w-8 h-8 text-red-400" />
-        </div>
-        <h3 className="text-lg font-bold text-stone-900 mb-1"
-          style={SERIF}>
-          Listing not found
-        </h3>
+        <div className="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center bg-red-50"><AlertCircle className="w-8 h-8 text-red-400" /></div>
+        <h3 className="text-lg font-bold text-stone-900 mb-1" style={SERIF}>Listing not found</h3>
         <p className="text-stone-400 text-sm mb-4">This listing may have been removed.</p>
-        <button onClick={() => router.back()}
-          className="px-6 py-2.5 text-white font-medium rounded-full text-sm shadow-sm"
-          style={{ background: GRAD }}>
-          Go Back
-        </button>
+        <button onClick={() => router.back()} className="px-6 py-2.5 text-white font-medium rounded-full text-sm" style={{ background: GRAD }}>Go Back</button>
       </div>
     </div>
   );
 
-  const vendorName = listing.vendor.business_name || listing.vendor.username;
-  const badge = listing.vendor.vendor_badge;
-  const rating = Number(listing.vendor.rating) || 0;
-  const totalReviews = Number(listing.vendor.total_reviews) || 0;
-  const completionRate = Number(listing.vendor.completion_rate) || 0;
+  const vendorName    = listing.vendor.business_name || listing.vendor.username;
+  const badge         = listing.vendor.vendor_badge;
+  const rating        = Number(listing.vendor.rating) || 0;
+  const totalReviews  = Number(listing.vendor.total_reviews) || 0;
+  const completionRate= Number(listing.vendor.completion_rate) || 0;
+  const effectivePrice= listing.deal?.discounted_price ?? listing.sale_price ?? null;
+  const discountPct   = listing.deal?.discount_percent ?? listing.discount_percent ?? 0;
+  const displayPrice  = effectivePrice !== null && effectivePrice < listing.price ? Number(effectivePrice) : Number(listing.price);
+  const hasDiscount   = effectivePrice !== null && Number(effectivePrice) < listing.price;
 
+  const allImages = [listing.image,(listing as any).image2,(listing as any).image3,(listing as any).image4,(listing as any).image5]
+    .filter((img): img is string => !!img && img.startsWith("http"));
+  const activeImg = allImages[activeIdx] ?? null;
+
+  /* rating breakdown */
+  const ratingCounts = [5,4,3,2,1].map(n => ({ n, count: reviews.filter(r => r.rating === n).length }));
+
+  /* ─────────────── RENDER ─────────────── */
   return (
     <>
-      {/* ── TOAST ── */}
       <AnimatePresence>
         {toast && (
-          <motion.div initial={{ y: -40, opacity: 0 }} animate={{ y: 70, opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed top-0 left-1/2 -translate-x-1/2 z-50 bg-teal-600 text-white px-6 py-3 rounded-full font-medium text-sm shadow-lg">
+          <motion.div key="toast" initial={{ y:-40, opacity:0 }} animate={{ y:72, opacity:1 }} exit={{ opacity:0 }}
+            className="fixed top-0 left-1/2 -translate-x-1/2 z-[9999] px-6 py-3 rounded-full text-white text-sm font-semibold shadow-xl" style={{ background: GRAD }}>
             {toast}
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* ── CHAT WINDOW ── */}
       {showChat && (
-        <ChatWindow
-          sellerId={listing.vendor.id}
-          sellerName={vendorName}
-          listingId={listing.id}
-          productName={listing.title}
-          originalPrice={listing.price}
-          onClose={() => setShowChat(false)}
-        />
+        <ChatWindow sellerId={listing.vendor.id} sellerName={vendorName} listingId={listing.id}
+          productName={listing.title} originalPrice={listing.price} onClose={() => setShowChat(false)} />
       )}
 
-      <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+      {/* Lightbox */}
+      <AnimatePresence>
+        {imageOpen && (
+          <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }}
+            className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4" onClick={() => setImageOpen(false)}>
+            <button onClick={() => setImageOpen(false)} className="absolute top-4 right-4 w-10 h-10 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center z-10">
+              <XIcon className="w-5 h-5 text-white" />
+            </button>
+            <motion.img initial={{ scale:0.9 }} animate={{ scale:1 }} exit={{ scale:0.9 }} transition={{ duration:0.2 }}
+              src={activeImg ?? ""} alt={listing.title}
+              className="max-w-full max-h-full object-contain rounded-xl shadow-2xl" onClick={e => e.stopPropagation()} />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
+      <div className="min-h-screen bg-white" style={{ fontFamily:"'DM Sans',sans-serif" }}>
         <TopNav showBack />
 
-        <div className="pb-28 max-w-2xl mx-auto">
+        <div className="max-w-6xl mx-auto px-4 lg:px-8 pt-4 lg:pt-8 pb-28">
 
-          {/* ── IMAGE GALLERY ── */}
-          {(() => {
-            const allImages = [
-              (listing as any).image, (listing as any).image2, (listing as any).image3,
-              (listing as any).image4, (listing as any).image5,
-            ].filter((img): img is string => !!img && img.startsWith('http'));
-            const activeImg = allImages[activeImageIdx] ?? null;
-            return (
-              <div>
-                {/* Main image */}
-                <div
-                  className={`relative w-full bg-stone-100 ${activeImg ? "cursor-zoom-in" : "h-48"}`}
-                  onClick={() => activeImg && setImageOpen(true)}
-                >
-                  {activeImg ? (
-                    <img src={activeImg} alt={listing.title} loading="lazy" decoding="async" className="w-full max-h-[280px] object-contain" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <Sparkles className="w-12 h-12 text-stone-300" />
-                    </div>
-                  )}
-                  <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-black/30 to-transparent pointer-events-none" />
-                  {activeImg && (
-                    <div className="absolute bottom-3 right-3 bg-black/40 backdrop-blur-sm rounded-full p-1.5">
-                      <ZoomIn className="w-4 h-4 text-white" />
-                    </div>
-                  )}
-                  {!listing.is_available && (
-                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                      <span className="bg-red-500 text-white font-bold px-6 py-2 rounded-full text-sm">Unavailable</span>
-                    </div>
-                  )}
-                </div>
-                {/* Thumbnails */}
+          {/* ══════════ MAIN PRODUCT SECTION ══════════ */}
+          <div className="lg:grid lg:grid-cols-2 lg:gap-16">
+
+            {/* ─── LEFT: image gallery ─── */}
+            <div>
+              {/* Desktop: thumbnails strip + main image side-by-side */}
+              <div className="flex gap-3">
+                {/* Vertical thumbnail strip — desktop only */}
                 {allImages.length > 1 && (
-                  <div className="flex gap-2 px-4 pt-2 overflow-x-auto hide-scrollbar">
+                  <div className="hidden lg:flex flex-col gap-2 flex-shrink-0 w-16">
                     {allImages.map((img, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => setActiveImageIdx(idx)}
-                        className={`flex-shrink-0 w-14 h-14 rounded-xl overflow-hidden border-2 transition ${activeImageIdx === idx ? 'border-teal-500' : 'border-transparent opacity-60 hover:opacity-100'}`}
-                      >
+                      <button key={idx} onClick={() => setActiveIdx(idx)}
+                        className={`aspect-square rounded-xl overflow-hidden border-2 transition-all ${
+                          activeIdx === idx ? "border-teal-500 shadow-md shadow-teal-200" : "border-stone-200 opacity-60 hover:opacity-100"
+                        }`}>
                         <img src={img} alt="" className="w-full h-full object-cover" />
                       </button>
                     ))}
                   </div>
                 )}
-              </div>
-            );
-          })()}
 
-          {/* ── IMAGE LIGHTBOX ── */}
-          <AnimatePresence>
-            {imageOpen && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4"
-                onClick={() => setImageOpen(false)}
-              >
-                <button
-                  onClick={() => setImageOpen(false)}
-                  className="absolute top-4 right-4 w-10 h-10 bg-white/10 hover:bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center transition z-10"
-                >
-                  <XIcon className="w-5 h-5 text-white" />
-                </button>
-                <motion.img
-                  initial={{ scale: 0.9, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  exit={{ scale: 0.9, opacity: 0 }}
-                  transition={{ duration: 0.2 }}
-                  src={[listing.image,(listing as any).image2,(listing as any).image3,(listing as any).image4,(listing as any).image5].filter(Boolean)[activeImageIdx] ?? listing.image ?? ''}
-                  alt={listing.title}
-                  className="max-w-full max-h-full object-contain rounded-xl shadow-2xl"
-                  onClick={(e) => e.stopPropagation()}
-                />
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          <div className="px-4 pt-4 space-y-4">
-
-            {/* ── STOCK WARNING / RESERVED ── */}
-            {(stockWarning || listing.is_reserved) && (
-              <div className={`border rounded-2xl p-3 flex items-center gap-2 ${listing.is_reserved ? "bg-stone-50 border-stone-200" : "bg-amber-50 border-amber-200"}`}>
-                <AlertCircle className={`w-4 h-4 flex-shrink-0 ${listing.is_reserved ? "text-stone-400" : "text-amber-500"}`} />
-                <p className={`text-sm font-medium ${listing.is_reserved ? "text-stone-500" : "text-amber-700"}`}>
-                  {listing.is_reserved ? "This item is currently reserved by another user" : stockWarning}
-                </p>
-              </div>
-            )}
-
-            {/* ── ADMIN CONTROLS ── */}
-            {isAdmin && (
-              <div className="bg-purple-50 border border-purple-200 rounded-2xl p-4 space-y-3">
-                <div className="flex items-center gap-2">
-                  <Shield className="w-4 h-4 text-purple-600" />
-                  <p className="text-purple-700 text-xs tracking-[0.2em] uppercase font-semibold">Admin Controls</p>
-                  <span className={`ml-auto px-2.5 py-0.5 rounded-full text-xs font-semibold ${listing.is_available ? "bg-teal-100 text-teal-700" : "bg-amber-100 text-amber-700"}`}>
-                    {listing.is_available ? "Live" : "Pending Approval"}
-                  </span>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={handleAdminToggle}
-                    disabled={!!adminLoading}
-                    className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all disabled:opacity-50 ${listing.is_available ? "bg-amber-100 text-amber-700 hover:bg-amber-200" : "bg-teal-100 text-teal-700 hover:bg-teal-200"}`}
-                  >
-                    {adminLoading === "toggle"
-                      ? <span className="flex items-center justify-center gap-1.5"><span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin inline-block" />Updating...</span>
-                      : listing.is_available ? "Hide Listing" : "Approve & Publish"}
-                  </button>
-                  <button
-                    onClick={handleAdminDelete}
-                    disabled={!!adminLoading}
-                    className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all disabled:opacity-50 ${confirmDelete ? "bg-red-500 text-white hover:bg-red-600" : "bg-red-100 text-red-700 hover:bg-red-200"}`}
-                  >
-                    {adminLoading === "delete"
-                      ? <span className="flex items-center justify-center gap-1.5"><span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin inline-block" />Deleting...</span>
-                      : confirmDelete ? "Confirm Delete" : "Delete Listing"}
-                  </button>
-                </div>
-                {confirmDelete && (
-                  <p className="text-xs text-red-500 text-center">Tap &quot;Confirm Delete&quot; again to permanently remove this listing</p>
-                )}
-              </div>
-            )}
-
-            {/* ── TITLE + PRICE ── */}
-            <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex-1">
-                  <p className="text-teal-600 text-xs tracking-[0.2em] uppercase font-semibold mb-1">
-                    {listing.category?.title}
-                  </p>
-                  <h2 className="text-xl font-bold text-stone-900"
-                    style={SERIF}>
-                    {listing.title}
-                  </h2>
-                </div>
-                <div className="flex flex-col items-end gap-2">
-                  {(() => {
-                    // Admin deal takes priority, then vendor discount
-                    const effectivePrice = listing.deal?.discounted_price ?? listing.sale_price ?? null;
-                    const discountPct = listing.deal?.discount_percent ?? listing.discount_percent ?? 0;
-                    if (effectivePrice !== null && effectivePrice < listing.price) {
-                      return (
-                        <div className="flex flex-col items-end gap-0.5">
-                          <span className="text-xs text-stone-400 line-through">₦{Number(listing.price).toLocaleString()}</span>
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-xs font-bold text-red-500 bg-red-50 px-1.5 py-0.5 rounded-full">-{discountPct}%</span>
-                            <p className="text-2xl font-bold whitespace-nowrap text-red-600">
-                              ₦{Number(effectivePrice).toLocaleString()}
-                            </p>
-                          </div>
-                        </div>
-                      );
+                {/* Main image */}
+                <div className="flex-1 relative">
+                  <div
+                    className={`w-full bg-stone-50 rounded-2xl overflow-hidden ${activeImg ? "cursor-zoom-in" : ""} aspect-square lg:aspect-[4/5]`}
+                    onClick={() => activeImg && setImageOpen(true)}>
+                    {activeImg
+                      ? <img src={activeImg} alt={listing.title} loading="lazy" decoding="async" className="w-full h-full object-cover" />
+                      : <div className="w-full h-full flex items-center justify-center"><Sparkles className="w-16 h-16 text-stone-200" /></div>
                     }
-                    return (
-                      <p className="text-2xl font-bold whitespace-nowrap" style={GRAD_TEXT}>
-                        ₦{Number(listing.price).toLocaleString()}
-                      </p>
-                    );
-                  })()}
-                  <button
-                    onClick={async () => {
-                      const url = window.location.href;
-                      const effectivePrice = listing.deal?.discounted_price ?? listing.sale_price ?? listing.price;
-                      const price = `₦${Number(effectivePrice).toLocaleString()}`;
-                      if (navigator.share) {
-                        await navigator.share({ title: `${listing.title} — ${price}`, url }).catch(() => {});
-                      } else {
-                        await navigator.clipboard.writeText(url);
-                        showToast("Link copied!");
-                      }
-                    }}
-                    className="flex items-center gap-1.5 text-xs text-stone-500 hover:text-teal-600 transition"
-                  >
-                    <Share2 className="w-4 h-4" />
-                    Share
-                  </button>
+                    {!listing.is_available && (
+                      <div className="absolute inset-0 bg-black/60 flex items-center justify-center rounded-2xl">
+                        <span className="bg-red-500 text-white font-bold px-6 py-2 rounded-full text-sm">Unavailable</span>
+                      </div>
+                    )}
+                    {hasDiscount && (
+                      <div className="absolute top-3 left-3 bg-red-500 text-white text-xs font-black px-2.5 py-1 rounded-xl shadow">
+                        -{discountPct}% OFF
+                      </div>
+                    )}
+                    {activeImg && (
+                      <div className="absolute bottom-3 right-3 bg-black/40 backdrop-blur-sm rounded-full p-2">
+                        <ZoomIn className="w-4 h-4 text-white" />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Mobile thumbnail dots */}
+                  {allImages.length > 1 && (
+                    <div className="flex justify-center gap-1.5 mt-3 lg:hidden">
+                      {allImages.map((_, idx) => (
+                        <button key={idx} onClick={() => setActiveIdx(idx)}
+                          className={`rounded-full transition-all ${activeIdx === idx ? "w-5 h-1.5 bg-teal-500" : "w-1.5 h-1.5 bg-stone-300"}`} />
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Mobile horizontal thumbnails */}
+                  {allImages.length > 1 && (
+                    <div className="flex gap-2 mt-3 overflow-x-auto lg:hidden" style={{ scrollbarWidth:"none" }}>
+                      {allImages.map((img, idx) => (
+                        <button key={idx} onClick={() => setActiveIdx(idx)}
+                          className={`flex-shrink-0 w-14 h-14 rounded-xl overflow-hidden border-2 transition ${activeIdx===idx?"border-teal-500":"border-transparent opacity-60 hover:opacity-100"}`}>
+                          <img src={img} alt="" className="w-full h-full object-cover" />
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
+            </div>
 
-              {totalReviews > 0 && (
-                <div className="flex items-center gap-1.5 mt-3">
-                  <div className="flex">
-                    {[1,2,3,4,5].map(s => (
-                      <Star key={s} className={`w-4 h-4 ${s <= Math.round(rating) ? "text-amber-400 fill-amber-400" : "text-stone-200 fill-stone-200"}`} />
-                    ))}
-                  </div>
-                  <span className="text-sm text-stone-500">{rating} ({totalReviews} reviews)</span>
+            {/* ─── RIGHT: product info ─── */}
+            <div className="mt-6 lg:mt-0 space-y-5">
+
+              {/* Stock / reserved alert */}
+              {(stockWarning || listing.is_reserved) && (
+                <div className={`flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-medium border ${listing.is_reserved ? "bg-stone-50 border-stone-200 text-stone-500" : "bg-amber-50 border-amber-200 text-amber-700"}`}>
+                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                  {listing.is_reserved ? "This item is currently reserved by another user" : stockWarning}
                 </div>
               )}
 
-              <p className="text-stone-500 text-sm mt-3 leading-relaxed">{listing.description}</p>
+              {/* Category */}
+              <p className="text-teal-600 text-xs tracking-[0.2em] uppercase font-bold">
+                {listing.category?.title}
+              </p>
 
-              {/* Item details */}
+              {/* Title */}
+              <h1 className="text-2xl lg:text-3xl font-black text-stone-900 leading-tight" style={SERIF}>
+                {listing.title}
+              </h1>
+
+              {/* Rating */}
+              {totalReviews > 0 && (
+                <div className="flex items-center gap-2">
+                  <div className="flex gap-0.5">
+                    {[1,2,3,4,5].map(s => (
+                      <Star key={s} className={`w-4 h-4 ${s <= Math.round(rating) ? "fill-amber-400 text-amber-400" : "fill-stone-200 text-stone-200"}`} />
+                    ))}
+                  </div>
+                  <span className="text-sm font-semibold text-stone-700">{rating.toFixed(1)}</span>
+                  <span className="text-sm text-stone-400">({totalReviews} reviews)</span>
+                </div>
+              )}
+
+              {/* Price */}
+              <div className="flex items-baseline gap-3">
+                <span className="text-3xl font-black text-stone-900">₦{displayPrice.toLocaleString()}</span>
+                {hasDiscount && (
+                  <>
+                    <span className="text-lg text-stone-400 line-through">₦{Number(listing.price).toLocaleString()}</span>
+                    <span className="text-sm font-bold text-red-500 bg-red-50 px-2 py-0.5 rounded-lg">{discountPct}% off</span>
+                  </>
+                )}
+              </div>
+
+              {/* Description */}
+              <div>
+                <p className={`text-stone-500 text-sm leading-relaxed ${descExpanded ? "" : "line-clamp-3"}`}>
+                  {listing.description}
+                </p>
+                {listing.description?.length > 160 && (
+                  <button onClick={() => setDescExpanded(e => !e)} className="mt-1 text-teal-600 text-xs font-semibold flex items-center gap-0.5">
+                    {descExpanded ? <><ChevronUp className="w-3.5 h-3.5" /> Show less</> : <><ChevronDown className="w-3.5 h-3.5" /> Read more</>}
+                  </button>
+                )}
+              </div>
+
+              {/* Item attributes */}
               {(() => {
                 const l = listing as any;
                 const rows: { icon: React.ReactNode; label: string; value: string }[] = [];
-                if (l.brand) rows.push({ icon: <Package className="w-3.5 h-3.5 text-teal-500" />, label: "Brand", value: l.brand });
-                if (l.condition) {
-                  const labels: Record<string, string> = { new: "Brand New", fairly_used: "Fairly Used", refurbished: "Refurbished" };
-                  rows.push({ icon: <CheckCircle className="w-3.5 h-3.5 text-teal-500" />, label: "Condition", value: labels[l.condition] || l.condition });
-                }
-                if (l.delivery_time) rows.push({ icon: <Truck className="w-3.5 h-3.5 text-teal-500" />, label: "Est. time", value: l.delivery_time });
+                if (l.brand)     rows.push({ icon:<Package className="w-3.5 h-3.5 text-teal-500"/>,   label:"Brand",     value:l.brand });
+                if (l.condition) rows.push({ icon:<CheckCircle className="w-3.5 h-3.5 text-teal-500"/>,label:"Condition", value:({new:"Brand New",fairly_used:"Fairly Used",refurbished:"Refurbished"} as Record<string,string>)[l.condition]||l.condition });
+                if (l.delivery_time) rows.push({ icon:<Truck className="w-3.5 h-3.5 text-teal-500"/>,  label:"Est. delivery",value:l.delivery_time });
                 if (!rows.length) return null;
                 return (
-                  <div className="mt-4 border-t border-stone-100 pt-3 space-y-2">
+                  <div className="space-y-2 py-4 border-t border-stone-100">
                     {rows.map(r => (
                       <div key={r.label} className="flex items-center gap-2">
                         {r.icon}
-                        <span className="text-xs text-stone-400 w-20 flex-shrink-0">{r.label}</span>
-                        <span className="text-xs font-semibold text-stone-700">{r.value}</span>
+                        <span className="text-xs text-stone-400 w-24 flex-shrink-0">{r.label}</span>
+                        <span className="text-xs font-semibold text-stone-800">{r.value}</span>
                       </div>
                     ))}
                   </div>
@@ -606,13 +483,11 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
 
               {/* Tags */}
               {(() => {
-                const rawTags = (listing as any).tags as string | undefined;
-                if (!rawTags) return null;
-                const tags = rawTags.split(',').map((t: string) => t.trim()).filter(Boolean);
-                if (!tags.length) return null;
+                const tags = ((listing as any).tags as string|undefined)?.split(',').map((t:string)=>t.trim()).filter(Boolean);
+                if (!tags?.length) return null;
                 return (
-                  <div className="mt-3 flex flex-wrap gap-1.5">
-                    {tags.map((tag: string) => (
+                  <div className="flex flex-wrap gap-1.5">
+                    {tags.map((tag:string) => (
                       <span key={tag} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-teal-50 border border-teal-100 text-teal-700 text-xs font-medium">
                         <Tag className="w-3 h-3" />{tag}
                       </span>
@@ -620,345 +495,293 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
                   </div>
                 );
               })()}
-            </div>
 
-            {/* ── VENDOR CARD ── */}
-            <div className="bg-white border border-stone-200 rounded-2xl p-4 shadow-sm">
-              <p className="text-teal-600 text-xs tracking-[0.2em] uppercase font-semibold mb-3">Vendor</p>
-              <div className="flex items-start gap-3">
-                <div className="w-11 h-11 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-sm flex-shrink-0"
+              {/* ── CTA: product ── */}
+              {!isService && listing.is_available && (
+                <div className="space-y-3 pt-2">
+                  {listing.is_reserved ? (
+                    <div className="w-full py-4 bg-stone-100 border border-stone-200 rounded-2xl flex items-center justify-center gap-2 text-stone-400 font-semibold cursor-not-allowed">
+                      <Clock className="w-4 h-4" /> Currently Reserved
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-3">
+                      {/* Quantity */}
+                      <div className="flex items-center border border-stone-200 rounded-xl overflow-hidden flex-shrink-0">
+                        <button onClick={() => setQty(q => Math.max(1, q-1))} className="px-3 py-3 text-stone-500 hover:bg-stone-50 transition">
+                          <Minus className="w-3.5 h-3.5" />
+                        </button>
+                        <span className="px-3 text-sm font-bold text-stone-900 min-w-[2rem] text-center">{qty}</span>
+                        <button onClick={() => setQty(q => q+1)} className="px-3 py-3 text-stone-500 hover:bg-stone-50 transition">
+                          <Plus className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                      {/* Add to cart */}
+                      <motion.button whileHover={{ scale:1.02 }} whileTap={{ scale:0.97 }}
+                        onClick={handleAddToCart}
+                        className="flex-1 py-3.5 text-white font-bold rounded-2xl flex items-center justify-center gap-2 text-sm shadow-lg"
+                        style={{ background: GRAD }}>
+                        <ShoppingCart className="w-4 h-4" /> Add to Cart
+                      </motion.button>
+                      {/* Share */}
+                      <button onClick={handleShare} className="p-3.5 border border-stone-200 rounded-2xl text-stone-500 hover:text-teal-600 hover:border-teal-300 transition">
+                        <Share2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ── CTA: service ── */}
+              {isService && listing.is_available && !showBooking && (
+                <div className="flex gap-3 pt-2">
+                  <motion.button whileHover={{ scale:1.02 }} whileTap={{ scale:0.97 }}
+                    onClick={openBooking}
+                    className="flex-1 py-3.5 text-white font-bold rounded-2xl flex items-center justify-center gap-2 text-sm shadow-lg"
+                    style={{ background: GRAD }}>
+                    <Calendar className="w-4 h-4" /> Book Now
+                  </motion.button>
+                  <button onClick={handleShare} className="p-3.5 border border-stone-200 rounded-2xl text-stone-500 hover:text-teal-600 hover:border-teal-300 transition">
+                    <Share2 className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+
+              {/* Trust badges */}
+              <div className="grid grid-cols-4 gap-3 py-5 border-t border-b border-stone-100">
+                {[
+                  { icon: Shield,      label: "Secure Order"      },
+                  { icon: BadgeCheck,  label: "Verified Vendor"   },
+                  { icon: Zap,         label: "Fast Response"     },
+                  { icon: CheckCircle, label: "Quality Assured"   },
+                ].map(({ icon: Icon, label }) => (
+                  <div key={label} className="flex flex-col items-center gap-1.5 text-center">
+                    <div className="w-9 h-9 rounded-xl bg-teal-50 flex items-center justify-center">
+                      <Icon className="w-4 h-4 text-teal-600" />
+                    </div>
+                    <p className="text-[10px] text-stone-500 font-semibold leading-tight">{label}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Vendor card */}
+              <div className="flex items-center gap-3 p-4 bg-stone-50 rounded-2xl border border-stone-100">
+                <div className="w-11 h-11 rounded-full flex items-center justify-center text-white font-bold text-lg flex-shrink-0"
                   style={{ background: GRAD }}>
                   {vendorName[0]?.toUpperCase()}
                 </div>
                 <div className="flex-1 min-w-0">
-                  {/* Name + Message button on same row */}
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="font-semibold text-stone-900 text-sm">{vendorName}</p>
-                        {badge && badge !== "none" && <VendorBadge badge={badge} size="sm" />}
-                      </div>
-                      {completionRate > 0 && (
-                        <p className="text-xs text-stone-400 mt-0.5">{completionRate}% completion rate</p>
-                      )}
-                    </div>
-                    <motion.button
-                      whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
-                      onClick={() => { if (!isLoggedIn) { router.push("/auth"); return; } setShowChat(true); }}
-                      className="flex items-center gap-1.5 px-3 py-2 border border-stone-200 hover:border-teal-300 text-stone-600 hover:text-teal-600 rounded-full text-sm font-medium transition-all flex-shrink-0">
-                      <MessageCircle className="w-4 h-4" /> Message
-                    </motion.button>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Link href={`/vendor/${listing.vendor.username}`} className="font-bold text-stone-900 text-sm hover:text-teal-600 transition truncate">
+                      {vendorName}
+                    </Link>
+                    {badge && badge !== "none" && <VendorBadge badge={badge} size="sm" />}
                   </div>
-                  {/* Location */}
-                  {listing.vendor.hostel && (
-                    <div className="flex items-center gap-0.5 mt-1">
-                      <MapPin className="w-3 h-3 text-teal-400 flex-shrink-0" />
-                      <span className="text-xs text-stone-400">{listing.vendor.hostel}</span>
-                    </div>
+                  {completionRate > 0 && (
+                    <p className="text-xs text-stone-400">{completionRate}% completion rate</p>
                   )}
-                  {/* Response time */}
-                  {(() => {
-                    const mins: number | null = (listing.vendor as any)?.profile?.avg_response_minutes ?? null;
-                    if (mins === null) return null;
-                    const label = mins < 60
-                      ? `~${mins} min`
-                      : mins < 1440
-                      ? `~${Math.round(mins / 60)} hr`
-                      : `~${Math.round(mins / 1440)}d`;
-                    return (
-                      <div className="flex items-center gap-0.5 mt-1">
-                        <Clock className="w-3 h-3 text-teal-400 flex-shrink-0" />
-                        <span className="text-xs text-stone-400">Responds in {label}</span>
-                      </div>
-                    );
-                  })()}
-                  {/* Active hours — full width so text wraps cleanly */}
-                  {(() => {
-                    const days: string[] = (listing.vendor as any)?.profile?.available_days || [];
-                    const open: string | null = (listing.vendor as any)?.profile?.opening_time ?? null;
-                    const close: string | null = (listing.vendor as any)?.profile?.closing_time ?? null;
-                    if (!days.length && !open) return null;
-                    const fmt = (t: string) => {
-                      const [h, m] = t.split(':');
-                      const hr = parseInt(h);
-                      return `${hr % 12 || 12}:${m}${hr < 12 ? 'am' : 'pm'}`;
-                    };
-                    return (
-                      <div className="flex items-start gap-0.5 mt-1">
-                        <Clock className="w-3 h-3 text-teal-400 flex-shrink-0 mt-0.5" />
-                        <span className="text-xs text-stone-400">
-                          {days.join(', ')}{open && close ? ` · ${fmt(open)}–${fmt(close)}` : ''}
-                        </span>
-                      </div>
-                    );
-                  })()}
                 </div>
-              </div>
-            </div>
-
-            {/* ── ADD TO CART — products only ── */}
-            {!isService && listing.is_available && (
-              listing.is_reserved ? (
-                <div className="w-full py-4 bg-stone-100 border border-stone-200 rounded-full flex items-center justify-center gap-2 text-stone-400 font-semibold text-base cursor-not-allowed select-none">
-                  <Clock className="w-5 h-5" /> Reserved
-                </div>
-              ) : (
-                <motion.button
-                  whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
-                  onClick={handleAddToCart}
-                  className="w-full py-4 text-white font-semibold rounded-full flex items-center justify-center gap-2 text-base shadow-lg shadow-teal-200/60"
-                  style={{ background: GRAD }}>
-                  <ShoppingCart className="w-5 h-5" /> Add to Cart
+                <motion.button whileHover={{ scale:1.03 }} whileTap={{ scale:0.97 }}
+                  onClick={() => { if (!isLoggedIn) { router.push("/auth"); return; } setShowChat(true); }}
+                  className="flex items-center gap-1.5 px-3 py-2 border border-stone-200 hover:border-teal-400 text-stone-600 hover:text-teal-600 rounded-xl text-xs font-semibold transition-all flex-shrink-0">
+                  <MessageCircle className="w-3.5 h-3.5" /> Message
                 </motion.button>
-              )
-            )}
-
-            {/* ── TRUST BADGES ── */}
-            <div className={`grid gap-3 ${totalReviews > 0 ? "grid-cols-2" : "grid-cols-1"}`}>
-              <div className="bg-white border border-stone-200 rounded-2xl p-3 text-center shadow-sm">
-                <CheckCircle className="w-5 h-5 text-teal-500 mx-auto mb-1" />
-                <p className="text-xs text-stone-500 font-medium">Vendor Verified</p>
               </div>
-              {totalReviews > 0 && (
-                <div className="bg-white border border-stone-200 rounded-2xl p-3 text-center shadow-sm">
-                  <Star className="w-5 h-5 text-amber-400 fill-amber-400 mx-auto mb-1" />
-                  <p className="text-xs text-stone-500 font-medium">{rating.toFixed(1)} ({totalReviews} reviews)</p>
+
+              {/* Admin controls */}
+              {isAdmin && (
+                <div className="bg-purple-50 border border-purple-200 rounded-2xl p-4 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Shield className="w-4 h-4 text-purple-600" />
+                    <p className="text-purple-700 text-xs tracking-[0.2em] uppercase font-semibold">Admin Controls</p>
+                    <span className={`ml-auto px-2.5 py-0.5 rounded-full text-xs font-semibold ${listing.is_available ? "bg-teal-100 text-teal-700" : "bg-amber-100 text-amber-700"}`}>
+                      {listing.is_available ? "Live" : "Pending"}
+                    </span>
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={handleAdminToggle} disabled={!!adminLoading}
+                      className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all disabled:opacity-50 ${listing.is_available ? "bg-amber-100 text-amber-700 hover:bg-amber-200" : "bg-teal-100 text-teal-700 hover:bg-teal-200"}`}>
+                      {adminLoading==="toggle" ? "Updating…" : listing.is_available ? "Hide Listing" : "Approve & Publish"}
+                    </button>
+                    <button onClick={handleAdminDelete} disabled={!!adminLoading}
+                      className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all disabled:opacity-50 ${confirmDelete ? "bg-red-500 text-white" : "bg-red-100 text-red-700 hover:bg-red-200"}`}>
+                      {adminLoading==="delete" ? "Deleting…" : confirmDelete ? "Confirm Delete" : "Delete"}
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
+          </div>
 
-            {/* ── BOOKING SECTION — services only ── */}
-            {isService && (
-              <div id="booking-section"
-                className="bg-white border border-stone-200 rounded-2xl shadow-sm overflow-hidden">
-
-                <button
-                  onClick={() => setShowBooking(v => !v)}
-                  className="w-full flex items-center justify-between p-4 text-left hover:bg-stone-50 transition">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg flex items-center justify-center"
-                      style={{ background: GRAD }}>
-                      <Calendar className="w-4 h-4 text-white" />
-                    </div>
-                    <span className="font-semibold text-stone-900 text-sm">Book a Date & Time</span>
+          {/* ══════════ BOOKING FORM (services) ══════════ */}
+          {isService && showBooking && (
+            <div id="booking-panel" className="mt-10 max-w-2xl bg-white border border-stone-200 rounded-2xl shadow-sm overflow-hidden">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-stone-100">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: GRAD }}>
+                    <Calendar className="w-4 h-4 text-white" />
                   </div>
-                  {showBooking
-                    ? <ChevronUp className="w-5 h-5 text-stone-400" />
-                    : <ChevronDown className="w-5 h-5 text-stone-400" />}
-                </button>
-
-                {!showBooking && listing.is_available && (
-                  <div className="px-4 pb-4">
-                    <motion.button
-                      whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
-                      onClick={openBooking}
-                      className="w-full py-3.5 text-white font-semibold rounded-full flex items-center justify-center gap-2 text-sm shadow-lg shadow-teal-200/60"
-                      style={{ background: GRAD }}>
-                      <Calendar className="w-4 h-4" /> Book
-                    </motion.button>
-                  </div>
-                )}
-
-                <AnimatePresence>
-                  {showBooking && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.25 }}
-                      className="overflow-hidden">
-                      <div className="px-4 pb-6 space-y-4 border-t border-stone-100 pt-4">
-
-                        {bookingStep === "done" ? (
-                          <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
-                            className="text-center py-6 space-y-3">
-                            <div className="w-16 h-16 mx-auto rounded-full bg-teal-50 flex items-center justify-center">
-                              <CheckCircle className="w-8 h-8 text-teal-500" />
-                            </div>
-                            <p className="font-bold text-stone-900 text-lg"
-                              style={SERIF}>
-                              Booking Request Sent!
-                            </p>
-                            <p className="text-stone-400 text-sm">
-                              The vendor will confirm your booking. You'll get a notification when they do.
-                            </p>
-                            <motion.button
-                              whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
-                              onClick={() => router.push("/account/bookings")}
-                              className="mt-2 px-6 py-2.5 text-white font-medium rounded-full text-sm shadow-sm"
-                              style={{ background: GRAD }}>
-                              View My Bookings
-                            </motion.button>
-                          </motion.div>
-                        ) : (
-                          <>
-                            {/* Date */}
-                            <div>
-                              <label className="flex items-center gap-1.5 text-xs text-stone-500 font-semibold uppercase tracking-wide mb-2">
-                                <Calendar className="w-3.5 h-3.5 text-teal-500" /> Pick a Date
-                              </label>
-                              <input type="date" min={today} value={bookingDate}
-                                onChange={e => setBookingDate(e.target.value)}
-                                className="w-full px-4 py-3 rounded-xl border border-stone-200 text-stone-900 text-sm focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30 transition bg-white" />
-                            </div>
-
-                            {/* Time slots */}
-                            <div>
-                              <label className="flex items-center gap-1.5 text-xs text-stone-500 font-semibold uppercase tracking-wide mb-2">
-                                <Clock className="w-3.5 h-3.5 text-teal-500" /> Pick a Time Slot
-                              </label>
-                              <div className="grid grid-cols-3 gap-2">
-                                {TIME_SLOTS.map(slot => (
-                                  <button key={slot} type="button" onClick={() => setBookingTime(slot)}
-                                    className={`py-2 rounded-xl text-xs font-medium border transition ${
-                                      bookingTime === slot
-                                        ? "text-white border-transparent shadow-sm"
-                                        : "bg-stone-50 text-stone-600 border-stone-200 hover:border-teal-300"
-                                    }`}
-                                    style={bookingTime === slot ? { background: GRAD } : {}}>
-                                    {slot}
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-
-                            {/* Location */}
-                            <div>
-                              <label className="flex items-center gap-1.5 text-xs text-stone-500 font-semibold uppercase tracking-wide mb-2">
-                                <MapPin className="w-3.5 h-3.5 text-teal-500" /> Location
-                              </label>
-                              <input
-                                type="text"
-                                value={bookingLocation}
-                                onChange={e => setBookingLocation(e.target.value)}
-                                placeholder="e.g. Cedar hostel, room 12"
-                                className="w-full px-4 py-3 rounded-xl border border-stone-200 text-stone-900 text-sm focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30 transition bg-white placeholder:text-stone-400"
-                              />
-                              <p className="text-xs text-stone-400 mt-1">Where should the vendor meet you?</p>
-                            </div>
-
-                            {/* Note */}
-                            <div>
-                              <label className="flex items-center gap-1.5 text-xs text-stone-500 font-semibold uppercase tracking-wide mb-2">
-                                <FileText className="w-3.5 h-3.5 text-teal-500" /> Note (optional)
-                              </label>
-                              <textarea value={bookingNote} onChange={e => setBookingNote(e.target.value)}
-                                placeholder="Any special requests or details..."
-                                rows={3}
-                                className="w-full px-4 py-3 rounded-xl border border-stone-200 text-stone-900 text-sm focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/30 transition bg-white placeholder:text-stone-400 resize-none" />
-                            </div>
-
-                            {/* Error */}
-                            {bookingError && (
-                              <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex items-center gap-2">
-                                <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
-                                <p className="text-red-600 text-sm font-medium">{bookingError}</p>
-                              </div>
-                            )}
-
-                            {/* Submit */}
-                            <motion.button
-                              whileHover={{ scale: bookingStep === "confirming" ? 1 : 1.02 }}
-                              whileTap={{ scale: 0.97 }}
-                              onClick={handleBooking}
-                              disabled={bookingStep === "confirming" || !bookingDate || !bookingTime || !bookingLocation.trim()}
-                              className="w-full py-4 rounded-full font-semibold text-white text-sm flex items-center justify-center gap-2 shadow-lg shadow-teal-200/60 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                              style={{ background: GRAD }}>
-                              {bookingStep === "confirming"
-                                ? <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin inline-block" /> Sending...</>
-                                : <><Send className="w-4 h-4" /> Send Booking Request</>}
-                            </motion.button>
-
-                            <p className="text-xs text-stone-400 text-center">
-                              Vendor must confirm before it's finalised. You'll receive reminders at 30, 15, 10 and 5 minutes before your appointment.
-                            </p>
-                          </>
-                        )}
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            )}
-
-            {/* ── REVIEWS ── */}
-            {reviews.length > 0 && (
-              <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm">
-                <div className="flex items-center gap-2 mb-4">
-                  <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
-                  <p className="text-teal-600 text-xs tracking-[0.2em] uppercase font-semibold">
-                    Reviews ({reviews.length})
-                  </p>
+                  <span className="font-bold text-stone-900">Book a Date & Time</span>
                 </div>
-                <div className="space-y-4">
+                <button onClick={() => setShowBooking(false)} className="p-1.5 rounded-full hover:bg-stone-100">
+                  <XIcon className="w-4 h-4 text-stone-400" />
+                </button>
+              </div>
+              <div className="p-5 space-y-4">
+                {bookingStep === "done" ? (
+                  <div className="text-center py-8 space-y-3">
+                    <div className="w-16 h-16 mx-auto rounded-full bg-teal-50 flex items-center justify-center">
+                      <CheckCircle className="w-8 h-8 text-teal-500" />
+                    </div>
+                    <p className="font-bold text-stone-900 text-lg" style={SERIF}>Booking Request Sent!</p>
+                    <p className="text-stone-400 text-sm">The vendor will confirm your booking. You'll get a notification when they do.</p>
+                    <button onClick={() => router.push("/account/bookings")} className="mt-2 px-6 py-2.5 text-white font-medium rounded-full text-sm" style={{ background: GRAD }}>View My Bookings</button>
+                  </div>
+                ) : (
+                  <>
+                    <div>
+                      <label className="text-xs text-stone-500 font-bold uppercase tracking-wide mb-2 flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5 text-teal-500" />Pick a Date</label>
+                      <input type="date" min={today} value={bookingDate} onChange={e => setBookingDate(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-stone-200 text-sm focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-stone-500 font-bold uppercase tracking-wide mb-2 flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-teal-500" />Time Slot</label>
+                      <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                        {TIME_SLOTS.map(slot => (
+                          <button key={slot} type="button" onClick={() => setBookingTime(slot)}
+                            className={`py-2 rounded-xl text-xs font-medium border transition ${bookingTime===slot ? "text-white border-transparent" : "bg-stone-50 text-stone-600 border-stone-200 hover:border-teal-300"}`}
+                            style={bookingTime===slot ? { background: GRAD } : {}}>
+                            {slot}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-xs text-stone-500 font-bold uppercase tracking-wide mb-2 flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5 text-teal-500" />Location</label>
+                      <input type="text" value={bookingLocation} onChange={e => setBookingLocation(e.target.value)} placeholder="e.g. Cedar hostel, room 12"
+                        className="w-full px-4 py-3 rounded-xl border border-stone-200 text-sm focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 placeholder:text-stone-400" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-stone-500 font-bold uppercase tracking-wide mb-2 flex items-center gap-1.5"><FileText className="w-3.5 h-3.5 text-teal-500" />Note (optional)</label>
+                      <textarea value={bookingNote} onChange={e => setBookingNote(e.target.value)} placeholder="Any special requests…" rows={3} className="w-full px-4 py-3 rounded-xl border border-stone-200 text-sm focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 resize-none placeholder:text-stone-400" />
+                    </div>
+                    {bookingError && (
+                      <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
+                        <p className="text-red-600 text-sm">{bookingError}</p>
+                      </div>
+                    )}
+                    <motion.button whileTap={{ scale:0.97 }} onClick={handleBooking}
+                      disabled={bookingStep==="confirming"||!bookingDate||!bookingTime||!bookingLocation.trim()}
+                      className="w-full py-4 rounded-2xl font-bold text-white text-sm flex items-center justify-center gap-2 shadow-lg disabled:opacity-50"
+                      style={{ background: GRAD }}>
+                      {bookingStep==="confirming" ? <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin inline-block" /> Sending…</> : <><Send className="w-4 h-4" /> Send Booking Request</>}
+                    </motion.button>
+                    <p className="text-xs text-stone-400 text-center">Vendor must confirm before it's finalised.</p>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ══════════ BELOW FOLD ══════════ */}
+          <div className="mt-16 space-y-14">
+
+            {/* ── Reviews ── */}
+            {reviews.length > 0 && (
+              <section>
+                <h2 className="text-xl font-black text-stone-900 mb-6" style={SERIF}>Customer Reviews</h2>
+                {/* Rating summary */}
+                <div className="flex flex-col sm:flex-row items-start gap-8 mb-8 p-6 bg-stone-50 rounded-2xl border border-stone-100">
+                  <div className="flex-shrink-0 text-center">
+                    <p className="text-5xl font-black text-stone-900 leading-none">{rating.toFixed(1)}</p>
+                    <div className="flex gap-0.5 justify-center mt-2">
+                      {[1,2,3,4,5].map(s => <Star key={s} className={`w-4 h-4 ${s<=Math.round(rating)?"fill-amber-400 text-amber-400":"fill-stone-200 text-stone-200"}`} />)}
+                    </div>
+                    <p className="text-xs text-stone-400 mt-1">{totalReviews} review{totalReviews!==1?"s":""}</p>
+                  </div>
+                  {/* Breakdown bars */}
+                  <div className="flex-1 w-full space-y-1.5">
+                    {ratingCounts.map(({ n, count }) => {
+                      const pct = totalReviews > 0 ? Math.round((count/totalReviews)*100) : 0;
+                      return (
+                        <div key={n} className="flex items-center gap-2.5">
+                          <span className="text-xs text-stone-500 w-4 text-right flex-shrink-0">{n}</span>
+                          <Star className="w-3 h-3 fill-amber-400 text-amber-400 flex-shrink-0" />
+                          <div className="flex-1 h-1.5 bg-stone-200 rounded-full overflow-hidden">
+                            <div className="h-full bg-amber-400 rounded-full transition-all" style={{ width:`${pct}%` }} />
+                          </div>
+                          <span className="text-xs text-stone-400 w-5 flex-shrink-0">{count}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+                {/* Individual reviews */}
+                <div className="space-y-5">
                   {reviews.map(review => (
-                    <div key={review.id} className="border-b border-stone-100 last:border-0 pb-4 last:pb-0">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="font-semibold text-sm text-stone-900">{review.reviewer_username}</span>
-                        <div className="flex gap-0.5">
-                          {[1,2,3,4,5].map(s => (
-                            <Star key={s} className={`w-3.5 h-3.5 ${s <= review.rating ? "text-amber-400 fill-amber-400" : "text-stone-200 fill-stone-200"}`} />
-                          ))}
+                    <div key={review.id} className="pb-5 border-b border-stone-100 last:border-0 last:pb-0">
+                      <div className="flex items-start justify-between gap-3 mb-2">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-full text-white text-sm font-bold flex items-center justify-center flex-shrink-0" style={{ background: GRAD }}>
+                            {review.reviewer_username[0]?.toUpperCase()}
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-stone-900">{review.reviewer_username}</p>
+                            <p className="text-xs text-stone-400">{new Date(review.created_at).toLocaleDateString("en-NG",{day:"numeric",month:"short",year:"numeric"})}</p>
+                          </div>
+                        </div>
+                        <div className="flex gap-0.5 flex-shrink-0">
+                          {[1,2,3,4,5].map(s => <Star key={s} className={`w-3.5 h-3.5 ${s<=review.rating?"fill-amber-400 text-amber-400":"fill-stone-200 text-stone-200"}`} />)}
                         </div>
                       </div>
-                      {review.comment && (
-                        <p className="text-sm text-stone-500 mt-1 leading-relaxed">{review.comment}</p>
-                      )}
-                      <p className="text-xs text-stone-400 mt-1">
-                        {new Date(review.created_at).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" })}
-                      </p>
+                      {review.comment && <p className="text-sm text-stone-500 leading-relaxed pl-10">{review.comment}</p>}
                     </div>
                   ))}
                 </div>
-              </div>
+              </section>
             )}
 
-            {/* ── MORE FROM VENDOR ── */}
-            {(vendorListingsLoading || vendorListings.length > 0) && (
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <p className="font-bold text-stone-900 text-sm">More from @{listing.vendor.username}</p>
-                  <Link href={`/vendor/${listing.vendor.username}`} className="text-teal-600 text-xs font-semibold hover:text-teal-700 transition">
-                    View all →
-                  </Link>
+            {/* ── More from vendor ── */}
+            {(vendorLoading || vendorListings.length > 0) && (
+              <section>
+                <div className="flex items-center justify-between mb-5">
+                  <h2 className="text-xl font-black text-stone-900" style={SERIF}>More from {vendorName}</h2>
+                  <Link href={`/vendor/${listing.vendor.username}`} className="text-teal-600 text-sm font-semibold hover:text-teal-700 transition">View store →</Link>
                 </div>
-                {vendorListingsLoading ? <RelatedSkeleton /> : (
-                  <div className="flex gap-3 overflow-x-auto pb-2" style={{ scrollbarWidth: "none" }}>
+                {vendorLoading ? <RelatedSkeleton /> : (
+                  <div className="flex gap-4 overflow-x-auto pb-2" style={{ scrollbarWidth:"none" }}>
                     {vendorListings.map(item => <RelatedCard key={item.id} item={item} />)}
                   </div>
                 )}
-              </div>
+              </section>
             )}
 
-            {/* ── SIMILAR ITEMS ── */}
+            {/* ── Similar items ── */}
             {(similarLoading || similarItems.length > 0) && (
-              <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <p className="font-bold text-stone-900 text-sm">Similar Items</p>
+              <section>
+                <div className="flex items-center justify-between mb-5">
+                  <h2 className="text-xl font-black text-stone-900" style={SERIF}>Similar Items</h2>
                   {listing.category?.title && (
-                    <span className="px-2 py-0.5 rounded-full text-xs font-bold text-teal-700 bg-teal-50 border border-teal-100">
-                      {listing.category.title}
-                    </span>
+                    <span className="px-3 py-1 rounded-full text-xs font-bold text-teal-700 bg-teal-50 border border-teal-100">{listing.category.title}</span>
                   )}
                 </div>
                 {similarLoading ? <RelatedSkeleton /> : (
-                  <div className="flex gap-3 overflow-x-auto pb-2" style={{ scrollbarWidth: "none" }}>
+                  <div className="flex gap-4 overflow-x-auto pb-2" style={{ scrollbarWidth:"none" }}>
                     {similarItems.map(item => <RelatedCard key={item.id} item={item} />)}
                   </div>
                 )}
-              </div>
+              </section>
             )}
 
-            {/* ── YOU MIGHT ALSO LIKE ── */}
+            {/* ── You might also like ── */}
             {(alsoLikeLoading || alsoLike.length > 0) && (
-              <div>
-                <p className="font-bold text-stone-900 text-sm mb-3">You might also like</p>
+              <section>
+                <h2 className="text-xl font-black text-stone-900 mb-5" style={SERIF}>You May Also Like</h2>
                 {alsoLikeLoading ? <RelatedSkeleton /> : (
-                  <div className="flex gap-3 overflow-x-auto pb-2" style={{ scrollbarWidth: "none" }}>
+                  <div className="flex gap-4 overflow-x-auto pb-2" style={{ scrollbarWidth:"none" }}>
                     {alsoLike.map(item => <RelatedCard key={item.id} item={item} />)}
                   </div>
                 )}
-              </div>
+              </section>
             )}
 
           </div>
