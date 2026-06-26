@@ -47,7 +47,7 @@ export default function BottomNav() {
   }
 
   return (
-    <div className="lg:hidden fixed bottom-4 left-4 right-4 rounded-2xl z-50 max-w-lg mx-auto"
+    <div className="fixed bottom-4 left-4 right-4 rounded-2xl z-50 max-w-lg mx-auto"
       style={{
         background: "#ffffff",
         border: "1px solid rgba(0,0,0,0.06)",
