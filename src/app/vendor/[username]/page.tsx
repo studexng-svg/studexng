@@ -161,6 +161,17 @@ export default function VendorProfilePage() {
   /* rating breakdown */
   const ratingCounts = [5,4,3,2,1].map(n => ({ n, count: reviews.filter((r:any) => r.rating === n).length }));
 
+  /* day matching — API may return "Monday", "monday", "mon", "1", etc. */
+  const DAY_FULL = ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"];
+  const isDayOpen = (d: typeof DAYS[number]) => {
+    if (!availDays.length) return false;
+    const idx = DAYS.indexOf(d);
+    return availDays.some((ad: string) => {
+      const v = String(ad).toLowerCase().trim();
+      return v === d || v === DAY_FULL[idx] || v.startsWith(d) || v === String(idx) || v === String(idx + 1);
+    });
+  };
+
   /* ══════════════════════════════════════════════════════════════════════ */
   return (
     <div className="min-h-screen bg-white" style={{ fontFamily: "'DM Sans', sans-serif" }}>
@@ -221,7 +232,7 @@ export default function VendorProfilePage() {
               <div className="flex items-start justify-between gap-3 flex-wrap">
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <h1 className="text-xl lg:text-2xl font-black text-stone-900 leading-tight" style={SERIF}>
+                    <h1 className="text-xl lg:text-2xl font-black text-stone-900 leading-tight [overflow-wrap:anywhere]" style={SERIF}>
                       {vendor.business_name || vendor.username}
                     </h1>
                     {badge && (
@@ -245,16 +256,11 @@ export default function VendorProfilePage() {
                     </div>
                   )}
 
-                  {/* Meta pills */}
+                  {/* Meta pills — location + response time only; hours live in the sidebar */}
                   <div className="flex flex-wrap gap-2 mt-3">
                     {vendor.hostel && (
                       <span className="flex items-center gap-1 text-xs text-stone-500 bg-stone-100 px-2.5 py-1 rounded-full">
                         <MapPin className="w-3 h-3 text-teal-500" />{vendor.hostel}
-                      </span>
-                    )}
-                    {vendor.opening_time && vendor.closing_time && (
-                      <span className="flex items-center gap-1 text-xs text-stone-500 bg-stone-100 px-2.5 py-1 rounded-full">
-                        <Clock className="w-3 h-3 text-teal-500" />{vendor.opening_time}–{vendor.closing_time}
                       </span>
                     )}
                     {respLabel && (
@@ -320,19 +326,27 @@ export default function VendorProfilePage() {
                 </div>
               )}
 
-              {/* Open days */}
-              {availDays.length > 0 && (
+              {/* Open days + hours */}
+              {(availDays.length > 0 || vendor.opening_time) && (
                 <div className="bg-stone-50 rounded-2xl border border-stone-100 p-5">
-                  <p className="text-teal-600 text-xs tracking-[0.2em] uppercase font-bold mb-3">Open Days</p>
-                  <div className="flex gap-1.5">
-                    {DAYS.map(d => (
-                      <div key={d} className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold transition ${
-                        availDays.includes(d) ? "text-white shadow-sm" : "bg-stone-100 text-stone-300"
-                      }`} style={availDays.includes(d) ? { background: GRAD } : {}}>
-                        {DAY_LBL[d]}
-                      </div>
-                    ))}
-                  </div>
+                  <p className="text-teal-600 text-xs tracking-[0.2em] uppercase font-bold mb-3">Hours & Availability</p>
+                  {availDays.length > 0 && (
+                    <div className="flex gap-1.5 mb-3">
+                      {DAYS.map(d => (
+                        <div key={d} className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold transition ${
+                          isDayOpen(d) ? "text-white shadow-sm" : "bg-stone-100 text-stone-300"
+                        }`} style={isDayOpen(d) ? { background: GRAD } : {}}>
+                          {DAY_LBL[d]}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {vendor.opening_time && vendor.closing_time && (
+                    <div className="flex items-center gap-1.5 text-sm text-stone-600 font-medium">
+                      <Clock className="w-3.5 h-3.5 text-teal-500 flex-shrink-0" />
+                      {vendor.opening_time} – {vendor.closing_time}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -414,18 +428,26 @@ export default function VendorProfilePage() {
                   <p className="text-stone-600 text-sm leading-relaxed">{vendor.bio}</p>
                 </div>
               )}
-              {availDays.length > 0 && (
+              {(availDays.length > 0 || vendor.opening_time) && (
                 <div className="bg-stone-50 rounded-2xl border border-stone-100 p-4">
-                  <p className="text-teal-600 text-xs tracking-[0.2em] uppercase font-bold mb-2">Open Days</p>
-                  <div className="flex gap-1.5">
-                    {DAYS.map(d => (
-                      <div key={d} className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold ${
-                        availDays.includes(d) ? "text-white" : "bg-stone-100 text-stone-300"
-                      }`} style={availDays.includes(d) ? { background: GRAD } : {}}>
-                        {DAY_LBL[d]}
-                      </div>
-                    ))}
-                  </div>
+                  <p className="text-teal-600 text-xs tracking-[0.2em] uppercase font-bold mb-2">Hours & Availability</p>
+                  {availDays.length > 0 && (
+                    <div className="flex gap-1.5 mb-2">
+                      {DAYS.map(d => (
+                        <div key={d} className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold ${
+                          isDayOpen(d) ? "text-white" : "bg-stone-100 text-stone-300"
+                        }`} style={isDayOpen(d) ? { background: GRAD } : {}}>
+                          {DAY_LBL[d]}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {vendor.opening_time && vendor.closing_time && (
+                    <div className="flex items-center gap-1.5 text-sm text-stone-600 font-medium">
+                      <Clock className="w-3.5 h-3.5 text-teal-500 flex-shrink-0" />
+                      {vendor.opening_time} – {vendor.closing_time}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -502,7 +524,7 @@ export default function VendorProfilePage() {
                                   flash(inCart ? "Added again" : "Added to cart");
                                 }}
                                 className="w-full py-2 rounded-xl text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-lg"
-                                style={{ background: isService ? "linear-gradient(135deg,#7C3AED,#4F46E5)" : GRAD }}>
+                                style={{ background: GRAD }}>
                                 {isService
                                   ? <><Calendar className="w-3 h-3" /> Book Now</>
                                   : <><ShoppingCart className="w-3 h-3" /> {inCart ? "In Cart ✓" : "Add to Cart"}</>
@@ -531,7 +553,7 @@ export default function VendorProfilePage() {
                               flash(inCart ? "Added again" : "Added to cart");
                             }}
                             className="w-full py-1.5 rounded-xl text-white text-xs font-bold flex items-center justify-center gap-1 transition-opacity hover:opacity-80"
-                            style={{ background: isService ? "linear-gradient(135deg,#7C3AED,#4F46E5)" : GRAD }}>
+                            style={{ background: GRAD }}>
                             {isService ? <><Calendar className="w-3 h-3" /> Book</> : <><ShoppingCart className="w-3 h-3" /> {inCart ? "In Cart" : "Add"}</>}
                           </button>
                         </div>
