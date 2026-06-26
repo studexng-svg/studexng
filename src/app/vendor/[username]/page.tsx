@@ -498,7 +498,7 @@ export default function VendorProfilePage() {
                                   flash(inCart ? "Added again" : "Added to cart");
                                 }}
                                 className="w-full py-2 rounded-xl text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-lg"
-                                style={{ background: GRAD }}>
+                                style={{ background: isService ? "#0d9488" : GRAD }}>
                                 {isService ? <><Calendar className="w-3 h-3" /> Book Now</> : <><ShoppingCart className="w-3 h-3" /> {inCart ? "In Cart ✓" : "Add to Cart"}</>}
                               </button>
                             </div>
@@ -521,7 +521,7 @@ export default function VendorProfilePage() {
                               flash(inCart ? "Added again" : "Added to cart");
                             }}
                             className="w-full py-1.5 rounded-xl text-white text-xs font-bold flex items-center justify-center gap-1 hover:opacity-80 transition"
-                            style={{ background: GRAD }}>
+                            style={{ background: isService ? "#0d9488" : GRAD }}>
                             {isService ? <><Calendar className="w-3 h-3" /> Book</> : <><ShoppingCart className="w-3 h-3" /> {inCart ? "In Cart" : "Add"}</>}
                           </button>
                         </div>
