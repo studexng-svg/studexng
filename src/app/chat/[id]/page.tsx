@@ -104,9 +104,12 @@ export default function ChatRoomPage() {
   }, [isHydrated, isLoggedIn, conversationId]);
 
   useEffect(() => {
-    if (!bottomRef.current || messages.length === 0) return;
-    bottomRef.current.scrollIntoView({ behavior: hasScrolled.current ? "smooth" : "instant" });
+    if (messages.length === 0) return;
+    const behavior = hasScrolled.current ? "smooth" : "instant";
     hasScrolled.current = true;
+    requestAnimationFrame(() => {
+      bottomRef.current?.scrollIntoView({ behavior });
+    });
   }, [messages]);
 
   useEffect(() => {
@@ -403,7 +406,7 @@ export default function ChatRoomPage() {
 
   /* ══════════════════════════════════════════════════════════════════════ */
   return (
-    <div className="flex flex-col" style={{ height: "100dvh", background: "#F4F5F7", paddingBottom: "5rem", fontFamily: "'DM Sans', sans-serif" }}>
+    <div className="flex flex-col" style={{ height: "100dvh", background: "#F4F5F7", fontFamily: "'DM Sans', sans-serif" }}>
 
       {/* ── HEADER ── */}
       <div className="bg-white px-4 py-3 flex items-center gap-3 flex-shrink-0 shadow-sm">
@@ -670,7 +673,7 @@ export default function ChatRoomPage() {
       {/* ── SCROLL TO BOTTOM ── */}
       {showScrollBtn && (
         <button onClick={() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' })}
-          className="fixed bottom-28 right-4 z-30 w-10 h-10 bg-white shadow-lg border border-stone-200 rounded-full flex items-center justify-center active:scale-95 transition">
+          className="fixed bottom-24 left-1/2 -translate-x-1/2 z-30 w-10 h-10 bg-white shadow-lg border border-stone-200 rounded-full flex items-center justify-center active:scale-95 transition">
           <ChevronDown className="w-5 h-5 text-stone-600" />
         </button>
       )}

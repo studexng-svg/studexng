@@ -23,7 +23,7 @@ export default function BottomNav() {
   const { isLoggedIn } = useAuth();
   const [unreadCount, setUnreadCount] = useState(0);
 
-  if (pathname === "/" || pathname === "/auth" || pathname.startsWith("/admin")) {
+  if (pathname === "/" || pathname === "/auth" || pathname.startsWith("/admin") || pathname.startsWith("/chat")) {
     return null;
   }
 
