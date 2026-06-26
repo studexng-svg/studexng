@@ -174,7 +174,7 @@ export default function VendorProfilePage() {
 
   /* ══════════════════════════════════════════════════════════════════════ */
   return (
-    <div className="min-h-screen bg-white" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+    <div className="flex flex-col h-screen overflow-hidden bg-white" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       <TopNav showBack activeNav="vendors" />
 
       {/* ── Toast ── */}
@@ -208,217 +208,217 @@ export default function VendorProfilePage() {
         </div>
       )}
 
-      {/* ══════════ HERO ══════════ */}
-      <div className="bg-white border-b border-stone-100">
-        <div className="max-w-6xl mx-auto px-4 lg:px-8 pt-7 pb-6">
-          <div className="flex items-start gap-5 lg:gap-7">
+      {/* ══════════ TWO-PANEL SHELL (sidebar + scrollable main) ══════════ */}
+      <div className="flex flex-1 min-h-0 overflow-hidden">
 
-            {/* Avatar */}
-            <div className="relative flex-shrink-0">
-              <div className="w-[72px] h-[72px] lg:w-[88px] lg:h-[88px] rounded-2xl overflow-hidden shadow-sm"
-                style={{ boxShadow: "0 0 0 3px #fff, 0 0 0 5px rgba(13,148,136,0.35)" }}>
-                {vendor.profile_picture
-                  ? <img src={vendor.profile_picture} alt={vendor.username} className="w-full h-full object-cover object-top" />
-                  : <div className="w-full h-full flex items-center justify-center text-white font-black text-2xl" style={{ background: GRAD }}>{initials}</div>
-                }
-              </div>
-              {vendor.is_online && (
-                <span className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-green-400 rounded-full border-2 border-white shadow" />
-              )}
+        {/* ─── SIDEBAR — stationary, never scrolls ─── */}
+        <aside className="hidden lg:flex flex-col w-64 flex-shrink-0 bg-white border-r border-stone-200 overflow-y-auto">
+
+          {/* Vendor mini header */}
+          <div className="flex items-center gap-3 px-4 py-4 border-b border-stone-100 flex-shrink-0">
+            <div className="w-10 h-10 rounded-xl overflow-hidden flex-shrink-0"
+              style={{ boxShadow: "0 0 0 2px rgba(13,148,136,0.3)" }}>
+              {vendor.profile_picture
+                ? <img src={vendor.profile_picture} alt={vendor.username} className="w-full h-full object-cover object-top" />
+                : <div className="w-full h-full flex items-center justify-center text-white font-black text-sm" style={{ background: GRAD }}>{initials}</div>
+              }
             </div>
+            <div className="min-w-0">
+              <p className="font-bold text-stone-900 text-sm [overflow-wrap:anywhere] leading-snug">{vendor.business_name || vendor.username}</p>
+              <p className="text-stone-400 text-xs truncate">@{vendor.username}</p>
+            </div>
+          </div>
 
-            {/* Info */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-start justify-between gap-3 flex-wrap">
-                <div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h1 className="text-xl lg:text-2xl font-black text-stone-900 leading-tight [overflow-wrap:anywhere]" style={SERIF}>
-                      {vendor.business_name || vendor.username}
-                    </h1>
-                    {badge && (
-                      <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200">
-                        {badge.emoji} {badge.label}
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-stone-400 text-sm mt-0.5">@{vendor.username}</p>
+          {/* About */}
+          {vendor.bio && (
+            <div className="px-4 py-4 border-b border-stone-100">
+              <p className="text-[10px] font-bold tracking-widest uppercase text-stone-400 mb-2">About</p>
+              <p className="text-stone-600 text-sm leading-relaxed">{vendor.bio}</p>
+            </div>
+          )}
 
-                  {/* Rating */}
-                  {totalReviews > 0 && (
-                    <div className="flex items-center gap-1.5 mt-2">
-                      <div className="flex gap-0.5">
-                        {[1,2,3,4,5].map(n => (
-                          <Star key={n} className={`w-3.5 h-3.5 ${n <= Math.round(vendorRating) ? "fill-amber-400 text-amber-400" : "fill-stone-200 text-stone-200"}`} />
-                        ))}
-                      </div>
-                      <span className="text-stone-700 font-bold text-sm">{vendorRating.toFixed(1)}</span>
-                      <span className="text-stone-400 text-xs">({totalReviews} reviews)</span>
+          {/* Hours & Availability */}
+          {(availDays.length > 0 || vendor.opening_time) && (
+            <div className="px-4 py-4 border-b border-stone-100">
+              <p className="text-[10px] font-bold tracking-widest uppercase text-stone-400 mb-3">Hours & Availability</p>
+              {availDays.length > 0 && (
+                <div className="flex gap-1 flex-wrap mb-3">
+                  {DAYS.map(d => (
+                    <div key={d} className={`w-7 h-7 rounded-lg flex items-center justify-center text-[11px] font-bold transition-colors ${
+                      isDayOpen(d) ? "bg-teal-500 text-white" : "bg-stone-100 text-stone-300"
+                    }`}>
+                      {DAY_LBL[d]}
                     </div>
-                  )}
-
-                  {/* Meta pills — location + response time only; hours live in the sidebar */}
-                  <div className="flex flex-wrap gap-2 mt-3">
-                    {vendor.hostel && (
-                      <span className="flex items-center gap-1 text-xs text-stone-500 bg-stone-100 px-2.5 py-1 rounded-full">
-                        <MapPin className="w-3 h-3 text-teal-500" />{vendor.hostel}
-                      </span>
-                    )}
-                    {respLabel && (
-                      <span className="flex items-center gap-1 text-xs text-stone-500 bg-stone-100 px-2.5 py-1 rounded-full">
-                        <Zap className="w-3 h-3 text-teal-500" />{respLabel} reply
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Actions */}
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <button onClick={handleShare}
-                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white hover:bg-stone-50 border border-stone-200 text-stone-600 text-sm font-semibold transition">
-                    <Share2 className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">Share</span>
-                  </button>
-                  <Link href={`/chat?vendor=${vendor.username}`}>
-                    <button className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-white text-sm font-semibold transition hover:opacity-90"
-                      style={{ background: GRAD }}>
-                      <MessageCircle className="w-3.5 h-3.5" /> Chat
-                    </button>
-                  </Link>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Stats row */}
-          <div className="mt-6 pt-5 border-t border-stone-100 flex items-center gap-0">
-            {[
-              { value: vendor.completed_order_count || 0,              label: "Orders",     icon: ShoppingCart  },
-              { value: `${Math.round(vendor.completion_rate || 0)}%`,  label: "Completion", icon: CheckCircle2  },
-              { value: vendor.total_listings || listings.length,        label: "Listings",   icon: Package       },
-            ].map(({ value, label, icon: Icon }, i) => (
-              <div key={label} className={`flex items-center gap-3 ${i > 0 ? "ml-6 pl-6 border-l border-stone-200" : ""}`}>
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-teal-50 flex-shrink-0">
-                  <Icon className="w-4 h-4 text-teal-600" />
-                </div>
-                <div>
-                  <p className="text-stone-900 font-black text-lg leading-none">{value}</p>
-                  <p className="text-stone-400 text-xs mt-0.5">{label}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* ══════════ BODY ══════════ */}
-      <div className="max-w-6xl mx-auto px-4 lg:px-8 pt-8 pb-28">
-        <div className="lg:grid lg:grid-cols-[260px_1fr] lg:gap-10">
-
-          {/* ─── LEFT: info panel (desktop sticky) ─── */}
-          <div className="hidden lg:block">
-            <div className="lg:sticky lg:top-6 space-y-4">
-
-              {/* Bio */}
-              {vendor.bio && (
-                <div className="bg-stone-50 rounded-2xl border border-stone-100 p-5">
-                  <p className="text-teal-600 text-xs tracking-[0.2em] uppercase font-bold mb-2">About</p>
-                  <p className="text-stone-600 text-sm leading-relaxed">{vendor.bio}</p>
+                  ))}
                 </div>
               )}
+              {vendor.opening_time && vendor.closing_time && (
+                <div className="flex items-center gap-1.5 text-xs text-stone-500">
+                  <Clock className="w-3.5 h-3.5 text-teal-500 flex-shrink-0" />
+                  {vendor.opening_time} – {vendor.closing_time}
+                </div>
+              )}
+            </div>
+          )}
 
-              {/* Open days + hours */}
-              {(availDays.length > 0 || vendor.opening_time) && (
-                <div className="bg-stone-50 rounded-2xl border border-stone-100 p-5">
-                  <p className="text-teal-600 text-xs tracking-[0.2em] uppercase font-bold mb-3">Hours & Availability</p>
-                  {availDays.length > 0 && (
-                    <div className="flex gap-1.5 mb-3">
-                      {DAYS.map(d => (
-                        <div key={d} className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold transition ${
-                          isDayOpen(d) ? "text-white shadow-sm" : "bg-stone-100 text-stone-300"
-                        }`} style={isDayOpen(d) ? { background: GRAD } : {}}>
-                          {DAY_LBL[d]}
+          {/* Reviews summary */}
+          {reviews.length > 0 && (
+            <div className="px-4 py-4 border-b border-stone-100">
+              <p className="text-[10px] font-bold tracking-widest uppercase text-stone-400 mb-3">Reviews</p>
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0">
+                  <p className="text-3xl font-black text-stone-900 leading-none">{vendorRating.toFixed(1)}</p>
+                  <div className="flex gap-0.5 mt-1">
+                    {[1,2,3,4,5].map(n => <Star key={n} className={`w-2.5 h-2.5 ${n<=Math.round(vendorRating)?"fill-amber-400 text-amber-400":"fill-stone-200 text-stone-200"}`} />)}
+                  </div>
+                  <p className="text-[11px] text-stone-400 mt-0.5">{totalReviews} review{totalReviews!==1?"s":""}</p>
+                </div>
+                <div className="flex-1 space-y-1 pt-0.5">
+                  {ratingCounts.map(({ n, count }) => {
+                    const pct = totalReviews > 0 ? Math.round((count/totalReviews)*100) : 0;
+                    return (
+                      <div key={n} className="flex items-center gap-1">
+                        <span className="text-[10px] text-stone-400 w-2.5 flex-shrink-0">{n}</span>
+                        <div className="flex-1 h-1 bg-stone-100 rounded-full overflow-hidden">
+                          <div className="h-full bg-amber-400 rounded-full" style={{ width:`${pct}%` }} />
                         </div>
-                      ))}
-                    </div>
-                  )}
-                  {vendor.opening_time && vendor.closing_time && (
-                    <div className="flex items-center gap-1.5 text-sm text-stone-600 font-medium">
-                      <Clock className="w-3.5 h-3.5 text-teal-500 flex-shrink-0" />
-                      {vendor.opening_time} – {vendor.closing_time}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Reviews summary */}
-              {reviews.length > 0 && (
-                <div className="bg-stone-50 rounded-2xl border border-stone-100 p-5">
-                  <p className="text-teal-600 text-xs tracking-[0.2em] uppercase font-bold mb-3">Reviews</p>
-                  <div className="flex items-start gap-3 mb-4">
-                    <div className="flex-shrink-0 text-center">
-                      <p className="text-4xl font-black text-stone-900 leading-none">{vendorRating.toFixed(1)}</p>
-                      <div className="flex gap-0.5 justify-center mt-1.5">
-                        {[1,2,3,4,5].map(n => <Star key={n} className={`w-3 h-3 ${n<=Math.round(vendorRating)?"fill-amber-400 text-amber-400":"fill-stone-200 text-stone-200"}`} />)}
+                        <span className="text-[10px] text-stone-400 w-3 flex-shrink-0 text-right">{count}</span>
                       </div>
-                      <p className="text-[11px] text-stone-400 mt-1">{totalReviews} review{totalReviews!==1?"s":""}</p>
-                    </div>
-                    <div className="flex-1 space-y-1">
-                      {ratingCounts.map(({ n, count }) => {
-                        const pct = totalReviews > 0 ? Math.round((count/totalReviews)*100) : 0;
-                        return (
-                          <div key={n} className="flex items-center gap-1.5">
-                            <span className="text-xs text-stone-400 w-3 flex-shrink-0 text-right">{n}</span>
-                            <Star className="w-2.5 h-2.5 fill-amber-400 text-amber-400 flex-shrink-0" />
-                            <div className="flex-1 h-1.5 bg-stone-200 rounded-full overflow-hidden">
-                              <div className="h-full bg-amber-400 rounded-full" style={{ width:`${pct}%` }} />
-                            </div>
-                            <span className="text-[11px] text-stone-400 w-4 flex-shrink-0">{count}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
+                    );
+                  })}
                 </div>
-              )}
+              </div>
+            </div>
+          )}
 
-              {/* Admin panel */}
-              {isAdmin && (
-                <div className="bg-purple-50 border border-purple-200 rounded-2xl p-5 space-y-3">
-                  <div className="flex items-center gap-2">
-                    <Shield className="w-4 h-4 text-purple-600" />
-                    <p className="text-purple-700 text-xs tracking-[0.2em] uppercase font-semibold">Admin</p>
-                  </div>
-                  <div className="text-xs text-stone-600 space-y-1">
-                    {vendor.email     && <p><span className="font-semibold">Email:</span> {vendor.email}</p>}
-                    {vendor.school    && <p><span className="font-semibold">School:</span> {vendor.school.toUpperCase()}</p>}
-                    {vendor.user_type && <p><span className="font-semibold">Type:</span> {vendor.user_type}</p>}
-                    {vendor.is_active !== undefined && (
-                      <p><span className="font-semibold">Status:</span>{" "}
-                        <span className={vendor.is_active ? "text-teal-600 font-semibold" : "text-red-500 font-semibold"}>
-                          {vendor.is_active ? "Active" : "Deactivated"}
+          {/* Admin */}
+          {isAdmin && (
+            <div className="px-4 py-4">
+              <div className="flex items-center gap-1.5 mb-3">
+                <Shield className="w-3.5 h-3.5 text-purple-500" />
+                <p className="text-[10px] font-bold tracking-widest uppercase text-purple-500">Admin</p>
+              </div>
+              <div className="text-xs text-stone-600 space-y-1 mb-3">
+                {vendor.email     && <p><span className="font-semibold">Email:</span> {vendor.email}</p>}
+                {vendor.school    && <p><span className="font-semibold">School:</span> {vendor.school.toUpperCase()}</p>}
+                {vendor.user_type && <p><span className="font-semibold">Type:</span> {vendor.user_type}</p>}
+                {vendor.is_active !== undefined && (
+                  <p><span className="font-semibold">Status:</span>{" "}
+                    <span className={vendor.is_active ? "text-teal-600 font-semibold" : "text-red-500 font-semibold"}>
+                      {vendor.is_active ? "Active" : "Deactivated"}
+                    </span>
+                  </p>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => setNotifyOpen(true)}
+                  className="flex-1 flex items-center justify-center gap-1 py-2 rounded-xl text-xs font-bold bg-purple-100 text-purple-700 hover:bg-purple-200 transition">
+                  <BellRing className="w-3 h-3" /> Notify
+                </button>
+                <button onClick={handleRevoke} disabled={!!adminLoading}
+                  className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-xl text-xs font-bold transition disabled:opacity-50 ${confirmRevoke ? "bg-red-500 text-white" : "bg-red-100 text-red-700 hover:bg-red-200"}`}>
+                  <UserX className="w-3 h-3" />
+                  {adminLoading === "revoke" ? "…" : confirmRevoke ? "Confirm?" : "Revoke"}
+                </button>
+              </div>
+            </div>
+          )}
+
+        </aside>
+
+        {/* ─── MAIN — scrollable ─── */}
+        <div className="flex-1 overflow-y-auto">
+
+          {/* Hero strip */}
+          <div className="bg-white border-b border-stone-100 px-5 lg:px-8 pt-7 pb-6">
+            <div className="flex items-start gap-5">
+
+              {/* Avatar (mobile only — desktop shows in sidebar) */}
+              <div className="relative flex-shrink-0 lg:hidden">
+                <div className="w-16 h-16 rounded-2xl overflow-hidden"
+                  style={{ boxShadow: "0 0 0 3px #fff, 0 0 0 5px rgba(13,148,136,0.35)" }}>
+                  {vendor.profile_picture
+                    ? <img src={vendor.profile_picture} alt={vendor.username} className="w-full h-full object-cover object-top" />
+                    : <div className="w-full h-full flex items-center justify-center text-white font-black text-xl" style={{ background: GRAD }}>{initials}</div>
+                  }
+                </div>
+                {vendor.is_online && <span className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-green-400 rounded-full border-2 border-white shadow" />}
+              </div>
+
+              {/* Info */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-start justify-between gap-3 flex-wrap">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h1 className="text-xl lg:text-2xl font-black text-stone-900 leading-tight [overflow-wrap:anywhere]" style={SERIF}>
+                        {vendor.business_name || vendor.username}
+                      </h1>
+                      {badge && (
+                        <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200 flex-shrink-0">
+                          {badge.emoji} {badge.label}
                         </span>
-                      </p>
+                      )}
+                    </div>
+                    <p className="text-stone-400 text-sm mt-0.5">@{vendor.username}</p>
+                    {totalReviews > 0 && (
+                      <div className="flex items-center gap-1.5 mt-2">
+                        <div className="flex gap-0.5">
+                          {[1,2,3,4,5].map(n => <Star key={n} className={`w-3.5 h-3.5 ${n<=Math.round(vendorRating)?"fill-amber-400 text-amber-400":"fill-stone-200 text-stone-200"}`} />)}
+                        </div>
+                        <span className="text-stone-700 font-bold text-sm">{vendorRating.toFixed(1)}</span>
+                        <span className="text-stone-400 text-xs">({totalReviews} reviews)</span>
+                      </div>
                     )}
+                    <div className="flex flex-wrap gap-2 mt-2.5">
+                      {vendor.hostel && (
+                        <span className="flex items-center gap-1 text-xs text-stone-500 bg-stone-100 px-2.5 py-1 rounded-full">
+                          <MapPin className="w-3 h-3 text-teal-500" />{vendor.hostel}
+                        </span>
+                      )}
+                      {respLabel && (
+                        <span className="flex items-center gap-1 text-xs text-stone-500 bg-stone-100 px-2.5 py-1 rounded-full">
+                          <Zap className="w-3 h-3 text-teal-500" />{respLabel} reply
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex gap-2">
-                    <button onClick={() => setNotifyOpen(true)}
-                      className="flex-1 flex items-center justify-center gap-1 py-2 rounded-xl text-xs font-bold bg-purple-100 text-purple-700 hover:bg-purple-200 transition">
-                      <BellRing className="w-3 h-3" /> Notify
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <button onClick={handleShare}
+                      className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white hover:bg-stone-50 border border-stone-200 text-stone-600 text-sm font-semibold transition">
+                      <Share2 className="w-3.5 h-3.5" /><span className="hidden sm:inline">Share</span>
                     </button>
-                    <button onClick={handleRevoke} disabled={!!adminLoading}
-                      className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-xl text-xs font-bold transition disabled:opacity-50 ${confirmRevoke ? "bg-red-500 text-white" : "bg-red-100 text-red-700 hover:bg-red-200"}`}>
-                      <UserX className="w-3 h-3" />
-                      {adminLoading === "revoke" ? "…" : confirmRevoke ? "Confirm?" : "Revoke"}
-                    </button>
+                    <Link href={`/chat?vendor=${vendor.username}`}>
+                      <button className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-white text-sm font-semibold hover:opacity-90 transition" style={{ background: GRAD }}>
+                        <MessageCircle className="w-3.5 h-3.5" /> Chat
+                      </button>
+                    </Link>
                   </div>
                 </div>
-              )}
+              </div>
+            </div>
 
+            {/* Stats */}
+            <div className="mt-5 pt-5 border-t border-stone-100 flex items-center gap-0">
+              {[
+                { value: vendor.completed_order_count || 0,             label: "Orders",     icon: ShoppingCart },
+                { value: `${Math.round(vendor.completion_rate || 0)}%`, label: "Completion", icon: CheckCircle2 },
+                { value: vendor.total_listings || listings.length,       label: "Listings",   icon: Package      },
+              ].map(({ value, label, icon: Icon }, i) => (
+                <div key={label} className={`flex items-center gap-3 ${i > 0 ? "ml-6 pl-6 border-l border-stone-200" : ""}`}>
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-teal-50 flex-shrink-0">
+                    <Icon className="w-4 h-4 text-teal-600" />
+                  </div>
+                  <div>
+                    <p className="text-stone-900 font-black text-lg leading-none">{value}</p>
+                    <p className="text-stone-400 text-xs mt-0.5">{label}</p>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 
-          {/* ─── RIGHT: main content ─── */}
-          <div>
+          {/* Scrollable body */}
+          <div className="px-5 lg:px-8 pt-6 pb-28">
 
             {/* Mobile info cards */}
             <div className="lg:hidden space-y-3 mb-6">
@@ -432,13 +432,11 @@ export default function VendorProfilePage() {
                 <div className="bg-stone-50 rounded-2xl border border-stone-100 p-4">
                   <p className="text-teal-600 text-xs tracking-[0.2em] uppercase font-bold mb-2">Hours & Availability</p>
                   {availDays.length > 0 && (
-                    <div className="flex gap-1.5 mb-2">
+                    <div className="flex gap-1.5 flex-wrap mb-2">
                       {DAYS.map(d => (
                         <div key={d} className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold ${
-                          isDayOpen(d) ? "text-white" : "bg-stone-100 text-stone-300"
-                        }`} style={isDayOpen(d) ? { background: GRAD } : {}}>
-                          {DAY_LBL[d]}
-                        </div>
+                          isDayOpen(d) ? "bg-teal-500 text-white" : "bg-stone-100 text-stone-300"
+                        }`}>{DAY_LBL[d]}</div>
                       ))}
                     </div>
                   )}
@@ -452,7 +450,7 @@ export default function VendorProfilePage() {
               )}
             </div>
 
-            {/* Product grid header */}
+            {/* Grid header */}
             <div className="flex items-center justify-between mb-5">
               <h2 className="text-xl font-black text-stone-900" style={SERIF}>
                 {vendor.business_name ? `${vendor.business_name}'s Listings` : "Listings"}
@@ -469,7 +467,7 @@ export default function VendorProfilePage() {
                 <p className="text-stone-400 font-semibold text-sm">No listings yet</p>
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 lg:gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 gap-3 lg:gap-4">
                 {sorted.map((listing, i) => {
                   const isService = (listing.listing_type || "").toLowerCase() === "service";
                   const isOwn     = !!(user?.id && user.id === listing.vendor?.id);
@@ -482,42 +480,32 @@ export default function VendorProfilePage() {
 
                   return (
                     <motion.div key={listing.id}
-                      initial={{ opacity:0, y:12 }}
-                      animate={{ opacity:1, y:0 }}
+                      initial={{ opacity:0, y:12 }} animate={{ opacity:1, y:0 }}
                       transition={{ delay: Math.min(i * 0.02, 0.18) }}
                       className="group bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md border border-stone-100 hover:border-stone-200 transition-all duration-300">
 
                       <Link href={`/listing/${listing.id}`} className="block">
                         <div className="relative w-full aspect-[3/4] overflow-hidden bg-stone-50">
-                          <SafeImg
-                            src={listing.image?.startsWith("http") ? listing.image : null}
-                            alt={listing.title}
-                            className="group-hover:scale-[1.04] transition-transform duration-500"
-                          />
-
+                          <SafeImg src={listing.image?.startsWith("http") ? listing.image : null} alt={listing.title}
+                            className="group-hover:scale-[1.04] transition-transform duration-500" />
                           {!listing.is_available && (
                             <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
                               <span className="text-white text-xs font-bold bg-black/70 px-3 py-1 rounded-full tracking-wide">Unavailable</span>
                             </div>
                           )}
-
                           {(discount > 0 || dealPrice) && (
                             <div className="absolute top-2 left-2 bg-red-500 text-white text-[11px] font-black px-2 py-0.5 rounded-lg shadow">
                               -{discount || listing.deal?.discount_percent}%
                             </div>
                           )}
-
                           {wc >= 3 && listing.is_available && (
                             <div className="absolute bottom-2 left-2 flex items-center gap-0.5 text-white text-[11px] font-semibold bg-black/55 backdrop-blur-sm px-2 py-0.5 rounded-lg">
                               <Zap className="w-2.5 h-2.5 text-yellow-400" /> {wc}/wk
                             </div>
                           )}
-
-                          {/* Desktop hover CTA */}
                           {listing.is_available && !isOwn && (
                             <div className="absolute inset-x-0 bottom-0 translate-y-full group-hover:translate-y-0 transition-transform duration-200 p-2 hidden sm:block">
-                              <button
-                                onClick={e => {
+                              <button onClick={e => {
                                   e.preventDefault();
                                   if (isService) { router.push(`/listing/${listing.id}`); return; }
                                   addToCart({ id: listing.id, title: listing.title, price: effPrice, img: listing.image || "" });
@@ -525,15 +513,11 @@ export default function VendorProfilePage() {
                                 }}
                                 className="w-full py-2 rounded-xl text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-lg"
                                 style={{ background: GRAD }}>
-                                {isService
-                                  ? <><Calendar className="w-3 h-3" /> Book Now</>
-                                  : <><ShoppingCart className="w-3 h-3" /> {inCart ? "In Cart ✓" : "Add to Cart"}</>
-                                }
+                                {isService ? <><Calendar className="w-3 h-3" /> Book Now</> : <><ShoppingCart className="w-3 h-3" /> {inCart ? "In Cart ✓" : "Add to Cart"}</>}
                               </button>
                             </div>
                           )}
                         </div>
-
                         <div className="px-3 pt-2.5 pb-1">
                           <p className="font-semibold text-stone-900 text-sm line-clamp-1 leading-snug">{listing.title}</p>
                           <div className="mt-1 flex items-center gap-1.5">
@@ -543,16 +527,14 @@ export default function VendorProfilePage() {
                         </div>
                       </Link>
 
-                      {/* Mobile CTA */}
                       {listing.is_available && !isOwn && (
                         <div className="px-3 pb-3 sm:hidden">
-                          <button
-                            onClick={() => {
+                          <button onClick={() => {
                               if (isService) { router.push(`/listing/${listing.id}`); return; }
                               addToCart({ id: listing.id, title: listing.title, price: effPrice, img: listing.image || "" });
                               flash(inCart ? "Added again" : "Added to cart");
                             }}
-                            className="w-full py-1.5 rounded-xl text-white text-xs font-bold flex items-center justify-center gap-1 transition-opacity hover:opacity-80"
+                            className="w-full py-1.5 rounded-xl text-white text-xs font-bold flex items-center justify-center gap-1 hover:opacity-80 transition"
                             style={{ background: GRAD }}>
                             {isService ? <><Calendar className="w-3 h-3" /> Book</> : <><ShoppingCart className="w-3 h-3" /> {inCart ? "In Cart" : "Add"}</>}
                           </button>
@@ -564,12 +546,10 @@ export default function VendorProfilePage() {
               </div>
             )}
 
-            {/* ── Reviews section (below grid) ── */}
+            {/* Reviews (below grid) */}
             {reviews.length > 0 && (
               <section className="mt-14">
                 <h2 className="text-xl font-black text-stone-900 mb-6" style={SERIF}>Customer Reviews</h2>
-
-                {/* Rating summary + breakdown bars */}
                 <div className="flex flex-col sm:flex-row items-start gap-8 mb-8 p-6 bg-stone-50 rounded-2xl border border-stone-100">
                   <div className="flex-shrink-0 text-center">
                     <p className="text-5xl font-black text-stone-900 leading-none">{vendorRating.toFixed(1)}</p>
@@ -594,8 +574,6 @@ export default function VendorProfilePage() {
                     })}
                   </div>
                 </div>
-
-                {/* Individual reviews */}
                 <div className="space-y-5">
                   {reviews.map((r: any) => (
                     <div key={r.id} className="pb-5 border-b border-stone-100 last:border-0 last:pb-0">
@@ -623,7 +601,7 @@ export default function VendorProfilePage() {
               </section>
             )}
 
-            {/* Mobile admin panel */}
+            {/* Mobile admin */}
             {isAdmin && (
               <div className="lg:hidden mt-8 bg-purple-50 border border-purple-200 rounded-2xl p-5 space-y-3">
                 <div className="flex items-center gap-2">
