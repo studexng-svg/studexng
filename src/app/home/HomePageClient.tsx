@@ -412,16 +412,16 @@ export default function HomePageClient({ initialVendors, initialListings, initia
   );
   const nonDealListings = allListings.filter(l => !adminDealIds.has(l.id));
 
-  const filteredListings   = applyPriceFilter(activeFilter === "All" ? nonDealListings : nonDealListings.filter(l => catSlug(l) === activeFilter));
-  const SEVENTY_TWO_HOURS  = 72 * 60 * 60 * 1000;
-  const newArrivals        = applyPriceFilter(nonDealListings.filter(l => Date.now() - new Date(l.created_at).getTime() < SEVENTY_TWO_HOURS));
-  const newArrivalIds      = new Set(newArrivals.map(l => l.id));
-  const olderListings      = applyPriceFilter(nonDealListings.filter(l => !newArrivalIds.has(l.id)));
-
-  const categorySections   = categories.map(cat => ({ ...cat, items: olderListings.filter(l => catSlug(l) === cat.slug) })).filter(s => s.items.length > 0);
-  const categorisedSlugs   = new Set(categories.map(c => c.slug));
-  const uncategorised      = olderListings.filter(l => !categorisedSlugs.has(catSlug(l)));
-  const allSections        = uncategorised.length > 0 ? [...categorySections, { id: 0, title: "Other", slug: "__other__", image: null, items: uncategorised }] : categorySections;
+  const filteredListings = applyPriceFilter(nonDealListings.filter(l => catSlug(l) === activeFilter));
+  const rankedListings   = applyPriceFilter(
+    [...nonDealListings].sort((a, b) => {
+      if (a.is_available !== b.is_available) return a.is_available ? -1 : 1;
+      const wca = a.weekly_order_count || 0;
+      const wcb = b.weekly_order_count || 0;
+      if (wcb !== wca) return wcb - wca;
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    })
+  );
 
   const renderListingCard = (listing: any, i: number) => {
     const badge        = listing.vendor?.profile?.vendor_badge;
@@ -1312,40 +1312,9 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                       <h3 className="text-lg font-bold text-stone-400">No listings yet</h3>
                       <p className="text-stone-400 text-sm mt-1">Check back soon!</p>
                     </div>
-                  ) : nonDealListings.length === 0 ? null : (
-                    <div className="space-y-10">
-                      {/* New Arrivals — listings posted within 48 hours */}
-                      {newArrivals.length > 0 && (
-                        <div>
-                          <div className="flex items-center justify-between mb-4">
-                            <div>
-                              <p className="text-teal-600 text-xs tracking-widest uppercase font-bold">{newArrivals.length} new</p>
-                              <h3 className="text-lg font-bold text-stone-900 mt-0.5">New Arrivals</h3>
-                            </div>
-                          </div>
-                          <div className={gridClass} style={gridStyle}>
-                            {newArrivals.map((l, i) => renderItem(l, i))}
-                          </div>
-                        </div>
-                      )}
-                      {allSections.map(section => (
-                        <div key={section.slug}>
-                          <div className="flex items-center justify-between mb-4">
-                            <div>
-                              <p className="text-teal-600 text-xs tracking-widest uppercase font-bold">{section.items.length} listing{section.items.length !== 1 ? "s" : ""}</p>
-                              <h3 className="text-lg font-bold text-stone-900 mt-0.5">{section.title}</h3>
-                            </div>
-                            {section.slug !== "__other__" && (
-                              <Link href={`/category/${section.slug}`} className="text-teal-600 text-sm font-semibold flex items-center gap-1 hover:text-teal-700 transition">
-                                View All <ChevronRight className="w-4 h-4" />
-                              </Link>
-                            )}
-                          </div>
-                          <div className={gridClass} style={gridStyle}>
-                            {section.items.map((l, i) => renderItem(l, i))}
-                          </div>
-                        </div>
-                      ))}
+                  ) : rankedListings.length === 0 ? null : (
+                    <div className={gridClass} style={gridStyle}>
+                      {rankedListings.map((l, i) => renderItem(l, i))}
                     </div>
                   )
                 ) : (

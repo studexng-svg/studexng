@@ -669,6 +669,126 @@ def send_lunch_notifications():
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# JOB 10: Daily vendor digest — 8am WAT every day
+# ─────────────────────────────────────────────────────────────────────────────
+
+def send_vendor_daily_digest():
+    """
+    At 8am WAT, send every active vendor their daily stats: pending bookings
+    and this week's order count + earnings. In-app only, no email.
+    """
+    from django.contrib.auth import get_user_model
+    from django.db.models import Sum
+    from orders.models import Order, Booking
+    from accounts.utils import send_notification
+
+    User = get_user_model()
+    week_ago = timezone.now() - timedelta(days=7)
+
+    vendors = (
+        User.objects
+        .filter(is_verified_vendor=True, is_active=True)
+        .only('id', 'username')
+    )
+
+    sent = 0
+    for vendor in vendors.iterator():
+        try:
+            pending_bookings = Booking.objects.filter(
+                listing__vendor=vendor,
+                status='pending',
+            ).count()
+
+            week_orders = Order.objects.filter(
+                listing__vendor=vendor,
+                status__in=['paid', 'preparing', 'ready', 'completed'],
+                created_at__gte=week_ago,
+            )
+            week_count    = week_orders.count()
+            week_earnings = week_orders.aggregate(total=Sum('amount'))['total'] or 0
+
+            parts = []
+            if pending_bookings:
+                plural = 's' if pending_bookings > 1 else ''
+                parts.append(f"{pending_bookings} pending booking{plural} waiting for your response")
+            if week_count:
+                plural = 's' if week_count > 1 else ''
+                parts.append(f"{week_count} order{plural} this week (₦{int(week_earnings):,} earned)")
+
+            if not parts:
+                message = "No new activity yet today — keep your listings fresh to attract orders!"
+            else:
+                message = " · ".join(parts) + ". Log in to stay on top of things."
+
+            send_notification(
+                recipient=vendor,
+                notification_type='ai_tip',
+                title='📊 Your Daily StudEx Update',
+                message=message,
+                action_url='/vendor/dashboard',
+                send_email=False,
+            )
+            sent += 1
+        except Exception as e:
+            logger.warning(f"send_vendor_daily_digest: failed for vendor {vendor.id}: {e}")
+
+    if sent:
+        logger.info(f"send_vendor_daily_digest: sent to {sent} vendor(s)")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# JOB 11: Pending booking nudge — every 30 min
+# ─────────────────────────────────────────────────────────────────────────────
+
+def nudge_pending_booking_vendors():
+    """
+    Every 30 min: if a vendor has a booking that has been pending for 2–2.5 h
+    with no response, send a push reminder. Idempotent per booking.
+    """
+    from orders.models import Booking
+    from notifications.models import Notification
+    from accounts.utils import send_notification
+
+    window_end   = timezone.now() - timedelta(hours=2)
+    window_start = window_end - timedelta(minutes=30)
+
+    bookings = Booking.objects.filter(
+        status='pending',
+        created_at__gte=window_start,
+        created_at__lt=window_end,
+    ).select_related('listing__vendor', 'buyer')
+
+    nudged = 0
+    for booking in bookings:
+        nudge_url = f'/vendor/dashboard?nudge={booking.id}'
+        already = Notification.objects.filter(
+            recipient=booking.listing.vendor,
+            notification_type='booking_reminder',
+            action_url=nudge_url,
+        ).exists()
+        if already:
+            continue
+        try:
+            send_notification(
+                recipient=booking.listing.vendor,
+                notification_type='booking_reminder',
+                title='Booking waiting for your response!',
+                message=(
+                    f'{booking.buyer.username} booked "{booking.listing.title}" '
+                    f'for {booking.scheduled_date}. Please confirm or decline on your dashboard.'
+                ),
+                action_url=nudge_url,
+                send_email=False,
+            )
+            nudged += 1
+        except Exception as e:
+            logger.warning(f"nudge_pending_booking_vendors: failed for booking {booking.id}: {e}")
+
+    if nudged:
+        logger.info(f"nudge_pending_booking_vendors: sent {nudged} nudge(s)")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Scheduler bootstrap — called by StudexConfig.ready()
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -775,6 +895,28 @@ def start():
         coalesce=True,
     )
 
+    # 8:00 WAT daily — vendor daily digest (pending bookings + weekly earnings)
+    scheduler.add_job(
+        send_vendor_daily_digest,
+        trigger=CronTrigger(hour=8, minute=0, timezone=LAGOS_TZ),
+        id='send_vendor_daily_digest',
+        name='Vendor daily digest — 8:00 WAT',
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+
+    # Every 30 min — nudge vendors with bookings pending for 2+ hours
+    scheduler.add_job(
+        nudge_pending_booking_vendors,
+        trigger=IntervalTrigger(minutes=30),
+        id='nudge_pending_booking_vendors',
+        name='Pending booking vendor nudge (every 30 min)',
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+
     try:
         scheduler.start()
         logger.info(
@@ -782,7 +924,8 @@ def start():
             "auto_release_orders (midnight), auto_cancel_pending_orders (midnight), "
             "retry_failed_transfers (1h), "
             "groq_notify_students (Mon/Wed/Fri 10:00 per campus), groq_notify_vendors (Tue/Thu/Sat 10:00 per campus), "
-            "prompt_rating_reviews (30 min), send_lunch_notifications (Mon-Fri 12:30 WAT)."
+            "prompt_rating_reviews (30 min), send_lunch_notifications (Mon-Fri 12:30 WAT), "
+            "send_vendor_daily_digest (08:00 WAT), nudge_pending_booking_vendors (30 min)."
         )
     except Exception as e:
         logger.error(f"Failed to start scheduler: {e}", exc_info=True)
