@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/authStore";
 import { GRAD, toArray } from "@/lib/tokens";
-import { Plus, Edit2, Trash2, Loader, ToggleLeft, ToggleRight, X } from "lucide-react";
+import { Plus, Edit2, Trash2, Loader, ToggleLeft, ToggleRight, X, Share2 } from "lucide-react";
 import { EmptyState, LoadingSpinner, HEADING_FONT } from "../_shared";
 import { api } from "@/lib/api";
 
@@ -119,6 +119,33 @@ export default function ListingsPage() {
       {toast && (
         <div className="fixed top-6 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full font-semibold text-white text-sm z-50 shadow-xl" style={{ background: GRAD }}>
           {toast}
+        </div>
+      )}
+
+      {/* Share store banner */}
+      {user?.username && (
+        <div className="mb-5 bg-gradient-to-r from-teal-50 to-purple-50 border border-teal-100 rounded-2xl p-4 flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-white flex items-center justify-center flex-shrink-0 shadow-sm">
+            <Share2 className="w-4 h-4 text-teal-600" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-bold text-stone-900 text-sm">Share your store</p>
+            <p className="text-stone-400 text-xs mt-0.5 truncate">studex.com.ng/vendor/{(user as any).username}</p>
+          </div>
+          <button
+            onClick={async () => {
+              const url = `${window.location.origin}/vendor/${(user as any).username}`;
+              if (navigator.share) {
+                await navigator.share({ title: (user as any).business_name || (user as any).username, url }).catch(() => {});
+              } else {
+                await navigator.clipboard.writeText(url);
+                setToast("Store link copied!");
+              }
+            }}
+            className="flex-shrink-0 px-3 py-1.5 rounded-lg text-white text-xs font-bold"
+            style={{ background: GRAD }}>
+            Share
+          </button>
         </div>
       )}
 

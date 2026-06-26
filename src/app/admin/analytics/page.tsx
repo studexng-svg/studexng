@@ -295,6 +295,48 @@ export default function AdminAnalytics() {
               </SectionCard>
             )}
 
+            {/* Orders by category (last 30d) */}
+            {summary?.category_orders?.length > 0 && (
+              <SectionCard title="Orders by Category — Last 30 days" icon={TrendingUp}>
+                <ResponsiveContainer width="100%" height={180}>
+                  <BarChart
+                    data={summary.category_orders.map((c: any) => ({
+                      name: (c.category || "Other").slice(0, 12),
+                      orders: c.orders,
+                    }))}
+                    layout="vertical"
+                    margin={{ top: 0, right: 8, left: 0, bottom: 0 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#F5F5F4" horizontal={false} />
+                    <XAxis type="number" tick={{ fontSize: 10, fill: "#A8A29E" }} allowDecimals={false} />
+                    <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: "#A8A29E" }} width={80} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Bar dataKey="orders" name="Orders" fill={TEAL} radius={[0, 4, 4, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </SectionCard>
+            )}
+
+            {/* Churning vendors */}
+            {summary?.churning_vendors?.length > 0 && (
+              <SectionCard title={`Churning Vendors — No orders in 14d (${summary.churning_vendors.length})`} icon={Users}>
+                <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                  {summary.churning_vendors.map((v: any) => (
+                    <div key={v.id} className="flex items-center justify-between py-1.5 border-b border-stone-100 last:border-0">
+                      <div>
+                        <p className="text-sm font-semibold text-stone-800">{v.business_name || v.username}</p>
+                        <p className="text-xs text-stone-400">@{v.username} · {(v.school || "").toUpperCase()}</p>
+                      </div>
+                      <a href={`/vendor/${v.username}`} target="_blank" rel="noreferrer"
+                        className="text-xs text-teal-600 font-semibold hover:underline flex-shrink-0">
+                        View →
+                      </a>
+                    </div>
+                  ))}
+                </div>
+              </SectionCard>
+            )}
+
             {/* Detailed stats table */}
             {summary && (
               <SectionCard title="Full Statistics" icon={TrendingUp}>

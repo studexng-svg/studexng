@@ -547,6 +547,7 @@ class VendorListSerializer(serializers.ModelSerializer):
             'bio', 'vendor_badge', 'rating', 'total_reviews',
             'completion_rate', 'total_listings', 'hostel', 'is_online', 'school',
             'completed_order_count', 'available_days', 'opening_time', 'closing_time',
+            'avg_response_minutes',
         ]
 
     def get_is_online(self, obj):
@@ -621,6 +622,27 @@ class VendorListSerializer(serializers.ModelSerializer):
 
     def get_total_listings(self, obj):
         return obj.listings.filter(is_available=True).count()
+
+    avg_response_minutes = serializers.SerializerMethodField()
+
+    def get_avg_response_minutes(self, obj):
+        try:
+            from orders.models import Booking
+            from django.db.models import Avg, ExpressionWrapper, F, DurationField
+            result = Booking.objects.filter(
+                listing__vendor=obj,
+                confirmed_at__isnull=False,
+            ).aggregate(
+                avg_time=Avg(ExpressionWrapper(
+                    F('confirmed_at') - F('created_at'),
+                    output_field=DurationField(),
+                ))
+            )
+            if result['avg_time']:
+                return round(result['avg_time'].total_seconds() / 60)
+        except Exception:
+            pass
+        return None
 
 
 class VendorSerializer(serializers.ModelSerializer):

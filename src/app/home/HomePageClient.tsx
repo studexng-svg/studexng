@@ -276,9 +276,19 @@ export default function HomePageClient({ initialVendors, initialListings, initia
     const t = setTimeout(async () => {
       setSearching(true);
       try {
-        const res = await api.pub.listings({ search: searchQuery, page_size: "20", campus: currentCampus });
+        const res = await api.pub.listings({ search: searchQuery, page_size: "30", campus: currentCampus });
         const data = await res.json();
-        setSearchResults(data.results || data || []); setShowResults(true);
+        const raw: any[] = data.results || data || [];
+        const q = searchQuery.toLowerCase();
+        raw.sort((a, b) => {
+          const aExact = a.title?.toLowerCase().startsWith(q) ? 1 : 0;
+          const bExact = b.title?.toLowerCase().startsWith(q) ? 1 : 0;
+          if (bExact !== aExact) return bExact - aExact;
+          const aScore = (a.weekly_order_count || 0) * 5 + (a.vendor?.profile?.rating || 0) * 10;
+          const bScore = (b.weekly_order_count || 0) * 5 + (b.vendor?.profile?.rating || 0) * 10;
+          return bScore - aScore;
+        });
+        setSearchResults(raw); setShowResults(true);
       } catch { setSearchResults([]); } finally { setSearching(false); }
     }, 400);
     return () => clearTimeout(t);
@@ -1352,8 +1362,35 @@ export default function HomePageClient({ initialVendors, initialListings, initia
             )}
           </div>
 
+          {/* ── INVITE BANNER ── */}
+          {isLoggedIn && (
+            <div className="animate-fadeUp mt-6 rounded-2xl bg-white border border-stone-100 shadow-sm p-5 flex items-center gap-4">
+              <div className="w-11 h-11 rounded-2xl bg-teal-50 border border-teal-100 flex items-center justify-center flex-shrink-0">
+                <Share2 className="w-5 h-5 text-teal-600" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-stone-900 text-sm">Invite a friend to StudEx</p>
+                <p className="text-stone-400 text-xs mt-0.5">Share the platform with a classmate or vendor.</p>
+              </div>
+              <motion.button whileTap={{ scale: 0.95 }}
+                onClick={async () => {
+                  const url = window.location.origin;
+                  if (navigator.share) {
+                    await navigator.share({ title: "StudEx — Campus Marketplace", url }).catch(() => {});
+                  } else {
+                    await navigator.clipboard.writeText(url);
+                    showToast("Link copied!");
+                  }
+                }}
+                className="flex-shrink-0 px-4 py-2 rounded-xl text-white text-xs font-bold"
+                style={{ background: GRAD }}>
+                Invite
+              </motion.button>
+            </div>
+          )}
+
           {/* ── CTA BANNER ── */}
-          <div className="animate-fadeUp mt-10 rounded-2xl overflow-hidden" style={{ background: HERO_GRAD }}>
+          <div className="animate-fadeUp mt-6 rounded-2xl overflow-hidden" style={{ background: HERO_GRAD }}>
             <div className="px-6 lg:px-10 py-8 lg:py-10 flex flex-col sm:flex-row items-center justify-between gap-5">
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0">

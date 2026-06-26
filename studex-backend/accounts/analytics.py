@@ -227,6 +227,56 @@ class AdminAnalytics:
             }
 
     @staticmethod
+    def get_category_order_stats():
+        """Orders per category in the last 30 days, top 8."""
+        try:
+            from orders.models import Order
+            from datetime import timedelta
+            cutoff = timezone.now() - timedelta(days=30)
+            rows = (
+                Order.objects
+                .filter(created_at__gte=cutoff, status__in=['paid', 'preparing', 'ready', 'completed'])
+                .values('listing__category__title', 'listing__category__slug')
+                .annotate(orders=Count('id'))
+                .order_by('-orders')[:8]
+            )
+            return [
+                {
+                    'category': r['listing__category__title'] or 'Other',
+                    'slug': r['listing__category__slug'] or '',
+                    'orders': r['orders'],
+                }
+                for r in rows
+            ]
+        except Exception:
+            return []
+
+    @staticmethod
+    def get_churning_vendors():
+        """Verified vendors with zero completed/paid orders in the last 14 days."""
+        try:
+            from accounts.models import User as UserModel
+            from orders.models import Order
+            from datetime import timedelta
+            cutoff = timezone.now() - timedelta(days=14)
+            active_vendor_ids = (
+                Order.objects
+                .filter(created_at__gte=cutoff, status__in=['paid', 'preparing', 'ready', 'completed'])
+                .values_list('listing__vendor_id', flat=True)
+                .distinct()
+            )
+            churning = (
+                UserModel.objects
+                .filter(is_verified_vendor=True, is_active=True)
+                .exclude(id__in=active_vendor_ids)
+                .order_by('username')
+                .values('id', 'username', 'business_name', 'school')[:20]
+            )
+            return list(churning)
+        except Exception:
+            return []
+
+    @staticmethod
     def get_dashboard_summary():
         """
         Get complete dashboard summary combining all stats.
@@ -239,5 +289,7 @@ class AdminAnalytics:
             'listings': AdminAnalytics.get_listing_stats(),
             'orders': AdminAnalytics.get_order_stats(),
             'payments': AdminAnalytics.get_payment_stats(),
+            'category_orders': AdminAnalytics.get_category_order_stats(),
+            'churning_vendors': AdminAnalytics.get_churning_vendors(),
             'timestamp': timezone.now().isoformat(),
         }
