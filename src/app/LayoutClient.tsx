@@ -1,6 +1,7 @@
 "use client";
 
 import BottomNav from "@/components/layout/BottomNav";
+import SiteHeader from "@/components/layout/SiteHeader";
 import CookieConsent from "@/components/CookieConsent";
 import { Toaster } from "@/components/ui/sonner";
 import { usePathname } from "next/navigation";
@@ -142,6 +143,12 @@ export default function LayoutClient({ children }: { children: React.ReactNode }
     pathname?.startsWith("/admin") ||
     pathname?.startsWith("/seller");
 
+  // SiteHeader is desktop-only; hide on pages that have their own header
+  const hideHeader =
+    hideNav ||
+    pathname === "/home" ||
+    pathname?.startsWith("/vendor/dashboard");
+
   if (!mounted) {
     return <main className="min-h-screen" />;
   }
@@ -151,6 +158,7 @@ export default function LayoutClient({ children }: { children: React.ReactNode }
       <ThemeProvider>
         <NotificationProvider>
           <CartWishlistSync />
+          {!hideHeader && <SiteHeader />}
           <main
             className={
               hideNav

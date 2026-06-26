@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import AccountSidebarWrapper from "./_sidebar";
 
 export const metadata: Metadata = {
   title: "My Account",
@@ -8,5 +7,5 @@ export const metadata: Metadata = {
 };
 
 export default function AccountLayout({ children }: { children: React.ReactNode }) {
-  return <AccountSidebarWrapper>{children}</AccountSidebarWrapper>;
+  return <>{children}</>;
 }
