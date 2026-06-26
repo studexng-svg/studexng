@@ -212,40 +212,25 @@ export default function VendorProfilePage() {
       <div className="lg:flex">
 
         {/* ─── SIDEBAR — sticky, stays in view as page scrolls ─── */}
-        <aside className="hidden lg:flex flex-col w-64 flex-shrink-0 bg-white border-r border-stone-200 sticky top-0 h-screen overflow-y-auto self-start">
-
-          {/* Vendor mini header */}
-          <div className="flex items-center gap-3 px-4 py-4 border-b border-stone-100 flex-shrink-0">
-            <div className="w-10 h-10 rounded-xl overflow-hidden flex-shrink-0"
-              style={{ boxShadow: "0 0 0 2px rgba(13,148,136,0.3)" }}>
-              {vendor.profile_picture
-                ? <img src={vendor.profile_picture} alt={vendor.username} className="w-full h-full object-cover object-top" />
-                : <div className="w-full h-full flex items-center justify-center text-white font-black text-sm" style={{ background: GRAD }}>{initials}</div>
-              }
-            </div>
-            <div className="min-w-0">
-              <p className="font-bold text-stone-900 text-sm [overflow-wrap:anywhere] leading-snug">{vendor.business_name || vendor.username}</p>
-              <p className="text-stone-400 text-xs truncate">@{vendor.username}</p>
-            </div>
-          </div>
+        <aside className="hidden lg:flex flex-col w-[260px] flex-shrink-0 gap-3 px-4 pt-6 pb-10 sticky top-0 h-screen overflow-y-auto self-start" style={{ scrollbarWidth: "none" }}>
 
           {/* About */}
           {vendor.bio && (
-            <div className="px-4 py-4 border-b border-stone-100">
-              <p className="text-[10px] font-bold tracking-widest uppercase text-stone-400 mb-2">About</p>
+            <div className="bg-stone-50 rounded-2xl border border-stone-100 p-4 shadow-sm">
+              <p className="text-teal-600 text-[10px] tracking-[0.18em] uppercase font-bold mb-2">About</p>
               <p className="text-stone-600 text-sm leading-relaxed">{vendor.bio}</p>
             </div>
           )}
 
           {/* Hours & Availability */}
           {(availDays.length > 0 || vendor.opening_time) && (
-            <div className="px-4 py-4 border-b border-stone-100">
-              <p className="text-[10px] font-bold tracking-widest uppercase text-stone-400 mb-3">Hours & Availability</p>
+            <div className="bg-stone-50 rounded-2xl border border-stone-100 p-4 shadow-sm">
+              <p className="text-teal-600 text-[10px] tracking-[0.18em] uppercase font-bold mb-3">Hours & Availability</p>
               {availDays.length > 0 && (
-                <div className="flex gap-1 flex-wrap mb-3">
+                <div className="flex gap-1.5 flex-wrap mb-3">
                   {DAYS.map(d => (
-                    <div key={d} className={`w-7 h-7 rounded-lg flex items-center justify-center text-[11px] font-bold transition-colors ${
-                      isDayOpen(d) ? "bg-teal-500 text-white" : "bg-stone-100 text-stone-300"
+                    <div key={d} className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold transition-colors ${
+                      isDayOpen(d) ? "bg-teal-500 text-white shadow-sm shadow-teal-200" : "bg-stone-100 text-stone-300"
                     }`}>
                       {DAY_LBL[d]}
                     </div>
@@ -253,7 +238,7 @@ export default function VendorProfilePage() {
                 </div>
               )}
               {vendor.opening_time && vendor.closing_time && (
-                <div className="flex items-center gap-1.5 text-xs text-stone-500">
+                <div className="flex items-center gap-1.5 text-xs text-stone-500 font-medium">
                   <Clock className="w-3.5 h-3.5 text-teal-500 flex-shrink-0" />
                   {vendor.opening_time} – {vendor.closing_time}
                 </div>
@@ -263,23 +248,24 @@ export default function VendorProfilePage() {
 
           {/* Reviews summary */}
           {reviews.length > 0 && (
-            <div className="px-4 py-4 border-b border-stone-100">
-              <p className="text-[10px] font-bold tracking-widest uppercase text-stone-400 mb-3">Reviews</p>
+            <div className="bg-stone-50 rounded-2xl border border-stone-100 p-4 shadow-sm">
+              <p className="text-teal-600 text-[10px] tracking-[0.18em] uppercase font-bold mb-3">Reviews</p>
               <div className="flex items-start gap-3">
                 <div className="flex-shrink-0">
-                  <p className="text-3xl font-black text-stone-900 leading-none">{vendorRating.toFixed(1)}</p>
-                  <div className="flex gap-0.5 mt-1">
-                    {[1,2,3,4,5].map(n => <Star key={n} className={`w-2.5 h-2.5 ${n<=Math.round(vendorRating)?"fill-amber-400 text-amber-400":"fill-stone-200 text-stone-200"}`} />)}
+                  <p className="text-4xl font-black text-stone-900 leading-none">{vendorRating.toFixed(1)}</p>
+                  <div className="flex gap-0.5 mt-1.5">
+                    {[1,2,3,4,5].map(n => <Star key={n} className={`w-3 h-3 ${n<=Math.round(vendorRating)?"fill-amber-400 text-amber-400":"fill-stone-200 text-stone-200"}`} />)}
                   </div>
-                  <p className="text-[11px] text-stone-400 mt-0.5">{totalReviews} review{totalReviews!==1?"s":""}</p>
+                  <p className="text-[11px] text-stone-400 mt-1">{totalReviews} review{totalReviews!==1?"s":""}</p>
                 </div>
-                <div className="flex-1 space-y-1 pt-0.5">
+                <div className="flex-1 space-y-1.5 pt-0.5">
                   {ratingCounts.map(({ n, count }) => {
                     const pct = totalReviews > 0 ? Math.round((count/totalReviews)*100) : 0;
                     return (
-                      <div key={n} className="flex items-center gap-1">
+                      <div key={n} className="flex items-center gap-1.5">
                         <span className="text-[10px] text-stone-400 w-2.5 flex-shrink-0">{n}</span>
-                        <div className="flex-1 h-1 bg-stone-100 rounded-full overflow-hidden">
+                        <Star className="w-2 h-2 fill-amber-400 text-amber-400 flex-shrink-0" />
+                        <div className="flex-1 h-1.5 bg-stone-200 rounded-full overflow-hidden">
                           <div className="h-full bg-amber-400 rounded-full" style={{ width:`${pct}%` }} />
                         </div>
                         <span className="text-[10px] text-stone-400 w-3 flex-shrink-0 text-right">{count}</span>
@@ -293,10 +279,10 @@ export default function VendorProfilePage() {
 
           {/* Admin */}
           {isAdmin && (
-            <div className="px-4 py-4">
+            <div className="bg-purple-50 rounded-2xl border border-purple-100 p-4 shadow-sm">
               <div className="flex items-center gap-1.5 mb-3">
                 <Shield className="w-3.5 h-3.5 text-purple-500" />
-                <p className="text-[10px] font-bold tracking-widest uppercase text-purple-500">Admin</p>
+                <p className="text-purple-600 text-[10px] tracking-[0.18em] uppercase font-bold">Admin</p>
               </div>
               <div className="text-xs text-stone-600 space-y-1 mb-3">
                 {vendor.email     && <p><span className="font-semibold">Email:</span> {vendor.email}</p>}
@@ -333,9 +319,9 @@ export default function VendorProfilePage() {
           <div className="bg-white border-b border-stone-100 px-5 lg:px-8 pt-7 pb-6">
             <div className="flex items-start gap-5">
 
-              {/* Avatar (mobile only — desktop shows in sidebar) */}
-              <div className="relative flex-shrink-0 lg:hidden">
-                <div className="w-16 h-16 rounded-2xl overflow-hidden"
+              {/* Avatar */}
+              <div className="relative flex-shrink-0">
+                <div className="w-16 h-16 lg:w-20 lg:h-20 rounded-2xl overflow-hidden"
                   style={{ boxShadow: "0 0 0 3px #fff, 0 0 0 5px rgba(13,148,136,0.35)" }}>
                   {vendor.profile_picture
                     ? <img src={vendor.profile_picture} alt={vendor.username} className="w-full h-full object-cover object-top" />
