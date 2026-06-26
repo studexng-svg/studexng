@@ -22,8 +22,8 @@ function SafeImage({ src, alt, className }: { src?: string | null; alt: string; 
   const [err, setErr] = useState(false);
   if (!src || err || !src.startsWith("http")) {
     return (
-      <div className={`w-full h-full bg-gradient-to-br from-teal-50 to-purple-50 flex items-center justify-center ${className ?? ""}`}>
-        <Sparkles className="w-8 h-8 text-stone-200" />
+      <div className={`w-full h-full bg-gradient-to-br from-stone-100 to-stone-200 flex items-center justify-center ${className ?? ""}`}>
+        <Sparkles className="w-8 h-8 text-stone-300" />
       </div>
     );
   }
@@ -39,7 +39,7 @@ const BADGE_META: Record<string, { label: string; icon: string; bg: string; text
 const DAY_ORDER = ["mon","tue","wed","thu","fri","sat","sun"];
 const DAY_LABEL: Record<string, string> = { mon:"Mon", tue:"Tue", wed:"Wed", thu:"Thu", fri:"Fri", sat:"Sat", sun:"Sun" };
 
-/* ─── main component ────────────────────────────────────────────────────── */
+/* ─── main ────────────────────────────────────────────────────────────── */
 
 export default function VendorProfilePage() {
   const params   = useParams();
@@ -55,12 +55,12 @@ export default function VendorProfilePage() {
   const [loading,  setLoading]  = useState(true);
   const [toast,    setToast]    = useState("");
 
-  const [adminLoading,     setAdminLoading]     = useState<string | null>(null);
-  const [adminToast,       setAdminToast]       = useState("");
-  const [notifyOpen,       setNotifyOpen]       = useState(false);
-  const [notifyTitle,      setNotifyTitle]      = useState("");
-  const [notifyMessage,    setNotifyMessage]    = useState("");
-  const [confirmRevoke,    setConfirmRevoke]    = useState(false);
+  const [adminLoading,  setAdminLoading]  = useState<string | null>(null);
+  const [adminToast,    setAdminToast]    = useState("");
+  const [notifyOpen,    setNotifyOpen]    = useState(false);
+  const [notifyTitle,   setNotifyTitle]   = useState("");
+  const [notifyMessage, setNotifyMessage] = useState("");
+  const [confirmRevoke, setConfirmRevoke] = useState(false);
 
   const scrollKey = `vendor_scroll:${username}`;
 
@@ -75,8 +75,8 @@ export default function VendorProfilePage() {
           api.pub.listings({ vendor_username: username, page_size: "100" }),
         ]);
         let v: any = null;
-        if (vRes.ok)  { v = await vRes.json(); setVendor(v); }
-        if (lRes.ok)  { const d = await lRes.json(); setListings(d.results || d || []); }
+        if (vRes.ok) { v = await vRes.json(); setVendor(v); }
+        if (lRes.ok) { const d = await lRes.json(); setListings(d.results || d || []); }
         if (v?.id) {
           const rRes = await api.pub.reviews({ vendor: String(v.id), page_size: "10" });
           if (rRes.ok) { const rd = await rRes.json(); setReviews(rd.results || rd || []); }
@@ -104,7 +104,7 @@ export default function VendorProfilePage() {
   const handleShare = async () => {
     const url = `${window.location.origin}/vendor/${username}`;
     if (navigator.share) await navigator.share({ title: vendor?.business_name || username, url }).catch(() => {});
-    else { await navigator.clipboard.writeText(url); showToast("Store link copied!"); }
+    else { await navigator.clipboard.writeText(url); showToast("Link copied!"); }
   };
 
   const handleRevoke = async () => {
@@ -130,29 +130,29 @@ export default function VendorProfilePage() {
     finally { setAdminLoading(null); }
   };
 
-  /* ── loading ── */
+  /* ── skeleton ── */
   if (loading) return (
     <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       <TopNav showBack activeNav="vendors" />
-      <div className="h-56 bg-stone-200 animate-pulse" />
-      <div className="max-w-7xl mx-auto px-4 lg:px-8 pt-6">
-        <div className="lg:grid lg:grid-cols-[300px_1fr] lg:gap-10">
-          <div className="space-y-4">
-            <div className="bg-white rounded-2xl p-6 animate-pulse space-y-3">
-              <div className="w-24 h-24 rounded-2xl bg-stone-100 mx-auto" />
-              <div className="h-4 bg-stone-100 rounded w-3/4 mx-auto" />
-              <div className="h-3 bg-stone-100 rounded w-1/2 mx-auto" />
+      <div className="bg-white border-b border-stone-100">
+        <div className="max-w-7xl mx-auto px-4 lg:px-8 py-8 space-y-4 animate-pulse">
+          <div className="flex gap-4">
+            <div className="w-20 h-20 rounded-2xl bg-stone-100 flex-shrink-0" />
+            <div className="flex-1 space-y-2 pt-1">
+              <div className="h-5 bg-stone-100 rounded w-48" />
+              <div className="h-3 bg-stone-100 rounded w-28" />
+              <div className="h-3 bg-stone-100 rounded w-36" />
             </div>
           </div>
-          <div className="mt-6 lg:mt-0 grid grid-cols-2 lg:grid-cols-3 gap-4">
-            {[...Array(6)].map((_, i) => (
-              <div key={i} className="bg-white rounded-2xl overflow-hidden animate-pulse">
-                <div className="aspect-[3/4] bg-stone-100" />
-                <div className="p-3 space-y-2"><div className="h-3 bg-stone-100 rounded" /><div className="h-3 bg-stone-100 rounded w-2/3" /></div>
-              </div>
-            ))}
-          </div>
         </div>
+      </div>
+      <div className="max-w-7xl mx-auto px-4 lg:px-8 py-6 grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {[...Array(8)].map((_, i) => (
+          <div key={i} className="bg-white rounded-2xl overflow-hidden animate-pulse">
+            <div className="aspect-[3/4] bg-stone-100" />
+            <div className="p-3 space-y-2"><div className="h-3 bg-stone-100 rounded" /><div className="h-3 bg-stone-100 rounded w-2/3" /></div>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -169,16 +169,16 @@ export default function VendorProfilePage() {
   const initials = (vendor.business_name || vendor.username || "??").slice(0, 2).toUpperCase();
   const respMins: number | null = vendor.avg_response_minutes ?? null;
   const respLabel = respMins === null ? null
-    : respMins < 60   ? `~${respMins} min`
-    : respMins < 1440 ? `~${Math.round(respMins / 60)} hr`
-    : `~${Math.round(respMins / 1440)}d`;
+    : respMins < 60   ? `~${respMins}m reply`
+    : respMins < 1440 ? `~${Math.round(respMins / 60)}h reply`
+    : `~${Math.round(respMins / 1440)}d reply`;
   const availDays: string[] = vendor.available_days || [];
 
   const available   = listings.filter(l => l.is_available);
   const unavailable = listings.filter(l => !l.is_available);
   const sorted      = [...available, ...unavailable];
 
-  /* ─────────────────── RENDER ─────────────────── */
+  /* ─────────── RENDER ─────────── */
   return (
     <div className="min-h-screen bg-[#F0F0F0]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       <TopNav showBack activeNav="vendors" />
@@ -213,136 +213,141 @@ export default function VendorProfilePage() {
         </div>
       )}
 
-      {/* ── COVER ── */}
-      <div className="relative h-48 lg:h-64 overflow-hidden bg-zinc-900">
-        {vendor.profile_picture && (
-          <>
-            <img
-              src={vendor.profile_picture}
-              alt=""
-              aria-hidden
-              className="absolute inset-0 w-full h-full object-cover object-top scale-125 blur-2xl opacity-60"
-            />
-            <div className="absolute inset-0 bg-black/50" />
-          </>
-        )}
-        {vendor.is_online && (
-          <div className="absolute top-4 right-4 flex items-center gap-1.5 bg-white/15 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/20">
-            <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-            <span className="text-white text-xs font-semibold">Online now</span>
-          </div>
-        )}
-      </div>
+      {/* ══════════ VENDOR HERO — full width white strip ══════════ */}
+      <div className="bg-white border-b border-stone-100">
+        {/* teal accent line */}
+        <div className="h-1 w-full" style={{ background: GRAD }} />
 
-      {/* ── BODY ── */}
-      <div className="max-w-7xl mx-auto px-4 lg:px-8">
-        <div className="lg:grid lg:grid-cols-[300px_1fr] lg:gap-10 lg:items-start">
+        <div className="max-w-7xl mx-auto px-4 lg:px-8 py-6 lg:py-8">
+          {/* Top row: avatar + info + actions */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
+            {/* Avatar */}
+            <div className="w-20 h-20 lg:w-24 lg:h-24 rounded-2xl overflow-hidden shadow-md border border-stone-100 flex-shrink-0">
+              {vendor.profile_picture
+                ? <img src={vendor.profile_picture} alt={vendor.username} className="w-full h-full object-cover object-top" />
+                : <div className="w-full h-full flex items-center justify-center text-white font-black text-2xl" style={{ background: GRAD }}>{initials}</div>
+              }
+            </div>
 
-          {/* ══════════ LEFT SIDEBAR ══════════ */}
-          <div className="lg:sticky lg:top-20">
-
-            {/* Profile card */}
-            <div className="bg-white rounded-2xl shadow-sm border border-stone-100 -mt-14 lg:-mt-20 relative z-10 overflow-hidden">
-              {/* Avatar centered on top */}
-              <div className="flex flex-col items-center pt-6 px-6 pb-5">
-                <div className="w-24 h-24 lg:w-28 lg:h-28 rounded-2xl overflow-hidden shadow-lg border-4 border-white -mt-2 mb-4 flex-shrink-0">
-                  {vendor.profile_picture
-                    ? <img src={vendor.profile_picture} alt={vendor.username} className="w-full h-full object-cover object-top" />
-                    : <div className="w-full h-full flex items-center justify-center text-white font-black text-2xl" style={{ background: GRAD }}>{initials}</div>
-                  }
-                </div>
-
-                <h1 className="text-lg font-black text-stone-900 text-center leading-tight mb-0.5" style={SERIF}>
-                  {vendor.business_name || vendor.username}
-                </h1>
-                <p className="text-stone-400 text-sm mb-2">@{vendor.username}</p>
-
-                {badge && (
-                  <span className={`text-xs font-bold px-3 py-1 rounded-full mb-3 ${badge.bg} ${badge.text}`}>
-                    {badge.icon} {badge.label}
-                  </span>
-                )}
-
-                {/* Rating */}
-                {vendor.total_reviews > 0 && (
-                  <div className="flex items-center gap-1.5 mb-3">
-                    <div className="flex gap-0.5">
-                      {[1,2,3,4,5].map(n => (
-                        <Star key={n} className={`w-3.5 h-3.5 ${n <= Math.round(vendor.rating) ? "fill-amber-400 text-amber-400" : "fill-stone-200 text-stone-200"}`} />
-                      ))}
-                    </div>
-                    <span className="font-bold text-stone-900 text-sm">{Number(vendor.rating).toFixed(1)}</span>
-                    <span className="text-stone-400 text-xs">({vendor.total_reviews})</span>
+            {/* Info + actions */}
+            <div className="flex-1 min-w-0">
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
+                {/* Name + meta */}
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h1 className="text-xl lg:text-2xl font-black text-stone-900 truncate" style={SERIF}>
+                      {vendor.business_name || vendor.username}
+                    </h1>
+                    {vendor.is_online && (
+                      <span className="flex items-center gap-1 text-xs font-semibold text-green-600 bg-green-50 px-2 py-0.5 rounded-full border border-green-100">
+                        <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse inline-block" />
+                        Online
+                      </span>
+                    )}
                   </div>
-                )}
+                  <p className="text-stone-400 text-sm mt-0.5">@{vendor.username}</p>
 
-                {/* Meta */}
-                <div className="flex flex-wrap justify-center gap-x-3 gap-y-1 text-xs text-stone-500 mb-4">
-                  {vendor.hostel && <span className="flex items-center gap-1"><MapPin className="w-3 h-3 text-teal-500" />{vendor.hostel}</span>}
-                  {respLabel && <span className="flex items-center gap-1"><Clock className="w-3 h-3 text-teal-500" />{respLabel}</span>}
-                  {vendor.opening_time && vendor.closing_time && (
-                    <span className="flex items-center gap-1"><Calendar className="w-3 h-3 text-teal-500" />{vendor.opening_time} – {vendor.closing_time}</span>
-                  )}
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-sm text-stone-500">
+                    {vendor.total_reviews > 0 && (
+                      <span className="flex items-center gap-1">
+                        <div className="flex gap-0.5">
+                          {[1,2,3,4,5].map(n => (
+                            <Star key={n} className={`w-3.5 h-3.5 ${n <= Math.round(vendor.rating) ? "fill-amber-400 text-amber-400" : "fill-stone-200 text-stone-200"}`} />
+                          ))}
+                        </div>
+                        <span className="font-bold text-stone-800">{Number(vendor.rating).toFixed(1)}</span>
+                        <span className="text-stone-400 text-xs">({vendor.total_reviews})</span>
+                      </span>
+                    )}
+                    {vendor.hostel && (
+                      <span className="flex items-center gap-1 text-xs"><MapPin className="w-3 h-3 text-teal-500" />{vendor.hostel}</span>
+                    )}
+                    {respLabel && (
+                      <span className="flex items-center gap-1 text-xs"><Clock className="w-3 h-3 text-teal-500" />{respLabel}</span>
+                    )}
+                    {vendor.opening_time && vendor.closing_time && (
+                      <span className="flex items-center gap-1 text-xs"><Calendar className="w-3 h-3 text-teal-500" />{vendor.opening_time}–{vendor.closing_time}</span>
+                    )}
+                    {badge && (
+                      <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${badge.bg} ${badge.text}`}>
+                        {badge.icon} {badge.label}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
-                {/* CTA buttons */}
-                <div className="flex gap-2 w-full">
+                {/* Action buttons */}
+                <div className="flex items-center gap-2 flex-shrink-0">
                   <button onClick={handleShare}
-                    className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-stone-100 hover:bg-stone-200 transition text-stone-700 text-xs font-bold">
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-stone-100 hover:bg-stone-200 transition text-stone-700 text-sm font-semibold">
                     <Share2 className="w-3.5 h-3.5" /> Share
                   </button>
-                  <Link href={`/chat?vendor=${vendor.username}`} className="flex-1">
-                    <button className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-white text-xs font-bold transition hover:opacity-90"
+                  <Link href={`/chat?vendor=${vendor.username}`}>
+                    <button className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-white text-sm font-semibold transition hover:opacity-90"
                       style={{ background: GRAD }}>
                       <MessageCircle className="w-3.5 h-3.5" /> Chat
                     </button>
                   </Link>
                 </div>
               </div>
-
-              {/* Stats strip */}
-              <div className="grid grid-cols-3 border-t border-stone-100">
-                {[
-                  { icon: ShoppingCart, label: "Orders",     value: vendor.completed_order_count || 0 },
-                  { icon: TrendingUp,   label: "Completion", value: `${Math.round(vendor.completion_rate || 0)}%` },
-                  { icon: Package,      label: "Listings",   value: vendor.total_listings || listings.length },
-                ].map(({ icon: Icon, label, value }, i) => (
-                  <div key={label} className={`flex flex-col items-center py-4 gap-1 ${i < 2 ? "border-r border-stone-100" : ""}`}>
-                    <Icon className="w-4 h-4 text-teal-500" />
-                    <p className="font-black text-stone-900 text-lg leading-none">{value}</p>
-                    <p className="text-stone-400 text-xs">{label}</p>
-                  </div>
-                ))}
-              </div>
             </div>
+          </div>
 
-            {/* Bio + Hours */}
-            {(vendor.bio || availDays.length > 0) && (
-              <div className="mt-3 bg-white rounded-2xl shadow-sm border border-stone-100 p-5 space-y-4">
-                {vendor.bio && (
-                  <div>
-                    <p className="text-xs font-bold text-teal-600 tracking-widest uppercase mb-1.5">About</p>
-                    <p className="text-stone-600 text-sm leading-relaxed">{vendor.bio}</p>
-                  </div>
-                )}
-                {availDays.length > 0 && (
-                  <div>
-                    <p className="text-xs font-bold text-teal-600 tracking-widest uppercase mb-2">Available</p>
-                    <div className="flex flex-wrap gap-1">
-                      {DAY_ORDER.map(d => (
-                        <span key={d} className={`text-xs font-semibold px-2 py-0.5 rounded-md ${
-                          availDays.includes(d) ? "bg-teal-600 text-white" : "bg-stone-100 text-stone-300"
-                        }`}>{DAY_LABEL[d]}</span>
-                      ))}
-                    </div>
-                  </div>
-                )}
+          {/* Stats row */}
+          <div className="mt-6 pt-5 border-t border-stone-100 grid grid-cols-3 sm:grid-cols-3 gap-4 max-w-xs sm:max-w-sm">
+            {[
+              { icon: ShoppingCart, label: "Orders",     value: vendor.completed_order_count || 0,             color: "text-teal-500" },
+              { icon: TrendingUp,   label: "Completion", value: `${Math.round(vendor.completion_rate || 0)}%`, color: "text-purple-500" },
+              { icon: Package,      label: "Listings",   value: vendor.total_listings || listings.length,       color: "text-amber-500" },
+            ].map(({ icon: Icon, label, value, color }) => (
+              <div key={label} className="flex flex-col gap-0.5">
+                <div className="flex items-center gap-1.5">
+                  <Icon className={`w-3.5 h-3.5 ${color}`} />
+                  <span className="text-xl font-black text-stone-900">{value}</span>
+                </div>
+                <span className="text-xs text-stone-400 font-medium">{label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ══════════ BODY ══════════ */}
+      <div className="max-w-7xl mx-auto px-4 lg:px-8 py-6">
+        <div className="lg:grid lg:grid-cols-[240px_1fr] lg:gap-8 lg:items-start">
+
+          {/* ── LEFT SIDEBAR ── */}
+          <div className="lg:sticky lg:top-20 space-y-3 mb-6 lg:mb-0">
+
+            {/* Bio */}
+            {vendor.bio && (
+              <div className="bg-white rounded-2xl border border-stone-100 shadow-sm p-5">
+                <p className="text-xs font-bold text-teal-600 tracking-widest uppercase mb-2">About</p>
+                <p className="text-stone-600 text-sm leading-relaxed">{vendor.bio}</p>
               </div>
             )}
 
-            {/* Reviews — shown in sidebar on desktop */}
+            {/* Available days */}
+            {availDays.length > 0 && (
+              <div className="bg-white rounded-2xl border border-stone-100 shadow-sm p-5">
+                <p className="text-xs font-bold text-teal-600 tracking-widest uppercase mb-3">Open days</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {DAY_ORDER.map(d => (
+                    <span key={d} className={`text-xs font-semibold px-2.5 py-1 rounded-lg ${
+                      availDays.includes(d)
+                        ? "text-white shadow-sm"
+                        : "bg-stone-100 text-stone-300"
+                    }`} style={availDays.includes(d) ? { background: GRAD } : {}}>
+                      {DAY_LABEL[d]}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Reviews */}
             {reviews.length > 0 && (
-              <div className="mt-3 bg-white rounded-2xl shadow-sm border border-stone-100 p-5">
+              <div className="bg-white rounded-2xl border border-stone-100 shadow-sm p-5">
                 <div className="flex items-baseline gap-2 mb-4">
                   <span className="text-3xl font-black text-stone-900">{Number(vendor.rating).toFixed(1)}</span>
                   <div>
@@ -380,7 +385,7 @@ export default function VendorProfilePage() {
 
             {/* Admin panel */}
             {isAdmin && (
-              <div className="mt-3 bg-purple-50 border border-purple-200 rounded-2xl p-4 space-y-3">
+              <div className="bg-purple-50 border border-purple-200 rounded-2xl p-4 space-y-3">
                 <div className="flex items-center gap-2">
                   <Shield className="w-4 h-4 text-purple-600" />
                   <p className="text-purple-700 text-xs tracking-widest uppercase font-semibold">Admin</p>
@@ -403,21 +408,19 @@ export default function VendorProfilePage() {
                   <button onClick={handleRevoke} disabled={!!adminLoading}
                     className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-sm font-semibold transition disabled:opacity-50 ${confirmRevoke ? "bg-red-500 text-white" : "bg-red-100 text-red-700 hover:bg-red-200"}`}>
                     <UserX className="w-3.5 h-3.5" />
-                    {adminLoading === "revoke" ? "…" : confirmRevoke ? "Confirm" : "Revoke"}
+                    {adminLoading === "revoke" ? "…" : confirmRevoke ? "Confirm?" : "Revoke"}
                   </button>
                 </div>
               </div>
             )}
           </div>
 
-          {/* ══════════ RIGHT — PRODUCT GRID ══════════ */}
-          <div className="mt-4 lg:mt-6 pb-28">
-
+          {/* ── PRODUCT GRID ── */}
+          <div className="pb-28">
             {listings.length === 0 ? (
               <div className="bg-white rounded-2xl p-20 text-center border border-stone-100 shadow-sm">
                 <Sparkles className="w-12 h-12 text-stone-200 mx-auto mb-3" />
                 <p className="text-stone-400 font-semibold">No listings yet</p>
-                <p className="text-stone-300 text-sm mt-1">Check back soon</p>
               </div>
             ) : (
               <>
@@ -441,75 +444,74 @@ export default function VendorProfilePage() {
 
                     return (
                       <motion.div key={listing.id}
-                        initial={{ opacity: 0, y: 12 }}
+                        initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: Math.min(i * 0.03, 0.25) }}
-                        className="group bg-white rounded-2xl overflow-hidden border border-stone-100 hover:border-stone-200 shadow-sm hover:shadow-lg transition-all duration-300">
+                        transition={{ delay: Math.min(i * 0.025, 0.2) }}
+                        className="group bg-white rounded-2xl overflow-hidden border border-stone-100 hover:border-stone-200 shadow-sm hover:shadow-md transition-all duration-300">
 
                         <Link href={`/listing/${listing.id}`} className="block">
-                          {/* Image — taller aspect ratio */}
+                          {/* Image */}
                           <div className="relative w-full aspect-[3/4] overflow-hidden bg-stone-50">
                             <SafeImage
                               src={listing.image?.startsWith("http") ? listing.image : null}
                               alt={listing.title}
-                              className="group-hover:scale-105 transition-transform duration-500"
+                              className="group-hover:scale-[1.04] transition-transform duration-500"
                             />
 
-                            {/* Unavailable overlay */}
                             {!listing.is_available && (
                               <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
                                 <span className="text-white text-xs font-bold bg-black/60 px-3 py-1 rounded-full">Unavailable</span>
                               </div>
                             )}
 
-                            {/* Discount badge */}
                             {(discount > 0 || dealPrice) && (
-                              <div className="absolute top-2.5 left-2.5 bg-red-500 text-white px-2 py-0.5 rounded-lg text-xs font-black shadow">
-                                -{discount || listing.deal?.discount_percent}% OFF
+                              <div className="absolute top-2 left-2 bg-red-500 text-white px-2 py-0.5 rounded-lg text-xs font-black shadow-sm">
+                                -{discount || listing.deal?.discount_percent}%
                               </div>
                             )}
 
-                            {/* Activity badge */}
                             {wc >= 3 && listing.is_available && (
-                              <div className="absolute bottom-2.5 left-2.5 flex items-center gap-0.5 bg-teal-600/90 backdrop-blur-sm text-white px-2 py-0.5 rounded-lg text-xs font-semibold">
-                                <Zap className="w-2.5 h-2.5" /> {wc} this week
+                              <div className="absolute bottom-2 left-2 flex items-center gap-0.5 bg-black/60 backdrop-blur-sm text-white px-2 py-0.5 rounded-lg text-xs font-semibold">
+                                <Zap className="w-2.5 h-2.5 text-yellow-400" /> {wc} this week
                               </div>
                             )}
                           </div>
 
                           {/* Info */}
-                          <div className="p-3">
-                            <p className="font-bold text-stone-900 text-sm line-clamp-2 leading-snug">{listing.title}</p>
-
-                            <div className="mt-2 flex items-center justify-between">
-                              <div>
-                                {originalPrice ? (
-                                  <div className="flex items-baseline gap-1.5">
-                                    <span className="text-stone-400 text-xs line-through">₦{originalPrice.toLocaleString()}</span>
-                                    <span className="font-black text-red-600 text-sm">₦{effectivePrice.toLocaleString()}</span>
-                                  </div>
-                                ) : (
+                          <div className="px-3 pt-3 pb-2">
+                            <p className="font-semibold text-stone-900 text-sm line-clamp-2 leading-snug">{listing.title}</p>
+                            <div className="mt-1.5 flex items-center gap-2">
+                              {originalPrice ? (
+                                <>
                                   <span className="font-black text-stone-900 text-sm">₦{effectivePrice.toLocaleString()}</span>
-                                )}
-                              </div>
+                                  <span className="text-stone-400 text-xs line-through">₦{originalPrice.toLocaleString()}</span>
+                                </>
+                              ) : (
+                                <span className="font-black text-stone-900 text-sm">₦{effectivePrice.toLocaleString()}</span>
+                              )}
                             </div>
                           </div>
                         </Link>
 
-                        {/* Add to cart / Book — below the link */}
+                        {/* CTA — compact, only for available listings */}
                         {listing.is_available && !isOwn && (
                           <div className="px-3 pb-3">
                             <button
                               onClick={() => {
                                 if (isService) { router.push(`/listing/${listing.id}`); return; }
                                 addToCart({ id: listing.id, title: listing.title, price: effectivePrice, img: listing.image || "" });
-                                showToast(inCart ? "Added again (+1)" : "Added to cart");
+                                showToast(inCart ? "Added again" : "Added to cart");
                               }}
-                              className="w-full py-2 rounded-xl text-white text-xs font-bold flex items-center justify-center gap-1.5 transition hover:opacity-90"
-                              style={{ background: isService
-                                ? "linear-gradient(135deg,#6D28D9 0%,#4F46E5 100%)"
-                                : "linear-gradient(135deg,#2DD4BF 0%,#0D9488 100%)" }}>
-                              {isService ? <><Calendar className="w-3 h-3" /> Book Now</> : <><ShoppingCart className="w-3 h-3" /> {inCart ? "In Cart" : "Add to Cart"}</>}
+                              className="w-full py-1.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1 transition-opacity hover:opacity-80"
+                              style={{
+                                background: isService
+                                  ? "linear-gradient(135deg,#7C3AED 0%,#4F46E5 100%)"
+                                  : "linear-gradient(135deg,#0D9488 0%,#0f766e 100%)",
+                                color: "white",
+                              }}>
+                              {isService
+                                ? <><Calendar className="w-3 h-3" /> Book</>
+                                : <><ShoppingCart className="w-3 h-3" /> {inCart ? "In Cart" : "Add"}</>}
                             </button>
                           </div>
                         )}
