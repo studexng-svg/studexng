@@ -416,7 +416,7 @@ export default function AccountPage() {
       <div className="min-h-screen bg-[#F4F5F7]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
 
         {/* ── HEADER ── */}
-        <div className="bg-[#F4F5F7] px-4 pt-5 pb-2 flex items-center justify-between">
+        <div className="lg:hidden bg-[#F4F5F7] px-4 pt-5 pb-2 flex items-center justify-between">
           <Link href="/home">
             <button className="w-9 h-9 rounded-full bg-white shadow-sm flex items-center justify-center">
               <svg className="w-4 h-4 text-stone-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
@@ -487,9 +487,12 @@ export default function AccountPage() {
           </div>
         </div>
 
+        <div className="hidden lg:block px-6 pt-8 pb-2 max-w-4xl mx-auto">
+          <h1 className="text-2xl font-black text-stone-900">Profile & Settings</h1>
+        </div>
         <div className="px-4 pb-32 max-w-lg lg:max-w-4xl mx-auto">
-          <div className="lg:grid lg:grid-cols-[1fr_320px] lg:gap-6 lg:items-start">
-          <div className="space-y-1">
+          <div className="lg:grid lg:grid-cols-[260px_1fr_240px] lg:gap-5 lg:items-start">
+          <div className="space-y-3 lg:sticky lg:top-6">
 
           {/* ── PROFILE ROW ── */}
           <div className="bg-white rounded-2xl px-4 py-4 flex items-center gap-3 mt-3 shadow-sm">
@@ -579,8 +582,11 @@ export default function AccountPage() {
             </div>
           )}
 
+          </div>{/* end profile col */}
+          <div className="space-y-1 mt-4 lg:mt-0">
+
           {/* ── SECTION: My Account ── */}
-          <p className="text-xs font-semibold text-stone-500 pt-5 pb-2 px-1">My Account</p>
+          <p className="text-xs font-semibold text-stone-500 pt-3 lg:pt-1 pb-2 px-1">My Account</p>
           <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
             <Row href="/account/orders"        icon={Package}       iconColor="#6366f1" label="My Orders"       badge={pendingOrders} />
             <Row href="/account/bookings"       icon={Calendar}      iconColor="#0d9488" label="My Bookings"     badge={vendorApproved ? 0 : pendingBookings} />
@@ -601,11 +607,11 @@ export default function AccountPage() {
             </>
           )}
 
-          </div>{/* end left col */}
-          <div className="space-y-1 mt-4 lg:mt-6 lg:sticky lg:top-20">
+          </div>{/* end center col */}
+          <div className="space-y-1 mt-4 lg:mt-0 lg:sticky lg:top-6">
 
           {/* ── SECTION: Settings ── */}
-          <p className="text-xs font-semibold text-stone-500 pt-5 lg:pt-0 pb-2 px-1">Settings</p>
+          <p className="text-xs font-semibold text-stone-500 pt-3 lg:pt-1 pb-2 px-1">Settings</p>
           <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
             <Row href="/account/address"        icon={Settings}  iconColor="#3b82f6" label="Address Book" />
             <Row href="/account/change-password" icon={KeyRound} iconColor="#8b5cf6" label="Change Password" />
