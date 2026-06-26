@@ -11,6 +11,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import AdminTopBar from "@/components/layout/AdminTopBar";
+import { SidebarLayout, Sidebar, SidebarCard, SidebarNavItem } from "@/components/layout/Sidebar";
 import { api } from "@/lib/api";
 import { GRAD, SERIF } from "@/lib/tokens";
 
@@ -186,10 +187,25 @@ export default function AdminDashboard() {
     <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       <AdminTopBar title="Admin Dashboard" back="/home" />
 
-      <div className="px-4 pt-5 pb-28 max-w-2xl mx-auto space-y-5">
+      <SidebarLayout
+        sidebarWidth="220px"
+        padY={false}
+        className="pt-5 pb-28"
+        sidebar={
+          <Sidebar top="top-16">
+            <SidebarCard title="Navigation" noPad>
+              <div className="px-3 pb-3 space-y-0.5">
+                {QUICK_LINKS.map(({ label, href, icon }) => (
+                  <SidebarNavItem key={href} href={href} icon={icon} label={label} />
+                ))}
+              </div>
+            </SidebarCard>
+            <LiveActivity />
+          </Sidebar>
+        }>
 
         {/* Header */}
-        <div>
+        <div className="mb-5">
           <p className="text-teal-600 text-xs tracking-[0.2em] uppercase font-semibold">Overview</p>
           <h2 className="text-xl font-bold text-stone-900 mt-0.5" style={SERIF}>StudEx Platform</h2>
         </div>
@@ -331,19 +347,15 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* Live activity */}
-        <LiveActivity />
-
-        {/* Quick links */}
-        <div>
+        {/* Quick links — mobile only (sidebar handles desktop) */}
+        <div className="lg:hidden">
           <p className="text-teal-600 text-xs tracking-[0.2em] uppercase font-semibold mb-3">Quick Access</p>
           <div className="space-y-2">
             {QUICK_LINKS.map(({ label, href, icon: Icon, desc }) => (
               <Link key={href} href={href}>
                 <div className="bg-white border border-stone-200 hover:border-teal-300 rounded-2xl p-4 flex items-center justify-between transition-all active:scale-[0.98]">
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-                      style={{ background: GRAD }}>
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: GRAD }}>
                       <Icon className="w-4 h-4 text-white" />
                     </div>
                     <div>
@@ -358,7 +370,7 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-      </div>
+      </SidebarLayout>
     </div>
   );
 }
