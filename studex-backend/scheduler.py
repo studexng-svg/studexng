@@ -674,12 +674,15 @@ def send_lunch_notifications():
 
 def send_vendor_daily_digest():
     """
-    At 8am WAT, send every active vendor their daily stats: pending bookings
-    and this week's order count + earnings. In-app only, no email.
+    At 8am WAT, send every active verified vendor a daily push:
+    - Vendors WITH listings  → stats (pending bookings + weekly earnings)
+    - Vendors WITHOUT listings → nudge to create their first listing
+    In-app + FCM push only, no email.
     """
     from django.contrib.auth import get_user_model
     from django.db.models import Sum
     from orders.models import Order, Booking
+    from services.models import Listing
     from accounts.utils import send_notification
 
     User = get_user_model()
@@ -694,40 +697,56 @@ def send_vendor_daily_digest():
     sent = 0
     for vendor in vendors.iterator():
         try:
-            pending_bookings = Booking.objects.filter(
-                listing__vendor=vendor,
-                status='pending',
-            ).count()
+            has_listings = Listing.objects.filter(vendor=vendor).exists()
 
-            week_orders = Order.objects.filter(
-                listing__vendor=vendor,
-                status__in=['paid', 'preparing', 'ready', 'completed'],
-                created_at__gte=week_ago,
-            )
-            week_count    = week_orders.count()
-            week_earnings = week_orders.aggregate(total=Sum('amount'))['total'] or 0
-
-            parts = []
-            if pending_bookings:
-                plural = 's' if pending_bookings > 1 else ''
-                parts.append(f"{pending_bookings} pending booking{plural} waiting for your response")
-            if week_count:
-                plural = 's' if week_count > 1 else ''
-                parts.append(f"{week_count} order{plural} this week (₦{int(week_earnings):,} earned)")
-
-            if not parts:
-                message = "No new activity yet today — keep your listings fresh to attract orders!"
+            if not has_listings:
+                send_notification(
+                    recipient=vendor,
+                    notification_type='ai_tip',
+                    title='Your store is empty — let\'s change that!',
+                    message=(
+                        'You\'re a verified vendor but you haven\'t posted any listings yet. '
+                        'Add your first service or product now and start getting orders from students on campus!'
+                    ),
+                    action_url='/vendor/dashboard/listings',
+                    send_email=False,
+                )
             else:
-                message = " · ".join(parts) + ". Log in to stay on top of things."
+                pending_bookings = Booking.objects.filter(
+                    listing__vendor=vendor,
+                    status='pending',
+                ).count()
 
-            send_notification(
-                recipient=vendor,
-                notification_type='ai_tip',
-                title='📊 Your Daily StudEx Update',
-                message=message,
-                action_url='/vendor/dashboard',
-                send_email=False,
-            )
+                week_orders = Order.objects.filter(
+                    listing__vendor=vendor,
+                    status__in=['paid', 'preparing', 'ready', 'completed'],
+                    created_at__gte=week_ago,
+                )
+                week_count    = week_orders.count()
+                week_earnings = week_orders.aggregate(total=Sum('amount'))['total'] or 0
+
+                parts = []
+                if pending_bookings:
+                    plural = 's' if pending_bookings > 1 else ''
+                    parts.append(f"{pending_bookings} pending booking{plural} waiting for your response")
+                if week_count:
+                    plural = 's' if week_count > 1 else ''
+                    parts.append(f"{week_count} order{plural} this week (₦{int(week_earnings):,} earned)")
+
+                if not parts:
+                    message = "No new activity yet today — keep your listings fresh to attract orders!"
+                else:
+                    message = " · ".join(parts) + ". Log in to stay on top of things."
+
+                send_notification(
+                    recipient=vendor,
+                    notification_type='ai_tip',
+                    title='📊 Your Daily StudEx Update',
+                    message=message,
+                    action_url='/vendor/dashboard',
+                    send_email=False,
+                )
+
             sent += 1
         except Exception as e:
             logger.warning(f"send_vendor_daily_digest: failed for vendor {vendor.id}: {e}")
