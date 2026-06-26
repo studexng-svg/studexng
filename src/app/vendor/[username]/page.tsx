@@ -214,11 +214,18 @@ export default function VendorProfilePage() {
       )}
 
       {/* ── COVER ── */}
-      <div className="relative h-48 lg:h-64 overflow-hidden"
-        style={{ background: "linear-gradient(135deg,#0f766e 0%,#0D9488 35%,#4F46E5 70%,#6D28D9 100%)" }}>
-        {/* Subtle pattern */}
-        <div className="absolute inset-0 opacity-10"
-          style={{ backgroundImage: "radial-gradient(circle at 20% 50%, white 1px, transparent 1px), radial-gradient(circle at 80% 20%, white 1px, transparent 1px)", backgroundSize: "40px 40px" }} />
+      <div className="relative h-48 lg:h-64 overflow-hidden bg-zinc-900">
+        {vendor.profile_picture && (
+          <>
+            <img
+              src={vendor.profile_picture}
+              alt=""
+              aria-hidden
+              className="absolute inset-0 w-full h-full object-cover object-top scale-125 blur-2xl opacity-60"
+            />
+            <div className="absolute inset-0 bg-black/50" />
+          </>
+        )}
         {vendor.is_online && (
           <div className="absolute top-4 right-4 flex items-center gap-1.5 bg-white/15 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/20">
             <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
