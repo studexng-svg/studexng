@@ -26,6 +26,15 @@ class Notification(models.Model):
         ('admin_message', 'Message from Admin'),
         ('bank_account_added', 'Bank Account Added'),
         ('ai_tip', 'AI Tip / Engagement Message'),
+        ('rate_vendor', 'Rate Your Vendor'),
+        ('order_auto_released', 'Order Auto-Released'),
+        ('new_order', 'New Order Received'),
+        ('order_placed', 'Order Placed'),
+        ('order_cancelled', 'Order Cancelled'),
+        ('payout_failed', 'Payout Failed'),
+        ('vendor_of_month', 'Vendor of the Month'),
+        ('badge_upgrade', 'Vendor Badge Upgrade'),
+        ('welcome', 'Welcome'),
     )
 
     recipient = models.ForeignKey(

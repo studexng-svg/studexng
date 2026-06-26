@@ -478,6 +478,7 @@ def pick_vendor_of_month_for_campus(campus, month_start, month_end):
                 f'Your profile is now featured on the StudEx home page!'
             ),
             action_url='/seller',
+            send_email=False,
         )
     except Exception as ne:
         logger.warning(f"pick_vendor_of_month: notification failed for {campus}: {ne}")
@@ -546,6 +547,125 @@ def groq_notify_vendors():
             send_groq_notifications(audience='vendors', school=school, triggered_by='scheduler')
     except Exception as e:
         logger.error(f'groq_notify_vendors failed: {e}', exc_info=True)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# JOB 8: Post-order rating prompt — every 30 min
+# ─────────────────────────────────────────────────────────────────────────────
+
+def prompt_rating_reviews():
+    """
+    2 hours after a buyer confirms delivery, send an in-app prompt to rate the vendor.
+    Runs every 30 min; checks a 30-min window so no order is missed or double-prompted.
+    """
+    from orders.models import Order
+    from notifications.models import Notification
+    from accounts.utils import send_notification
+
+    window_end   = timezone.now() - timedelta(hours=2)
+    window_start = window_end - timedelta(minutes=30)
+
+    orders = Order.objects.filter(
+        status='completed',
+        buyer_confirmed_at__gte=window_start,
+        buyer_confirmed_at__lt=window_end,
+    ).select_related('buyer', 'listing__vendor')
+
+    prompted = 0
+    for order in orders:
+        already = Notification.objects.filter(
+            recipient=order.buyer,
+            notification_type='rate_vendor',
+            action_url=f'/account/orders/{order.id}',
+        ).exists()
+        if already:
+            continue
+        try:
+            vendor_name = (
+                getattr(order.listing.vendor, 'business_name', None)
+                or order.listing.vendor.username
+            )
+            send_notification(
+                recipient=order.buyer,
+                notification_type='rate_vendor',
+                title='How was your order?',
+                message=(
+                    f'You just got "{order.listing.title}" from {vendor_name}. '
+                    f'Leave a quick rating to help other students!'
+                ),
+                action_url=f'/account/orders/{order.id}',
+                send_email=False,
+            )
+            prompted += 1
+        except Exception as e:
+            logger.warning(f"prompt_rating_reviews: failed for order {order.id}: {e}")
+
+    if prompted:
+        logger.info(f"prompt_rating_reviews: sent {prompted} rating prompt(s)")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# JOB 9: Lunch notification — weekdays 12:30 WAT
+# ─────────────────────────────────────────────────────────────────────────────
+
+def send_lunch_notifications():
+    """
+    At 12:30 WAT on weekdays, nudge students who have previously ordered food
+    to check out food listings on their campus. In-app only, no email.
+    """
+    from django.contrib.auth import get_user_model
+    from orders.models import Order
+    from accounts.utils import send_notification
+
+    User = get_user_model()
+
+    food_orderer_ids = (
+        Order.objects
+        .filter(
+            status__in=['paid', 'preparing', 'ready', 'completed'],
+            listing__category__slug='food',
+        )
+        .values_list('buyer_id', flat=True)
+        .distinct()
+    )
+
+    students = (
+        User.objects
+        .filter(
+            id__in=food_orderer_ids,
+            user_type='student',
+            is_active=True,
+        )
+        .only('id', 'school')
+    )
+
+    lunch_messages = [
+        ("It's lunch o'clock! 🍽️", "Quick, check what food vendors are serving on campus today!"),
+        ("Hungry? Let's fix that 🔥", "Your favourite campus food vendors are ready to take your order."),
+        ("Lunch break loading... 🍛", "Don't go hungry! Browse food vendors near you on StudEx."),
+    ]
+
+    import random
+    title, message = random.choice(lunch_messages)
+
+    sent = 0
+    for student in students.iterator():
+        campus = getattr(student, 'school', 'pau') or 'pau'
+        try:
+            send_notification(
+                recipient=student,
+                notification_type='ai_tip',
+                title=title,
+                message=message,
+                action_url=f'/categories/food?campus={campus}',
+                send_email=False,
+            )
+            sent += 1
+        except Exception as e:
+            logger.warning(f"send_lunch_notifications: failed for user {student.id}: {e}")
+
+    if sent:
+        logger.info(f"send_lunch_notifications: sent to {sent} student(s)")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -633,13 +753,36 @@ def start():
         coalesce=True,
     )
 
+    # Every 30 min — rate vendor prompt (2 h after buyer confirms delivery)
+    scheduler.add_job(
+        prompt_rating_reviews,
+        trigger=IntervalTrigger(minutes=30),
+        id='prompt_rating_reviews',
+        name='Post-order rating prompt (every 30 min)',
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+
+    # Weekdays 12:30 WAT — lunch notification for food-ordering students
+    scheduler.add_job(
+        send_lunch_notifications,
+        trigger=CronTrigger(day_of_week='mon-fri', hour=12, minute=30, timezone=LAGOS_TZ),
+        id='send_lunch_notifications',
+        name='Lunch notification — food-ordering students (Mon-Fri 12:30 WAT)',
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+
     try:
         scheduler.start()
         logger.info(
             "Scheduler started: booking_reminders (60s), "
             "auto_release_orders (midnight), auto_cancel_pending_orders (midnight), "
             "retry_failed_transfers (1h), "
-            "groq_notify_students (Mon/Wed/Fri 10:00 per campus), groq_notify_vendors (Tue/Thu/Sat 10:00 per campus)."
+            "groq_notify_students (Mon/Wed/Fri 10:00 per campus), groq_notify_vendors (Tue/Thu/Sat 10:00 per campus), "
+            "prompt_rating_reviews (30 min), send_lunch_notifications (Mon-Fri 12:30 WAT)."
         )
     except Exception as e:
         logger.error(f"Failed to start scheduler: {e}", exc_info=True)

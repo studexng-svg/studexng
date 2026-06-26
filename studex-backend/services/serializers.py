@@ -65,6 +65,8 @@ class ListingSerializer(serializers.ModelSerializer):
     is_reserved = serializers.SerializerMethodField()
     campus = serializers.CharField(source='vendor.school', read_only=True, default='')
     sale_price = serializers.SerializerMethodField(read_only=True)
+    weekly_order_count = serializers.SerializerMethodField(read_only=True)
+    last_ordered_at = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = Listing
@@ -75,6 +77,7 @@ class ListingSerializer(serializers.ModelSerializer):
             'is_reserved',
             'category', 'vendor', 'vendor_is_verified',
             'campus',
+            'weekly_order_count', 'last_ordered_at',
             'created_at', 'updated_at'
         ]
         read_only_fields = ['vendor', 'vendor_is_verified', 'created_at', 'updated_at']
@@ -84,6 +87,31 @@ class ListingSerializer(serializers.ModelSerializer):
             from decimal import Decimal
             return float(obj.price - obj.price * Decimal(obj.discount_percent) / 100)
         return None
+
+    def get_weekly_order_count(self, obj):
+        from django.utils import timezone
+        from datetime import timedelta
+        try:
+            from orders.models import Order
+            cutoff = timezone.now() - timedelta(days=7)
+            return Order.objects.filter(
+                listing=obj,
+                created_at__gte=cutoff,
+                status__in=['paid', 'preparing', 'ready', 'completed'],
+            ).count()
+        except Exception:
+            return 0
+
+    def get_last_ordered_at(self, obj):
+        try:
+            from orders.models import Order
+            last = Order.objects.filter(
+                listing=obj,
+                status__in=['paid', 'preparing', 'ready', 'completed'],
+            ).order_by('-created_at').values_list('created_at', flat=True).first()
+            return last.isoformat() if last else None
+        except Exception:
+            return None
 
     def validate_discount_percent(self, value):
         if not (0 <= value <= 100):

@@ -845,6 +845,7 @@ def pay_with_credits(request):
                 f'Your payout of ₦{listing_price:,.0f} will be released once they confirm delivery.'
             ),
             action_url='/vendor/dashboard',
+            send_email=False,
         )
         send_notification(
             recipient=buyer,
@@ -1310,6 +1311,7 @@ def _create_order_from_paystack_data(paystack_data, buyer, listing_id, order_typ
                         f'Your payout of ₦{vendor_amount:,.0f} will be released once the buyer confirms delivery.'
                     ),
                     action_url='/vendor/dashboard',
+                    send_email=False,
                 )
                 # Notify buyer
                 send_notification(

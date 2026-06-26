@@ -339,6 +339,21 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                 <span className="text-sm text-stone-400">({totalReviews})</span>
               </div>
             )}
+            {(() => {
+              const wc = listing.weekly_order_count || 0;
+              const lo = listing.last_ordered_at;
+              if (wc >= 3) return (
+                <p className="text-xs text-teal-600 font-medium mt-0.5 flex items-center gap-0.5">
+                  <Zap className="w-3 h-3" />{wc} orders this week
+                </p>
+              );
+              if (lo) {
+                const hrs = Math.floor((Date.now() - new Date(lo).getTime()) / 3600000);
+                const label = hrs < 1 ? "Just now" : hrs < 24 ? `${hrs}h ago` : `${Math.floor(hrs / 24)}d ago`;
+                return <p className="text-xs text-stone-400 mt-0.5">Last order {label}</p>;
+              }
+              return null;
+            })()}
             <p className="font-bold text-stone-900 text-base mt-1.5">₦{Number(listing.price).toLocaleString()}</p>
           </div>
         </Link>
@@ -465,6 +480,27 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                 <span className="text-xs text-stone-400">({totalReviews})</span>
               </div>
             )}
+
+            {(() => {
+              const wc = listing.weekly_order_count || 0;
+              const lo = listing.last_ordered_at;
+              if (wc >= 3) {
+                return (
+                  <p className="text-xs text-teal-600 font-medium mt-1 flex items-center gap-0.5">
+                    <Zap className="w-3 h-3" />{wc} orders this week
+                  </p>
+                );
+              }
+              if (lo) {
+                const diff = Date.now() - new Date(lo).getTime();
+                const hrs = Math.floor(diff / 3600000);
+                const label = hrs < 1 ? "Just now" : hrs < 24 ? `${hrs}h ago` : `${Math.floor(hrs / 24)}d ago`;
+                return (
+                  <p className="text-xs text-stone-400 mt-1">Last order {label}</p>
+                );
+              }
+              return null;
+            })()}
 
             <div className="mt-2 space-y-2">
               {discountPct > 0 ? (

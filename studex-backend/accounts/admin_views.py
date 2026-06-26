@@ -610,6 +610,7 @@ try:
                                     f'"{order.listing.title}". Your payout is being processed.'
                                 ),
                                 action_url='/vendor/dashboard',
+                                send_email=False,
                             )
                         except Exception:
                             pass
@@ -1952,6 +1953,7 @@ class AdminVendorOfMonthView(APIView):
                     f'Your profile is now featured on the StudEx home page!'
                 ),
                 action_url='/seller',
+                send_email=False,
             )
         except Exception:
             pass

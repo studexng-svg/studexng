@@ -280,6 +280,7 @@ class ConversationViewSet(viewsets.ModelViewSet):
                 title=f'New message from {request.user.username}',
                 message=preview,
                 action_url=f'/chat/{conversation.id}',
+                send_email=False,
             )
         except Exception:
             pass

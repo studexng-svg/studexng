@@ -158,6 +158,7 @@ def register_user(request):
             title='🎉 Welcome to StudEx!',
             message=f'Your account has been created successfully. Browse services, book vendors, and enjoy the {campus_name} marketplace!',
             action_url='/home',
+            send_email=False,
         )
 
         refresh = RefreshToken.for_user(user)
