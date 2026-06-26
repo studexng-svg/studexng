@@ -808,6 +808,169 @@ def nudge_pending_booking_vendors():
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# JOB 12: Buyer daily nudge — weekdays 9am WAT
+# ─────────────────────────────────────────────────────────────────────────────
+
+def send_buyer_daily_nudge():
+    """
+    At 9am WAT on weekdays, nudge buyers who have ordered in the last 30 days.
+    Personalized to their most-ordered category if one exists.
+    Idempotent per day via action_url ref=daily.
+    """
+    import random
+    from django.contrib.auth import get_user_model
+    from django.db.models import Count
+    from orders.models import Order
+    from notifications.models import Notification
+    from accounts.utils import send_notification
+
+    User = get_user_model()
+    now = timezone.now()
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    month_ago = now - timedelta(days=30)
+
+    active_buyer_ids = (
+        Order.objects
+        .filter(
+            status__in=['paid', 'preparing', 'ready', 'completed'],
+            created_at__gte=month_ago,
+        )
+        .values_list('buyer_id', flat=True)
+        .distinct()
+    )
+
+    buyers = User.objects.filter(id__in=active_buyer_ids, is_active=True).only('id', 'school')
+
+    general_messages = [
+        ("What's on campus today? 👀", "Check out the latest listings from vendors around you on StudEx."),
+        ("Campus marketplace is live 🛍️", "Food, fashion, laundry and more — see what vendors have for you today."),
+        ("Good morning! Start your day right 🌅", "Browse services from verified campus vendors, all in one place."),
+    ]
+
+    sent = 0
+    for buyer in buyers.iterator():
+        try:
+            campus = getattr(buyer, 'school', 'pau') or 'pau'
+
+            already = Notification.objects.filter(
+                recipient=buyer,
+                notification_type='ai_tip',
+                action_url__contains='ref=daily',
+                created_at__gte=today_start,
+            ).exists()
+            if already:
+                continue
+
+            fav = (
+                Order.objects
+                .filter(
+                    buyer=buyer,
+                    status__in=['paid', 'preparing', 'ready', 'completed'],
+                    created_at__gte=month_ago,
+                )
+                .values('listing__category__slug', 'listing__category__title')
+                .annotate(cnt=Count('id'))
+                .order_by('-cnt')
+                .first()
+            )
+
+            if fav and fav['listing__category__slug']:
+                slug        = fav['listing__category__slug']
+                cat_title   = fav['listing__category__title'] or slug.replace('-', ' ').title()
+                title       = f"{cat_title} vendors are ready for you! 🔥"
+                message     = f"You love ordering {cat_title.lower()} — check what's available on campus today."
+                action_url  = f'/category/{slug}?campus={campus}&ref=daily'
+            else:
+                title, message = random.choice(general_messages)
+                action_url = f'/home?ref=daily'
+
+            send_notification(
+                recipient=buyer,
+                notification_type='ai_tip',
+                title=title,
+                message=message,
+                action_url=action_url,
+                send_email=False,
+            )
+            sent += 1
+        except Exception as e:
+            logger.warning(f"send_buyer_daily_nudge: failed for user {buyer.id}: {e}")
+
+    if sent:
+        logger.info(f"send_buyer_daily_nudge: sent to {sent} buyer(s)")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# JOB 13: Buyer re-engagement nudge — 5pm WAT daily
+# ─────────────────────────────────────────────────────────────────────────────
+
+def send_buyer_reengagement_nudge():
+    """
+    At 5pm WAT daily, nudge buyers whose last order was 5-14 days ago.
+    Idempotent per day via action_url ref=reengaged.
+    """
+    import random
+    from django.contrib.auth import get_user_model
+    from django.db.models import Max
+    from orders.models import Order
+    from notifications.models import Notification
+    from accounts.utils import send_notification
+
+    User = get_user_model()
+    now = timezone.now()
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    window_end   = now - timedelta(days=5)
+    window_start = now - timedelta(days=14)
+
+    buyer_ids = (
+        Order.objects
+        .filter(status__in=['paid', 'preparing', 'ready', 'completed'])
+        .values('buyer_id')
+        .annotate(last_order=Max('created_at'))
+        .filter(last_order__gte=window_start, last_order__lt=window_end)
+        .values_list('buyer_id', flat=True)
+    )
+
+    buyers = User.objects.filter(id__in=buyer_ids, is_active=True).only('id', 'school')
+
+    messages = [
+        ("Missing you on StudEx! 👋", "It's been a while — come see what your campus vendors have been up to."),
+        ("Your campus vendors are waiting 🛍️", "Haven't ordered in a few days? Check what's new on StudEx today."),
+        ("Back to campus life 🎓", "Plenty of food, laundry, fashion and more waiting for you on StudEx."),
+    ]
+
+    sent = 0
+    for buyer in buyers.iterator():
+        try:
+            campus = getattr(buyer, 'school', 'pau') or 'pau'
+
+            already = Notification.objects.filter(
+                recipient=buyer,
+                notification_type='ai_tip',
+                action_url__contains='ref=reengaged',
+                created_at__gte=today_start,
+            ).exists()
+            if already:
+                continue
+
+            title, message = random.choice(messages)
+            send_notification(
+                recipient=buyer,
+                notification_type='ai_tip',
+                title=title,
+                message=message,
+                action_url=f'/categories?campus={campus}&ref=reengaged',
+                send_email=False,
+            )
+            sent += 1
+        except Exception as e:
+            logger.warning(f"send_buyer_reengagement_nudge: failed for user {buyer.id}: {e}")
+
+    if sent:
+        logger.info(f"send_buyer_reengagement_nudge: sent to {sent} buyer(s)")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Scheduler bootstrap — called by StudexConfig.ready()
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -936,6 +1099,28 @@ def start():
         coalesce=True,
     )
 
+    # Mon-Fri 9:00 WAT — personalized buyer morning nudge
+    scheduler.add_job(
+        send_buyer_daily_nudge,
+        trigger=CronTrigger(day_of_week='mon-fri', hour=9, minute=0, timezone=LAGOS_TZ),
+        id='send_buyer_daily_nudge',
+        name='Buyer daily discovery nudge (Mon-Fri 09:00 WAT)',
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+
+    # 5pm WAT daily — re-engage buyers silent for 5-14 days
+    scheduler.add_job(
+        send_buyer_reengagement_nudge,
+        trigger=CronTrigger(hour=17, minute=0, timezone=LAGOS_TZ),
+        id='send_buyer_reengagement_nudge',
+        name='Buyer re-engagement nudge (17:00 WAT daily)',
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+
     try:
         scheduler.start()
         logger.info(
@@ -944,7 +1129,8 @@ def start():
             "retry_failed_transfers (1h), "
             "groq_notify_students (Mon/Wed/Fri 10:00 per campus), groq_notify_vendors (Tue/Thu/Sat 10:00 per campus), "
             "prompt_rating_reviews (30 min), send_lunch_notifications (Mon-Fri 12:30 WAT), "
-            "send_vendor_daily_digest (08:00 WAT), nudge_pending_booking_vendors (30 min)."
+            "send_vendor_daily_digest (08:00 WAT), nudge_pending_booking_vendors (30 min), "
+            "send_buyer_daily_nudge (Mon-Fri 09:00 WAT), send_buyer_reengagement_nudge (17:00 WAT)."
         )
     except Exception as e:
         logger.error(f"Failed to start scheduler: {e}", exc_info=True)
