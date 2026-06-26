@@ -340,6 +340,16 @@ export default function HomePageClient({ initialVendors, initialListings, initia
               </div>
             )}
             {(() => {
+              const mins: number | null = listing.vendor?.profile?.avg_response_minutes ?? null;
+              if (mins === null) return null;
+              const label = mins < 60 ? `~${mins} min` : mins < 1440 ? `~${Math.round(mins / 60)} hr` : `~${Math.round(mins / 1440)}d`;
+              return (
+                <p className="text-xs text-stone-400 mt-0.5 flex items-center gap-0.5">
+                  <Clock className="w-3 h-3" /> Responds in {label}
+                </p>
+              );
+            })()}
+            {(() => {
               const wc = listing.weekly_order_count || 0;
               const lo = listing.last_ordered_at;
               if (wc >= 3) return (

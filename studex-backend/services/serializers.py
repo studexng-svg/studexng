@@ -39,13 +39,36 @@ class ListingVendorSerializer(serializers.ModelSerializer):
     def get_profile(self, obj):
         try:
             p = obj.profile
-            return {
+            profile_data = {
                 'available_days': p.available_days or [],
                 'opening_time': p.opening_time.strftime('%H:%M') if p.opening_time else None,
                 'closing_time': p.closing_time.strftime('%H:%M') if p.closing_time else None,
+                'avg_response_minutes': None,
             }
         except Exception:
-            return {'available_days': [], 'opening_time': None, 'closing_time': None}
+            profile_data = {
+                'available_days': [], 'opening_time': None, 'closing_time': None,
+                'avg_response_minutes': None,
+            }
+
+        try:
+            from orders.models import Booking
+            from django.db.models import Avg, ExpressionWrapper, F, DurationField
+            result = Booking.objects.filter(
+                listing__vendor=obj,
+                confirmed_at__isnull=False,
+            ).aggregate(
+                avg_time=Avg(ExpressionWrapper(
+                    F('confirmed_at') - F('created_at'),
+                    output_field=DurationField(),
+                ))
+            )
+            if result['avg_time']:
+                profile_data['avg_response_minutes'] = round(result['avg_time'].total_seconds() / 60)
+        except Exception:
+            pass
+
+        return profile_data
 
 
 class ListingSerializer(serializers.ModelSerializer):

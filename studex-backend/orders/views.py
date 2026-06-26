@@ -573,6 +573,7 @@ class BookingViewSet(viewsets.ModelViewSet):
             return Response({'detail': f'Booking is already {booking.status}.'}, status=400)
 
         booking.status = 'confirmed'
+        booking.confirmed_at = timezone.now()
         booking.save()
 
         _notify(

@@ -656,6 +656,22 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
                       <span className="text-xs text-stone-400">{listing.vendor.hostel}</span>
                     </div>
                   )}
+                  {/* Response time */}
+                  {(() => {
+                    const mins: number | null = (listing.vendor as any)?.profile?.avg_response_minutes ?? null;
+                    if (mins === null) return null;
+                    const label = mins < 60
+                      ? `~${mins} min`
+                      : mins < 1440
+                      ? `~${Math.round(mins / 60)} hr`
+                      : `~${Math.round(mins / 1440)}d`;
+                    return (
+                      <div className="flex items-center gap-0.5 mt-1">
+                        <Clock className="w-3 h-3 text-teal-400 flex-shrink-0" />
+                        <span className="text-xs text-stone-400">Responds in {label}</span>
+                      </div>
+                    );
+                  })()}
                   {/* Active hours — full width so text wraps cleanly */}
                   {(() => {
                     const days: string[] = (listing.vendor as any)?.profile?.available_days || [];
