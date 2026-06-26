@@ -529,12 +529,37 @@ export default function AccountPage() {
             </button>
           </div>
 
+          </div>{/* end profile col */}
+          <div className="space-y-1 mt-4 lg:mt-0">
+
+          {/* ── SECTION: My Account ── */}
+          <p className="text-xs font-semibold text-stone-500 pt-3 lg:pt-1 pb-2 px-1">My Account</p>
+          <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
+            <Row href="/account/orders"        icon={Package}       iconColor="#6366f1" label="My Orders"       badge={pendingOrders} />
+            <Row href="/account/bookings"       icon={Calendar}      iconColor="#0d9488" label="My Bookings"     badge={vendorApproved ? 0 : pendingBookings} />
+            <Row href="/chat"                   icon={MessageCircle} iconColor="#0d9488" label="Messages"        badge={unreadMessages} />
+            <Row href="/account/notifications"  icon={Bell}          iconColor="#f59e0b" label="Notifications"   badge={unreadNotifications} />
+            <Row href="/account/loyalty"        icon={Gift}          iconColor="#10b981" label="Loyalty Rewards" />
+            <Row href="/wishlist"               icon={Heart}         iconColor="#ec4899" label="Wishlist"        last />
+          </div>
+
+          {/* ── SECTION: Vendor (if approved) ── */}
+          {vendorApproved && (
+            <>
+              <p className="text-xs font-semibold text-stone-500 pt-5 pb-2 px-1">Vendor Tools</p>
+              <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
+                <Row href="/vendor/dashboard"   icon={LayoutDashboard} iconColor="#0d9488" label="Vendor Dashboard" />
+                <Row href="/account/bank-account" icon={Banknote}       iconColor={hasBankAccount ? "#10b981" : "#f59e0b"} label={hasBankAccount ? "Payout Account" : "Add Payout Account"} last />
+              </div>
+            </>
+          )}
+
           {/* ── VENDOR / PLAN CARD ── */}
           {vendorApproved ? (
             <Link href="/vendor/dashboard">
               <motion.div whileTap={{ scale: 0.98 }}
                 className="relative rounded-2xl p-5 overflow-hidden shadow-md mt-4"
-                style={{ background: "linear-gradient(135deg, #0d9488 0%, #0f766e 100%)" }}>
+                style={{ background: GRAD }}>
                 <div className="absolute top-0 right-0 w-28 h-28 rounded-full bg-white/10 blur-2xl pointer-events-none" />
                 <div className="flex items-start justify-between gap-3">
                   <div>
@@ -562,7 +587,7 @@ export default function AccountPage() {
               </div>
             </div>
           ) : (
-            <div className="relative rounded-2xl p-5 overflow-hidden shadow-md mt-4" style={{ background: "linear-gradient(135deg, #7c3aed 0%, #0d9488 100%)" }}>
+            <div className="relative rounded-2xl p-5 overflow-hidden shadow-md mt-4" style={{ background: GRAD }}>
               <div className="absolute top-0 right-0 w-28 h-28 rounded-full bg-white/10 blur-2xl pointer-events-none" />
               <div className="flex items-start justify-between gap-3">
                 <div>
@@ -580,31 +605,6 @@ export default function AccountPage() {
                 </div>
               </Link>
             </div>
-          )}
-
-          </div>{/* end profile col */}
-          <div className="space-y-1 mt-4 lg:mt-0">
-
-          {/* ── SECTION: My Account ── */}
-          <p className="text-xs font-semibold text-stone-500 pt-3 lg:pt-1 pb-2 px-1">My Account</p>
-          <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
-            <Row href="/account/orders"        icon={Package}       iconColor="#6366f1" label="My Orders"       badge={pendingOrders} />
-            <Row href="/account/bookings"       icon={Calendar}      iconColor="#0d9488" label="My Bookings"     badge={vendorApproved ? 0 : pendingBookings} />
-            <Row href="/chat"                   icon={MessageCircle} iconColor="#0d9488" label="Messages"        badge={unreadMessages} />
-            <Row href="/account/notifications"  icon={Bell}          iconColor="#f59e0b" label="Notifications"   badge={unreadNotifications} />
-            <Row href="/account/loyalty"        icon={Gift}          iconColor="#10b981" label="Loyalty Rewards" />
-            <Row href="/wishlist"               icon={Heart}         iconColor="#ec4899" label="Wishlist"        last />
-          </div>
-
-          {/* ── SECTION: Vendor (if approved) ── */}
-          {vendorApproved && (
-            <>
-              <p className="text-xs font-semibold text-stone-500 pt-5 pb-2 px-1">Vendor Tools</p>
-              <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
-                <Row href="/vendor/dashboard"   icon={LayoutDashboard} iconColor="#0d9488" label="Vendor Dashboard" />
-                <Row href="/account/bank-account" icon={Banknote}       iconColor={hasBankAccount ? "#10b981" : "#f59e0b"} label={hasBankAccount ? "Payout Account" : "Add Payout Account"} last />
-              </div>
-            </>
           )}
 
           </div>{/* end center col */}

@@ -163,9 +163,9 @@ export default function MessagesPage() {
   }
 
   return (
-    <div className="lg:flex lg:gap-3">
+    <div className="lg:flex lg:bg-white lg:rounded-2xl lg:shadow-sm lg:overflow-hidden" style={{ minHeight: "calc(100vh - 220px)" }}>
       {/* Conversations list */}
-      <div className="w-full lg:w-60 lg:flex-shrink-0 bg-white rounded-2xl overflow-hidden shadow-sm">
+      <div className="w-full lg:w-60 lg:flex-shrink-0 lg:border-r lg:border-stone-100">
         <div className="px-4 py-3 border-b border-stone-100">
           <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-bold mb-0.5">Messages</p>
           <h2 className="font-black text-stone-900 text-base tracking-tight">Conversations</h2>
@@ -198,7 +198,7 @@ export default function MessagesPage() {
       </div>
 
       {/* Desktop chat panel */}
-      <div className="hidden lg:flex flex-1 flex-col bg-white rounded-2xl overflow-hidden shadow-sm" style={{ height: "calc(100vh - 260px)" }}>
+      <div className="hidden lg:flex flex-1 flex-col" style={{ minHeight: "calc(100vh - 220px)" }}>
         {!activeConv ? (
           <div className="flex-1 flex items-center justify-center text-stone-400">
             <div className="text-center">
