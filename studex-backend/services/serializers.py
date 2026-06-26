@@ -77,6 +77,7 @@ class ListingSerializer(serializers.ModelSerializer):
             'is_reserved',
             'category', 'vendor', 'vendor_is_verified',
             'campus',
+            'brand', 'condition', 'delivery_time', 'tags',
             'weekly_order_count', 'last_ordered_at',
             'created_at', 'updated_at'
         ]

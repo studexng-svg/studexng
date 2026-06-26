@@ -8,7 +8,7 @@ import {
   Star, MessageCircle, ShoppingCart, Calendar,
   Clock, FileText, CheckCircle, AlertCircle,
   ChevronDown, ChevronUp, Send, MapPin, Sparkles, ZoomIn, X as XIcon,
-  Shield, Share2
+  Shield, Share2, Tag, Truck, Package
 } from "lucide-react";
 import TopNav from "@/components/layout/TopNav";
 import { useAuth } from "@/lib/authStore";
@@ -579,6 +579,47 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
               )}
 
               <p className="text-stone-500 text-sm mt-3 leading-relaxed">{listing.description}</p>
+
+              {/* Item details */}
+              {(() => {
+                const l = listing as any;
+                const rows: { icon: React.ReactNode; label: string; value: string }[] = [];
+                if (l.brand) rows.push({ icon: <Package className="w-3.5 h-3.5 text-teal-500" />, label: "Brand", value: l.brand });
+                if (l.condition) {
+                  const labels: Record<string, string> = { new: "Brand New", fairly_used: "Fairly Used", refurbished: "Refurbished" };
+                  rows.push({ icon: <CheckCircle className="w-3.5 h-3.5 text-teal-500" />, label: "Condition", value: labels[l.condition] || l.condition });
+                }
+                if (l.delivery_time) rows.push({ icon: <Truck className="w-3.5 h-3.5 text-teal-500" />, label: "Est. time", value: l.delivery_time });
+                if (!rows.length) return null;
+                return (
+                  <div className="mt-4 border-t border-stone-100 pt-3 space-y-2">
+                    {rows.map(r => (
+                      <div key={r.label} className="flex items-center gap-2">
+                        {r.icon}
+                        <span className="text-xs text-stone-400 w-20 flex-shrink-0">{r.label}</span>
+                        <span className="text-xs font-semibold text-stone-700">{r.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+
+              {/* Tags */}
+              {(() => {
+                const rawTags = (listing as any).tags as string | undefined;
+                if (!rawTags) return null;
+                const tags = rawTags.split(',').map((t: string) => t.trim()).filter(Boolean);
+                if (!tags.length) return null;
+                return (
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    {tags.map((tag: string) => (
+                      <span key={tag} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-teal-50 border border-teal-100 text-teal-700 text-xs font-medium">
+                        <Tag className="w-3 h-3" />{tag}
+                      </span>
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
 
             {/* ── VENDOR CARD ── */}

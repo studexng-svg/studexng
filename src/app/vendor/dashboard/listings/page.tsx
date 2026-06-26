@@ -17,6 +17,7 @@ export default function ListingsPage() {
     title: "", description: "", price: "", category: "",
     listing_type: "service", track_inventory: false,
     stock_quantity: 0, discount_percent: 0, images: Array(5).fill(null) as (File | null)[],
+    brand: "", condition: "", delivery_time: "", tags: "",
   });
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState("");
@@ -56,12 +57,16 @@ export default function ListingsPage() {
       stock_quantity: listing.stock_quantity || 0,
       discount_percent: listing.discount_percent || 0,
       images: Array(5).fill(null),
+      brand: listing.brand || "",
+      condition: listing.condition || "",
+      delivery_time: listing.delivery_time || "",
+      tags: listing.tags || "",
     });
     setShowForm(true);
   };
 
   const resetForm = () => {
-    setForm({ title: "", description: "", price: "", category: "", listing_type: "service", track_inventory: false, stock_quantity: 0, discount_percent: 0, images: Array(5).fill(null) });
+    setForm({ title: "", description: "", price: "", category: "", listing_type: "service", track_inventory: false, stock_quantity: 0, discount_percent: 0, images: Array(5).fill(null), brand: "", condition: "", delivery_time: "", tags: "" });
     setEditing(null);
     setShowForm(false);
   };
@@ -82,6 +87,10 @@ export default function ListingsPage() {
       fd.append("track_inventory", isInventoryType ? "true" : "false");
       fd.append("stock_quantity", isInventoryType ? form.stock_quantity.toString() : "0");
       fd.append("discount_percent", form.discount_percent.toString());
+      if (form.brand) fd.append("brand", form.brand);
+      if (form.condition) fd.append("condition", form.condition);
+      if (form.delivery_time) fd.append("delivery_time", form.delivery_time);
+      if (form.tags) fd.append("tags", form.tags);
       const slots = ['image', 'image2', 'image3', 'image4', 'image5'];
       form.images.forEach((file, i) => { if (file) fd.append(slots[i], file); });
 
@@ -231,6 +240,30 @@ export default function ListingsPage() {
                   className="w-20 bg-white border border-stone-200 rounded-lg px-3 py-2 text-stone-900 text-sm text-center focus:outline-none focus:border-teal-500" />
               </div>
             )}
+
+            {/* Extra details */}
+            <div className="border-t border-stone-100 pt-3 space-y-3">
+              <p className="text-xs text-stone-400 font-semibold uppercase tracking-wider">Extra details (optional)</p>
+              <div className="grid grid-cols-2 gap-3">
+                <input value={form.brand} onChange={e => setForm(f => ({ ...f, brand: e.target.value }))}
+                  placeholder="Brand (e.g. Samsung, Gucci)"
+                  className="bg-white border border-stone-200 rounded-xl px-4 py-3 text-stone-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 transition placeholder:text-stone-400" />
+                <select value={form.condition} onChange={e => setForm(f => ({ ...f, condition: e.target.value }))}
+                  className="bg-white border border-stone-200 rounded-xl px-4 py-3 text-stone-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 transition">
+                  <option value="">Condition</option>
+                  <option value="new">Brand New</option>
+                  <option value="fairly_used">Fairly Used</option>
+                  <option value="refurbished">Refurbished</option>
+                </select>
+              </div>
+              <input value={form.delivery_time} onChange={e => setForm(f => ({ ...f, delivery_time: e.target.value }))}
+                placeholder="Est. delivery / completion time (e.g. 15-20 mins, Same day)"
+                className="w-full bg-white border border-stone-200 rounded-xl px-4 py-3 text-stone-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 transition placeholder:text-stone-400" />
+              <input value={form.tags} onChange={e => setForm(f => ({ ...f, tags: e.target.value }))}
+                placeholder="Tags — comma separated (e.g. Authentic, Express, Handmade)"
+                className="w-full bg-white border border-stone-200 rounded-xl px-4 py-3 text-stone-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 transition placeholder:text-stone-400" />
+            </div>
+
             <div className="flex gap-3">
               <button onClick={handleSave} disabled={saving || !form.title || !form.price || !form.category}
                 className="flex-1 py-3 text-white disabled:opacity-40 rounded-full font-semibold text-sm transition active:scale-[0.98]"

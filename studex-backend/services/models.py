@@ -77,6 +77,25 @@ class Listing(models.Model):
         help_text="Vendor-set discount percentage (0 = no discount, 1-100 for a sale)"
     )
 
+    CONDITION_CHOICES = (
+        ('new', 'Brand New'),
+        ('fairly_used', 'Fairly Used'),
+        ('refurbished', 'Refurbished'),
+    )
+    brand = models.CharField(max_length=100, blank=True, default='')
+    condition = models.CharField(
+        max_length=20, choices=CONDITION_CHOICES, blank=True, default='',
+        help_text="Condition of the item (mainly for physical products)"
+    )
+    delivery_time = models.CharField(
+        max_length=100, blank=True, default='',
+        help_text="Estimated delivery or completion time, e.g. '15-20 mins', '1-2 days'"
+    )
+    tags = models.CharField(
+        max_length=300, blank=True, default='',
+        help_text="Comma-separated keywords, e.g. 'Authentic, Handmade, Express'"
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
