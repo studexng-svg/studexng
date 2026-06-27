@@ -158,7 +158,7 @@ export default function LayoutClient({ children }: { children: React.ReactNode }
       <ThemeProvider>
         <NotificationProvider>
           <CartWishlistSync />
-          {!hideHeader && <SiteHeader />}
+          {/* SiteHeader removed — TopNav handles all non-home pages on all screen sizes */}
           <main
             className={
               hideNav

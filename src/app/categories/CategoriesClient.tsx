@@ -92,8 +92,7 @@ export default function CategoriesClient({ categories }: { categories: Category[
         <div className="mt-5 flex items-center gap-2 px-5">
           <button
             onClick={() => scrollChips("left")}
-            className="flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center shadow-md transition-opacity hover:opacity-90 active:scale-95"
-            style={{ background: "linear-gradient(135deg,#0D9488 0%,#7C3AED 100%)" }}
+            className="flex-shrink-0 w-10 h-10 rounded-xl bg-stone-900 flex items-center justify-center shadow-md hover:bg-stone-700 transition-colors active:scale-95"
           >
             <ChevronLeft className="w-5 h-5 text-white" />
           </button>
@@ -134,8 +133,7 @@ export default function CategoriesClient({ categories }: { categories: Category[
 
           <button
             onClick={() => scrollChips("right")}
-            className="flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center shadow-md transition-opacity hover:opacity-90 active:scale-95"
-            style={{ background: "linear-gradient(135deg,#0D9488 0%,#7C3AED 100%)" }}
+            className="flex-shrink-0 w-10 h-10 rounded-xl bg-stone-900 flex items-center justify-center shadow-md hover:bg-stone-700 transition-colors active:scale-95"
           >
             <ChevronRight className="w-5 h-5 text-white" />
           </button>
