@@ -415,13 +415,13 @@ export default function LandingClient({ initialListings }: { initialListings: an
                           </div>
                         </div>
 
-                        {/* Screenshot 1 — app header through filter tabs */}
-                        <div className="overflow-hidden flex-shrink-0" style={{ height: "300px" }}>
+                        {/* Screenshot 1 — header through filter tabs (stop before bottom nav) */}
+                        <div className="overflow-hidden flex-shrink-0" style={{ height: "265px" }}>
                           <img src="/images/app-screen-1.png" alt="StudEx home" className="w-full block" loading="lazy" />
                         </div>
 
-                        {/* Screenshot 2 — listing cards */}
-                        <div className="overflow-hidden flex-shrink-0" style={{ height: "220px" }}>
+                        {/* Screenshot 2 — listing cards only (stop before bottom nav) */}
+                        <div className="overflow-hidden flex-shrink-0" style={{ height: "195px" }}>
                           <img src="/images/app-screen-2.png" alt="StudEx listings" className="w-full block" loading="lazy" />
                         </div>
 
