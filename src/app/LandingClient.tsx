@@ -354,59 +354,108 @@ export default function LandingClient({ initialListings }: { initialListings: an
                 </motion.div>
               </div>
 
-              {/* ── RIGHT — Phone mockup ── */}
+              {/* ── RIGHT — iPhone 17 Pro Max mockup ── */}
               <motion.div initial={{ opacity: 0, x: 40 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.7, delay: 0.2 }}
-                className="relative flex-shrink-0 lg:mr-16">
+                className="relative flex-shrink-0 lg:mr-20">
 
-                {/* Phone */}
-                <div className="relative w-[230px] md:w-[250px]">
-                  <div className="bg-stone-900 rounded-[36px] p-[5px] shadow-2xl ring-1 ring-stone-700">
-                    <div className="bg-white rounded-[31px] overflow-hidden">
+                {/* Phone frame */}
+                <div className="relative w-[270px] md:w-[290px]">
 
-                      {/* Awning */}
-                      <div className="relative h-14 overflow-hidden flex flex-col justify-end" style={{ background: TEAL }}>
-                        <div className="absolute inset-0"
-                          style={{ backgroundImage: `repeating-linear-gradient(90deg, transparent 0px, transparent 14px, rgba(255,255,255,0.35) 14px, rgba(255,255,255,0.35) 24px)` }} />
-                        <div className="absolute top-2.5 left-0 right-0 flex items-center justify-center">
-                          <span className="text-white text-[10px] font-black tracking-wider z-10">🏪 StudEx Store</span>
+                  {/* Side buttons */}
+                  <div className="absolute left-[-4px] top-[90px] w-[4px] h-6 rounded-l-full" style={{ background: "linear-gradient(to right, #4B5563, #374151)" }} />
+                  <div className="absolute left-[-4px] top-[124px] w-[4px] h-9 rounded-l-full" style={{ background: "linear-gradient(to right, #4B5563, #374151)" }} />
+                  <div className="absolute left-[-4px] top-[170px] w-[4px] h-9 rounded-l-full" style={{ background: "linear-gradient(to right, #4B5563, #374151)" }} />
+                  <div className="absolute right-[-4px] top-[140px] w-[4px] h-14 rounded-r-full" style={{ background: "linear-gradient(to left, #4B5563, #374151)" }} />
+
+                  {/* Titanium outer shell */}
+                  <div className="rounded-[54px] p-[3px]"
+                    style={{ background: "linear-gradient(145deg, #6B7280 0%, #374151 40%, #1F2937 70%, #4B5563 100%)", boxShadow: "0 40px 80px -15px rgba(0,0,0,0.55), 0 0 0 0.5px rgba(255,255,255,0.12) inset" }}>
+
+                    {/* Inner black bezel */}
+                    <div className="bg-stone-950 rounded-[51px] p-[5px]">
+
+                      {/* Screen glass */}
+                      <div className="bg-white rounded-[46px] overflow-hidden flex flex-col">
+
+                        {/* Status bar + Dynamic Island */}
+                        <div className="relative bg-white flex items-center justify-between px-6 pt-3 pb-1 flex-shrink-0">
+                          {/* Dynamic Island */}
+                          <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10 flex items-center justify-center gap-1.5 bg-stone-950 rounded-full"
+                            style={{ width: "96px", height: "28px" }}>
+                            <div className="w-2 h-2 rounded-full bg-stone-700" />
+                            <div className="w-1.5 h-1.5 rounded-full bg-stone-700 opacity-60" />
+                          </div>
+                          <span className="text-[10px] font-semibold text-stone-900 tabular-nums">9:41</span>
+                          <div className="flex items-center gap-1.5">
+                            {/* Signal bars */}
+                            <div className="flex items-end gap-[2px] h-3">
+                              {[3, 4, 5, 6].map(h => <div key={h} className="w-[2px] bg-stone-900 rounded-[1px]" style={{ height: `${h}px` }} />)}
+                            </div>
+                            {/* WiFi */}
+                            <svg width="13" height="10" viewBox="0 0 13 10" fill="none">
+                              <path d="M0.5 3.5C2.3 1.5 4.3 0.5 6.5 0.5S10.7 1.5 12.5 3.5" stroke="#111827" strokeWidth="1.3" strokeLinecap="round"/>
+                              <path d="M2.5 5.8C3.7 4.7 5 4 6.5 4S9.3 4.7 10.5 5.8" stroke="#111827" strokeWidth="1.3" strokeLinecap="round"/>
+                              <circle cx="6.5" cy="8.5" r="1.2" fill="#111827"/>
+                            </svg>
+                            {/* Battery */}
+                            <div className="flex items-center gap-[1px]">
+                              <div className="w-[18px] h-[9px] rounded-[2px] border border-stone-900 relative overflow-hidden">
+                                <div className="absolute inset-[1px] rounded-[1px]" style={{ width: "80%", background: "#111827" }} />
+                              </div>
+                              <div className="w-[2px] h-[5px] rounded-r-sm bg-stone-900 opacity-60" />
+                            </div>
+                          </div>
                         </div>
-                        {/* Scalloped valance */}
-                        <div className="flex h-4 relative z-10">
-                          {Array.from({ length: 9 }).map((_, i) => (
-                            <div key={i} className="flex-1 relative overflow-hidden">
-                              <div className="absolute -top-3 left-0 right-0 mx-0.5 h-5 bg-white rounded-full" />
+
+                        {/* Awning */}
+                        <div className="relative h-16 overflow-hidden flex flex-col justify-end flex-shrink-0" style={{ background: TEAL }}>
+                          <div className="absolute inset-0"
+                            style={{ backgroundImage: `repeating-linear-gradient(90deg, transparent 0px, transparent 16px, rgba(255,255,255,0.3) 16px, rgba(255,255,255,0.3) 26px)` }} />
+                          <div className="absolute top-3 left-0 right-0 flex items-center justify-center">
+                            <span className="text-white text-[11px] font-black tracking-wider z-10">🏪 StudEx Store</span>
+                          </div>
+                          {/* Scalloped valance */}
+                          <div className="flex h-5 relative z-10">
+                            {Array.from({ length: 10 }).map((_, i) => (
+                              <div key={i} className="flex-1 relative overflow-hidden">
+                                <div className="absolute -top-3 left-0 right-0 mx-0.5 h-6 bg-white rounded-full" />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* 2×3 product grid */}
+                        <div className="grid grid-cols-2 gap-px bg-stone-100 flex-1">
+                          {[l[0], l[1], l[2], l[3], l[4], l[5]].map((item, i) => (
+                            <div key={i} className="aspect-square overflow-hidden bg-stone-50">
+                              {item?.image?.startsWith("http") ? (
+                                <img src={item.image} alt={item?.title ?? ""} className="w-full h-full object-cover" loading="lazy" />
+                              ) : (
+                                <div className="w-full h-full bg-stone-100 animate-pulse" />
+                              )}
                             </div>
                           ))}
                         </div>
-                      </div>
 
-                      {/* 2×2 product grid */}
-                      <div className="grid grid-cols-2 gap-px bg-stone-100">
-                        {[l[0], l[1], l[2], l[3]].map((item, i) => (
-                          <div key={i} className="aspect-square overflow-hidden bg-stone-50">
-                            {item?.image?.startsWith("http") ? (
-                              <img src={item.image} alt={item?.title ?? ""} className="w-full h-full object-cover" loading="lazy" />
-                            ) : (
-                              <div className="w-full h-full bg-stone-100 animate-pulse" />
-                            )}
-                          </div>
-                        ))}
-                      </div>
+                        {/* Bottom CTA bar */}
+                        <div className="px-5 py-3 flex items-center justify-between flex-shrink-0" style={{ background: TEAL }}>
+                          <span className="text-white text-xs font-black tracking-widest">SHOP NOW</span>
+                          <ArrowRight className="w-4 h-4 text-white" />
+                        </div>
 
-                      {/* Bottom CTA bar */}
-                      <div className="px-4 py-3 flex items-center justify-between" style={{ background: TEAL }}>
-                        <span className="text-white text-xs font-black tracking-widest">SHOP NOW</span>
-                        <ArrowRight className="w-4 h-4 text-white" />
+                        {/* Home indicator */}
+                        <div className="bg-white pb-2 pt-1.5 flex justify-center flex-shrink-0">
+                          <div className="w-28 h-[5px] bg-stone-900 rounded-full opacity-20" />
+                        </div>
+
                       </div>
                     </div>
                   </div>
-                  {/* Camera notch */}
-                  <div className="absolute top-[7px] left-1/2 -translate-x-1/2 w-10 h-1.5 bg-stone-700 rounded-full" />
                 </div>
 
                 {/* Floating badges — desktop only */}
                 <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.6, duration: 0.4 }}
-                  className="hidden lg:flex absolute -right-2 top-6 items-center gap-2 bg-white rounded-2xl px-3 py-2 shadow-lg border border-stone-100"
+                  className="hidden lg:flex absolute -right-2 top-10 items-center gap-2 bg-white rounded-2xl px-3 py-2 shadow-lg border border-stone-100"
                   style={{ transform: "translateX(110%)" }}>
                   <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: TEAL }}>
                     <ShieldCheck className="w-4 h-4 text-white" />
@@ -418,8 +467,8 @@ export default function LandingClient({ initialListings }: { initialListings: an
                 </motion.div>
 
                 <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.7, duration: 0.4 }}
-                  className="hidden lg:flex absolute -right-2 top-1/2 -translate-y-1/2 items-center gap-2 bg-white rounded-2xl px-3 py-2 shadow-lg border border-stone-100"
-                  style={{ transform: "translateX(110%) translateY(-50%)" }}>
+                  className="hidden lg:flex absolute -right-2 top-[42%] items-center gap-2 bg-white rounded-2xl px-3 py-2 shadow-lg border border-stone-100"
+                  style={{ transform: "translateX(110%)" }}>
                   <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "#F59E0B" }}>
                     <MapPin className="w-4 h-4 text-white" />
                   </div>
@@ -430,7 +479,7 @@ export default function LandingClient({ initialListings }: { initialListings: an
                 </motion.div>
 
                 <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.8, duration: 0.4 }}
-                  className="hidden lg:flex absolute -right-2 bottom-16 items-center gap-2 bg-white rounded-2xl px-3 py-2 shadow-lg border border-stone-100"
+                  className="hidden lg:flex absolute -right-2 bottom-20 items-center gap-2 bg-white rounded-2xl px-3 py-2 shadow-lg border border-stone-100"
                   style={{ transform: "translateX(110%)" }}>
                   <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: PURPLE }}>
                     <Tag className="w-4 h-4 text-white" />
@@ -442,7 +491,7 @@ export default function LandingClient({ initialListings }: { initialListings: an
                 </motion.div>
 
                 <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.65, duration: 0.4 }}
-                  className="hidden lg:flex absolute -left-2 top-12 items-center gap-2 bg-white rounded-2xl px-3 py-2 shadow-lg border border-stone-100"
+                  className="hidden lg:flex absolute -left-2 top-16 items-center gap-2 bg-white rounded-2xl px-3 py-2 shadow-lg border border-stone-100"
                   style={{ transform: "translateX(-110%)" }}>
                   <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 bg-amber-400">
                     <Star className="w-4 h-4 text-white fill-white" />
