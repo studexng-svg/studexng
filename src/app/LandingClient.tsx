@@ -4,8 +4,9 @@ import { motion } from "framer-motion";
 import {
   Search, ShieldCheck, Zap, Star, Heart,
   GraduationCap, Store, Package, MessageSquare, LayoutDashboard,
+  ChevronLeft, ChevronRight,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Script from "next/script";
 import Link from "next/link";
@@ -100,36 +101,48 @@ function TestimonialCard({ review }: { review: typeof reviews[0] }) {
   );
 }
 
+function ScrollRow({ items }: { items: typeof reviews }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const scroll = (dir: "left" | "right") =>
+    ref.current?.scrollBy({ left: dir === "left" ? -320 : 320, behavior: "smooth" });
+
+  return (
+    <div className="relative group">
+      {/* Left arrow */}
+      <button
+        onClick={() => scroll("left")}
+        className="hidden sm:flex absolute left-0 top-1/2 -translate-y-1/2 -translate-x-3 z-10 w-9 h-9 bg-white border border-stone-200 shadow-md rounded-full items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-stone-50"
+      >
+        <ChevronLeft className="w-4 h-4 text-stone-600" />
+      </button>
+
+      <div
+        ref={ref}
+        className="flex gap-4 overflow-x-auto pb-2"
+        style={{ scrollbarWidth: "none", msOverflowStyle: "none" } as React.CSSProperties}
+      >
+        {items.map((r, i) => <TestimonialCard key={i} review={r} />)}
+      </div>
+
+      {/* Right arrow */}
+      <button
+        onClick={() => scroll("right")}
+        className="hidden sm:flex absolute right-0 top-1/2 -translate-y-1/2 translate-x-3 z-10 w-9 h-9 bg-white border border-stone-200 shadow-md rounded-full items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-stone-50"
+      >
+        <ChevronRight className="w-4 h-4 text-stone-600" />
+      </button>
+    </div>
+  );
+}
+
 function TestimonialMarquee() {
   const half = Math.ceil(reviews.length / 2);
   const row1 = reviews.slice(0, half);
   const row2 = reviews.slice(half);
   return (
-    <div className="relative overflow-hidden">
-      <style>{`
-        @keyframes marquee-left {
-          from { transform: translateX(0); }
-          to   { transform: translateX(-50%); }
-        }
-        @keyframes marquee-right {
-          from { transform: translateX(-50%); }
-          to   { transform: translateX(0); }
-        }
-        .marquee-left  { animation: marquee-left  70s linear infinite; }
-        .marquee-right { animation: marquee-right 80s linear infinite; }
-        .marquee-left:hover,
-        .marquee-right:hover { animation-play-state: paused; }
-      `}</style>
-
-      {/* Row 1 — scrolls left, pauses on hover */}
-      <div className="marquee-left flex gap-4 mb-4" style={{ width: "max-content" }}>
-        {[...row1, ...row1].map((r, i) => <TestimonialCard key={i} review={r} />)}
-      </div>
-
-      {/* Row 2 — scrolls right, pauses on hover independently */}
-      <div className="marquee-right flex gap-4" style={{ width: "max-content" }}>
-        {[...row2, ...row2].map((r, i) => <TestimonialCard key={i} review={r} />)}
-      </div>
+    <div className="space-y-4">
+      <ScrollRow items={row1} />
+      <ScrollRow items={row2} />
     </div>
   );
 }
