@@ -262,7 +262,7 @@ export default function VendorProfilePage() {
               {/* Name / bio / actions */}
               <div className="min-w-0">
                 <div className="flex items-center gap-3 flex-wrap">
-                  <h1 className="text-3xl lg:text-4xl font-black text-stone-900 [overflow-wrap:anywhere] leading-tight" style={SERIF}>
+                  <h1 className="text-3xl lg:text-4xl font-black text-stone-900 [overflow-wrap:anywhere] leading-tight" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                     {vendor.business_name || vendor.username}
                   </h1>
                   {badge && (

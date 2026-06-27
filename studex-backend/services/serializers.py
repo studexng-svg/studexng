@@ -42,8 +42,11 @@ class ListingVendorSerializer(serializers.ModelSerializer):
             img = obj.profile_image
             name = getattr(img, 'name', None)
             if name and 'default' not in name:
-                request = self.context.get('request')
                 url = img.url
+                # Cloudinary and other CDN URLs are already absolute
+                if url.startswith('http'):
+                    return url
+                request = self.context.get('request')
                 if request:
                     return request.build_absolute_uri(url)
                 return url
