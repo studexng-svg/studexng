@@ -327,7 +327,7 @@ export default function AuthPage() {
   const flipToLogin = () => { setIsFlipped(false); setStep(1); setMessage(""); setOtp(""); };
 
   if (!mounted) return (
-    <div className="min-h-screen bg-[#FAFAF9] flex items-center justify-center">
+    <div className="min-h-screen bg-[#F5F5F5] flex items-center justify-center">
       <div className="w-10 h-10 border-4 border-stone-200 border-t-teal-500 rounded-full animate-spin" />
     </div>
   );
@@ -336,7 +336,7 @@ export default function AuthPage() {
     // FIX 1: Replaced pb-24 md:pb-4 with py-8 so content isn't pushed under the bottom nav.
     // Added overflow-y-auto so the page itself scrolls if the viewport is short.
     <div
-      className="min-h-screen bg-[#FAFAF9] flex items-start justify-center p-4 py-16 relative overflow-x-hidden overflow-y-auto"
+      className="min-h-screen bg-[#F5F5F5] flex items-start justify-center p-4 py-16 relative overflow-x-hidden overflow-y-auto"
       style={{ fontFamily: "'DM Sans', sans-serif" }}
     >
 
@@ -389,7 +389,7 @@ export default function AuthPage() {
                 </div>
                 <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold mb-1">StudEx</p>
                 <h1 className="text-2xl font-bold text-stone-900"
-                  style={SERIF}>
+                  style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                   {isForgotPassword ? "Reset Password" : "Welcome Back"}
                 </h1>
                 <p className="text-sm text-stone-400 mt-1">
@@ -406,7 +406,7 @@ export default function AuthPage() {
                         <Mail className="w-8 h-8 text-teal-600" />
                       </div>
                       <div>
-                        <h3 className="text-lg font-bold text-stone-900" style={SERIF}>Check your inbox!</h3>
+                        <h3 className="text-lg font-bold text-stone-900" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Check your inbox!</h3>
                         <p className="text-sm text-stone-400 mt-1">We sent a reset link to</p>
                         <p className="font-semibold text-teal-600 mt-0.5 text-sm">{resetEmail}</p>
                         <p className="text-xs text-stone-400 mt-2">Can&apos;t find it? Check your spam or junk folder.</p>
@@ -536,7 +536,7 @@ export default function AuthPage() {
                 </div>
                 <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold mb-1">StudEx</p>
                 <h1 className="text-2xl font-bold text-stone-900"
-                  style={SERIF}>
+                  style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                   {step === 1 ? "Create Account" : "Verify Email"}
                 </h1>
                 <p className="text-sm text-stone-400 mt-1">

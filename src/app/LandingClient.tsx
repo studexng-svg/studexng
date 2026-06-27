@@ -67,7 +67,7 @@ function TestimonialCard({ review }: { review: typeof reviews[0] }) {
   const [liked, setLiked] = useState(false);
   const [count, setCount] = useState(Math.floor(review.name.charCodeAt(0) % 30) + 4);
   return (
-    <div className="w-[300px] flex-shrink-0 bg-white rounded-2xl shadow-sm border border-stone-100 p-5 select-none transition-all duration-200 hover:scale-[1.04] hover:shadow-xl hover:border-stone-200 cursor-default">
+    <div className="w-[300px] flex-shrink-0 bg-white rounded-2xl shadow-md border border-stone-100 p-5 select-none transition-all duration-200 hover:scale-[1.04] hover:shadow-xl hover:border-stone-200 cursor-default">
       <div className="flex items-center gap-3 mb-3">
         <div
           className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
