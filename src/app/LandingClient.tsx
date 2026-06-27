@@ -68,7 +68,7 @@ function TestimonialCard({ review }: { review: typeof reviews[0] }) {
   const [liked, setLiked] = useState(false);
   const [count, setCount] = useState(Math.floor(review.name.charCodeAt(0) % 30) + 4);
   return (
-    <div className="w-[300px] flex-shrink-0 bg-white rounded-2xl shadow-md border border-stone-100 p-5 select-none transition-all duration-200 hover:scale-[1.04] hover:shadow-xl hover:border-stone-200 cursor-default">
+    <div className="w-full bg-white rounded-2xl shadow-md border border-stone-100 p-5 select-none transition-all duration-200 hover:scale-[1.04] hover:shadow-xl hover:border-stone-200 cursor-default">
       <div className="flex items-center gap-3 mb-3">
         <div
           className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
@@ -101,16 +101,25 @@ function TestimonialCard({ review }: { review: typeof reviews[0] }) {
   );
 }
 
+const FEATURED_REVIEWS = [
+  reviews[0],  // Valerie — PAU
+  reviews[2],  // Kachi — FUTO
+  reviews[6],  // Lolope & Nonye — PAU
+  reviews[7],  // Sommy — FUTO
+  reviews[13], // Adaeze — FUTO
+  reviews[14], // Zara — PAU
+];
+
 function TestimonialGrid() {
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 px-5 max-w-7xl mx-auto">
-      {reviews.map((review, i) => (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 px-5 max-w-5xl mx-auto">
+      {FEATURED_REVIEWS.map((review, i) => (
         <motion.div
           key={i}
           animate={{ opacity: [1, 0.28, 1] }}
           transition={{
-            duration: 2.8 + (i % 4) * 0.6,
-            delay: i * 0.22,
+            duration: 2.8 + (i % 3) * 0.7,
+            delay: i * 0.35,
             repeat: Infinity,
             ease: "easeInOut",
           }}
