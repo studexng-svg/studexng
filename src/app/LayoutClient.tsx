@@ -162,8 +162,8 @@ export default function LayoutClient({ children }: { children: React.ReactNode }
           <main
             className={
               hideNav
-                ? "min-h-screen bg-[#FFF8F0] dark:bg-gray-950"
-                : "min-h-screen bg-[#FFF8F0] dark:bg-gray-950 pb-28"
+                ? "min-h-screen bg-[#F5F5F5] dark:bg-gray-950"
+                : "min-h-screen bg-[#F5F5F5] dark:bg-gray-950 pb-28"
             }
           >
             {children}

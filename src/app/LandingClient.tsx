@@ -336,38 +336,42 @@ export default function LandingClient({ initialListings }: { initialListings: an
             </div>
           </motion.div>
 
-          {/* ── Mobile image strips (full-height columns left + right) ── */}
-          <div className="lg:hidden absolute inset-y-0 left-0 w-[62px] flex flex-col gap-1.5 py-3 px-1.5 z-0">
-            {[l[0], l[1], l[2], l[3]].map((listing, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.25 + i * 0.08, duration: 0.5 }}
-                className="rounded-xl overflow-hidden flex-1 shadow-md border border-stone-100 min-h-0"
-              >
-                {listing?.image
-                  ? <img src={listing.image} alt="" className="w-full h-full object-cover" />
-                  : <div className="w-full h-full bg-stone-200 animate-pulse" />}
-              </motion.div>
-            ))}
-          </div>
-          <div className="lg:hidden absolute inset-y-0 right-0 w-[62px] flex flex-col gap-1.5 py-3 px-1.5 z-0">
-            {[l[4], l[5], l[6], l[7]].map((listing, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.25 + i * 0.08, duration: 0.5 }}
-                className="rounded-xl overflow-hidden flex-1 shadow-md border border-stone-100 min-h-0"
-              >
-                {listing?.image
-                  ? <img src={listing.image} alt="" className="w-full h-full object-cover" />
-                  : <div className="w-full h-full bg-stone-200 animate-pulse" />}
-              </motion.div>
-            ))}
-          </div>
+          {/* ── Mobile corner images (4 corners, lg:hidden) ── */}
+          {l[0]?.image && (
+            <motion.div initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.3, duration: 0.5 }}
+              className="lg:hidden absolute top-4 left-3 w-[96px] rounded-2xl overflow-hidden shadow-lg border border-stone-100 z-0"
+              style={{ rotate: "-4deg" } as any}>
+              <img src={l[0].image} alt="" className="w-full aspect-[3/4] object-cover" />
+            </motion.div>
+          )}
+          {l[2]?.image && (
+            <motion.div initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.4, duration: 0.5 }}
+              className="lg:hidden absolute top-4 right-3 w-[96px] rounded-2xl overflow-hidden shadow-lg border border-stone-100 z-0"
+              style={{ rotate: "4deg" } as any}>
+              <img src={l[2].image} alt="" className="w-full aspect-[3/4] object-cover" />
+            </motion.div>
+          )}
+          {l[5]?.image && (
+            <motion.div initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.5, duration: 0.5 }}
+              className="lg:hidden absolute bottom-4 left-3 w-[96px] rounded-2xl overflow-hidden shadow-lg border border-stone-100 z-0"
+              style={{ rotate: "3deg" } as any}>
+              <img src={l[5].image} alt="" className="w-full aspect-[3/4] object-cover" />
+            </motion.div>
+          )}
+          {l[7]?.image && (
+            <motion.div initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.6, duration: 0.5 }}
+              className="lg:hidden absolute bottom-4 right-3 w-[96px] rounded-2xl overflow-hidden shadow-lg border border-stone-100 z-0"
+              style={{ rotate: "-3deg" } as any}>
+              <img src={l[7].image} alt="" className="w-full aspect-[3/4] object-cover" />
+            </motion.div>
+          )}
 
           {/* ── Center content ── */}
-          <div className="relative z-10 w-full max-w-2xl mx-auto text-center px-[46px] lg:px-0">
+          <div className="relative z-10 max-w-2xl mx-auto text-center">
 
             {/* Logo badge */}
             <motion.div
@@ -384,7 +388,7 @@ export default function LandingClient({ initialListings }: { initialListings: an
             <motion.h1
               initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.05 }}
-              className="text-[1.9rem] leading-snug lg:text-7xl font-extrabold tracking-tight mb-4"
+              className="text-4xl md:text-5xl lg:text-7xl font-extrabold leading-tight tracking-tight mb-4"
               style={JK}
             >
               <span className="text-stone-900">Buy, book &amp; order</span>
@@ -408,12 +412,12 @@ export default function LandingClient({ initialListings }: { initialListings: an
               className="flex flex-wrap justify-center gap-3 mb-8"
             >
               <Link href="/auth">
-                <button className="px-5 py-3 lg:px-7 lg:py-3.5 text-white font-semibold rounded-full shadow-md hover:opacity-90 transition text-sm lg:text-base" style={{ background: GRAD }}>
+                <button className="px-7 py-3.5 text-white font-semibold rounded-full shadow-md hover:opacity-90 transition" style={{ background: GRAD }}>
                   Start Ordering
                 </button>
               </Link>
               <Link href="/home">
-                <button className="px-5 py-3 lg:px-7 lg:py-3.5 text-stone-700 font-semibold rounded-full border border-stone-300 bg-white hover:bg-stone-50 transition text-sm lg:text-base">
+                <button className="px-7 py-3.5 text-stone-700 font-semibold rounded-full border border-stone-300 bg-white hover:bg-stone-50 transition">
                   Browse Services
                 </button>
               </Link>
@@ -520,7 +524,7 @@ export default function LandingClient({ initialListings }: { initialListings: an
               </div>
 
               {/* Mini listing grid */}
-              <div className="bg-[#FFF8F0] p-4">
+              <div className="bg-[#F5F5F5] p-4">
                 {l.length > 0 ? (
                   <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
                     {l.slice(0, 6).map((listing: any) => (
