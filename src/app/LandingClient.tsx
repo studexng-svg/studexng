@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import {
   Search, ShieldCheck, Zap, Star, Heart,
   GraduationCap, Store, Package, MessageSquare, LayoutDashboard,
-  ChevronLeft, ChevronRight,
+  ChevronLeft, ChevronRight, ArrowRight, MapPin, Tag,
 } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
@@ -283,220 +283,179 @@ export default function LandingClient({ initialListings }: { initialListings: an
         </nav>
 
         {/* ── HERO ──────────────────────────────────────────── */}
-        <section
-          style={DOT_BG}
-          className="relative overflow-hidden flex items-center justify-center min-h-[680px] md:min-h-[760px] py-16 px-5"
-        >
-          {/* ── Floating cards — absolutely positioned in all 4 corners on desktop ── */}
+        <section className="relative overflow-hidden bg-white min-h-[680px] flex items-center py-14 px-5">
 
-          {/* TOP-LEFT: listing card stack */}
-          <motion.div
-            initial={{ opacity: 0, x: -30, y: -10 }}
-            animate={{ opacity: 1, x: 0, y: 0 }}
-            transition={{ delay: 0.3, duration: 0.7, ease: "easeOut" }}
-            className="absolute top-10 left-[2%] xl:left-[6%] hidden lg:block w-52"
-            style={{ rotate: "-3deg" } as any}
-          >
-            <div className="bg-white rounded-2xl shadow-lg border border-stone-100 overflow-hidden">
-              <div className="px-3 pt-3 pb-1">
-                <p className="text-[10px] font-bold text-stone-400 uppercase tracking-wide mb-1">Featured</p>
-              </div>
-              {l[0] && <MiniListingCard listing={l[0]} />}
-              {l[1] && <MiniListingCard listing={l[1]} />}
-              <div className="mx-3 mb-3 mt-1">
-                <div className="h-px bg-stone-100 mb-2" />
-                <span className="text-[10px] font-semibold" style={GRAD_TEXT}>View all listings →</span>
-              </div>
-            </div>
-          </motion.div>
+          {/* Background blobs */}
+          <div className="absolute inset-0 pointer-events-none overflow-hidden">
+            <div className="absolute -top-24 -right-24 w-[480px] h-[480px] rounded-full"
+              style={{ background: "radial-gradient(circle, #FDE68A44 0%, #FCA5A530 50%, transparent 70%)" }} />
+            <div className="absolute -bottom-28 -left-28 w-[420px] h-[420px] rounded-full"
+              style={{ background: "radial-gradient(circle, #99F6E430 0%, #5EEAD420 50%, transparent 70%)" }} />
+            <div className="absolute top-1/2 left-[30%] w-[260px] h-[260px] rounded-full"
+              style={{ background: "radial-gradient(circle, #E7E5E420 0%, transparent 70%)" }} />
+          </div>
 
-          {/* TOP-RIGHT: single listing + vendor badge */}
-          <motion.div
-            initial={{ opacity: 0, x: 30, y: -10 }}
-            animate={{ opacity: 1, x: 0, y: 0 }}
-            transition={{ delay: 0.4, duration: 0.7, ease: "easeOut" }}
-            className="absolute top-10 right-[2%] xl:right-[6%] hidden lg:block w-48"
-            style={{ rotate: "2.5deg" } as any}
-          >
-            {l[2] ? (
-              <div className="bg-white rounded-2xl shadow-lg border border-stone-100 overflow-hidden">
-                <img src={l[2].image} alt={l[2].title} className="w-full h-28 object-cover" />
-                <div className="p-3">
-                  <p className="text-xs font-bold text-stone-900 line-clamp-1">{l[2].title}</p>
-                  <div className="flex items-center justify-between mt-1.5">
-                    <span className="text-[10px] font-semibold" style={GRAD_TEXT}>₦{Number(l[2].price ?? 0).toLocaleString()}</span>
-                    <span className="text-[10px] text-stone-400 flex items-center gap-0.5">
-                      <Star className="w-2.5 h-2.5 fill-amber-400 text-amber-400" /> 4.9
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="bg-white rounded-2xl shadow-lg border border-stone-100 p-3">
-                <div className="w-full h-24 rounded-xl bg-stone-100 animate-pulse mb-2" />
-                <div className="h-3 bg-stone-100 rounded animate-pulse" />
-              </div>
-            )}
-          </motion.div>
+          <div className="relative z-10 max-w-6xl mx-auto w-full">
+            <div className="flex flex-col lg:flex-row items-center gap-10 lg:gap-16">
 
-          {/* BOTTOM-LEFT: mini listing grid */}
-          <motion.div
-            initial={{ opacity: 0, x: -30, y: 10 }}
-            animate={{ opacity: 1, x: 0, y: 0 }}
-            transition={{ delay: 0.5, duration: 0.7, ease: "easeOut" }}
-            className="absolute bottom-10 left-[2%] xl:left-[6%] hidden lg:block w-52"
-            style={{ rotate: "2deg" } as any}
-          >
-            <div className="bg-white rounded-2xl shadow-lg border border-stone-100 p-3">
-              <p className="text-[10px] font-bold text-stone-400 uppercase tracking-wide mb-2">Just listed</p>
-              <div className="grid grid-cols-2 gap-1.5">
-                {[l[3], l[4], l[5], l[6]].map((listing, i) => (
-                  listing ? (
-                    <div key={i} className="rounded-xl overflow-hidden bg-stone-50 border border-stone-100">
-                      <img src={listing.image} alt={listing.title} className="w-full aspect-square object-cover" />
+              {/* ── LEFT ── */}
+              <div className="flex-1 text-center lg:text-left">
+
+                <motion.p initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}
+                  className="text-xs font-bold tracking-[0.22em] uppercase mb-3" style={{ color: TEAL }}>
+                  CAMPUS SHOPPING
+                </motion.p>
+
+                <motion.h1 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.05 }}
+                  className="text-5xl md:text-6xl lg:text-[68px] font-black leading-[1.04] tracking-tight mb-5" style={JK}>
+                  <span className="text-stone-900">Your Campus</span>
+                  <br />
+                  <span style={{ color: TEAL }}>Marketplace</span>
+                </motion.h1>
+
+                <motion.p initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.1 }}
+                  className="text-stone-500 text-lg leading-relaxed max-w-md mx-auto lg:mx-0 mb-8">
+                  Verified campus vendors — food, products, services, tech and more. All escrow-protected. Fast campus delivery.
+                </motion.p>
+
+                <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.15 }}
+                  className="flex flex-wrap justify-center lg:justify-start gap-3 mb-8">
+                  <Link href="/auth">
+                    <button className="px-8 py-4 text-white font-bold rounded-full shadow-md hover:opacity-90 transition text-[15px] flex items-center gap-2" style={{ background: TEAL }}>
+                      Start Shopping <ArrowRight className="w-4 h-4" />
+                    </button>
+                  </Link>
+                  <Link href="/home">
+                    <button className="px-8 py-4 text-stone-700 font-semibold rounded-full border-2 border-stone-200 bg-white hover:bg-stone-50 transition text-[15px]">
+                      Browse Services
+                    </button>
+                  </Link>
+                </motion.div>
+
+                {/* Stats */}
+                <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.2 }}
+                  className="flex flex-wrap justify-center lg:justify-start gap-8 mb-6">
+                  {[{ v: "70+", l: "Vendors" }, { v: "320+", l: "Listings" }, { v: "3", l: "Campuses" }].map(s => (
+                    <div key={s.l} className="text-center lg:text-left">
+                      <p className="text-2xl font-black text-stone-900" style={JK}>{s.v}</p>
+                      <p className="text-xs text-stone-400 font-medium">{s.l}</p>
                     </div>
-                  ) : (
-                    <div key={i} className="rounded-xl bg-stone-100 animate-pulse aspect-square" />
-                  )
-                ))}
-              </div>
-              <div className="mt-2.5 flex items-center justify-between">
-                <span className="text-[10px] text-stone-400">53+ services available</span>
-                <div className="w-5 h-5 rounded-full flex items-center justify-center" style={{ background: TEAL }}>
-                  <span className="text-white text-[8px] font-bold">→</span>
-                </div>
-              </div>
-            </div>
-          </motion.div>
+                  ))}
+                </motion.div>
 
-          {/* BOTTOM-RIGHT: secure payment + campus card */}
-          <motion.div
-            initial={{ opacity: 0, x: 30, y: 10 }}
-            animate={{ opacity: 1, x: 0, y: 0 }}
-            transition={{ delay: 0.6, duration: 0.7, ease: "easeOut" }}
-            className="absolute bottom-10 right-[2%] xl:right-[6%] hidden lg:block w-48"
-            style={{ rotate: "-2deg" } as any}
-          >
-            <div className="bg-white rounded-2xl shadow-lg border border-stone-100 p-3 mb-3">
-              <div className="w-8 h-8 rounded-xl flex items-center justify-center mb-2" style={{ background: TEAL }}>
-                <ShieldCheck className="w-4 h-4 text-white" />
+                {/* Category pills */}
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.25 }}
+                  className="flex flex-wrap justify-center lg:justify-start gap-2">
+                  {["📦 Products", "🍜 Food", "💡 Tutoring", "💻 Tech", "👗 Fashion", "📸 Photography"].map(s => (
+                    <span key={s} className="px-3 py-1.5 rounded-full bg-stone-50 border border-stone-200 text-stone-600 text-xs font-medium">
+                      {s}
+                    </span>
+                  ))}
+                </motion.div>
               </div>
-              <p className="text-xs font-bold text-stone-900">Secure Payment</p>
-              <p className="text-[10px] text-stone-400 mt-0.5 leading-snug">Escrow-protected. Pay only when satisfied.</p>
-            </div>
-            <div className="bg-white rounded-2xl shadow-lg border border-stone-100 p-3">
-              <div className="flex -space-x-2 mb-2">
-                {["/images/pau-logo.png", "/images/futo-logo.png", "/images/imsu-logo.png"].map((src, i) => (
-                  <div key={i} className="w-6 h-6 rounded-full bg-stone-100 border-2 border-white overflow-hidden">
-                    <Image src={src} alt="campus" width={24} height={24} className="w-full h-full object-contain" />
+
+              {/* ── RIGHT — Phone mockup ── */}
+              <motion.div initial={{ opacity: 0, x: 40 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.7, delay: 0.2 }}
+                className="relative flex-shrink-0 lg:mr-16">
+
+                {/* Phone */}
+                <div className="relative w-[230px] md:w-[250px]">
+                  <div className="bg-stone-900 rounded-[36px] p-[5px] shadow-2xl ring-1 ring-stone-700">
+                    <div className="bg-white rounded-[31px] overflow-hidden">
+
+                      {/* Awning */}
+                      <div className="relative h-14 overflow-hidden flex flex-col justify-end" style={{ background: TEAL }}>
+                        <div className="absolute inset-0"
+                          style={{ backgroundImage: `repeating-linear-gradient(90deg, transparent 0px, transparent 14px, rgba(255,255,255,0.35) 14px, rgba(255,255,255,0.35) 24px)` }} />
+                        <div className="absolute top-2.5 left-0 right-0 flex items-center justify-center">
+                          <span className="text-white text-[10px] font-black tracking-wider z-10">🏪 StudEx Store</span>
+                        </div>
+                        {/* Scalloped valance */}
+                        <div className="flex h-4 relative z-10">
+                          {Array.from({ length: 9 }).map((_, i) => (
+                            <div key={i} className="flex-1 relative overflow-hidden">
+                              <div className="absolute -top-3 left-0 right-0 mx-0.5 h-5 bg-white rounded-full" />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* 2×2 product grid */}
+                      <div className="grid grid-cols-2 gap-px bg-stone-100">
+                        {[l[0], l[1], l[2], l[3]].map((item, i) => (
+                          <div key={i} className="aspect-square overflow-hidden bg-stone-50">
+                            {item?.image?.startsWith("http") ? (
+                              <img src={item.image} alt={item?.title ?? ""} className="w-full h-full object-cover" loading="lazy" />
+                            ) : (
+                              <div className="w-full h-full bg-stone-100 animate-pulse" />
+                            )}
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Bottom CTA bar */}
+                      <div className="px-4 py-3 flex items-center justify-between" style={{ background: TEAL }}>
+                        <span className="text-white text-xs font-black tracking-widest">SHOP NOW</span>
+                        <ArrowRight className="w-4 h-4 text-white" />
+                      </div>
+                    </div>
                   </div>
-                ))}
-              </div>
-              <p className="text-xs font-bold text-stone-900">3 Campuses</p>
-              <p className="text-[10px] text-stone-400">PAU · FUTO · IMSU</p>
+                  {/* Camera notch */}
+                  <div className="absolute top-[7px] left-1/2 -translate-x-1/2 w-10 h-1.5 bg-stone-700 rounded-full" />
+                </div>
+
+                {/* Floating badges — desktop only */}
+                <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.6, duration: 0.4 }}
+                  className="hidden lg:flex absolute -right-2 top-6 items-center gap-2 bg-white rounded-2xl px-3 py-2 shadow-lg border border-stone-100"
+                  style={{ transform: "translateX(110%)" }}>
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: TEAL }}>
+                    <ShieldCheck className="w-4 h-4 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-stone-400 leading-none">Payment</p>
+                    <p className="text-xs font-bold text-stone-800">Escrow Safe</p>
+                  </div>
+                </motion.div>
+
+                <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.7, duration: 0.4 }}
+                  className="hidden lg:flex absolute -right-2 top-1/2 -translate-y-1/2 items-center gap-2 bg-white rounded-2xl px-3 py-2 shadow-lg border border-stone-100"
+                  style={{ transform: "translateX(110%) translateY(-50%)" }}>
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "#F59E0B" }}>
+                    <MapPin className="w-4 h-4 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-stone-400 leading-none">Delivery</p>
+                    <p className="text-xs font-bold text-stone-800">3 Campuses</p>
+                  </div>
+                </motion.div>
+
+                <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.8, duration: 0.4 }}
+                  className="hidden lg:flex absolute -right-2 bottom-16 items-center gap-2 bg-white rounded-2xl px-3 py-2 shadow-lg border border-stone-100"
+                  style={{ transform: "translateX(110%)" }}>
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: PURPLE }}>
+                    <Tag className="w-4 h-4 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-stone-400 leading-none">Campus</p>
+                    <p className="text-xs font-bold text-stone-800">Best Deals</p>
+                  </div>
+                </motion.div>
+
+                <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.65, duration: 0.4 }}
+                  className="hidden lg:flex absolute -left-2 top-12 items-center gap-2 bg-white rounded-2xl px-3 py-2 shadow-lg border border-stone-100"
+                  style={{ transform: "translateX(-110%)" }}>
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 bg-amber-400">
+                    <Star className="w-4 h-4 text-white fill-white" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-stone-400 leading-none">Rating</p>
+                    <p className="text-xs font-bold text-stone-800">4.9 ★ Avg</p>
+                  </div>
+                </motion.div>
+
+              </motion.div>
+
             </div>
-          </motion.div>
-
-          {/* ── Mobile corner images (4 corners, lg:hidden) ── */}
-          {l[0]?.image && (
-            <motion.div initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.3, duration: 0.5 }}
-              className="lg:hidden absolute top-4 left-3 w-[96px] rounded-2xl overflow-hidden shadow-lg border border-stone-100 z-0"
-              style={{ rotate: "-4deg" } as any}>
-              <img src={l[0].image} alt="" className="w-full aspect-[3/4] object-cover" />
-            </motion.div>
-          )}
-          {l[2]?.image && (
-            <motion.div initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.4, duration: 0.5 }}
-              className="lg:hidden absolute top-4 right-3 w-[96px] rounded-2xl overflow-hidden shadow-lg border border-stone-100 z-0"
-              style={{ rotate: "4deg" } as any}>
-              <img src={l[2].image} alt="" className="w-full aspect-[3/4] object-cover" />
-            </motion.div>
-          )}
-          {l[5]?.image && (
-            <motion.div initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.5, duration: 0.5 }}
-              className="lg:hidden absolute bottom-4 left-3 w-[96px] rounded-2xl overflow-hidden shadow-lg border border-stone-100 z-0"
-              style={{ rotate: "3deg" } as any}>
-              <img src={l[5].image} alt="" className="w-full aspect-[3/4] object-cover" />
-            </motion.div>
-          )}
-          {l[7]?.image && (
-            <motion.div initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.6, duration: 0.5 }}
-              className="lg:hidden absolute bottom-4 right-3 w-[96px] rounded-2xl overflow-hidden shadow-lg border border-stone-100 z-0"
-              style={{ rotate: "-3deg" } as any}>
-              <img src={l[7].image} alt="" className="w-full aspect-[3/4] object-cover" />
-            </motion.div>
-          )}
-
-          {/* ── Center content ── */}
-          <div className="relative z-10 max-w-2xl mx-auto text-center">
-
-            {/* Logo badge */}
-            <motion.div
-              initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
-              className="flex justify-center mb-7"
-            >
-              <div className="w-16 h-16 rounded-2xl overflow-hidden shadow-md border border-stone-200 bg-white p-1.5">
-                <Image src="/images/logo-1.jpg" alt="StudEx" width={64} height={64} className="w-full h-full object-contain" />
-              </div>
-            </motion.div>
-
-            {/* Headline */}
-            <motion.h1
-              initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.05 }}
-              className="text-4xl md:text-5xl lg:text-7xl font-extrabold leading-tight tracking-tight mb-4"
-              style={JK}
-            >
-              <span className="text-stone-900">Buy, book &amp; order</span>
-              <br />
-              <span className="text-stone-400">on your </span>
-              <span style={GRAD_TEXT}>campus.</span>
-            </motion.h1>
-
-            <motion.p
-              initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.1 }}
-              className="text-stone-500 text-lg max-w-md mx-auto mb-7"
-            >
-              Verified campus vendors — food, products, services, tech and more. All in one place.
-            </motion.p>
-
-            {/* CTAs */}
-            <motion.div
-              initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.15 }}
-              className="flex flex-wrap justify-center gap-3 mb-8"
-            >
-              <Link href="/auth">
-                <button className="px-7 py-3.5 text-white font-semibold rounded-full shadow-md hover:opacity-90 transition" style={{ background: TEAL }}>
-                  Start Ordering
-                </button>
-              </Link>
-              <Link href="/home">
-                <button className="px-7 py-3.5 text-stone-700 font-semibold rounded-full border border-stone-300 bg-white hover:bg-stone-50 transition">
-                  Browse Services
-                </button>
-              </Link>
-            </motion.div>
-
-            {/* Category pills */}
-            <motion.div
-              initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.2 }}
-              className="flex flex-wrap justify-center gap-2"
-            >
-              {["📦 Products", "🍜 Food & Drinks", "💡 Tutoring", "📸 Photography", "💻 Tech & Gadgets", "🧺 Laundry", "💅 Beauty", "👗 Fashion"].map(s => (
-                <span key={s} className="px-3 py-1.5 rounded-full bg-white border border-stone-200 text-stone-600 text-xs font-medium shadow-sm">
-                  {s}
-                </span>
-              ))}
-            </motion.div>
-
           </div>
         </section>
 
