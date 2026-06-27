@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/lib/authStore";
 import { api } from "@/lib/api";
-import { GRAD, SERIF } from "@/lib/tokens";
+import { GRAD } from "@/lib/tokens";
 import {
   DollarSign, ShoppingBag, Package, Star,
   TrendingUp, Clock, CheckCircle2, ArrowRight,
@@ -114,7 +114,7 @@ export default function VendorOverviewPage() {
       {/* ── GREETING ── */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-black text-stone-900" style={SERIF}>{greeting}</h1>
+          <h1 className="text-2xl font-black text-stone-900" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{greeting}</h1>
           <p className="text-stone-400 text-sm mt-0.5">Here's what's happening in your store.</p>
         </div>
         {user?.profile?.vendor_badge && user.profile.vendor_badge !== "none" && (

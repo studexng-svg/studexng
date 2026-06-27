@@ -12,7 +12,7 @@ import {
 import TopNav from "@/components/layout/TopNav";
 import { useAuth } from "@/lib/authStore";
 import { api } from "@/lib/api";
-import { GRAD, SERIF, toArray, calcServiceFee } from "@/lib/tokens";
+import { GRAD, toArray, calcServiceFee } from "@/lib/tokens";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 
@@ -344,8 +344,15 @@ export default function BuyerBookingsPage() {
               exit={{ scale: 0.95, opacity: 0 }} transition={{ type: "spring", damping: 25, stiffness: 300 }}
               className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl border border-stone-100 overflow-y-auto"
               style={{ maxHeight: "calc(100dvh - 3rem)" }}>
-              <h2 className="text-xl font-bold text-stone-900 mb-1">Confirm Payment</h2>
-              <p className="text-sm text-stone-500 mb-5">You're about to pay for this confirmed booking.</p>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: GRAD }}>
+                  <CreditCard className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-black text-stone-900 leading-tight" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Confirm Payment</h2>
+                  <p className="text-xs text-stone-400">You're about to pay for this confirmed booking.</p>
+                </div>
+              </div>
 
               <div className="bg-stone-50 rounded-2xl p-4 mb-5 space-y-2 border border-stone-100">
                 <div className="flex justify-between text-sm gap-4">

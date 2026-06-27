@@ -15,7 +15,7 @@ import {
   Shield,
 } from "lucide-react";
 
-import { GRAD, SERIF } from "@/lib/tokens";
+import { GRAD } from "@/lib/tokens";
 import TopNav from "@/components/layout/TopNav";
 import { api } from "@/lib/api";
 
@@ -99,7 +99,7 @@ export default function OrderConfirmationPage() {
           <Package className="w-8 h-8 text-stone-400" />
         </div>
         <h2 className="text-lg font-bold text-stone-900 mb-1"
-          style={SERIF}>
+          style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
           Order Not Found
         </h2>
         <p className="text-sm text-stone-400 mb-6">{error || "We couldn't load this order."}</p>
@@ -136,7 +136,7 @@ export default function OrderConfirmationPage() {
         <div className="text-center animate-fadeUp">
           <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold">Payment Successful</p>
           <h2 className="text-2xl font-bold text-stone-900 mt-0.5"
-            style={SERIF}>
+            style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
             Order Confirmed!
           </h2>
           <p className="text-sm text-stone-400 mt-1">
@@ -259,7 +259,7 @@ export default function OrderConfirmationPage() {
               <div>
                 <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold">Quick Feedback</p>
                 <h3 className="text-lg font-bold text-stone-900 mt-0.5"
-                  style={SERIF}>
+                  style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                   How was your experience?
                 </h3>
                 <p className="text-sm text-stone-400 mt-0.5">Rate the StudEx checkout experience</p>

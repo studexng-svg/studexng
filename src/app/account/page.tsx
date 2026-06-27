@@ -12,8 +12,9 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/lib/authStore";
-import { GRAD, GRAD_TEXT, SERIF } from "@/lib/tokens";
+import { GRAD, GRAD_TEXT } from "@/lib/tokens";
 import { api } from "@/lib/api";
+import TopNav from "@/components/layout/TopNav";
 
 function VerifiedTick({ color, label }: { color: string; label: string }) {
   return (
@@ -415,16 +416,11 @@ export default function AccountPage() {
       {/* ══════════ PAGE ══════════ */}
       <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
 
-        {/* ── HEADER ── */}
-        <div className="bg-[#F5F5F5] px-4 pt-5 pb-2 flex items-center justify-between">
-          <Link href="/home">
-            <button className="w-9 h-9 rounded-full bg-white shadow-sm flex items-center justify-center">
-              <svg className="w-4 h-4 text-stone-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-              </svg>
-            </button>
-          </Link>
-          <h1 className="text-base font-extrabold text-stone-900" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Profile & Settings</h1>
+        <TopNav showBack backHref="/home" />
+
+        {/* ── PAGE TITLE + NOTIFICATIONS ── */}
+        <div className="px-4 pt-4 pb-1 flex items-center justify-between max-w-lg mx-auto">
+          <h1 className="text-xl font-extrabold text-stone-900" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Profile & Settings</h1>
           <div className="relative">
             <button onClick={() => setShowNotifications(v => !v)}
               className="w-9 h-9 bg-white shadow-sm rounded-full flex items-center justify-center">
@@ -579,7 +575,7 @@ export default function AccountPage() {
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <div className="flex items-center gap-2 mb-1">
-                      <p className="font-black text-white text-lg leading-tight" style={SERIF}>StudEx</p>
+                      <p className="font-black text-white text-lg leading-tight" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>StudEx</p>
                       <span className="bg-white/20 text-white text-[10px] font-bold px-2 py-0.5 rounded-full border border-white/30">VENDOR</span>
                     </div>
                     <p className="text-white/80 text-xs leading-relaxed">Manage your listings, bookings, and earnings all in one place.</p>
@@ -607,7 +603,7 @@ export default function AccountPage() {
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-2 mb-1">
-                    <p className="font-black text-white text-lg leading-tight" style={SERIF}>StudEx</p>
+                    <p className="font-black text-white text-lg leading-tight" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>StudEx</p>
                     <span className="bg-white/20 text-white text-[10px] font-bold px-2 py-0.5 rounded-full border border-white/30">VENDOR</span>
                   </div>
                   <p className="text-white/80 text-xs leading-relaxed">Sell on campus. Earn from your skills, products & services.</p>

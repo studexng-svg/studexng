@@ -9,7 +9,9 @@ import { useRouter } from "next/navigation";
 import { useCartStore } from "@/lib/cartStore";
 import { useAuth } from "@/lib/authStore";
 import { useEffect, useState, useMemo } from "react";
-import { GRAD, GRAD_TEXT, SERIF } from "@/lib/tokens";
+import { GRAD, GRAD_TEXT } from "@/lib/tokens";
+
+const JAKARTA = { fontFamily: "'Plus Jakarta Sans', sans-serif" };
 import { api } from "@/lib/api";
 
 function CountdownTimer({ reservedAt }: { reservedAt: string }) {
@@ -116,7 +118,7 @@ export default function CartPage() {
             <ShoppingBag className="w-12 h-12 text-white" strokeWidth={1.5} />
           </div>
           <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold mb-2">Empty Cart</p>
-          <h2 className="text-2xl font-bold text-stone-900 mb-2" style={SERIF}>
+          <h2 className="text-2xl font-bold text-stone-900 mb-2" style={JAKARTA}>
             Your cart is empty
           </h2>
           <p className="text-stone-400 text-sm mb-8">Add something from our services to get started.</p>
@@ -143,7 +145,7 @@ export default function CartPage() {
         <div className="flex items-center justify-between animate-fadeUp">
           <div>
             <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold">Your Order</p>
-            <h2 className="text-xl font-bold text-stone-900 mt-0.5" style={SERIF}>
+            <h2 className="text-xl font-bold text-stone-900 mt-0.5" style={JAKARTA}>
               Cart ({cart.length})
             </h2>
           </div>
@@ -263,7 +265,7 @@ export default function CartPage() {
                 ))}
               </div>
               <div className="border-t border-stone-100 mt-3 pt-3 flex justify-between items-center">
-                <span className="font-bold text-stone-900" style={SERIF}>Total</span>
+                <span className="font-bold text-stone-900" style={JAKARTA}>Total</span>
                 <span className="text-2xl font-bold" style={GRAD_TEXT}>₦{total.toLocaleString()}</span>
               </div>
               {hasUnavailable && (

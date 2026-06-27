@@ -12,7 +12,9 @@ import { useBookingStore } from "@/lib/bookingStore";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/authStore";
 import Script from "next/script";
-import { GRAD, GRAD_TEXT, SERIF, calcServiceFee } from "@/lib/tokens";
+import { GRAD, GRAD_TEXT, calcServiceFee } from "@/lib/tokens";
+
+const JAKARTA = { fontFamily: "'Plus Jakarta Sans', sans-serif" };
 import TopNav from "@/components/layout/TopNav";
 import { api } from "@/lib/api";
 
@@ -229,7 +231,7 @@ export default function CheckoutPage() {
             <Package className="w-12 h-12 text-white" strokeWidth={1.5} />
           </div>
           <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold mb-2">Empty</p>
-          <h2 className="text-2xl font-bold text-stone-900 mb-2" style={SERIF}>
+          <h2 className="text-2xl font-bold text-stone-900 mb-2" style={JAKARTA}>
             Nothing to checkout
           </h2>
           <p className="text-stone-400 text-sm mb-8">Go book a service or add items to your cart first.</p>
@@ -256,7 +258,7 @@ export default function CheckoutPage() {
           <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold">
             {isServiceBooking ? "Service Booking" : "Product Order"}
           </p>
-          <h2 className="text-xl font-bold text-stone-900 mt-0.5" style={SERIF}>
+          <h2 className="text-xl font-bold text-stone-900 mt-0.5" style={JAKARTA}>
             Review your order
           </h2>
         </motion.div>
@@ -441,7 +443,7 @@ export default function CheckoutPage() {
               <span className="text-stone-700 font-medium">₦{serviceFee.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
             <div className="border-t border-stone-100 pt-3 flex justify-between items-center">
-              <span className="font-bold text-stone-900" style={SERIF}>Total</span>
+              <span className="font-bold text-stone-900" style={JAKARTA}>Total</span>
               <span className="text-2xl font-bold" style={GRAD_TEXT}>
                 ₦{finalTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>

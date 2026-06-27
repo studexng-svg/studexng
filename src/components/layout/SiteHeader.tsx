@@ -7,7 +7,7 @@ import { Search, ShoppingCart, Heart, Trophy, X } from "lucide-react";
 import Image from "next/image";
 import { useAuth } from "@/lib/authStore";
 import { useCart } from "@/lib/cartStore";
-import { GRAD, SERIF } from "@/lib/tokens";
+import { GRAD } from "@/lib/tokens";
 
 export default function SiteHeader() {
   const router   = useRouter();
@@ -34,7 +34,7 @@ export default function SiteHeader() {
           <div className="w-9 h-9 rounded-xl overflow-hidden border border-stone-100 shadow-sm flex items-center justify-center p-1 bg-white">
             <Image src="/images/logo-1.jpg" alt="StudEx" width={36} height={36} className="w-full h-full object-contain" />
           </div>
-          <span className="font-black text-lg text-stone-900" style={SERIF}>
+          <span className="font-black text-lg text-stone-900" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
             Stud<span className="text-transparent bg-clip-text" style={{ backgroundImage: GRAD }}>Ex</span>
           </span>
         </Link>
