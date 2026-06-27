@@ -377,21 +377,14 @@ export default function LandingClient({ initialListings }: { initialListings: an
                       {/* Screen glass */}
                       <div className="bg-white rounded-[46px] overflow-hidden flex flex-col">
 
-                          {/* App screenshots stacked — fills the full screen */}
-                        <img
-                          src="/images/app-screen-1.png"
-                          alt="StudEx app home"
-                          className="w-full block"
-                          loading="lazy"
-                          style={{ display: "block" }}
-                        />
-                        <img
-                          src="/images/app-screen-2.png"
-                          alt="StudEx app listings"
-                          className="w-full block"
-                          loading="lazy"
-                          style={{ display: "block" }}
-                        />
+                          {/* Top half — header + vendor banner from screenshot 1 */}
+                        <div className="overflow-hidden" style={{ height: "250px" }}>
+                          <img src="/images/app-screen-1.png" alt="StudEx home" className="w-full block" loading="lazy" />
+                        </div>
+                        {/* Bottom half — listing cards from screenshot 2 */}
+                        <div className="overflow-hidden" style={{ height: "270px" }}>
+                          <img src="/images/app-screen-2.png" alt="StudEx listings" className="w-full block" loading="lazy" />
+                        </div>
 
                         {/* Home indicator */}
                         <div className="bg-white pb-2 pt-1.5 flex justify-center flex-shrink-0">

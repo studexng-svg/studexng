@@ -4,7 +4,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
   Search, ArrowRight, Heart, X, Sparkles, Star,
-  ChevronRight, ChevronDown, Clock, Plus, Trophy, ShoppingCart, User, LayoutGrid, List, GalleryHorizontal, MapPin,
+  ChevronRight, ChevronDown, Clock, Plus, Trophy, ShoppingCart, LayoutGrid, List, GalleryHorizontal, MapPin,
   Share2, ShieldCheck, Tag, Zap, Headphones,
   Shirt, Monitor, Home, BookOpen, Car,
   UtensilsCrossed, Smartphone, Scissors, WashingMachine,
@@ -904,7 +904,13 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                     <span className="text-xs font-medium">Cart</span>
                   </Link>
                   <Link href="/account/address" className="flex items-center gap-1.5 text-sm text-stone-600 hover:text-teal-600 transition cursor-pointer">
-                    <User className="w-4 h-4 text-stone-400" />
+                    {(user as any)?.profile_image ? (
+                      <img src={(user as any).profile_image} alt={(user as any).username} className="w-7 h-7 rounded-full object-cover flex-shrink-0" />
+                    ) : (
+                      <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0" style={{ background: TEAL }}>
+                        {((user as any)?.username?.[0] || "U").toUpperCase()}
+                      </div>
+                    )}
                     <span>Hi, <span className="font-semibold text-stone-900">{(user as any).username}</span></span>
                     <ChevronDown className="w-3.5 h-3.5 text-stone-400" />
                   </Link>
