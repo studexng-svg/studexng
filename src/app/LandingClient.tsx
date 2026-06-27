@@ -358,17 +358,39 @@ export default function LandingClient({ initialListings }: { initialListings: an
               <motion.div initial={{ opacity: 0, x: 40 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.7, delay: 0.2 }}
                 className="flex-shrink-0 flex items-center gap-5">
 
-                {/* Left badge — avg rating */}
-                <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.65, duration: 0.4 }}
-                  className="hidden lg:flex flex-row items-center gap-3 bg-white rounded-2xl px-4 py-3 shadow-xl border border-stone-100 whitespace-nowrap">
-                  <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 bg-amber-400">
-                    <Star className="w-5 h-5 text-white fill-white" />
-                  </div>
-                  <div>
-                    <p className="text-[11px] text-stone-400 leading-none mb-1">Avg Rating</p>
-                    <p className="text-base font-black text-stone-800 leading-none">4.9 ★</p>
-                  </div>
-                </motion.div>
+                {/* Left badges column */}
+                <div className="hidden lg:flex flex-col gap-4">
+                  <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.6, duration: 0.4 }}
+                    className="flex flex-row items-center gap-3 bg-white rounded-2xl px-4 py-3 shadow-xl border border-stone-100 whitespace-nowrap">
+                    <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 bg-amber-400">
+                      <Star className="w-5 h-5 text-white fill-white" />
+                    </div>
+                    <div>
+                      <p className="text-[11px] text-stone-400 leading-none mb-1">Avg Rating</p>
+                      <p className="text-base font-black text-stone-800 leading-none">4.9 ★</p>
+                    </div>
+                  </motion.div>
+                  <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.7, duration: 0.4 }}
+                    className="flex flex-row items-center gap-3 bg-white rounded-2xl px-4 py-3 shadow-xl border border-stone-100 whitespace-nowrap">
+                    <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: PURPLE }}>
+                      <MapPin className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-[11px] text-stone-400 leading-none mb-1">Campuses</p>
+                      <p className="text-base font-black text-stone-800 leading-none">3 Active</p>
+                    </div>
+                  </motion.div>
+                  <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.8, duration: 0.4 }}
+                    className="flex flex-row items-center gap-3 bg-white rounded-2xl px-4 py-3 shadow-xl border border-stone-100 whitespace-nowrap">
+                    <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 bg-emerald-500">
+                      <Store className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-[11px] text-stone-400 leading-none mb-1">Vendors</p>
+                      <p className="text-base font-black text-stone-800 leading-none">70+ Active</p>
+                    </div>
+                  </motion.div>
+                </div>
 
                 {/* Phone frame */}
                 <div className="relative w-[270px] md:w-[290px]">
@@ -437,17 +459,39 @@ export default function LandingClient({ initialListings }: { initialListings: an
                   </div>
                 </div>
 
-                {/* Right badge — escrow safe */}
-                <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.6, duration: 0.4 }}
-                  className="hidden lg:flex flex-row items-center gap-3 bg-white rounded-2xl px-4 py-3 shadow-xl border border-stone-100 whitespace-nowrap">
-                  <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: TEAL }}>
-                    <ShieldCheck className="w-5 h-5 text-white" />
-                  </div>
-                  <div>
-                    <p className="text-[11px] text-stone-400 leading-none mb-1">Payment</p>
-                    <p className="text-base font-black text-stone-800 leading-none">Escrow Safe</p>
-                  </div>
-                </motion.div>
+                {/* Right badges column */}
+                <div className="hidden lg:flex flex-col gap-4">
+                  <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.6, duration: 0.4 }}
+                    className="flex flex-row items-center gap-3 bg-white rounded-2xl px-4 py-3 shadow-xl border border-stone-100 whitespace-nowrap">
+                    <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: TEAL }}>
+                      <ShieldCheck className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-[11px] text-stone-400 leading-none mb-1">Payment</p>
+                      <p className="text-base font-black text-stone-800 leading-none">Escrow Safe</p>
+                    </div>
+                  </motion.div>
+                  <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.7, duration: 0.4 }}
+                    className="flex flex-row items-center gap-3 bg-white rounded-2xl px-4 py-3 shadow-xl border border-stone-100 whitespace-nowrap">
+                    <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "#F59E0B" }}>
+                      <Zap className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-[11px] text-stone-400 leading-none mb-1">Delivery</p>
+                      <p className="text-base font-black text-stone-800 leading-none">Fast & Local</p>
+                    </div>
+                  </motion.div>
+                  <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.8, duration: 0.4 }}
+                    className="flex flex-row items-center gap-3 bg-white rounded-2xl px-4 py-3 shadow-xl border border-stone-100 whitespace-nowrap">
+                    <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "#EF4444" }}>
+                      <Tag className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-[11px] text-stone-400 leading-none mb-1">Listings</p>
+                      <p className="text-base font-black text-stone-800 leading-none">320+ Items</p>
+                    </div>
+                  </motion.div>
+                </div>
 
               </motion.div>
 
