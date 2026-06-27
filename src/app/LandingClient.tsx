@@ -65,7 +65,7 @@ const AVATAR_COLORS = ["#0D9488","#7C3AED","#F59E0B","#EF4444","#3B82F6","#10B98
 function TestimonialCard({ review }: { review: typeof reviews[0] }) {
   const color = AVATAR_COLORS[review.name.charCodeAt(0) % AVATAR_COLORS.length];
   return (
-    <div className="w-[300px] flex-shrink-0 bg-white rounded-2xl shadow-sm border border-stone-100 p-5 select-none">
+    <div className="w-[300px] flex-shrink-0 bg-white rounded-2xl shadow-sm border border-stone-100 p-5 select-none transition-all duration-200 hover:scale-[1.04] hover:shadow-xl hover:border-stone-200 cursor-default">
       <div className="flex items-center gap-3 mb-3">
         <div
           className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
@@ -106,8 +106,8 @@ function TestimonialMarquee() {
           from { transform: translateX(-50%); }
           to   { transform: translateX(0); }
         }
-        .marquee-left  { animation: marquee-left  36s linear infinite; }
-        .marquee-right { animation: marquee-right 40s linear infinite; }
+        .marquee-left  { animation: marquee-left  70s linear infinite; }
+        .marquee-right { animation: marquee-right 80s linear infinite; }
         .marquee-left:hover,
         .marquee-right:hover { animation-play-state: paused; }
       `}</style>
