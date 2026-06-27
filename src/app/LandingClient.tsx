@@ -2,10 +2,10 @@
 
 import { motion } from "framer-motion";
 import {
-  Search, ShieldCheck, Zap, Star,
+  Search, ShieldCheck, Zap, Star, Heart,
   GraduationCap, Store, Package, MessageSquare, LayoutDashboard,
 } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Script from "next/script";
 import Link from "next/link";
@@ -23,14 +23,14 @@ const reviews = [
   { name: "Khalid, Semilore & Samuel", role: "Students",       campus: "PAU",                     text: "I like the website layout and navigation. Clean, simple, and it just works.",                                                                                     stars: 5 },
   { name: "Rehwa & Chierika",          role: "Students",       campus: "FUTO",                    text: "I love everything about the idea and website. Campus commerce done right!",                                                                                       stars: 5 },
   { name: "Lolope & Nonye",            role: "Students",       campus: "PAU",                     text: "I like the aesthetics. The whole vibe of the platform is clean and fun to use.",                                                                                  stars: 5 },
-  { name: "Sommy",                     role: "Student, FUTO",  campus: "FUTO",                    text: "StudEx made it so easy to find food on campus. I ordered jollof rice and it arrived in minutes. This is the future!",                                            stars: 5 },
+  { name: "Sommy",                     role: "Student, FUTO",  campus: "FUTO",                    text: "The website design is so clean and everything is well laid out. I can already tell this will be huge when it launches fully at FUTO!",                         stars: 5 },
   { name: "Dubby",                     role: "Student",        campus: "PAU",                     text: "The escrow payment gives me so much confidence. My money is safe until I confirm delivery. 10/10.",                                                               stars: 5 },
-  { name: "Dxtny",                     role: "Student, PAU",   campus: "Pan-Atlantic University", text: "Found the best nail vendor on campus through StudEx. The booking process was seamless and she delivered perfectly!",                                              stars: 5 },
-  { name: "Temi",                      role: "Student, IMSU",  campus: "IMSU",                    text: "Amazing platform! I got my laundry done without leaving my hostel. The vendor was professional and fast.",                                                        stars: 5 },
-  { name: "Chioma",                    role: "Vendor, FUTO",   campus: "FUTO",                    text: "I run my fashion business through StudEx and orders have been amazing. The vendor dashboard is everything.",                                                      stars: 5 },
+  { name: "Dxtny",                     role: "Student, FUTO",  campus: "FUTO",                    text: "The layout is genuinely clean and intuitive. This is exactly the kind of platform FUTO students have been waiting for. Big potential here.",                   stars: 5 },
+  { name: "Temi",                      role: "Student, IMSU",  campus: "IMSU",                    text: "Amazing concept and the interface is beautiful. The escrow idea for campus vendors is so smart — IMSU students are going to love this!",                      stars: 5 },
+  { name: "Chioma",                    role: "Vendor, FUTO",   campus: "FUTO",                    text: "The vendor dashboard looks incredibly well designed. I already know I'm listing my fashion business the moment StudEx officially launches at FUTO.",            stars: 5 },
   { name: "Femi",                      role: "Student",        campus: "PAU",                     text: "The real-time messaging with vendors is a game changer. I coordinated my photoshoot entirely through the chat.",                                                  stars: 5 },
-  { name: "Bolu",                      role: "Student, IMSU",  campus: "IMSU",                    text: "I love how you can chat directly with vendors. Communication is key and StudEx nailed it completely.",                                                            stars: 4 },
-  { name: "Adaeze",                    role: "Student",        campus: "FUTO",                    text: "Got my birthday photoshoot done by a campus vendor. The pictures came out absolutely stunning!",                                                                   stars: 5 },
+  { name: "Bolu",                      role: "Student, IMSU",  campus: "IMSU",                    text: "The design is super clean and easy to navigate. The whole concept of secure campus commerce is exactly what IMSU has been missing.",                             stars: 4 },
+  { name: "Adaeze",                    role: "Student",        campus: "FUTO",                    text: "I've been exploring the website and the design is stunning. The way everything is laid out and categorized feels so professional and easy to use.",              stars: 5 },
   { name: "Zara",                      role: "Student, PAU",   campus: "Pan-Atlantic University", text: "Ordered makeup for my friend's event through StudEx. The vendor was professional and arrived on time. So impressed!",                                            stars: 5 },
 ];
 
@@ -64,6 +64,8 @@ const AVATAR_COLORS = ["#0D9488","#7C3AED","#F59E0B","#EF4444","#3B82F6","#10B98
 
 function TestimonialCard({ review }: { review: typeof reviews[0] }) {
   const color = AVATAR_COLORS[review.name.charCodeAt(0) % AVATAR_COLORS.length];
+  const [liked, setLiked] = useState(false);
+  const [count, setCount] = useState(Math.floor(review.name.charCodeAt(0) % 30) + 4);
   return (
     <div className="w-[300px] flex-shrink-0 bg-white rounded-2xl shadow-sm border border-stone-100 p-5 select-none transition-all duration-200 hover:scale-[1.04] hover:shadow-xl hover:border-stone-200 cursor-default">
       <div className="flex items-center gap-3 mb-3">
@@ -82,10 +84,17 @@ function TestimonialCard({ review }: { review: typeof reviews[0] }) {
         </div>
       </div>
       <p className="text-stone-600 text-sm leading-relaxed line-clamp-3">{review.text}</p>
-      <div className="mt-3 pt-3 border-t border-stone-100">
+      <div className="mt-3 pt-3 border-t border-stone-100 flex items-center justify-between">
         <span className="text-xs font-medium text-teal-600 bg-teal-50 px-2.5 py-1 rounded-full border border-teal-100">
           {review.campus}
         </span>
+        <button
+          className="flex items-center gap-1 transition-all duration-150 cursor-pointer"
+          onClick={() => { setLiked(l => !l); setCount(c => liked ? c - 1 : c + 1); }}
+        >
+          <Heart className={`w-4 h-4 transition-all duration-150 ${liked ? "fill-rose-500 text-rose-500 scale-110" : "text-stone-300 hover:text-rose-400"}`} />
+          <span className={`text-xs font-medium transition-colors duration-150 ${liked ? "text-rose-500" : "text-stone-300"}`}>{count}</span>
+        </button>
       </div>
     </div>
   );
@@ -402,7 +411,7 @@ export default function LandingClient({ initialListings }: { initialListings: an
               transition={{ duration: 0.5, delay: 0.1 }}
               className="text-stone-500 text-lg max-w-md mx-auto mb-7"
             >
-              Verified vendors on campus — food, beauty, laundry, photography and more.
+              Verified campus vendors — food, products, services, tech and more. All in one place.
             </motion.p>
 
             {/* CTAs */}
@@ -429,7 +438,7 @@ export default function LandingClient({ initialListings }: { initialListings: an
               transition={{ duration: 0.5, delay: 0.2 }}
               className="flex flex-wrap justify-center gap-2"
             >
-              {["🍜 Food", "💅 Nails", "🧺 Laundry", "📸 Photography", "👗 Fashion", "💇 Hair", "💄 Makeup", "💪 Fitness"].map(s => (
+              {["📦 Products", "🍜 Food & Drinks", "💡 Tutoring", "📸 Photography", "💻 Tech & Gadgets", "🧺 Laundry", "💅 Beauty", "👗 Fashion"].map(s => (
                 <span key={s} className="px-3 py-1.5 rounded-full bg-white border border-stone-200 text-stone-600 text-xs font-medium shadow-sm">
                   {s}
                 </span>
@@ -471,7 +480,7 @@ export default function LandingClient({ initialListings }: { initialListings: an
             </motion.div>
             <div className="grid md:grid-cols-3 gap-4">
               {[
-                { Icon: Search,      title: "Find services instantly", desc: "Browse hundreds of verified campus vendors across food, beauty, laundry, photography and more." },
+                { Icon: Search,      title: "Find anything on campus", desc: "Browse hundreds of verified campus vendors — food, products, services, tech, and more." },
                 { Icon: ShieldCheck, title: "Pay with confidence",     desc: "Our escrow system holds your payment until you confirm delivery — no risk, ever."               },
                 { Icon: Zap,         title: "Campus-fast delivery",    desc: "Everything is on campus. No long waits, no delivery fees from off-campus vendors."              },
               ].map(({ Icon, title, desc }, i) => (
@@ -576,10 +585,10 @@ export default function LandingClient({ initialListings }: { initialListings: an
                   </div>
                   <p className="font-bold text-stone-900 text-lg mb-2" style={JK}>Browse &amp; Discover</p>
                   <p className="text-stone-500 text-sm leading-relaxed mb-6">
-                    Explore dozens of categories across campus — all in one beautifully organised marketplace.
+                    Explore dozens of categories across campus — products, services, food, tech and more in one marketplace.
                   </p>
                   <div className="flex flex-wrap gap-2 mt-auto">
-                    {["🍜 Food", "💅 Nails", "🧺 Laundry", "📸 Photo", "👗 Fashion", "💇 Hair"].map(s => (
+                    {["📦 Products", "🍜 Food", "💡 Tutoring", "📸 Photo", "💻 Tech", "👗 Fashion"].map(s => (
                       <span key={s} className="px-2.5 py-1 rounded-full text-xs font-medium bg-stone-50 border border-stone-200 text-stone-600">{s}</span>
                     ))}
                   </div>
