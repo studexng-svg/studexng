@@ -6,7 +6,7 @@ import {
   GraduationCap, Store, Package, MessageSquare, LayoutDashboard,
   ChevronLeft, ChevronRight, ArrowRight, MapPin, Tag,
 } from "lucide-react";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Script from "next/script";
 import Link from "next/link";
@@ -101,87 +101,23 @@ function TestimonialCard({ review }: { review: typeof reviews[0] }) {
   );
 }
 
-function ScrollRow({ items, direction = "left" }: { items: typeof reviews; direction?: "left" | "right" }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const paused = useRef(false);
-  const rafRef = useRef<number>(0);
-
-  // Triple items so we always have content to loop through seamlessly
-  const tripled = [...items, ...items, ...items];
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-
-    // Start in the middle third so user can scroll left or right
-    const jumpToMiddle = () => { el.scrollLeft = el.scrollWidth / 3; };
-    jumpToMiddle();
-
-    const SPEED = 0.5; // px per frame at 60fps
-    let lastTime = 0;
-
-    const tick = (time: number) => {
-      const delta = Math.min(time - lastTime, 50); // cap at 50ms to avoid jump on tab focus
-      lastTime = time;
-
-      if (!paused.current && el) {
-        if (direction === "left") {
-          el.scrollLeft += SPEED * (delta / 16);
-          // When we've scrolled into the last third, silently jump back to the first third
-          if (el.scrollLeft >= (el.scrollWidth * 2) / 3) {
-            el.scrollLeft -= el.scrollWidth / 3;
-          }
-        } else {
-          el.scrollLeft -= SPEED * (delta / 16);
-          // When we've scrolled into the first third, silently jump forward
-          if (el.scrollLeft <= el.scrollWidth / 3) {
-            el.scrollLeft += el.scrollWidth / 3;
-          }
-        }
-      }
-      rafRef.current = requestAnimationFrame(tick);
-    };
-
-    rafRef.current = requestAnimationFrame(tick);
-
-    let resumeTimer: ReturnType<typeof setTimeout>;
-    const pause  = () => { paused.current = true; clearTimeout(resumeTimer); };
-    const resume = () => { resumeTimer = setTimeout(() => { paused.current = false; }, 2000); };
-
-    el.addEventListener("mouseenter", pause);
-    el.addEventListener("mouseleave", resume);
-    el.addEventListener("touchstart", pause, { passive: true });
-    el.addEventListener("touchend",   resume);
-
-    return () => {
-      cancelAnimationFrame(rafRef.current);
-      clearTimeout(resumeTimer);
-      el.removeEventListener("mouseenter", pause);
-      el.removeEventListener("mouseleave", resume);
-      el.removeEventListener("touchstart", pause);
-      el.removeEventListener("touchend",   resume);
-    };
-  }, [direction]);
-
+function TestimonialGrid() {
   return (
-    <div
-      ref={ref}
-      className="flex gap-4 overflow-x-auto"
-      style={{ scrollbarWidth: "none", msOverflowStyle: "none" } as React.CSSProperties}
-    >
-      {tripled.map((r, i) => <TestimonialCard key={i} review={r} />)}
-    </div>
-  );
-}
-
-function TestimonialMarquee() {
-  const half = Math.ceil(reviews.length / 2);
-  const row1 = reviews.slice(0, half);
-  const row2 = reviews.slice(half);
-  return (
-    <div className="space-y-4 overflow-hidden">
-      <ScrollRow items={row1} direction="left" />
-      <ScrollRow items={row2} direction="right" />
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 px-5 max-w-7xl mx-auto">
+      {reviews.map((review, i) => (
+        <motion.div
+          key={i}
+          animate={{ opacity: [1, 0.28, 1] }}
+          transition={{
+            duration: 2.8 + (i % 4) * 0.6,
+            delay: i * 0.22,
+            repeat: Infinity,
+            ease: "easeInOut",
+          }}
+        >
+          <TestimonialCard review={review} />
+        </motion.div>
+      ))}
     </div>
   );
 }
@@ -715,7 +651,7 @@ export default function LandingClient({ initialListings }: { initialListings: an
               </h2>
             </motion.div>
           </div>
-          <TestimonialMarquee />
+          <TestimonialGrid />
         </section>
 
         {/* ── CAMPUSES ──────────────────────────────────────── */}
