@@ -23,6 +23,8 @@ interface Booking {
   listing_title: string;
   listing_price: string;
   vendor_name: string;
+  vendor_image?: string | null;
+  listing_image?: string | null;
   buyer_username: string;
   scheduled_date: string;
   scheduled_time: string;
@@ -477,9 +479,20 @@ export default function BuyerBookingsPage() {
               <motion.div key={booking.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
                 className={`rounded-2xl border p-4 ${cfg.bg}`}>
                 <div className="flex items-start justify-between gap-2 mb-3">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-stone-900 text-base leading-tight">{booking.listing_title}</p>
-                    <p className="text-sm text-stone-500 mt-0.5">by <span className="font-semibold">{booking.vendor_name}</span></p>
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    {booking.vendor_image ? (
+                      <img src={booking.vendor_image} alt={booking.vendor_name}
+                        className="w-11 h-11 rounded-full object-cover flex-shrink-0 ring-2 ring-white shadow-sm" />
+                    ) : (
+                      <div className="w-11 h-11 rounded-full flex items-center justify-center text-white font-bold text-base flex-shrink-0 shadow-sm"
+                        style={{ background: GRAD }}>
+                        {booking.vendor_name?.[0]?.toUpperCase() || "V"}
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <p className="font-semibold text-stone-900 text-base leading-tight">{booking.listing_title}</p>
+                      <p className="text-sm text-stone-500 mt-0.5">by <span className="font-semibold">{booking.vendor_name}</span></p>
+                    </div>
                   </div>
                   <span className={`flex-shrink-0 flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold ${cfg.badge}`}>
                     <Icon className="w-3.5 h-3.5" />{cfg.label}

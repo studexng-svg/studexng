@@ -55,6 +55,7 @@ interface Listing {
     id: number;
     username: string;
     business_name?: string;
+    profile_picture?: string | null;
     vendor_badge?: "none" | "rising" | "trusted" | "top" | null;
     completion_rate?: number;
     rating?: number;
@@ -565,10 +566,15 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
 
               {/* Vendor card */}
               <div className="flex items-center gap-3 p-4 bg-stone-50 rounded-2xl border border-stone-100">
-                <div className="w-11 h-11 rounded-full flex items-center justify-center text-white font-bold text-lg flex-shrink-0"
-                  style={{ background: GRAD }}>
-                  {vendorName[0]?.toUpperCase()}
-                </div>
+                {listing.vendor.profile_picture ? (
+                  <img src={listing.vendor.profile_picture} alt={vendorName}
+                    className="w-11 h-11 rounded-full object-cover flex-shrink-0 ring-2 ring-white shadow-sm" />
+                ) : (
+                  <div className="w-11 h-11 rounded-full flex items-center justify-center text-white font-bold text-lg flex-shrink-0"
+                    style={{ background: GRAD }}>
+                    {vendorName[0]?.toUpperCase()}
+                  </div>
+                )}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <Link href={`/vendor/${listing.vendor.username}`} className="font-bold text-stone-900 text-sm hover:text-teal-600 transition truncate">
