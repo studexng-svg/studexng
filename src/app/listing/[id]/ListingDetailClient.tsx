@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Star, MessageCircle, ShoppingCart, Calendar,
   Clock, FileText, CheckCircle, AlertCircle,
-  ChevronDown, ChevronUp, Send, MapPin, Sparkles, ZoomIn, X as XIcon,
+  ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Send, MapPin, Sparkles, ZoomIn, X as XIcon,
   Shield, Share2, Tag, Truck, Package, Heart, Minus, Plus,
   BadgeCheck, Zap,
 } from "lucide-react";
@@ -139,6 +139,17 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
   const [activeIdx,     setActiveIdx]     = useState(0);
   const [qty,           setQty]           = useState(1);
   const [descExpanded,  setDescExpanded]  = useState(false);
+
+  const touchStartX = useRef<number | null>(null);
+  const handleTouchStart = (e: React.TouchEvent) => { touchStartX.current = e.touches[0].clientX; };
+  const handleTouchEnd   = (e: React.TouchEvent) => {
+    if (touchStartX.current === null || allImages.length <= 1) return;
+    const delta = e.changedTouches[0].clientX - touchStartX.current;
+    touchStartX.current = null;
+    if (Math.abs(delta) < 40) return;
+    if (delta < 0) setActiveIdx(i => Math.min(i + 1, allImages.length - 1));
+    else           setActiveIdx(i => Math.max(i - 1, 0));
+  };
 
   const [vendorListings, setVendorListings]         = useState<any[]>([]);
   const [vendorLoading,  setVendorLoading]           = useState(false);
@@ -357,7 +368,10 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
                 <div className="flex-1 relative">
                   <div
                     className={`w-full bg-stone-50 rounded-2xl overflow-hidden ${activeImg ? "cursor-zoom-in" : ""} aspect-square lg:aspect-[4/5]`}
-                    onClick={() => activeImg && setImageOpen(true)}>
+                    onClick={() => activeImg && setImageOpen(true)}
+                    onTouchStart={handleTouchStart}
+                    onTouchEnd={handleTouchEnd}
+                  >
                     {activeImg
                       ? <img src={activeImg} alt={listing.title} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                       : <div className="w-full h-full flex items-center justify-center"><Sparkles className="w-16 h-16 text-stone-200" /></div>
@@ -378,6 +392,26 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
                       </div>
                     )}
                   </div>
+
+                  {/* Mobile swipe arrows */}
+                  {allImages.length > 1 && (
+                    <>
+                      {activeIdx > 0 && (
+                        <button
+                          onClick={e => { e.stopPropagation(); setActiveIdx(i => i - 1); }}
+                          className="lg:hidden absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-black/30 backdrop-blur-sm rounded-full flex items-center justify-center z-10">
+                          <ChevronLeft className="w-4 h-4 text-white" />
+                        </button>
+                      )}
+                      {activeIdx < allImages.length - 1 && (
+                        <button
+                          onClick={e => { e.stopPropagation(); setActiveIdx(i => i + 1); }}
+                          className="lg:hidden absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-black/30 backdrop-blur-sm rounded-full flex items-center justify-center z-10">
+                          <ChevronRight className="w-4 h-4 text-white" />
+                        </button>
+                      )}
+                    </>
+                  )}
 
                   {/* Mobile thumbnail dots */}
                   {allImages.length > 1 && (
