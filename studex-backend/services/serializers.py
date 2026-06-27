@@ -31,10 +31,25 @@ class ListingVendorSerializer(serializers.ModelSerializer):
     rating = serializers.DecimalField(source='profile.rating', max_digits=3, decimal_places=2, default=0)
     total_reviews = serializers.IntegerField(source='profile.total_reviews', default=0)
     profile = serializers.SerializerMethodField()
+    profile_picture = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ['id', 'username', 'business_name', 'hostel', 'vendor_badge', 'completion_rate', 'rating', 'total_reviews', 'profile']
+        fields = ['id', 'username', 'business_name', 'hostel', 'vendor_badge', 'completion_rate', 'rating', 'total_reviews', 'profile', 'profile_picture']
+
+    def get_profile_picture(self, obj):
+        try:
+            img = obj.profile_image
+            name = getattr(img, 'name', None)
+            if name and 'default' not in name:
+                request = self.context.get('request')
+                url = img.url
+                if request:
+                    return request.build_absolute_uri(url)
+                return url
+        except Exception:
+            pass
+        return None
 
     def get_profile(self, obj):
         try:
