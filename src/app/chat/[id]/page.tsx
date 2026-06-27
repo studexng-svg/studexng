@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/lib/authStore";
-import { GRAD } from "@/lib/tokens";
+import { TEAL, PURPLE } from "@/lib/tokens";
 import { api } from "@/lib/api";
 
 const DELETE_EVERYONE_LIMIT_HOURS = 60;
@@ -420,7 +420,7 @@ export default function ChatRoomPage() {
 
         {otherUserPicture
           ? <img src={otherUserPicture} alt={otherUser} className="w-11 h-11 rounded-full object-cover flex-shrink-0 ring-2 ring-white shadow-sm" />
-          : <div className="w-11 h-11 rounded-full flex items-center justify-center text-white font-bold text-base flex-shrink-0 shadow-sm" style={{ background: GRAD }}>
+          : <div className="w-11 h-11 rounded-full flex items-center justify-center text-white font-bold text-base flex-shrink-0 shadow-sm" style={{ background: PURPLE }}>
               {otherUser?.[0]?.toUpperCase() || "?"}
             </div>
         }

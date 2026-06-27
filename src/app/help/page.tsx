@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Mail, MessageCircle, Phone, Headphones, Clock, Shield, Zap, ChevronRight } from "lucide-react";
 import TopNav from "@/components/layout/TopNav";
 import Link from "next/link";
-import { GRAD, SERIF } from "@/lib/tokens";
+import { TEAL } from "@/lib/tokens";
 
 export default function HelpPage() {
   const router = useRouter();
@@ -18,7 +18,7 @@ export default function HelpPage() {
       <div className="px-4 pt-6 pb-32 max-w-2xl mx-auto space-y-5">
 
         {/* HERO */}
-        <div className="rounded-2xl p-6 text-white text-center shadow-md animate-fadeUp" style={{ background: GRAD }}>
+        <div className="rounded-2xl p-6 text-white text-center shadow-md animate-fadeUp" style={{ background: TEAL }}>
           <Headphones className="w-12 h-12 mx-auto mb-3 opacity-90" />
           <h2 className="text-xl font-bold mb-1" style={SERIF}>How Can We Help?</h2>
           <p className="text-sm opacity-80">Fast, friendly support — available every day</p>
@@ -105,7 +105,7 @@ export default function HelpPage() {
           <Link href="/faq">
             <button
               className="px-8 py-3 text-white font-semibold rounded-full shadow-lg shadow-teal-200/60 text-sm transition active:scale-[0.98]"
-              style={{ background: GRAD }}
+              style={{ background: TEAL }}
             >
               Browse FAQs
             </button>

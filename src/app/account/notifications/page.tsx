@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import TopNav from "@/components/layout/TopNav";
 import { useAuth } from "@/lib/authStore";
-import { GRAD, SERIF } from "@/lib/tokens";
+import { TEAL } from "@/lib/tokens";
 import { api } from "@/lib/api";
 
 interface Notification {
@@ -250,7 +250,7 @@ export default function NotificationsPage() {
                     whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
                     onClick={() => { setDetailNotif(null); router.push(detailNotif.action_url); }}
                     className="flex-1 py-3 rounded-full text-white text-sm font-semibold shadow-lg"
-                    style={{ background: GRAD }}
+                    style={{ background: TEAL }}
                   >
                     Go There
                   </motion.button>

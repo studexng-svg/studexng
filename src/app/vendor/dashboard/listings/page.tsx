@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/authStore";
-import { GRAD, toArray } from "@/lib/tokens";
+import { TEAL, toArray } from "@/lib/tokens";
 import { Plus, Edit2, Trash2, Loader, ToggleLeft, ToggleRight, X, Share2 } from "lucide-react";
 import { EmptyState, LoadingSpinner, HEADING_FONT } from "../_shared";
 import { api } from "@/lib/api";
@@ -117,7 +117,7 @@ export default function ListingsPage() {
   return (
     <div className="pb-4">
       {toast && (
-        <div className="fixed top-6 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full font-semibold text-white text-sm z-50 shadow-xl" style={{ background: GRAD }}>
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full font-semibold text-white text-sm z-50 shadow-xl" style={{ background: TEAL }}>
           {toast}
         </div>
       )}
@@ -143,7 +143,7 @@ export default function ListingsPage() {
               }
             }}
             className="flex-shrink-0 px-3 py-1.5 rounded-lg text-white text-xs font-bold"
-            style={{ background: GRAD }}>
+            style={{ background: TEAL }}>
             Share
           </button>
         </div>
@@ -157,7 +157,7 @@ export default function ListingsPage() {
         </div>
         <button onClick={() => { resetForm(); setShowForm(true); }}
           className="flex items-center gap-1.5 px-4 py-2 text-white rounded-full font-semibold text-sm transition active:scale-95"
-          style={{ background: GRAD }}>
+          style={{ background: TEAL }}>
           <Plus className="w-4 h-4" /> Add
         </button>
       </div>
@@ -294,7 +294,7 @@ export default function ListingsPage() {
             <div className="flex gap-3">
               <button onClick={handleSave} disabled={saving || !form.title || !form.price || !form.category}
                 className="flex-1 py-3 text-white disabled:opacity-40 rounded-full font-semibold text-sm transition active:scale-[0.98]"
-                style={{ background: GRAD }}>
+                style={{ background: TEAL }}>
                 {saving ? "Saving..." : editing ? "Update" : "Create Listing"}
               </button>
               <button onClick={resetForm}

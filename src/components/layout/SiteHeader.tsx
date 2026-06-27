@@ -108,7 +108,7 @@ export default function SiteHeader() {
                 Sell on StudEx
               </Link>
               <Link href="/auth">
-                <button className="px-4 py-2 text-white font-semibold rounded-xl text-sm shadow-sm" style={{ background: GRAD }}>
+                <button className="px-4 py-2 text-white font-semibold rounded-xl text-sm shadow-sm" style={{ background: TEAL }}>
                   Login
                 </button>
               </Link>

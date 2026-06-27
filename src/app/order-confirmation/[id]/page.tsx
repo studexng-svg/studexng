@@ -15,7 +15,7 @@ import {
   Shield,
 } from "lucide-react";
 
-import { GRAD } from "@/lib/tokens";
+import { TEAL, PURPLE } from "@/lib/tokens";
 import TopNav from "@/components/layout/TopNav";
 import { api } from "@/lib/api";
 
@@ -106,7 +106,7 @@ export default function OrderConfirmationPage() {
         <Link href="/home">
           <button
             className="px-6 py-3 rounded-full font-semibold text-white text-sm tap-scale"
-            style={{ background: GRAD }}>
+            style={{ background: TEAL }}>
             Back to Home
           </button>
         </Link>
@@ -126,7 +126,7 @@ export default function OrderConfirmationPage() {
         <div className="flex justify-center pt-2 animate-fadeUp">
           <div
             className="w-20 h-20 rounded-full flex items-center justify-center shadow-lg"
-            style={{ background: GRAD }}
+            style={{ background: TEAL }}
           >
             <CheckCircle className="w-10 h-10 text-white" />
           </div>
@@ -224,7 +224,7 @@ export default function OrderConfirmationPage() {
           <Link href={`/account/orders/${order.id}`} className="w-full">
             <button
               className="w-full py-3 rounded-full font-semibold text-white text-sm flex items-center justify-center gap-2 transition-all tap-scale"
-              style={{ background: GRAD }}
+              style={{ background: TEAL }}
             >
               <Package className="w-4 h-4" />
               View Order
@@ -298,7 +298,7 @@ export default function OrderConfirmationPage() {
                 onClick={submitFeedback}
                 disabled={feedbackSubmitting || !feedbackRating}
                 className="w-full py-3 rounded-full font-semibold text-white text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all mb-4 hover-scale tap-scale"
-                style={{ background: GRAD }}>
+                style={{ background: TEAL }}>
                 {feedbackSubmitting ? "Submitting..." : "Submit Feedback"}
               </button>
             </div>

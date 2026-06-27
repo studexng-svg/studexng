@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/authStore";
-import { GRAD, toArray } from "@/lib/tokens";
+import { TEAL, PURPLE, toArray } from "@/lib/tokens";
 import { Calendar, Check, X, Loader, MessageCircle } from "lucide-react";
 import { StatusBadge, EmptyState, LoadingSpinner, HEADING_FONT } from "../_shared";
 import { api } from "@/lib/api";
@@ -65,7 +65,7 @@ export default function BookingsPage() {
             className={`px-4 py-2 rounded-full text-sm font-medium capitalize transition-all ${
               filter === f ? "text-white shadow-sm" : "bg-white border border-stone-200 text-stone-600 hover:border-stone-300"
             }`}
-            style={filter === f ? { background: GRAD } : {}}>
+            style={filter === f ? { background: TEAL } : {}}>
             {f} {f !== "all" && `(${bookings.filter(b => b.status === f).length})`}
           </button>
         ))}
@@ -78,7 +78,7 @@ export default function BookingsPage() {
           {filtered.map(booking => (
             <div key={booking.id} className="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm">
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0" style={{ background: GRAD }}>
+                <div className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0" style={{ background: PURPLE }}>
                   {booking.buyer_username?.[0]?.toUpperCase() || "?"}
                 </div>
                 <div className="flex-1">
@@ -122,7 +122,7 @@ export default function BookingsPage() {
                   <button onClick={() => handleAction(booking.id, "confirm")}
                     disabled={actionLoading === booking.id}
                     className="flex-1 py-2.5 text-white disabled:opacity-50 rounded-full font-semibold text-sm transition flex items-center justify-center gap-2 active:scale-[0.98]"
-                    style={{ background: GRAD }}>
+                    style={{ background: TEAL }}>
                     {actionLoading === booking.id ? <Loader className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
                     Accept
                   </button>

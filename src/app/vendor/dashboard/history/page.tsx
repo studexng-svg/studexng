@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { GRAD, toArray } from "@/lib/tokens";
+import { TEAL, toArray } from "@/lib/tokens";
 import { History, TrendingUp, Download, Calendar, User, Package } from "lucide-react";
 import { EmptyState, LoadingSpinner, HEADING_FONT } from "../_shared";
 import { api } from "@/lib/api";
@@ -88,7 +88,7 @@ export default function HistoryPage() {
       </div>
 
       {/* Summary card */}
-      <div className="rounded-2xl p-5 text-white shadow-md" style={{ background: GRAD }}>
+      <div className="rounded-2xl p-5 text-white shadow-md" style={{ background: TEAL }}>
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <TrendingUp className="w-5 h-5" />
@@ -112,7 +112,7 @@ export default function HistoryPage() {
             className={`px-4 py-2 rounded-full text-sm font-medium capitalize transition-all ${
               tab === t ? "text-white shadow-sm" : "bg-white border border-stone-200 text-stone-600"
             }`}
-            style={tab === t ? { background: GRAD } : {}}>
+            style={tab === t ? { background: TEAL } : {}}>
             {t}
           </button>
         ))}
@@ -125,7 +125,7 @@ export default function HistoryPage() {
             className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
               dateFilter === f ? "text-white" : "bg-white border border-stone-200 text-stone-500"
             }`}
-            style={dateFilter === f ? { background: GRAD } : {}}>
+            style={dateFilter === f ? { background: TEAL } : {}}>
             {f === "all" ? "All Time" : f === "week" ? "This Week" : "This Month"}
           </button>
         ))}

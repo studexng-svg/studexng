@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/lib/authStore";
 import { api } from "@/lib/api";
-import { GRAD } from "@/lib/tokens";
+import { TEAL } from "@/lib/tokens";
 import {
   DollarSign, ShoppingBag, Package, Star,
   TrendingUp, Clock, CheckCircle2, ArrowRight,
@@ -268,7 +268,7 @@ export default function VendorOverviewPage() {
                     className="px-5 py-4 flex items-center gap-3 hover:bg-stone-50 transition-colors group"
                   >
                     <div className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-black flex-shrink-0 shadow-sm"
-                      style={{ background: GRAD }}>
+                      style={{ background: TEAL }}>
                       {initials}
                     </div>
                     <div className="flex-1 min-w-0">

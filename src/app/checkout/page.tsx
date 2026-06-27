@@ -12,7 +12,7 @@ import { useBookingStore } from "@/lib/bookingStore";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/authStore";
 import Script from "next/script";
-import { GRAD, GRAD_TEXT, calcServiceFee } from "@/lib/tokens";
+import { GRAD, GRAD_TEXT, TEAL, PURPLE, calcServiceFee } from "@/lib/tokens";
 
 const JAKARTA = { fontFamily: "'Plus Jakarta Sans', sans-serif" };
 import TopNav from "@/components/layout/TopNav";
@@ -227,7 +227,7 @@ export default function CheckoutPage() {
         style={{ fontFamily: "'DM Sans', sans-serif" }}>
         <div className="text-center">
           <div className="w-24 h-24 mx-auto mb-6 rounded-2xl flex items-center justify-center"
-            style={{ background: GRAD }}>
+            style={{ background: TEAL }}>
             <Package className="w-12 h-12 text-white" strokeWidth={1.5} />
           </div>
           <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold mb-2">Empty</p>
@@ -238,7 +238,7 @@ export default function CheckoutPage() {
           <Link href="/home">
             <button
               className="px-8 py-3 text-white font-semibold rounded-full shadow-lg shadow-teal-200/60 inline-flex items-center gap-2 text-sm transition active:scale-[0.98]"
-              style={{ background: GRAD }}>
+              style={{ background: TEAL }}>
               Explore StudEx <ArrowRight className="w-4 h-4" />
             </button>
           </Link>
@@ -268,7 +268,7 @@ export default function CheckoutPage() {
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
             className="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: GRAD }}>
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: PURPLE }}>
                 <Calendar className="w-5 h-5 text-white" />
               </div>
               <div>
@@ -510,7 +510,7 @@ export default function CheckoutPage() {
               whileTap={{ scale: isProcessing ? 1 : 0.97 }}
               disabled={isProcessing || !isLoggedIn || !paystackLoaded}
               className="w-full py-4 rounded-full font-semibold text-white text-base shadow-lg shadow-teal-200/60 flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{ background: GRAD }}>
+              style={{ background: TEAL }}>
               {isProcessing ? (
                 <><Loader className="w-5 h-5 animate-spin" /> Processing...</>
               ) : isFullyCoveredByCredits ? (

@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/lib/authStore";
-import { GRAD, SERIF } from "@/lib/tokens";
+import { TEAL, PURPLE } from "@/lib/tokens";
 import ReviewForm from "@/components/ReviewForm";
 import TopNav from "@/components/layout/TopNav";
 import { api } from "@/lib/api";
@@ -265,7 +265,7 @@ export default function OrderDetailPage() {
         <AlertCircle className="w-14 h-14 text-red-500 mx-auto mb-3" />
         <h2 className="text-xl font-bold text-stone-800 mb-2">Order Not Found</h2>
         <Link href="/account/orders">
-          <button className="mt-4 px-6 py-3 text-white font-semibold rounded-full" style={{ background: GRAD }}>
+          <button className="mt-4 px-6 py-3 text-white font-semibold rounded-full" style={{ background: TEAL }}>
             Back to Orders
           </button>
         </Link>
@@ -506,7 +506,7 @@ export default function OrderDetailPage() {
             <button
               onClick={() => { setAcknowledged(false); setShowModal(true); }}
               className="flex-1 py-4 text-white rounded-full font-semibold text-sm shadow-lg flex items-center justify-center gap-1.5 active:scale-[0.98] transition-all"
-              style={{ background: GRAD }}
+              style={{ background: TEAL }}
             >
               <CheckCircle className="w-4 h-4" /> Confirm
             </button>
@@ -754,7 +754,7 @@ export default function OrderDetailPage() {
               </button>
               <button onClick={handleConfirm} disabled={confirming || !acknowledged}
                 className="flex-1 py-3 text-white rounded-full font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
-                style={{ background: GRAD }}>
+                style={{ background: TEAL }}>
                 {confirming
                   ? <div className="animate-spin"><Clock className="w-5 h-5" /></div>
                   : <><CheckCircle className="w-5 h-5" /> Confirm</>}

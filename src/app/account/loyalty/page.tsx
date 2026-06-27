@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Gift, Star, Loader } from "lucide-react";
 import TopNav from "@/components/layout/TopNav";
 import { useAuth } from "@/lib/authStore";
-import { GRAD, SERIF } from "@/lib/tokens";
+import { TEAL, PURPLE } from "@/lib/tokens";
 import { api } from "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
 
@@ -57,7 +57,7 @@ export default function LoyaltyPage() {
           <>
             {/* CREDIT BALANCE */}
             <div className="rounded-2xl p-6 text-white text-center shadow-xl animate-fadeUp"
-              style={{ background: GRAD }}>
+              style={{ background: TEAL }}>
               <Gift className="w-12 h-12 mx-auto mb-3 opacity-90" />
               <p className="text-sm font-semibold opacity-80">Available Credits</p>
               <p className="text-5xl font-bold mt-1">₦{data.credit_balance.toLocaleString()}</p>
@@ -75,7 +75,7 @@ export default function LoyaltyPage() {
               <div className="w-full bg-stone-100 rounded-full h-3 overflow-hidden">
                 <div
                   className="h-full rounded-full transition-[width] duration-700 ease-out"
-                  style={{ width: `${progress}%`, background: GRAD }}
+                  style={{ width: `${progress}%`, background: TEAL }}
                 />
               </div>
               <div className="flex justify-between mt-2">
@@ -134,7 +134,7 @@ export default function LoyaltyPage() {
               ].map((step, i) => (
                 <div key={i} className="flex gap-3 mb-2">
                   <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
-                    style={{ background: GRAD }}>
+                    style={{ background: TEAL }}>
                     <span className="text-white text-xs font-semibold">{i + 1}</span>
                   </div>
                   <p className="text-sm text-teal-800">{step}</p>

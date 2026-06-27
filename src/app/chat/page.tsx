@@ -7,7 +7,7 @@ import { MessageCircle, Search, X, Pin, Trash2, PinOff } from "lucide-react";
 import TopNav from "@/components/layout/TopNav";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "@/lib/authStore";
-import { GRAD, SERIF } from "@/lib/tokens";
+import { TEAL, PURPLE } from "@/lib/tokens";
 import { useScrollRestoration } from "@/hooks/useScrollRestoration";
 import { api } from "@/lib/api";
 import { motion, AnimatePresence } from "framer-motion";
@@ -150,7 +150,7 @@ export default function ChatListPage() {
           </div>
         ) : filtered.length === 0 ? (
           <div className="bg-white rounded-2xl p-12 text-center border border-stone-100 shadow-sm animate-fadeUp">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center" style={{ background: GRAD }}>
+            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center" style={{ background: TEAL }}>
               <MessageCircle className="w-8 h-8 text-white" strokeWidth={1.5} />
             </div>
             <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold mb-2">No Messages</p>
@@ -192,7 +192,7 @@ export default function ChatListPage() {
                             className="w-12 h-12 rounded-full object-cover shadow-sm" />
                         ) : (
                           <div className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-sm"
-                            style={{ background: GRAD }}>
+                            style={{ background: PURPLE }}>
                             {conv.other_user?.username?.[0]?.toUpperCase() || "?"}
                           </div>
                         )}
@@ -230,7 +230,7 @@ export default function ChatListPage() {
 
                       {/* Unread badge */}
                       {conv.unread_count > 0 && (
-                        <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: GRAD }}>
+                        <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: TEAL }}>
                           <span className="text-white text-xs font-bold">{conv.unread_count > 9 ? "9+" : conv.unread_count}</span>
                         </div>
                       )}
@@ -269,7 +269,7 @@ export default function ChatListPage() {
             {/* Who */}
             <div className="flex items-center gap-3 px-1 mb-5">
               <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0"
-                style={{ background: GRAD }}>
+                style={{ background: TEAL }}>
                 {selected.other_user?.username?.[0]?.toUpperCase() || "?"}
               </div>
               <div>

@@ -110,7 +110,7 @@ export default function MessagesPage() {
         <div key={msg.id} className={`flex ${msg.is_mine ? "justify-end" : "justify-start"}`}>
           <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 ${
             msg.is_mine ? "text-white rounded-br-sm" : "bg-stone-100 text-stone-800 rounded-bl-sm"
-          }`} style={msg.is_mine ? { background: GRAD } : {}}>
+          }`} style={msg.is_mine ? { background: TEAL } : {}}>
             <p className={`text-xs font-medium mb-1 ${msg.is_mine ? "text-teal-100 text-right" : "text-stone-500"}`}>
               {msg.sender_username || (msg.is_mine ? user?.username : activeConv?.buyer_username)}
             </p>
@@ -165,7 +165,7 @@ export default function MessagesPage() {
             className="flex-1 bg-stone-50 border border-stone-200 rounded-xl px-4 py-2.5 text-stone-900 text-base placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 transition" />
           <button onClick={sendMessage} disabled={sending || !text.trim()}
             className="p-2.5 text-white disabled:opacity-40 rounded-xl transition active:scale-95"
-            style={{ background: GRAD }}>
+            style={{ background: TEAL }}>
             {sending ? <Loader className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
           </button>
         </div>
@@ -236,7 +236,7 @@ export default function MessagesPage() {
                 className="flex-1 bg-white border border-stone-200 rounded-xl px-4 py-2.5 text-stone-900 text-base placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 transition" />
               <button onClick={sendMessage} disabled={sending || !text.trim()}
                 className="p-2.5 text-white disabled:opacity-40 rounded-xl transition active:scale-95"
-                style={{ background: GRAD }}>
+                style={{ background: TEAL }}>
                 {sending ? <Loader className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
               </button>
             </div>

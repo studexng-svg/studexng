@@ -6,7 +6,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/authStore";
-import { GRAD, SERIF } from "@/lib/tokens";
+import { GRAD, TEAL } from "@/lib/tokens";
 
 const PAU_HOSTELS = [
   "Cedar", "Trezadel", "Trinity", "Pearl", "Redwood",
@@ -384,7 +384,7 @@ export default function AuthPage() {
               {/* Header */}
               <div className="text-center mb-8">
                 <div className="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center shadow-md"
-                  style={{ background: GRAD }}>
+                  style={{ background: TEAL }}>
                   <Store className="w-9 h-9 text-white" />
                 </div>
                 <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold mb-1">StudEx</p>
@@ -430,7 +430,7 @@ export default function AuthPage() {
                       {loginError && <p className="text-sm text-red-500 text-center">{loginError}</p>}
                       <button type="submit" disabled={isLoading}
                         className="w-full py-3.5 rounded-full font-semibold text-white text-sm shadow-lg shadow-teal-200/60 disabled:opacity-50"
-                        style={{ background: GRAD }}>
+                        style={{ background: TEAL }}>
                         {isLoading ? "Getting link..." : "Get Reset Link"}
                       </button>
                       <button type="button" onClick={() => { setIsForgotPassword(false); setLoginError(""); }}
@@ -492,7 +492,7 @@ export default function AuthPage() {
                   <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
                     type="submit" disabled={isLoading || accountDisabled}
                     className="w-full py-3.5 rounded-full font-semibold text-white text-sm shadow-lg shadow-teal-200/60 transition-all disabled:opacity-50"
-                    style={{ background: GRAD }}>
+                    style={{ background: TEAL }}>
                     {isLoading ? "Logging in..." : accountDisabled ? "Account Disabled" : "Login to StudEx"}
                   </motion.button>
                 </form>
@@ -531,7 +531,7 @@ export default function AuthPage() {
               {/* Header */}
               <div className="text-center mb-6">
                 <div className="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center shadow-md"
-                  style={{ background: GRAD }}>
+                  style={{ background: TEAL }}>
                   <Store className="w-9 h-9 text-white" />
                 </div>
                 <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold mb-1">StudEx</p>
@@ -900,7 +900,7 @@ export default function AuthPage() {
                 <motion.button whileHover={{ scale: isLoading ? 1 : 1.02 }} whileTap={{ scale: isLoading ? 1 : 0.97 }}
                   type="submit" disabled={isLoading || (step === 1 && !step1Valid)}
                   className="w-full py-3 rounded-full font-semibold text-white text-sm shadow-lg shadow-teal-200/60 transition-all disabled:opacity-50"
-                  style={{ background: GRAD }}>
+                  style={{ background: TEAL }}>
                   {isLoading ? "Processing..." : step === 1 ? "Send Verification Code" : "Complete Signup"}
                 </motion.button>
               </form>

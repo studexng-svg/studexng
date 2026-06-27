@@ -11,7 +11,7 @@ import { motion } from "framer-motion";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/authStore";
 import { useCart } from "@/lib/cartStore";
-import { GRAD } from "@/lib/tokens";
+import { TEAL } from "@/lib/tokens";
 
 function slugToTitle(slug: string) {
   return slug.split("-").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
@@ -152,7 +152,7 @@ export default function CategoryPageClient({ slug, initialListings, initialNextP
       {toast && (
         <motion.div initial={{ y: -50, opacity: 0 }} animate={{ y: 60, opacity: 1 }}
           className="fixed top-4 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full shadow-lg z-50 font-medium text-sm text-white"
-          style={{ background: GRAD }}>
+          style={{ background: TEAL }}>
           {toast}
         </motion.div>
       )}
@@ -208,7 +208,7 @@ export default function CategoryPageClient({ slug, initialListings, initialNextP
               </p>
               {!search && (
                 <Link href="/home">
-                  <button className="mt-5 px-5 py-2.5 text-white text-sm font-bold rounded-xl" style={{ background: GRAD }}>
+                  <button className="mt-5 px-5 py-2.5 text-white text-sm font-bold rounded-xl" style={{ background: TEAL }}>
                     Browse All
                   </button>
                 </Link>

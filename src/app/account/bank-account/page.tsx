@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/authStore";
-import { GRAD, SERIF } from "@/lib/tokens";
+import { TEAL } from "@/lib/tokens";
 import { Banknote, Loader, Check, AlertCircle, Search } from "lucide-react";
 import TopNav from "@/components/layout/TopNav";
 import Link from "next/link";
@@ -334,7 +334,7 @@ export default function BankAccountPage() {
           {/* Save Button */}
           <button onClick={handleSave} disabled={saving || !isComplete}
             className="w-full py-4 text-white disabled:opacity-40 disabled:cursor-not-allowed rounded-full font-semibold transition flex items-center justify-center gap-2 shadow-lg"
-            style={{ background: GRAD }}>
+            style={{ background: TEAL }}>
             {saving ? <><Loader className="w-5 h-5 animate-spin" /> Saving...</> : <><Check className="w-5 h-5" /> Save Bank Account</>}
           </button>
         </div>

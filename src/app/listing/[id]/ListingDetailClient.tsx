@@ -15,7 +15,7 @@ import TopNav from "@/components/layout/TopNav";
 import { useAuth } from "@/lib/authStore";
 import { useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { GRAD, SERIF } from "@/lib/tokens";
+import { GRAD, TEAL, PURPLE } from "@/lib/tokens";
 import VendorBadge from "@/components/VendorBadge";
 import ChatWindow from "@/components/ChatWindow";
 import { useAdminMode } from "@/hooks/useAdminMode";
@@ -282,9 +282,9 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
     <div className="min-h-screen bg-white flex items-center justify-center p-6" style={{ fontFamily:"'DM Sans',sans-serif" }}>
       <div className="text-center">
         <div className="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center bg-red-50"><AlertCircle className="w-8 h-8 text-red-400" /></div>
-        <h3 className="text-lg font-bold text-stone-900 mb-1" style={SERIF}>Listing not found</h3>
+        <h3 className="text-lg font-bold text-stone-900 mb-1" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Listing not found</h3>
         <p className="text-stone-400 text-sm mb-4">This listing may have been removed.</p>
-        <button onClick={() => router.back()} className="px-6 py-2.5 text-white font-medium rounded-full text-sm" style={{ background: GRAD }}>Go Back</button>
+        <button onClick={() => router.back()} className="px-6 py-2.5 text-white font-medium rounded-full text-sm" style={{ background: TEAL }}>Go Back</button>
       </div>
     </div>
   );
@@ -312,7 +312,7 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
       <AnimatePresence>
         {toast && (
           <motion.div key="toast" initial={{ y:-40, opacity:0 }} animate={{ y:72, opacity:1 }} exit={{ opacity:0 }}
-            className="fixed top-0 left-1/2 -translate-x-1/2 z-[9999] px-6 py-3 rounded-full text-white text-sm font-semibold shadow-xl" style={{ background: GRAD }}>
+            className="fixed top-0 left-1/2 -translate-x-1/2 z-[9999] px-6 py-3 rounded-full text-white text-sm font-semibold shadow-xl" style={{ background: TEAL }}>
             {toast}
           </motion.div>
         )}
@@ -455,7 +455,7 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
               </p>
 
               {/* Title */}
-              <h1 className="text-2xl lg:text-3xl font-black text-stone-900 leading-tight" style={SERIF}>
+              <h1 className="text-2xl lg:text-3xl font-black text-stone-900 leading-tight" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                 {listing.title}
               </h1>
 
@@ -554,7 +554,7 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
                       <motion.button whileHover={{ scale:1.02 }} whileTap={{ scale:0.97 }}
                         onClick={handleAddToCart}
                         className="flex-1 py-3.5 text-white font-bold rounded-2xl flex items-center justify-center gap-2 text-sm shadow-lg"
-                        style={{ background: GRAD }}>
+                        style={{ background: TEAL }}>
                         <ShoppingCart className="w-4 h-4" /> Add to Cart
                       </motion.button>
                       {/* Share */}
@@ -572,7 +572,7 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
                   <motion.button whileHover={{ scale:1.02 }} whileTap={{ scale:0.97 }}
                     onClick={openBooking}
                     className="flex-1 py-3.5 text-white font-bold rounded-2xl flex items-center justify-center gap-2 text-sm shadow-lg"
-                    style={{ background: GRAD }}>
+                    style={{ background: TEAL }}>
                     <Calendar className="w-4 h-4" /> Book Now
                   </motion.button>
                   <button onClick={handleShare} className="p-3.5 border border-stone-200 rounded-2xl text-stone-500 hover:text-teal-600 hover:border-teal-300 transition">
@@ -605,7 +605,7 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
                     className="w-11 h-11 rounded-full object-cover flex-shrink-0 ring-2 ring-white shadow-sm" />
                 ) : (
                   <div className="w-11 h-11 rounded-full flex items-center justify-center text-white font-bold text-lg flex-shrink-0"
-                    style={{ background: GRAD }}>
+                    style={{ background: TEAL }}>
                     {vendorName[0]?.toUpperCase()}
                   </div>
                 )}
@@ -657,7 +657,7 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
             <div id="booking-panel" className="mt-10 max-w-2xl bg-white border border-stone-200 rounded-2xl shadow-sm overflow-hidden">
               <div className="flex items-center justify-between px-5 py-4 border-b border-stone-100">
                 <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: GRAD }}>
+                  <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: PURPLE }}>
                     <Calendar className="w-4 h-4 text-white" />
                   </div>
                   <span className="font-bold text-stone-900">Book a Date & Time</span>
@@ -672,9 +672,9 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
                     <div className="w-16 h-16 mx-auto rounded-full bg-teal-50 flex items-center justify-center">
                       <CheckCircle className="w-8 h-8 text-teal-500" />
                     </div>
-                    <p className="font-bold text-stone-900 text-lg" style={SERIF}>Booking Request Sent!</p>
+                    <p className="font-bold text-stone-900 text-lg" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Booking Request Sent!</p>
                     <p className="text-stone-400 text-sm">The vendor will confirm your booking. You'll get a notification when they do.</p>
-                    <button onClick={() => router.push("/account/bookings")} className="mt-2 px-6 py-2.5 text-white font-medium rounded-full text-sm" style={{ background: GRAD }}>View My Bookings</button>
+                    <button onClick={() => router.push("/account/bookings")} className="mt-2 px-6 py-2.5 text-white font-medium rounded-full text-sm" style={{ background: TEAL }}>View My Bookings</button>
                   </div>
                 ) : (
                   <>
@@ -688,7 +688,7 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
                         {TIME_SLOTS.map(slot => (
                           <button key={slot} type="button" onClick={() => setBookingTime(slot)}
                             className={`py-2 rounded-xl text-xs font-medium border transition ${bookingTime===slot ? "text-white border-transparent" : "bg-stone-50 text-stone-600 border-stone-200 hover:border-teal-300"}`}
-                            style={bookingTime===slot ? { background: GRAD } : {}}>
+                            style={bookingTime===slot ? { background: TEAL } : {}}>
                             {slot}
                           </button>
                         ))}
@@ -712,7 +712,7 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
                     <motion.button whileTap={{ scale:0.97 }} onClick={handleBooking}
                       disabled={bookingStep==="confirming"||!bookingDate||!bookingTime||!bookingLocation.trim()}
                       className="w-full py-4 rounded-2xl font-bold text-white text-sm flex items-center justify-center gap-2 shadow-lg disabled:opacity-50"
-                      style={{ background: GRAD }}>
+                      style={{ background: TEAL }}>
                       {bookingStep==="confirming" ? <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin inline-block" /> Sending…</> : <><Send className="w-4 h-4" /> Send Booking Request</>}
                     </motion.button>
                     <p className="text-xs text-stone-400 text-center">Vendor must confirm before it's finalised.</p>
@@ -728,7 +728,7 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
             {/* ── Reviews ── */}
             {reviews.length > 0 && (
               <section>
-                <h2 className="text-xl font-black text-stone-900 mb-6" style={SERIF}>Customer Reviews</h2>
+                <h2 className="text-xl font-black text-stone-900 mb-6" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Customer Reviews</h2>
                 {/* Rating summary */}
                 <div className="flex flex-col sm:flex-row items-start gap-8 mb-8 p-6 bg-stone-50 rounded-2xl border border-stone-100">
                   <div className="flex-shrink-0 text-center">
@@ -761,7 +761,7 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
                     <div key={review.id} className="pb-5 border-b border-stone-100 last:border-0 last:pb-0">
                       <div className="flex items-start justify-between gap-3 mb-2">
                         <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-full text-white text-sm font-bold flex items-center justify-center flex-shrink-0" style={{ background: GRAD }}>
+                          <div className="w-8 h-8 rounded-full text-white text-sm font-bold flex items-center justify-center flex-shrink-0" style={{ background: PURPLE }}>
                             {review.reviewer_username[0]?.toUpperCase()}
                           </div>
                           <div>
@@ -784,7 +784,7 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
             {(vendorLoading || vendorListings.length > 0) && (
               <section>
                 <div className="flex items-center justify-between mb-5">
-                  <h2 className="text-xl font-black text-stone-900" style={SERIF}>More from {vendorName}</h2>
+                  <h2 className="text-xl font-black text-stone-900" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>More from {vendorName}</h2>
                   <Link href={`/vendor/${listing.vendor.username}`} className="text-teal-600 text-sm font-semibold hover:text-teal-700 transition">View store →</Link>
                 </div>
                 {vendorLoading ? <RelatedSkeleton /> : (
@@ -799,7 +799,7 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
             {(similarLoading || similarItems.length > 0) && (
               <section>
                 <div className="flex items-center justify-between mb-5">
-                  <h2 className="text-xl font-black text-stone-900" style={SERIF}>Similar Items</h2>
+                  <h2 className="text-xl font-black text-stone-900" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Similar Items</h2>
                   {listing.category?.title && (
                     <span className="px-3 py-1 rounded-full text-xs font-bold text-teal-700 bg-teal-50 border border-teal-100">{listing.category.title}</span>
                   )}
@@ -815,7 +815,7 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
             {/* ── You might also like ── */}
             {(alsoLikeLoading || alsoLike.length > 0) && (
               <section>
-                <h2 className="text-xl font-black text-stone-900 mb-5" style={SERIF}>You May Also Like</h2>
+                <h2 className="text-xl font-black text-stone-900 mb-5" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>You May Also Like</h2>
                 {alsoLikeLoading ? <RelatedSkeleton /> : (
                   <div className="flex gap-4 overflow-x-auto pb-2" style={{ scrollbarWidth:"none" }}>
                     {alsoLike.map(item => <RelatedCard key={item.id} item={item} />)}

@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { GRAD, toArray } from "@/lib/tokens";
+import { TEAL, toArray } from "@/lib/tokens";
 import { ShoppingBag, MapPin, Camera, X, ImagePlus, Clock, MessageCircle } from "lucide-react";
 import { StatusBadge, EmptyState, LoadingSpinner, HEADING_FONT } from "../_shared";
 import { api } from "@/lib/api";
@@ -116,7 +116,7 @@ function ProofModal({ order, onSuccess, onClose }: {
           </button>
           <button onClick={submit} disabled={submitting || !files[0]}
             className="flex-1 py-3 text-white rounded-full font-semibold text-sm disabled:opacity-50 flex items-center justify-center gap-2"
-            style={{ background: GRAD }}>
+            style={{ background: TEAL }}>
             {submitting
               ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Uploading…</>
               : "Mark as Delivered"}
@@ -231,7 +231,7 @@ export default function OrdersPage() {
                     onClick={() => canMark && setProofOrder(order)}
                     disabled={!canMark}
                     className="w-full py-2.5 rounded-xl text-sm font-semibold text-white flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
-                    style={{ background: GRAD }}
+                    style={{ background: TEAL }}
                   >
                     {!canMark && <Clock className="w-4 h-4" />}
                     {canMark ? "Mark as Delivered" : `Mark as Delivered (${label})`}

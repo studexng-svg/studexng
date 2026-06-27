@@ -13,7 +13,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useAuth } from "@/lib/authStore";
 import { generateStructuredData } from "@/lib/metadata";
-import { GRAD } from "@/lib/tokens";
+import { GRAD, TEAL, PURPLE } from "@/lib/tokens";
 
 /* ─── DATA ─────────────────────────────────────────────── */
 const reviews = [
@@ -274,7 +274,7 @@ export default function LandingClient({ initialListings }: { initialListings: an
                 Sign in
               </Link>
               <Link href="/auth">
-                <button className="px-4 py-2 text-white text-sm font-semibold rounded-full shadow-sm" style={{ background: GRAD }}>
+                <button className="px-4 py-2 text-white text-sm font-semibold rounded-full shadow-sm" style={{ background: TEAL }}>
                   Get Started
                 </button>
               </Link>
@@ -362,7 +362,7 @@ export default function LandingClient({ initialListings }: { initialListings: an
               </div>
               <div className="mt-2.5 flex items-center justify-between">
                 <span className="text-[10px] text-stone-400">53+ services available</span>
-                <div className="w-5 h-5 rounded-full flex items-center justify-center" style={{ background: GRAD }}>
+                <div className="w-5 h-5 rounded-full flex items-center justify-center" style={{ background: TEAL }}>
                   <span className="text-white text-[8px] font-bold">→</span>
                 </div>
               </div>
@@ -378,7 +378,7 @@ export default function LandingClient({ initialListings }: { initialListings: an
             style={{ rotate: "-2deg" } as any}
           >
             <div className="bg-white rounded-2xl shadow-lg border border-stone-100 p-3 mb-3">
-              <div className="w-8 h-8 rounded-xl flex items-center justify-center mb-2" style={{ background: GRAD }}>
+              <div className="w-8 h-8 rounded-xl flex items-center justify-center mb-2" style={{ background: TEAL }}>
                 <ShieldCheck className="w-4 h-4 text-white" />
               </div>
               <p className="text-xs font-bold text-stone-900">Secure Payment</p>
@@ -473,7 +473,7 @@ export default function LandingClient({ initialListings }: { initialListings: an
               className="flex flex-wrap justify-center gap-3 mb-8"
             >
               <Link href="/auth">
-                <button className="px-7 py-3.5 text-white font-semibold rounded-full shadow-md hover:opacity-90 transition" style={{ background: GRAD }}>
+                <button className="px-7 py-3.5 text-white font-semibold rounded-full shadow-md hover:opacity-90 transition" style={{ background: TEAL }}>
                   Start Ordering
                 </button>
               </Link>
@@ -542,7 +542,7 @@ export default function LandingClient({ initialListings }: { initialListings: an
                   viewport={{ once: true }} transition={{ duration: 0.5, delay: i * 0.08 }}
                   className="bg-white rounded-2xl border border-stone-200 p-6 shadow-sm"
                 >
-                  <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-4" style={{ background: GRAD }}>
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-4" style={{ background: i === 1 ? PURPLE : TEAL }}>
                     <Icon className="w-5 h-5 text-white" />
                   </div>
                   <p className="font-bold text-stone-900 mb-1.5" style={JK}>{title}</p>
@@ -632,7 +632,7 @@ export default function LandingClient({ initialListings }: { initialListings: an
                 style={{ background: "linear-gradient(180deg, #ffffff 60%, rgba(13,148,136,0.06) 100%)" }}
               >
                 <div className="p-6 flex-1 flex flex-col">
-                  <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-4" style={{ background: GRAD }}>
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-4" style={{ background: TEAL }}>
                     <Search className="w-5 h-5 text-white" />
                   </div>
                   <p className="font-bold text-stone-900 text-lg mb-2" style={JK}>Browse &amp; Discover</p>

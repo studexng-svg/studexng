@@ -8,7 +8,7 @@ import { useCartStore } from "@/lib/cartStore";
 import { useWishlistStore } from "@/lib/wishlistStore";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { GRAD, GRAD_TEXT, SERIF } from "@/lib/tokens";
+import { TEAL, GRAD_TEXT } from "@/lib/tokens";
 import { useScrollRestoration } from "@/hooks/useScrollRestoration";
 
 export default function WishlistPage() {
@@ -53,7 +53,7 @@ export default function WishlistPage() {
           <Link href="/auth">
             <button
               className="px-6 py-3 text-white font-medium rounded-full shadow-lg text-sm"
-              style={{ background: GRAD }}>
+              style={{ background: TEAL }}>
               Login
             </button>
           </Link>
@@ -72,7 +72,7 @@ export default function WishlistPage() {
           <Link href="/categories">
             <button
               className="px-6 py-3 text-white font-medium rounded-full shadow-lg text-sm"
-              style={{ background: GRAD }}>
+              style={{ background: TEAL }}>
               Browse Categories
             </button>
           </Link>
@@ -130,7 +130,7 @@ export default function WishlistPage() {
               <button
                 onClick={() => handleAddToCart(item)}
                 className="flex items-center gap-1.5 px-5 py-2.5 text-white font-semibold rounded-full text-sm shadow-lg shadow-teal-200/60 transition-all"
-                style={{ background: GRAD }}>
+                style={{ background: TEAL }}>
                 <Package className="w-4 h-4" />
                 Add to Cart
               </button>

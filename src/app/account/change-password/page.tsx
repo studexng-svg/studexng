@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { Lock, Save, Eye, EyeOff, CheckCircle, XCircle } from "lucide-react";
 import TopNav from "@/components/layout/TopNav";
-import { GRAD, SERIF } from "@/lib/tokens";
+import { TEAL } from "@/lib/tokens";
 
 export default function ChangePasswordPage() {
   const router = useRouter();
@@ -175,7 +175,7 @@ export default function ChangePasswordPage() {
                 onClick={handleSave}
                 disabled={!passwords.oldPassword || !passwords.newPassword || !passwords.confirmPassword}
                 className="w-full py-4 text-white rounded-full font-semibold text-base shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition active:scale-[0.98]"
-                style={{ background: GRAD }}
+                style={{ background: TEAL }}
               >
                 <Save className="w-5 h-5" />
                 Update Password

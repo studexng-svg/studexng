@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { GRAD } from "@/lib/tokens";
+import { TEAL } from "@/lib/tokens";
 import { Star } from "lucide-react";
 import { HEADING_FONT } from "../_shared";
 import { api } from "@/lib/api";
@@ -88,7 +88,7 @@ export default function FeedbackPage() {
           onClick={submit}
           disabled={submitting || !rating}
           className="w-full py-3 rounded-full font-semibold text-white text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-          style={{ background: GRAD }}>
+          style={{ background: TEAL }}>
           {submitting ? "Submitting..." : "Submit Feedback"}
         </button>
       </div>

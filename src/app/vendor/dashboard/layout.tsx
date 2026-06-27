@@ -88,7 +88,7 @@ export default function VendorDashboardLayout({ children }: { children: React.Re
             ? "text-white shadow-sm"
             : "text-stone-500 hover:bg-stone-50 hover:text-stone-800"
         }`}
-      style={active ? { background: GRAD } : {}}
+      style={active ? { background: TEAL } : {}}
       >
         <Icon className="w-4.5 h-4.5 flex-shrink-0" />
         <span className="flex-1">{tab.label}</span>
@@ -156,7 +156,7 @@ export default function VendorDashboardLayout({ children }: { children: React.Re
                 }).catch(() => {});
               }}
               className="w-full py-2 rounded-xl text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-opacity hover:opacity-90"
-              style={{ background: GRAD }}
+              style={{ background: TEAL }}
             >
               <Share2 className="w-3.5 h-3.5" /> Share Store
             </button>

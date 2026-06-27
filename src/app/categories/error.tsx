@@ -1,6 +1,6 @@
-'use client';
+﻿'use client';
 
-import { GRAD } from "@/lib/tokens";
+import { TEAL } from "@/lib/tokens";
 
 export default function Error({ reset }: { reset: () => void }) {
   return (
@@ -10,7 +10,7 @@ export default function Error({ reset }: { reset: () => void }) {
         <button
           onClick={reset}
           className="px-6 py-3 text-white font-medium rounded-full text-sm"
-          style={{ background: GRAD }}>
+          style={{ background: TEAL }}>
           Try again
         </button>
       </div>

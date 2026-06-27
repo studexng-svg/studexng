@@ -11,7 +11,7 @@ import TopNav from "@/components/layout/TopNav";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { api } from "@/lib/api";
-import { GRAD, SERIF } from "@/lib/tokens";
+import { GRAD, TEAL, PURPLE } from "@/lib/tokens";
 import { useAdminMode } from "@/hooks/useAdminMode";
 import { useCart } from "@/lib/cartStore";
 import { useAuth } from "@/lib/authStore";
@@ -196,7 +196,7 @@ export default function VendorProfilePage() {
         {(toast || adminToast) && (
           <motion.div key="toast" initial={{ opacity:0, y:-20 }} animate={{ opacity:1, y:72 }} exit={{ opacity:0 }}
             className="fixed top-0 left-1/2 -translate-x-1/2 z-[9999] px-5 py-2.5 rounded-full text-white text-sm font-semibold shadow-xl"
-            style={{ background: GRAD }}>
+            style={{ background: TEAL }}>
             {toast || adminToast}
           </motion.div>
         )}
@@ -215,7 +215,7 @@ export default function VendorProfilePage() {
             <textarea value={notifyMessage} onChange={e => setNotifyMessage(e.target.value)} placeholder="Message" rows={3}
               className="w-full px-4 py-2.5 rounded-xl border border-stone-200 text-sm focus:outline-none focus:border-teal-400 resize-none" />
             <button onClick={handleNotify} disabled={!!adminLoading || !notifyTitle.trim() || !notifyMessage.trim()}
-              className="w-full py-3 rounded-xl text-sm font-semibold text-white disabled:opacity-50" style={{ background: GRAD }}>
+              className="w-full py-3 rounded-xl text-sm font-semibold text-white disabled:opacity-50" style={{ background: TEAL }}>
               {adminLoading === "notify" ? "Sending…" : "Send Notification"}
             </button>
           </div>
@@ -248,7 +248,7 @@ export default function VendorProfilePage() {
               <div className="w-36 h-36 lg:w-52 lg:h-52 rounded-3xl overflow-hidden shadow-xl ring-4 ring-white">
                 {vendor.profile_picture
                   ? <img src={vendor.profile_picture} alt={vendor.username} className="w-full h-full object-cover object-top" />
-                  : <div className="w-full h-full flex items-center justify-center text-white font-black text-4xl" style={{ background: GRAD }}>{initials}</div>
+                  : <div className="w-full h-full flex items-center justify-center text-white font-black text-4xl" style={{ background: TEAL }}>{initials}</div>
                 }
               </div>
               {vendor.is_online && (
@@ -482,7 +482,7 @@ export default function VendorProfilePage() {
                     <div key={r.id} className="pb-5 border-b border-stone-100 last:border-0 last:pb-0">
                       <div className="flex items-start justify-between gap-3 mb-2">
                         <div className="flex items-center gap-2">
-                          <div className="w-9 h-9 rounded-full text-white text-sm font-bold flex items-center justify-center flex-shrink-0" style={{ background: GRAD }}>
+                          <div className="w-9 h-9 rounded-full text-white text-sm font-bold flex items-center justify-center flex-shrink-0" style={{ background: PURPLE }}>
                             {(r.reviewer_username || "?")[0].toUpperCase()}
                           </div>
                           <div>

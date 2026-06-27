@@ -12,7 +12,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useAuth } from "@/lib/authStore";
 import { useWishlistStore } from "@/lib/wishlistStore";
-import { GRAD, SERIF } from "@/lib/tokens";
+import { TEAL, PURPLE } from "@/lib/tokens";
 import TopNav from "@/components/layout/TopNav";
 import { api } from "@/lib/api";
 
@@ -429,7 +429,7 @@ export default function ProfilePage() {
 
         {completionPct < 100 && !bonusGranted && (
           <div className="text-white rounded-2xl p-5 shadow-lg animate-fadeUp"
-            style={{ background: GRAD }}>
+            style={{ background: TEAL }}>
             <div className="flex justify-between items-center">
               <div>
                 <h3 className="text-lg font-semibold flex items-center gap-2">
@@ -688,7 +688,7 @@ export default function ProfilePage() {
                 onClick={handleHostelSave}
                 disabled={hostelSaving || !profile.campus}
                 className="mt-3 w-full py-3 text-white rounded-full font-semibold text-sm shadow-md flex items-center justify-center gap-2 disabled:opacity-50 tap-scale"
-                style={{ background: GRAD }}
+                style={{ background: TEAL }}
               >
                 <Save className="w-4 h-4" />
                 {hostelSaving ? "Saving..." : profile.school ? "Update Hostel" : "Update Location"}
@@ -799,14 +799,14 @@ export default function ProfilePage() {
             <button onClick={saveProfile}
               disabled={saving || !!usernameError}
               className="w-full py-4 text-white rounded-full font-semibold text-lg shadow-lg flex items-center justify-center gap-2 disabled:opacity-70 tap-scale"
-              style={{ background: GRAD }}>
+              style={{ background: TEAL }}>
               <Save className="w-5 h-5" />
               {saving ? "Saving..." : "Save Changes"}
             </button>
           ) : (
             <button onClick={() => setIsEditing(true)}
               className="w-full py-4 text-white rounded-full font-semibold text-lg shadow-lg flex items-center justify-center gap-2 tap-scale"
-              style={{ background: GRAD }}>
+              style={{ background: TEAL }}>
               <Edit3 className="w-5 h-5" /> Edit Profile
             </button>
           )}

@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { useAuth } from "@/lib/authStore";
-import { GRAD } from "@/lib/tokens";
+import { TEAL } from "@/lib/tokens";
 import { api } from "@/lib/api";
 import {
   Package, Heart, Settings, HelpCircle, LogOut, ChevronRight,
@@ -122,7 +122,7 @@ export default function AccountSidebarWrapper({ children }: { children: React.Re
               <div className="w-12 h-12 rounded-2xl overflow-hidden ring-2 ring-stone-100 shadow-sm">
                 {pic
                   ? <img src={pic} alt="Profile" className="w-full h-full object-cover" />
-                  : <div className="w-full h-full flex items-center justify-center text-white text-base font-bold" style={{ background: GRAD }}>{initials}</div>
+                  : <div className="w-full h-full flex items-center justify-center text-white text-base font-bold" style={{ background: TEAL }}>{initials}</div>
                 }
               </div>
               <div className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full border-2 border-white shadow flex items-center justify-center" style={{ background: "#0d9488" }}>

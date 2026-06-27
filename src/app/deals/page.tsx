@@ -9,7 +9,7 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/lib/authStore";
 import { useWishlistStore } from "@/lib/wishlistStore";
 import { useCart } from "@/lib/cartStore";
-import { GRAD } from "@/lib/tokens";
+import { TEAL } from "@/lib/tokens";
 
 function SafeImage({ src, alt }: { src: string | null | undefined; alt: string }) {
   const [error, setError] = useState(false);
@@ -51,7 +51,7 @@ export default function DealsPage() {
       {toast && (
         <motion.div initial={{ y: -50, opacity: 0 }} animate={{ y: 60, opacity: 1 }}
           className="fixed top-4 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full shadow-lg z-50 font-medium text-sm text-white"
-          style={{ background: GRAD }}>
+          style={{ background: TEAL }}>
           {toast}
         </motion.div>
       )}
@@ -92,7 +92,7 @@ export default function DealsPage() {
               <h3 className="text-lg font-bold text-stone-400">No deals right now</h3>
               <p className="text-stone-400 text-sm mt-1">Check back soon for discounts!</p>
               <Link href="/home">
-                <button className="mt-5 px-5 py-2.5 text-white text-sm font-bold rounded-xl" style={{ background: GRAD }}>
+                <button className="mt-5 px-5 py-2.5 text-white text-sm font-bold rounded-xl" style={{ background: TEAL }}>
                   Browse Listings
                 </button>
               </Link>

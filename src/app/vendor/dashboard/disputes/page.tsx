@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertCircle, X, ChevronDown, ChevronUp, CheckCircle, Clock, Image as ImageIcon } from "lucide-react";
-import { GRAD } from "@/lib/tokens";
+import { TEAL } from "@/lib/tokens";
 import { EmptyState, LoadingSpinner, HEADING_FONT } from "../_shared";
 import { api } from "@/lib/api";
 
@@ -89,7 +89,7 @@ function RespondModal({ dispute, onSuccess, onClose }: {
           </button>
           <button onClick={submit} disabled={submitting || !response.trim()}
             className="flex-1 py-3 text-white rounded-full font-semibold text-sm disabled:opacity-50 flex items-center justify-center gap-2"
-            style={{ background: GRAD }}>
+            style={{ background: TEAL }}>
             {submitting
               ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Submitting…</>
               : "Submit Response"}
@@ -190,7 +190,7 @@ function DisputeCard({ dispute, onRespond }: { dispute: any; onRespond: () => vo
               <button
                 onClick={onRespond}
                 className="w-full py-2.5 text-white rounded-xl font-semibold text-sm flex items-center justify-center gap-2"
-                style={{ background: GRAD }}
+                style={{ background: TEAL }}
               >
                 <AlertCircle className="w-4 h-4" /> Respond to Dispute
               </button>
@@ -215,7 +215,7 @@ function DisputeCard({ dispute, onRespond }: { dispute: any; onRespond: () => vo
           <button
             onClick={() => { setExpanded(true); onRespond(); }}
             className="w-full py-2.5 text-white rounded-xl font-semibold text-sm flex items-center justify-center gap-2"
-            style={{ background: GRAD }}
+            style={{ background: TEAL }}
           >
             <AlertCircle className="w-4 h-4" /> Respond to Dispute
           </button>

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { CheckCircle, CalendarCheck, Calendar, Clock, MapPin, ArrowRight } from "lucide-react";
 import TopNav from "@/components/layout/TopNav";
 import { useBookingStore } from "@/lib/bookingStore";
-import { GRAD, SERIF } from "@/lib/tokens";
+import { TEAL, PURPLE } from "@/lib/tokens";
 
 export default function SuccessPage() {
   const router = useRouter();
@@ -20,7 +20,7 @@ export default function SuccessPage() {
 
         {/* SUCCESS ICON */}
         <div className="flex justify-center pt-2 animate-fadeUp">
-          <div className="w-20 h-20 rounded-full flex items-center justify-center shadow-lg" style={{ background: GRAD }}>
+          <div className="w-20 h-20 rounded-full flex items-center justify-center shadow-lg" style={{ background: TEAL }}>
             <CheckCircle className="w-10 h-10 text-white" />
           </div>
         </div>
@@ -38,7 +38,7 @@ export default function SuccessPage() {
         {booking && (
           <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm space-y-4 animate-fadeUp">
             <div className="flex items-center gap-3 pb-3 border-b border-stone-100">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: GRAD }}>
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: PURPLE }}>
                 <CalendarCheck className="w-5 h-5 text-white" />
               </div>
               <div>
@@ -80,7 +80,7 @@ export default function SuccessPage() {
           <Link href="/account/bookings" className="block">
             <button
               className="w-full py-4 rounded-full font-semibold text-white text-base shadow-lg flex items-center justify-center gap-2 transition active:scale-[0.98]"
-              style={{ background: GRAD }}
+              style={{ background: TEAL }}
             >
               <CalendarCheck className="w-5 h-5" />
               View My Bookings <ArrowRight className="w-4 h-4" />

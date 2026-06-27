@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { Package, CheckCircle, Clock, AlertCircle, ChevronLeft } from "lucide-react";
 import { useEffect } from "react";
 import { useAuth } from "@/lib/authStore";
-import { GRAD, SERIF } from "@/lib/tokens";
+import { TEAL } from "@/lib/tokens";
 import TopNav from "@/components/layout/TopNav";
 import { useScrollRestoration } from "@/hooks/useScrollRestoration";
 import { api } from "@/lib/api";
@@ -121,7 +121,7 @@ export default function OrdersPage() {
             <Link href="/home">
               <button
                 className="mt-6 px-8 py-3 text-white rounded-full font-semibold shadow-lg"
-                style={{ background: GRAD }}
+                style={{ background: TEAL }}
               >
                 Start Exploring
               </button>

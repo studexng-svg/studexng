@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
-import { GRAD, SERIF } from "@/lib/tokens";
+import { TEAL } from "@/lib/tokens";
 import { ChevronDown, ChevronUp, HelpCircle, MessageCircle, Shield, CreditCard, Star, Package, Calendar } from "lucide-react";
 import TopNav from "@/components/layout/TopNav";
 
@@ -131,7 +131,7 @@ export default function FAQPage() {
       <div className="pb-28 p-4 space-y-5 max-w-2xl mx-auto">
 
         {/* HERO */}
-        <div className="rounded-2xl p-6 text-white text-center shadow-md animate-fadeUp" style={{ background: GRAD }}>
+        <div className="rounded-2xl p-6 text-white text-center shadow-md animate-fadeUp" style={{ background: TEAL }}>
           <HelpCircle className="w-12 h-12 mx-auto mb-3 opacity-90" />
           <h2 className="text-xl font-bold mb-1" style={SERIF}>
             How can we help?
@@ -199,7 +199,7 @@ export default function FAQPage() {
           </p>
           <a href="mailto:studex.ng@gmail.com"
             className="inline-block px-6 py-3 text-white font-semibold rounded-full text-sm shadow-lg shadow-teal-200/60 transition active:scale-[0.98]"
-            style={{ background: GRAD }}>
+            style={{ background: TEAL }}>
             Email Support
           </a>
         </div>

@@ -5,7 +5,7 @@ import TopNav from "@/components/layout/TopNav";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/authStore";
-import { GRAD, SERIF } from "@/lib/tokens";
+import { TEAL } from "@/lib/tokens";
 import { api } from "@/lib/api";
 
 type DocType = "id_card" | "admission_letter" | "nin";
@@ -117,7 +117,7 @@ export default function VendorApplyPage() {
                 className={`w-11 h-11 rounded-full flex items-center justify-center font-semibold text-sm shadow-sm transition-all ${
                   i <= step ? "text-white" : "bg-stone-100 text-stone-400"
                 }`}
-                style={i <= step ? { background: GRAD } : {}}
+                style={i <= step ? { background: TEAL } : {}}
               >
                 {i < step ? <CheckCircle className="w-5 h-5" /> : i}
               </div>
@@ -143,7 +143,7 @@ export default function VendorApplyPage() {
             <button
               onClick={() => setStep(2)}
               className="w-full py-4 rounded-full font-semibold text-white shadow-md flex items-center justify-center gap-2 active:scale-[0.98] transition-all"
-              style={{ background: GRAD }}
+              style={{ background: TEAL }}
             >
               Start Application <ArrowRight className="w-4 h-4" />
             </button>
@@ -358,7 +358,7 @@ export default function VendorApplyPage() {
               onClick={() => setStep(3)}
               disabled={!isStep2Complete}
               className="w-full py-4 rounded-full font-semibold text-white shadow-md flex items-center justify-center gap-2 transition-all disabled:opacity-50 active:scale-[0.98]"
-              style={{ background: isStep2Complete ? GRAD : "#D6D3D1" }}
+              style={{ background: isStep2Complete ? TEAL : "#D6D3D1" }}
             >
               Continue to Review {isStep2Complete && <ArrowRight className="w-4 h-4" />}
             </button>
@@ -441,7 +441,7 @@ export default function VendorApplyPage() {
                   onClick={handleSubmit}
                   disabled={loading}
                   className="w-full py-4 rounded-full font-semibold text-white shadow-md disabled:opacity-50 transition-all active:scale-[0.98]"
-                  style={{ background: GRAD }}
+                  style={{ background: TEAL }}
                 >
                   {loading ? "Submitting Application..." : "Submit Application"}
                 </button>

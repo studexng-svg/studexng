@@ -12,7 +12,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/lib/authStore";
-import { GRAD, GRAD_TEXT } from "@/lib/tokens";
+import { GRAD, GRAD_TEXT, TEAL } from "@/lib/tokens";
 import { api } from "@/lib/api";
 import TopNav from "@/components/layout/TopNav";
 
@@ -96,7 +96,7 @@ function CanvasCrop({ src, onCrop, onCancel }: { src: string; onCrop: (blob: Blo
       <div className="flex gap-3 w-full">
         <button onClick={onCancel} className="flex-1 py-3 rounded-full border border-stone-200 text-stone-600 text-sm font-medium hover:bg-stone-50 transition">Cancel</button>
         <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }} onClick={handleDone} disabled={!img}
-          className="flex-1 py-3 rounded-full text-white text-sm font-semibold shadow-lg disabled:opacity-50" style={{ background: GRAD }}>
+          className="flex-1 py-3 rounded-full text-white text-sm font-semibold shadow-lg disabled:opacity-50" style={{ background: TEAL }}>
           Done & Upload
         </motion.button>
       </div>
@@ -350,7 +350,7 @@ export default function AccountPage() {
                 {selectedNotif.action_url && !selectedNotif.action_url.includes("/seller") && !selectedNotif.action_url.includes("/auth") && (
                   <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
                     onClick={() => { setShowNotifDetail(false); setShowNotifications(false); isNavigating.current = true; router.push(selectedNotif.action_url); setTimeout(() => { isNavigating.current = false; }, 2000); }}
-                    className="flex-1 py-3 rounded-full text-white text-sm font-semibold shadow-lg" style={{ background: GRAD }}>
+                    className="flex-1 py-3 rounded-full text-white text-sm font-semibold shadow-lg" style={{ background: TEAL }}>
                     Go There
                   </motion.button>
                 )}
@@ -392,12 +392,12 @@ export default function AccountPage() {
               className="w-full max-w-xs" onClick={e => e.stopPropagation()}>
               <div className="w-64 h-64 mx-auto rounded-2xl overflow-hidden shadow-2xl ring-4 ring-white/20">
                 {pic ? <img src={pic} alt="Profile" className="w-full h-full object-cover block" />
-                     : <div className="w-full h-full flex items-center justify-center text-white text-6xl font-bold" style={{ background: GRAD }}>{initials}</div>}
+                     : <div className="w-full h-full flex items-center justify-center text-white text-6xl font-bold" style={{ background: TEAL }}>{initials}</div>}
               </div>
               <div className="flex gap-3 mt-6 justify-center flex-wrap">
                 <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
                   onClick={() => { setViewModalOpen(false); setTimeout(() => fileInputRef.current?.click(), 150); }}
-                  className="px-6 py-3 rounded-full text-white text-sm font-semibold shadow-lg flex items-center gap-2" style={{ background: GRAD }}>
+                  className="px-6 py-3 rounded-full text-white text-sm font-semibold shadow-lg flex items-center gap-2" style={{ background: TEAL }}>
                   <Camera className="w-4 h-4" /> Change Photo
                 </motion.button>
                 {pic && (
@@ -492,12 +492,12 @@ export default function AccountPage() {
             <motion.button whileTap={{ scale: 0.95 }} onClick={() => setViewModalOpen(true)} className="relative flex-shrink-0">
               <div className="w-20 h-20 rounded-2xl overflow-hidden ring-2 ring-stone-100 shadow-md">
                 {uploading
-                  ? <div className="w-full h-full flex items-center justify-center" style={{ background: GRAD }}>
+                  ? <div className="w-full h-full flex items-center justify-center" style={{ background: TEAL }}>
                       <div className="w-6 h-6 border-2 border-white/40 border-t-white rounded-full animate-spin" />
                     </div>
                   : pic
                     ? <img src={pic} alt="Profile" className="w-full h-full object-cover" />
-                    : <div className="w-full h-full flex items-center justify-center text-white text-2xl font-black" style={{ background: GRAD }}>{initials}</div>
+                    : <div className="w-full h-full flex items-center justify-center text-white text-2xl font-black" style={{ background: TEAL }}>{initials}</div>
                 }
               </div>
               <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full border-2 border-white shadow flex items-center justify-center" style={{ background: "#0d9488" }}>
@@ -570,7 +570,7 @@ export default function AccountPage() {
             <Link href="/vendor/dashboard">
               <motion.div whileTap={{ scale: 0.98 }}
                 className="relative rounded-2xl p-5 overflow-hidden shadow-md mt-4"
-                style={{ background: GRAD }}>
+                style={{ background: TEAL }}>
                 <div className="absolute top-0 right-0 w-28 h-28 rounded-full bg-white/10 blur-2xl pointer-events-none" />
                 <div className="flex items-start justify-between gap-3">
                   <div>
@@ -598,7 +598,7 @@ export default function AccountPage() {
               </div>
             </div>
           ) : (
-            <div className="relative rounded-2xl p-5 overflow-hidden shadow-md mt-4" style={{ background: GRAD }}>
+            <div className="relative rounded-2xl p-5 overflow-hidden shadow-md mt-4" style={{ background: TEAL }}>
               <div className="absolute top-0 right-0 w-28 h-28 rounded-full bg-white/10 blur-2xl pointer-events-none" />
               <div className="flex items-start justify-between gap-3">
                 <div>

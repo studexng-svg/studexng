@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Lock, Eye, EyeOff, CheckCircle, AlertCircle, ChevronLeft } from "lucide-react";
-import { GRAD, SERIF } from "@/lib/tokens";
+import { TEAL } from "@/lib/tokens";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -90,7 +90,7 @@ function ResetPasswordForm() {
               <button
                 onClick={() => router.push("/auth")}
                 className="w-full py-4 rounded-full text-white font-semibold text-base shadow-lg transition active:scale-[0.98]"
-                style={{ background: GRAD }}
+                style={{ background: TEAL }}
               >
                 Go to Login →
               </button>
@@ -100,7 +100,7 @@ function ResetPasswordForm() {
 
               {/* HEADING */}
               <div>
-                <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4" style={{ background: GRAD }}>
+                <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4" style={{ background: TEAL }}>
                   <Lock className="w-7 h-7 text-white" />
                 </div>
                 <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold">Secure your account</p>
@@ -190,7 +190,7 @@ function ResetPasswordForm() {
                     type="submit"
                     disabled={isLoading}
                     className="w-full py-4 rounded-full text-white font-semibold text-base shadow-lg disabled:opacity-50 transition active:scale-[0.98]"
-                    style={{ background: GRAD }}
+                    style={{ background: TEAL }}
                   >
                     {isLoading ? "Resetting..." : "Reset Password"}
                   </button>

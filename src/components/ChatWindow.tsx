@@ -10,7 +10,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/lib/authStore";
 import { api } from "@/lib/api";
-import { GRAD } from "@/lib/tokens";
+import { TEAL, PURPLE } from "@/lib/tokens";
 const DELETE_EVERYONE_LIMIT_HOURS = 60;
 
 interface ChatWindowProps {
@@ -423,7 +423,7 @@ export default function ChatWindow({
           </button>
           <div
             className="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0 shadow-sm"
-            style={{ background: GRAD }}
+            style={{ background: PURPLE }}
           >
             {sellerName?.[0]?.toUpperCase() || "?"}
           </div>
@@ -529,7 +529,7 @@ export default function ChatWindow({
                           ? "text-white rounded-br-sm"
                           : "bg-white text-stone-900 shadow-sm rounded-bl-sm border border-stone-100"
                       } ${msg.is_pinned ? 'ring-2 ring-teal-400/40' : ''}`}
-                      style={msg.is_mine ? { background: GRAD } : {}}
+                      style={msg.is_mine ? { background: TEAL } : {}}
                     >
                       {!msg.is_mine && (
                         <p className="text-xs font-semibold text-teal-600 mb-1">{msg.sender || sellerName}</p>
@@ -629,7 +629,7 @@ export default function ChatWindow({
             onClick={handleSend}
             disabled={sending || !conversationId || (!message.trim() && !imageFile)}
             className="p-2.5 text-white rounded-xl disabled:opacity-40 flex-shrink-0 transition active:scale-95"
-            style={{ background: GRAD }}
+            style={{ background: TEAL }}
           >
             {sending ? <Loader className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
           </button>

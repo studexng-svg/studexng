@@ -12,7 +12,7 @@ import {
 import TopNav from "@/components/layout/TopNav";
 import { useAuth } from "@/lib/authStore";
 import { api } from "@/lib/api";
-import { GRAD, toArray, calcServiceFee } from "@/lib/tokens";
+import { TEAL, PURPLE, toArray, calcServiceFee } from "@/lib/tokens";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 
@@ -345,7 +345,7 @@ export default function BuyerBookingsPage() {
               className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl border border-stone-100 overflow-y-auto"
               style={{ maxHeight: "calc(100dvh - 3rem)" }}>
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: GRAD }}>
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: PURPLE }}>
                   <CreditCard className="w-5 h-5 text-white" />
                 </div>
                 <div>
@@ -428,7 +428,7 @@ export default function BuyerBookingsPage() {
                 </button>
                 <button onClick={proceedToPaystack} disabled={isProcessing}
                   className="flex-1 py-3 text-white rounded-full font-semibold text-sm flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-transform disabled:opacity-70"
-                  style={{ background: GRAD }}>
+                  style={{ background: TEAL }}>
                   {isProcessing
                     ? <><Loader className="w-4 h-4 animate-spin" /> Processing...</>
                     : <><CreditCard className="w-4 h-4" />{isFullyCoveredByCredits ? "Pay with Credits" : `Pay ₦${totalWithFee.toLocaleString()}`}</>
@@ -452,7 +452,7 @@ export default function BuyerBookingsPage() {
                   ? "text-white shadow-md"
                   : "bg-white text-stone-500 border border-stone-200"
               }`}
-              style={filter === f ? { background: GRAD } : {}}>
+              style={filter === f ? { background: TEAL } : {}}>
               {f}{counts[f] > 0 && <span className={`ml-1 text-xs ${filter === f ? "opacity-80" : "text-teal-500"}`}>({counts[f]})</span>}
             </button>
           ))}
@@ -492,7 +492,7 @@ export default function BuyerBookingsPage() {
                         className="w-11 h-11 rounded-full object-cover flex-shrink-0 ring-2 ring-white shadow-sm" />
                     ) : (
                       <div className="w-11 h-11 rounded-full flex items-center justify-center text-white font-bold text-base flex-shrink-0 shadow-sm"
-                        style={{ background: GRAD }}>
+                        style={{ background: TEAL }}>
                         {booking.vendor_name?.[0]?.toUpperCase() || "V"}
                       </div>
                     )}
@@ -533,7 +533,7 @@ export default function BuyerBookingsPage() {
                   {isBookingConfirmed && (
                     <button onClick={() => handlePay(booking.id)}
                       className="flex-1 py-3 text-white rounded-xl font-semibold text-sm flex items-center justify-center gap-2 shadow-md active:scale-95 transition-transform"
-                      style={{ background: GRAD }}>
+                      style={{ background: TEAL }}>
                       <CreditCard className="w-4 h-4" /> Pay ₦{(Number(booking.listing_price) + calcServiceFee(Number(booking.listing_price))).toLocaleString()}
                     </button>
                   )}

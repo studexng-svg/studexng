@@ -17,7 +17,7 @@ import { useAuth } from "@/lib/authStore";
 import { api } from "@/lib/api";
 import { useWishlistStore } from "@/lib/wishlistStore";
 import { useCart } from "@/lib/cartStore";
-import { GRAD, GRAD_TEXT, SERIF } from "@/lib/tokens";
+import { GRAD, GRAD_TEXT, TEAL, PURPLE } from "@/lib/tokens";
 import VendorOfMonthModal from "@/components/VendorOfMonthModal";
 import { useScrollRestoration } from "@/hooks/useScrollRestoration";
 import WhatsAppGroupModal from "@/components/WhatsAppGroupModal";
@@ -466,7 +466,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                 -{discountPct}% OFF
               </div>
             ) : badge && badge !== "none" ? (
-              <div className="absolute top-2.5 left-2.5 z-10 px-2 py-0.5 rounded-md text-xs font-bold text-white" style={{ background: GRAD }}>
+              <div className="absolute top-2.5 left-2.5 z-10 px-2 py-0.5 rounded-md text-xs font-bold text-white" style={{ background: PURPLE }}>
                 {BADGE_LABELS[badge]}
               </div>
             ) : null}
@@ -616,7 +616,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
             )}
 
             {badge && badge !== "none" && (
-              <div className="absolute top-2.5 left-2.5 z-10 px-2 py-0.5 rounded-md text-xs font-bold text-white mt-6" style={{ background: GRAD }}>
+              <div className="absolute top-2.5 left-2.5 z-10 px-2 py-0.5 rounded-md text-xs font-bold text-white mt-6" style={{ background: PURPLE }}>
                 {BADGE_LABELS[badge]}
               </div>
             )}
@@ -713,7 +713,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
             <div className="relative w-full aspect-square overflow-hidden bg-stone-50">
               {displaySrc
                 ? <img src={displaySrc} alt={vendor.business_name || vendor.username} className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                : <div className="absolute inset-0 flex items-center justify-center text-white text-3xl font-black" style={{ background: GRAD }}>{initials}</div>
+                : <div className="absolute inset-0 flex items-center justify-center text-white text-3xl font-black" style={{ background: TEAL }}>{initials}</div>
               }
               {vendor.is_online && (
                 <div className="absolute top-2.5 right-2.5 flex items-center gap-1 bg-white/90 px-2 py-0.5 rounded-full shadow-sm">
@@ -796,7 +796,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                     setShowDisclaimer(false);
                   }}
                   className="w-full py-3.5 rounded-full text-white font-semibold text-sm shadow-lg"
-                  style={{ background: GRAD }}
+                  style={{ background: TEAL }}
                 >
                   I Understand & Accept
                 </motion.button>
@@ -808,7 +808,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
 
       {toast && (
         <motion.div initial={{ y: -50, opacity: 0 }} animate={{ y: 60, opacity: 1 }}
-          className="fixed top-4 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full shadow-lg z-50 font-medium text-sm text-white" style={{ background: GRAD }}>
+          className="fixed top-4 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full shadow-lg z-50 font-medium text-sm text-white" style={{ background: TEAL }}>
           {toast}
         </motion.div>
       )}
@@ -823,7 +823,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
               <div className="w-9 h-9 rounded-xl overflow-hidden border border-stone-100 shadow-sm flex items-center justify-center p-1 bg-white">
                 <img src="/images/logo-1.jpg" alt="StudEx" loading="lazy" className="w-full h-full object-contain" />
               </div>
-              <span className="font-black text-lg text-stone-900 hidden sm:block" style={SERIF}>
+              <span className="font-black text-lg text-stone-900 hidden sm:block" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                 Stud<span className="text-transparent bg-clip-text" style={{ backgroundImage: GRAD }}>Ex</span>
               </span>
             </Link>
@@ -875,7 +875,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                               <p className="font-semibold text-stone-900 text-sm truncate">{item.title}</p>
                               <p className="text-xs text-stone-400">@{item.vendor?.username || item.vendor}</p>
                             </div>
-                            <p className="font-bold text-sm flex-shrink-0 text-transparent bg-clip-text" style={{ backgroundImage: GRAD }}>₦{Number(item.price).toLocaleString()}</p>
+                            <p className="font-bold text-sm flex-shrink-0" style={{ color: TEAL }}>₦{Number(item.price).toLocaleString()}</p>
                           </div>
                         </Link>
                       ))}
@@ -896,7 +896,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                     <div className="relative">
                       <ShoppingCart className="w-5 h-5" />
                       {cart.length > 0 && (
-                        <span className="absolute -top-1.5 -right-1.5 w-4 h-4 text-xs font-bold text-white rounded-full flex items-center justify-center" style={{ background: GRAD }}>
+                        <span className="absolute -top-1.5 -right-1.5 w-4 h-4 text-xs font-bold text-white rounded-full flex items-center justify-center" style={{ background: TEAL }}>
                           {cart.length}
                         </span>
                       )}
@@ -916,7 +916,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                   </Link>
                   <Link href="/auth">
                     <motion.button whileTap={{ scale: 0.97 }}
-                      className="px-4 py-2 text-white font-semibold rounded-xl text-sm shadow-sm" style={{ background: GRAD }}>
+                      className="px-4 py-2 text-white font-semibold rounded-xl text-sm shadow-sm" style={{ background: TEAL }}>
                       Login
                     </motion.button>
                   </Link>
@@ -1090,7 +1090,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
             {[{ slug: "All", title: "All Products" }, ...categories.map(c => ({ slug: c.slug, title: c.title }))].map(tab => (
               <button key={tab.slug} onClick={() => { setActiveTab("listings"); handleFilter(tab.slug); }}
                 className={`flex-shrink-0 px-4 py-1.5 rounded-full text-xs font-semibold transition-all border ${activeFilter === tab.slug && activeTab === "listings" ? "text-white shadow-sm border-transparent" : "bg-white text-stone-500 border-stone-200 hover:border-stone-300"}`}
-                style={activeFilter === tab.slug && activeTab === "listings" ? { background: GRAD } : {}}>
+                style={activeFilter === tab.slug && activeTab === "listings" ? { background: TEAL } : {}}>
                 {tab.title}
               </button>
             ))}
@@ -1383,7 +1383,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                   }
                 }}
                 className="flex-shrink-0 px-4 py-2 rounded-xl text-white text-xs font-bold"
-                style={{ background: GRAD }}>
+                style={{ background: TEAL }}>
                 Invite
               </motion.button>
             </div>

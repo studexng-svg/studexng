@@ -9,7 +9,7 @@ import { useRouter } from "next/navigation";
 import { useCartStore } from "@/lib/cartStore";
 import { useAuth } from "@/lib/authStore";
 import { useEffect, useState, useMemo } from "react";
-import { GRAD, GRAD_TEXT } from "@/lib/tokens";
+import { GRAD, GRAD_TEXT, TEAL } from "@/lib/tokens";
 
 const JAKARTA = { fontFamily: "'Plus Jakarta Sans', sans-serif" };
 import { api } from "@/lib/api";
@@ -114,7 +114,7 @@ export default function CartPage() {
       <div className="min-h-screen bg-[#F5F5F5] flex flex-col items-center justify-center px-6 pb-28" style={{ fontFamily: "'DM Sans', sans-serif" }}>
         <div className="text-center animate-fadeUp">
           <div className="w-24 h-24 mx-auto mb-6 rounded-2xl flex items-center justify-center"
-            style={{ background: GRAD }}>
+            style={{ background: TEAL }}>
             <ShoppingBag className="w-12 h-12 text-white" strokeWidth={1.5} />
           </div>
           <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold mb-2">Empty Cart</p>
@@ -125,7 +125,7 @@ export default function CartPage() {
           <Link href="/categories">
             <button
               className="px-8 py-3 text-white font-semibold rounded-full shadow-lg shadow-teal-200/60 inline-flex items-center gap-2 text-sm hover-scale tap-scale"
-              style={{ background: GRAD }}>
+              style={{ background: TEAL }}>
               Browse Categories <ArrowRight className="w-4 h-4" />
             </button>
           </Link>
@@ -283,7 +283,7 @@ export default function CartPage() {
                     ? "bg-stone-100 text-stone-400 cursor-not-allowed"
                     : "text-white shadow-lg shadow-teal-200/60"
                 }`}
-                style={hasUnavailable ? {} : { background: GRAD }}>
+                style={hasUnavailable ? {} : { background: TEAL }}>
                 {hasUnavailable
                   ? "Remove unavailable items first"
                   : <> Checkout Now <ArrowRight className="w-4 h-4" /></>
