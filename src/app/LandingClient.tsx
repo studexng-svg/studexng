@@ -387,16 +387,40 @@ export default function LandingClient({ initialListings }: { initialListings: an
                       {/* Screen glass */}
                       <div className="relative rounded-[46px] overflow-hidden flex flex-col bg-white">
 
-                        {/* Dynamic Island — sits on top of the screenshot */}
-                        <div className="absolute top-[7px] left-1/2 -translate-x-1/2 z-20 rounded-full bg-stone-950"
-                          style={{ width: "88px", height: "26px" }} />
+                        {/* Status bar — time left, Dynamic Island center, icons right */}
+                        <div className="relative flex items-center justify-between bg-white px-5 flex-shrink-0" style={{ height: "44px" }}>
+                          {/* Dynamic Island */}
+                          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-stone-950 z-10"
+                            style={{ width: "88px", height: "26px" }} />
+                          {/* Time */}
+                          <span className="text-[11px] font-semibold text-stone-900 tabular-nums z-20 relative">9:41</span>
+                          {/* Signal + WiFi + Battery */}
+                          <div className="flex items-center gap-1.5 z-20 relative">
+                            <div className="flex items-end gap-[2px]" style={{ height: "12px" }}>
+                              {[3, 4, 5, 6].map(h => (
+                                <div key={h} className="w-[2.5px] bg-stone-900 rounded-[1px]" style={{ height: `${h}px` }} />
+                              ))}
+                            </div>
+                            <svg width="13" height="10" viewBox="0 0 13 10" fill="none">
+                              <path d="M0.5 3.5C2.3 1.5 4.3 0.5 6.5 0.5S10.7 1.5 12.5 3.5" stroke="#111827" strokeWidth="1.3" strokeLinecap="round"/>
+                              <path d="M2.5 5.8C3.7 4.7 5 4 6.5 4S9.3 4.7 10.5 5.8" stroke="#111827" strokeWidth="1.3" strokeLinecap="round"/>
+                              <circle cx="6.5" cy="8.5" r="1.2" fill="#111827"/>
+                            </svg>
+                            <div className="flex items-center gap-[1.5px]">
+                              <div className="w-[18px] h-[9px] rounded-[2px] border border-stone-800 relative overflow-hidden">
+                                <div className="absolute inset-[1.5px] rounded-[1px] bg-stone-900" style={{ width: "75%" }} />
+                              </div>
+                              <div className="w-[2px] h-[5px] rounded-r-sm bg-stone-800 opacity-50" />
+                            </div>
+                          </div>
+                        </div>
 
-                        {/* Screenshot 1 — status bar → filter tabs (crop bottom nav off) */}
-                        <div className="overflow-hidden flex-shrink-0" style={{ height: "330px" }}>
+                        {/* Screenshot 1 — app header through filter tabs */}
+                        <div className="overflow-hidden flex-shrink-0" style={{ height: "300px" }}>
                           <img src="/images/app-screen-1.png" alt="StudEx home" className="w-full block" loading="lazy" />
                         </div>
 
-                        {/* Screenshot 2 — listing cards (skip its own status bar row) */}
+                        {/* Screenshot 2 — listing cards */}
                         <div className="overflow-hidden flex-shrink-0" style={{ height: "220px" }}>
                           <img src="/images/app-screen-2.png" alt="StudEx listings" className="w-full block" loading="lazy" />
                         </div>
