@@ -9,7 +9,7 @@ import { api } from "@/lib/api";
 import {
   MessageCircle, Calendar, DollarSign, Package, ShoppingBag,
   Star, LayoutDashboard, Link2, Share2, Check, History,
-  MessageSquare, AlertCircle, ChevronRight, LogOut, Menu, X,
+  MessageSquare, AlertCircle, ChevronRight, LogOut, Menu, X, ChevronLeft,
 } from "lucide-react";
 
 const TABS = [
@@ -204,7 +204,11 @@ export default function VendorDashboardLayout({ children }: { children: React.Re
       {/* ── MOBILE HEADER ── */}
       <div className="lg:hidden sticky top-0 z-40">
         <div className="bg-white border-b border-stone-100 px-4 py-3.5 flex items-center justify-between shadow-sm">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <Link href="/home"
+              className="w-9 h-9 rounded-xl bg-stone-100 flex items-center justify-center flex-shrink-0 hover:bg-stone-200 transition">
+              <ChevronLeft className="w-4.5 h-4.5 text-stone-600" />
+            </Link>
             <button
               onClick={() => setSidebarOpen(true)}
               className="w-9 h-9 rounded-xl bg-stone-100 flex items-center justify-center"

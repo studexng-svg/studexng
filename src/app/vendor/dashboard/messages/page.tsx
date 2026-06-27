@@ -4,6 +4,20 @@ import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/lib/authStore";
 import { GRAD, toArray } from "@/lib/tokens";
 import { ArrowLeft, MessageCircle, Check, CheckCheck, Send, Loader } from "lucide-react";
+
+function Avatar({ conv, size = "md" }: { conv: any; size?: "sm" | "md" }) {
+  const pic = conv.other_user?.profile_picture;
+  const initial = (conv.buyer_username?.[0] || conv.other_user?.username?.[0] || "?").toUpperCase();
+  const cls = size === "sm"
+    ? "w-8 h-8 rounded-full text-xs font-bold flex-shrink-0"
+    : "w-10 h-10 rounded-full text-sm font-bold flex-shrink-0";
+  if (pic) return <img src={pic} alt={initial} className={`${cls} object-cover`} />;
+  return (
+    <div className={`${cls} flex items-center justify-center text-white`} style={{ background: "linear-gradient(135deg,#0D9488 0%,#7C3AED 100%)" }}>
+      {initial}
+    </div>
+  );
+}
 import { LoadingSpinner, EmptyState } from "../_shared";
 import { api } from "@/lib/api";
 
@@ -129,10 +143,7 @@ export default function MessagesPage() {
             className="p-1.5 -ml-1 hover:bg-stone-100 rounded-full transition flex-shrink-0">
             <ArrowLeft className="w-4 h-4 text-stone-600" />
           </button>
-          <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
-            style={{ background: GRAD }}>
-            {activeConv.buyer_username?.[0]?.toUpperCase() || "?"}
-          </div>
+          <Avatar conv={activeConv} size="sm" />
           <div className="min-w-0">
             <p className="font-semibold text-stone-800 text-sm truncate">{activeConv.buyer_username || "Buyer"}</p>
             <p className="text-xs text-stone-400 truncate">{activeConv.listing_title}</p>
@@ -179,10 +190,7 @@ export default function MessagesPage() {
               activeConv?.id === conv.id ? "bg-teal-50 border-l-2 border-l-teal-500" : ""
             }`}>
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
-                style={{ background: GRAD }}>
-                {conv.buyer_username?.[0]?.toUpperCase() || "?"}
-              </div>
+              <Avatar conv={conv} size="sm" />
               <div className="flex-1 min-w-0">
                 <p className="font-semibold text-stone-800 text-sm truncate">{conv.buyer_username || "Buyer"}</p>
                 <p className="text-xs text-stone-400 truncate">{conv.listing_title || "Service inquiry"}</p>
@@ -210,10 +218,7 @@ export default function MessagesPage() {
         ) : (
           <>
             <div className="px-4 py-3 border-b border-stone-100 flex items-center gap-3 flex-shrink-0">
-              <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
-                style={{ background: GRAD }}>
-                {activeConv.buyer_username?.[0]?.toUpperCase() || "?"}
-              </div>
+              <Avatar conv={activeConv} size="sm" />
               <div className="min-w-0">
                 <p className="font-semibold text-stone-800 text-sm truncate">{activeConv.buyer_username || "Buyer"}</p>
                 <p className="text-xs text-stone-400 truncate">{activeConv.listing_title}</p>
