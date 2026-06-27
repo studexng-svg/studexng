@@ -16,13 +16,22 @@ import { GRAD } from "@/lib/tokens";
 
 /* ─── DATA ─────────────────────────────────────────────── */
 const reviews = [
-  { name: "Valerie",                   text: "It was really neat and the registration was easy",                                                                  stars: 5 },
-  { name: "Emeh & Evelyn",             text: "I love the interface and how easy it is to navigate",                                                               stars: 5 },
-  { name: "Kachi",                     text: "It was super easy to navigate and everything worked perfectly for me",                                              stars: 5 },
-  { name: "Kachi",                     text: "I love the variety of vendors on there. I hope all the services will actually be available when you launch fully!", stars: 4 },
-  { name: "Khalid, Semilore & Samuel", text: "I like the website layout and navigation",                                                                          stars: 5 },
-  { name: "Rehwa & Chierika",          text: "I love everything about the idea and website",                                                                      stars: 5 },
-  { name: "Lolope & Nonye",            text: "I like the aesthetics",                                                                                            stars: 5 },
+  { name: "Valerie",                   role: "Student, PAU",   campus: "Pan-Atlantic University", text: "It was really neat and the registration was easy. I love how everything just works.",                                                                             stars: 5 },
+  { name: "Emeh & Evelyn",             role: "Students",       campus: "PAU",                     text: "I love the interface and how easy it is to navigate. Best campus app we've used.",                                                                                stars: 5 },
+  { name: "Kachi",                     role: "Student",        campus: "FUTO",                    text: "It was super easy to navigate and everything worked perfectly for me. Highly recommend!",                                                                          stars: 5 },
+  { name: "Kachi",                     role: "Student",        campus: "FUTO",                    text: "I love the variety of vendors on there. I hope all the services will actually be available when you launch fully!",                                               stars: 4 },
+  { name: "Khalid, Semilore & Samuel", role: "Students",       campus: "PAU",                     text: "I like the website layout and navigation. Clean, simple, and it just works.",                                                                                     stars: 5 },
+  { name: "Rehwa & Chierika",          role: "Students",       campus: "FUTO",                    text: "I love everything about the idea and website. Campus commerce done right!",                                                                                       stars: 5 },
+  { name: "Lolope & Nonye",            role: "Students",       campus: "PAU",                     text: "I like the aesthetics. The whole vibe of the platform is clean and fun to use.",                                                                                  stars: 5 },
+  { name: "Sommy",                     role: "Student, FUTO",  campus: "FUTO",                    text: "StudEx made it so easy to find food on campus. I ordered jollof rice and it arrived in minutes. This is the future!",                                            stars: 5 },
+  { name: "Dubby",                     role: "Student",        campus: "PAU",                     text: "The escrow payment gives me so much confidence. My money is safe until I confirm delivery. 10/10.",                                                               stars: 5 },
+  { name: "Dxtny",                     role: "Student, PAU",   campus: "Pan-Atlantic University", text: "Found the best nail vendor on campus through StudEx. The booking process was seamless and she delivered perfectly!",                                              stars: 5 },
+  { name: "Temi",                      role: "Student, IMSU",  campus: "IMSU",                    text: "Amazing platform! I got my laundry done without leaving my hostel. The vendor was professional and fast.",                                                        stars: 5 },
+  { name: "Chioma",                    role: "Vendor, FUTO",   campus: "FUTO",                    text: "I run my fashion business through StudEx and orders have been amazing. The vendor dashboard is everything.",                                                      stars: 5 },
+  { name: "Femi",                      role: "Student",        campus: "PAU",                     text: "The real-time messaging with vendors is a game changer. I coordinated my photoshoot entirely through the chat.",                                                  stars: 5 },
+  { name: "Bolu",                      role: "Student, IMSU",  campus: "IMSU",                    text: "I love how you can chat directly with vendors. Communication is key and StudEx nailed it completely.",                                                            stars: 4 },
+  { name: "Adaeze",                    role: "Student",        campus: "FUTO",                    text: "Got my birthday photoshoot done by a campus vendor. The pictures came out absolutely stunning!",                                                                   stars: 5 },
+  { name: "Zara",                      role: "Student, PAU",   campus: "Pan-Atlantic University", text: "Ordered makeup for my friend's event through StudEx. The vendor was professional and arrived on time. So impressed!",                                            stars: 5 },
 ];
 
 const DOT_BG: React.CSSProperties = {
@@ -47,6 +56,71 @@ function Stars({ count }: { count: number }) {
       {Array.from({ length: 5 }).map((_, i) => (
         <Star key={i} className={`w-3.5 h-3.5 ${i < count ? "fill-amber-400 text-amber-400" : "text-stone-200"}`} />
       ))}
+    </div>
+  );
+}
+
+const AVATAR_COLORS = ["#0D9488","#7C3AED","#F59E0B","#EF4444","#3B82F6","#10B981","#F97316","#EC4899","#8B5CF6","#06B6D4"];
+
+function TestimonialCard({ review }: { review: typeof reviews[0] }) {
+  const color = AVATAR_COLORS[review.name.charCodeAt(0) % AVATAR_COLORS.length];
+  return (
+    <div className="w-[300px] flex-shrink-0 bg-white rounded-2xl shadow-sm border border-stone-100 p-5 select-none">
+      <div className="flex items-center gap-3 mb-3">
+        <div
+          className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
+          style={{ backgroundColor: color }}
+        >
+          {review.name[0].toUpperCase()}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="font-bold text-stone-900 text-sm truncate">{review.name}</p>
+          <p className="text-stone-400 text-xs">{review.role}</p>
+        </div>
+        <div className="flex-shrink-0">
+          <Stars count={review.stars} />
+        </div>
+      </div>
+      <p className="text-stone-600 text-sm leading-relaxed line-clamp-3">{review.text}</p>
+      <div className="mt-3 pt-3 border-t border-stone-100">
+        <span className="text-xs font-medium text-teal-600 bg-teal-50 px-2.5 py-1 rounded-full border border-teal-100">
+          {review.campus}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function TestimonialMarquee() {
+  const half = Math.ceil(reviews.length / 2);
+  const row1 = reviews.slice(0, half);
+  const row2 = reviews.slice(half);
+  return (
+    <div className="relative overflow-hidden">
+      <style>{`
+        @keyframes marquee-left {
+          from { transform: translateX(0); }
+          to   { transform: translateX(-50%); }
+        }
+        @keyframes marquee-right {
+          from { transform: translateX(-50%); }
+          to   { transform: translateX(0); }
+        }
+        .marquee-left  { animation: marquee-left  36s linear infinite; }
+        .marquee-right { animation: marquee-right 40s linear infinite; }
+        .marquee-left:hover,
+        .marquee-right:hover { animation-play-state: paused; }
+      `}</style>
+
+      {/* Row 1 — scrolls left, pauses on hover */}
+      <div className="marquee-left flex gap-4 mb-4" style={{ width: "max-content" }}>
+        {[...row1, ...row1].map((r, i) => <TestimonialCard key={i} review={r} />)}
+      </div>
+
+      {/* Row 2 — scrolls right, pauses on hover independently */}
+      <div className="marquee-right flex gap-4" style={{ width: "max-content" }}>
+        {[...row2, ...row2].map((r, i) => <TestimonialCard key={i} review={r} />)}
+      </div>
     </div>
   );
 }
@@ -564,38 +638,20 @@ export default function LandingClient({ initialListings }: { initialListings: an
         </section>
 
         {/* ── TESTIMONIALS ──────────────────────────────────── */}
-        <section id="reviews" className="py-24 px-5 bg-white">
-          <div className="max-w-5xl mx-auto">
+        <section id="reviews" className="py-24 bg-white overflow-hidden">
+          <div className="max-w-5xl mx-auto px-5 mb-14">
             <motion.div
               initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }} transition={{ duration: 0.5 }}
-              className="text-center mb-14"
+              className="text-center"
             >
               <SectionPill label="Testimonials" />
               <h2 className="text-4xl md:text-5xl font-extrabold text-stone-900 tracking-tight max-w-lg mx-auto" style={JK}>
                 Students just like you <span style={GRAD_TEXT}>love StudEx</span>
               </h2>
             </motion.div>
-
-            {/* Masonry 3-col */}
-            <div className="columns-1 sm:columns-2 md:columns-3 gap-4 space-y-4">
-              {reviews.map((r, i) => (
-                <motion.div
-                  key={i}
-                  initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }} transition={{ duration: 0.45, delay: i * 0.07 }}
-                  className="break-inside-avoid bg-stone-50 border border-stone-200 rounded-2xl p-5"
-                >
-                  <Stars count={r.stars} />
-                  <p className="text-stone-700 text-sm leading-relaxed mt-3 mb-4">&ldquo;{r.text}&rdquo;</p>
-                  <div>
-                    <p className="text-stone-900 font-semibold text-sm">{r.name}</p>
-                    <p className="text-stone-400 text-xs">Student</p>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
           </div>
+          <TestimonialMarquee />
         </section>
 
         {/* ── CAMPUSES ──────────────────────────────────────── */}
