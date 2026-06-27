@@ -1,15 +1,12 @@
 // Shared design tokens — import these instead of writing inline styles
 import type { CSSProperties } from "react";
 
-export const GRAD = "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)";
+export const GRAD = "#0D9488";
 
-export const GRAD_DARK = "linear-gradient(135deg, #0b1a18 0%, #1a0b2e 100%)";
+export const GRAD_DARK = "#064E3B";
 
 export const GRAD_TEXT: CSSProperties = {
-  background: GRAD,
-  WebkitBackgroundClip: "text",
-  WebkitTextFillColor: "transparent",
-  backgroundClip: "text",
+  color: "#0D9488",
 };
 
 export const SERIF: CSSProperties = {

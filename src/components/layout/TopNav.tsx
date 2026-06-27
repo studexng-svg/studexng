@@ -42,7 +42,7 @@ export default function TopNav({ showBack = false, backHref, activeNav }: TopNav
             <img src="/images/logo-1.jpg" alt="StudEx" loading="lazy" className="w-full h-full object-contain" />
           </div>
           <span className="font-black text-lg text-stone-900 hidden sm:block" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-            Stud<span className="text-transparent bg-clip-text" style={{ backgroundImage: GRAD }}>Ex</span>
+            Stud<span style={{ color: "#0D9488" }}>Ex</span>
           </span>
         </Link>
 

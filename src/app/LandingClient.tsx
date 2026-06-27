@@ -43,12 +43,7 @@ const DOT_BG: React.CSSProperties = {
 
 const JK: React.CSSProperties = { fontFamily: "'Plus Jakarta Sans', sans-serif" };
 
-const GRAD_TEXT: React.CSSProperties = {
-  background: GRAD,
-  WebkitBackgroundClip: "text",
-  WebkitTextFillColor: "transparent",
-  backgroundClip: "text",
-};
+const GRAD_TEXT: React.CSSProperties = { color: "#0D9488" };
 
 /* ─── HELPERS ─────────────────────────────────────────── */
 function Stars({ count }: { count: number }) {
