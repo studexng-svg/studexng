@@ -133,7 +133,7 @@ export default function ChatListPage() {
 
         <div className="animate-fadeUp">
           <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold">Inbox</p>
-          <h2 className="text-xl font-bold text-stone-900 mt-0.5" style={SERIF}>Your Conversations</h2>
+          <h2 className="text-xl font-extrabold text-stone-900 mt-0.5" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Your Conversations</h2>
         </div>
 
         {loading ? (
@@ -154,7 +154,7 @@ export default function ChatListPage() {
               <MessageCircle className="w-8 h-8 text-white" strokeWidth={1.5} />
             </div>
             <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold mb-2">No Messages</p>
-            <h3 className="text-lg font-bold text-stone-900 mb-1" style={SERIF}>
+            <h3 className="text-lg font-extrabold text-stone-900 mb-1" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
               {search ? "No results found" : "No conversations yet"}
             </h3>
             <p className="text-stone-400 text-sm">

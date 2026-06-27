@@ -86,6 +86,7 @@ export default function ChatRoomPage() {
   const [showScrollBtn, setShowScrollBtn] = useState(false);
 
   const bottomRef      = useRef<HTMLDivElement>(null);
+  const inputRef       = useRef<HTMLInputElement>(null);
   const fileInputRef   = useRef<HTMLInputElement>(null);
   const typingTimer    = useRef<ReturnType<typeof setTimeout> | null>(null);
   const editInputRef   = useRef<HTMLInputElement>(null);
@@ -133,6 +134,8 @@ export default function ChatRoomPage() {
   }, []);
 
   useEffect(() => { if (editingId !== null) editInputRef.current?.focus(); }, [editingId]);
+  useEffect(() => { if (!loading) setTimeout(() => inputRef.current?.focus(), 100); }, [loading]);
+  useEffect(() => { if (replyingTo) inputRef.current?.focus(); }, [replyingTo]);
 
   useEffect(() => {
     if (!conversationId) return;
@@ -399,14 +402,14 @@ export default function ChatRoomPage() {
   }
 
   if (loading) return (
-    <div className="flex justify-center items-center min-h-screen" style={{ background: "#F4F5F7" }}>
+    <div className="flex justify-center items-center min-h-screen" style={{ background: "#F5F5F5" }}>
       <Loader className="w-8 h-8 text-teal-600 animate-spin" />
     </div>
   );
 
   /* ══════════════════════════════════════════════════════════════════════ */
   return (
-    <div className="flex flex-col" style={{ height: "100dvh", background: "#F4F5F7", fontFamily: "'DM Sans', sans-serif" }}>
+    <div className="flex flex-col" style={{ height: "100dvh", background: "#F5F5F5", fontFamily: "'DM Sans', sans-serif" }}>
 
       {/* ── HEADER ── */}
       <div className="bg-white px-4 py-3 flex items-center gap-3 flex-shrink-0 shadow-sm">
@@ -713,6 +716,7 @@ export default function ChatRoomPage() {
           {/* Pill input */}
           <div className="flex-1 flex items-center bg-stone-100 rounded-full px-4 py-2 gap-2">
             <input
+              ref={inputRef}
               value={input}
               onChange={e => handleTyping(e.target.value)}
               onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
