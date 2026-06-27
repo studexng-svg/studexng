@@ -39,20 +39,19 @@ class ListingVendorSerializer(serializers.ModelSerializer):
 
     def get_profile_picture(self, obj):
         try:
-            img = obj.profile_image
+            img = getattr(obj, 'profile_image', None)
+            if not img:
+                return None
             name = getattr(img, 'name', None)
-            if name and 'default' not in name:
-                url = img.url
-                # Cloudinary and other CDN URLs are already absolute
-                if url.startswith('http'):
-                    return url
-                request = self.context.get('request')
-                if request:
-                    return request.build_absolute_uri(url)
-                return url
+            if not name or name == 'profiles/default.jpg':
+                return None
+            # Cloudinary stores the full URL as the name field
+            if name.startswith('http'):
+                return name
+            url = img.url
+            return url if url.startswith('http') else None
         except Exception:
-            pass
-        return None
+            return None
 
     def get_profile(self, obj):
         try:
