@@ -354,9 +354,19 @@ export default function LandingClient({ initialListings }: { initialListings: an
                 </motion.div>
               </div>
 
-              {/* ── RIGHT — iPhone 17 Pro Max mockup ── */}
+              {/* ── RIGHT — iPhone 17 Pro Max mockup + side badges ── */}
               <motion.div initial={{ opacity: 0, x: 40 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.7, delay: 0.2 }}
-                className="relative flex-shrink-0 lg:mr-20">
+                className="flex-shrink-0 flex items-center gap-5">
+
+                {/* Left badge — avg rating */}
+                <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.65, duration: 0.4 }}
+                  className="hidden lg:flex flex-col items-center gap-1.5 bg-white rounded-2xl px-4 py-3 shadow-xl border border-stone-100 w-[110px]">
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center bg-amber-400">
+                    <Star className="w-5 h-5 text-white fill-white" />
+                  </div>
+                  <p className="text-[11px] text-stone-400 leading-none">Avg Rating</p>
+                  <p className="text-base font-black text-stone-800">4.9 ★</p>
+                </motion.div>
 
                 {/* Phone frame */}
                 <div className="relative w-[270px] md:w-[290px]">
@@ -396,29 +406,14 @@ export default function LandingClient({ initialListings }: { initialListings: an
                   </div>
                 </div>
 
-                {/* Floating badges — desktop only */}
+                {/* Right badge — escrow safe */}
                 <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.6, duration: 0.4 }}
-                  className="hidden lg:flex absolute -right-2 top-[38%] items-center gap-2 bg-white rounded-2xl px-3 py-2.5 shadow-xl border border-stone-100"
-                  style={{ transform: "translateX(110%)" }}>
-                  <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: TEAL }}>
+                  className="hidden lg:flex flex-col items-center gap-1.5 bg-white rounded-2xl px-4 py-3 shadow-xl border border-stone-100 w-[110px]">
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: TEAL }}>
                     <ShieldCheck className="w-5 h-5 text-white" />
                   </div>
-                  <div>
-                    <p className="text-[10px] text-stone-400 leading-none mb-0.5">Payment</p>
-                    <p className="text-sm font-bold text-stone-800">Escrow Safe</p>
-                  </div>
-                </motion.div>
-
-                <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.65, duration: 0.4 }}
-                  className="hidden lg:flex absolute -left-2 top-[38%] items-center gap-2 bg-white rounded-2xl px-3 py-2.5 shadow-xl border border-stone-100"
-                  style={{ transform: "translateX(-110%)" }}>
-                  <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 bg-amber-400">
-                    <Star className="w-5 h-5 text-white fill-white" />
-                  </div>
-                  <div>
-                    <p className="text-[10px] text-stone-400 leading-none mb-0.5">Avg Rating</p>
-                    <p className="text-sm font-bold text-stone-800">4.9 ★</p>
-                  </div>
+                  <p className="text-[11px] text-stone-400 leading-none">Payment</p>
+                  <p className="text-base font-black text-stone-800">Escrow Safe</p>
                 </motion.div>
 
               </motion.div>
