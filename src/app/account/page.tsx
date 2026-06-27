@@ -294,7 +294,7 @@ export default function AccountPage() {
 
   if (!isHydrated || loading) {
     return (
-      <div className="min-h-screen bg-[#F4F5F7] flex items-center justify-center">
+      <div className="min-h-screen bg-[#F5F5F5] flex items-center justify-center">
         <div className="w-10 h-10 border-4 border-stone-200 border-t-teal-500 rounded-full animate-spin" />
       </div>
     );
@@ -413,10 +413,10 @@ export default function AccountPage() {
       </AnimatePresence>
 
       {/* ══════════ PAGE ══════════ */}
-      <div className="min-h-screen bg-[#F4F5F7]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+      <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
 
         {/* ── HEADER ── */}
-        <div className="bg-[#F4F5F7] px-4 pt-5 pb-2 flex items-center justify-between">
+        <div className="bg-[#F5F5F5] px-4 pt-5 pb-2 flex items-center justify-between">
           <Link href="/home">
             <button className="w-9 h-9 rounded-full bg-white shadow-sm flex items-center justify-center">
               <svg className="w-4 h-4 text-stone-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
@@ -424,7 +424,7 @@ export default function AccountPage() {
               </svg>
             </button>
           </Link>
-          <h1 className="text-base font-bold text-stone-900">Profile & Settings</h1>
+          <h1 className="text-base font-extrabold text-stone-900" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Profile & Settings</h1>
           <div className="relative">
             <button onClick={() => setShowNotifications(v => !v)}
               className="w-9 h-9 bg-white shadow-sm rounded-full flex items-center justify-center">
@@ -530,7 +530,7 @@ export default function AccountPage() {
           <div className="space-y-1 mt-4">
 
           {/* ── SECTION: My Account ── */}
-          <p className="text-xs font-semibold text-stone-500 pt-3 pb-2 px-1">My Account</p>
+          <p className="text-xs font-bold text-stone-400 uppercase tracking-widest pt-3 pb-2 px-1" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>My Account</p>
           <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
             <Row href="/account/orders"        icon={Package}       iconColor="#6366f1" label="My Orders"       badge={pendingOrders} />
             <Row href="/account/bookings"       icon={Calendar}      iconColor="#0d9488" label="My Bookings"     badge={vendorApproved ? 0 : pendingBookings} />
@@ -543,7 +543,7 @@ export default function AccountPage() {
           {/* ── SECTION: Vendor (if approved) ── */}
           {vendorApproved && (
             <>
-              <p className="text-xs font-semibold text-stone-500 pt-5 pb-2 px-1">Vendor Tools</p>
+              <p className="text-xs font-bold text-stone-400 uppercase tracking-widest pt-5 pb-2 px-1" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Vendor Tools</p>
               <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
                 <Row href="/vendor/dashboard"   icon={LayoutDashboard} iconColor="#0d9488" label="Vendor Dashboard" />
                 <Row href="/account/bank-account" icon={Banknote}       iconColor={hasBankAccount ? "#10b981" : "#f59e0b"} label={hasBankAccount ? "Payout Account" : "Add Payout Account"} last />
@@ -555,7 +555,7 @@ export default function AccountPage() {
           <div className="space-y-1 mt-4">
 
           {/* ── SECTION: Settings ── */}
-          <p className="text-xs font-semibold text-stone-500 pt-3 pb-2 px-1">Settings</p>
+          <p className="text-xs font-bold text-stone-400 uppercase tracking-widest pt-3 pb-2 px-1" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Settings</p>
           <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
             <Row href="/account/address"        icon={Settings}  iconColor="#3b82f6" label="Address Book" />
             <Row href="/account/change-password" icon={KeyRound} iconColor="#8b5cf6" label="Change Password" />
@@ -564,7 +564,7 @@ export default function AccountPage() {
           </div>
 
           {/* ── SECTION: Support ── */}
-          <p className="text-xs font-semibold text-stone-500 pt-5 pb-2 px-1">Help & Support</p>
+          <p className="text-xs font-bold text-stone-400 uppercase tracking-widest pt-5 pb-2 px-1" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Help & Support</p>
           <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
             <Row href="/faq" icon={HelpCircle} iconColor="#14b8a6" label="FAQs & Help Center" last />
           </div>

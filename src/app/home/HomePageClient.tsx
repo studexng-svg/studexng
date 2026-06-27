@@ -91,10 +91,10 @@ const TRUST_ITEMS = [
   { icon: Zap,         title: "Fast Service",    desc: "Get it done on campus quickly" },
 ];
 
-const HERO_GRAD = "linear-gradient(135deg,#6D28D9 0%,#4F46E5 45%,#06B6D4 100%)";
+const HERO_GRAD = "linear-gradient(135deg,#0D9488 0%,#7C3AED 100%)";
 
 const heroBackgrounds = [
-  { type: "gradient", value: "linear-gradient(135deg,#6D28D9 0%,#4F46E5 45%,#06B6D4 100%)" },
+  { type: "gradient", value: "linear-gradient(135deg,#0D9488 0%,#7C3AED 100%)" },
   // Nails / nail art
   { type: "image", value: "https://images.unsplash.com/photo-1604654894610-df63bc536371?w=1200&q=80" },
   // Lashes / eye makeup close-up
@@ -448,7 +448,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
       : Number(listing.price);
 
     return (
-      <div key={listing.id} className="animate-fadeUp bg-white rounded-xl border border-stone-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow group"
+      <div key={listing.id} className="animate-fadeUp bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow group"
         style={{ animationDelay: `${Math.min(i * 0.04, 0.2)}s` }}>
 
         <Link href={`/listing/${listing.id}`} className="block">
@@ -597,7 +597,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
     const dealPrice    = Number(deal.discounted_price);
 
     return (
-      <div key={listing.id} className="animate-fadeUp bg-white rounded-xl border border-stone-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow group relative"
+      <div key={listing.id} className="animate-fadeUp bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow group relative"
         style={{ animationDelay: `${Math.min(i * 0.04, 0.2)}s` }}>
 
         {/* Discount badge */}
@@ -958,15 +958,15 @@ export default function HomePageClient({ initialVendors, initialListings, initia
               className="absolute inset-0 transition-opacity duration-1000 pointer-events-none"
               style={{
                 opacity: heroBackgrounds[heroIndex]?.type === "image" ? 1 : 0,
-                background: "linear-gradient(135deg,rgba(109,40,217,0.80) 0%,rgba(79,70,229,0.70) 45%,rgba(6,182,212,0.55) 100%)",
+                background: "linear-gradient(135deg,rgba(13,148,136,0.82) 0%,rgba(124,58,237,0.72) 100%)",
               }}
             />
 
             {/* Decorative blobs — visible on gradient slide */}
             <div className="absolute top-1/2 left-[45%] -translate-y-1/2 w-80 h-80 rounded-full pointer-events-none"
-              style={{ background: "radial-gradient(circle,rgba(165,180,252,0.35) 0%,transparent 70%)" }} />
+              style={{ background: "radial-gradient(circle,rgba(124,58,237,0.30) 0%,transparent 70%)" }} />
             <div className="absolute bottom-0 left-[20%] w-56 h-56 rounded-full pointer-events-none"
-              style={{ background: "radial-gradient(circle,rgba(103,232,249,0.25) 0%,transparent 70%)" }} />
+              style={{ background: "radial-gradient(circle,rgba(13,148,136,0.25) 0%,transparent 70%)" }} />
 
             <div className="relative z-10 px-4 py-10 sm:px-8 sm:py-10 lg:px-10 lg:py-12">
               {/* Always side-by-side — scaled down on mobile */}
@@ -1155,7 +1155,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
           <div className="mt-8" ref={featuredRef}>
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
               <div>
-                <h2 className="text-xl font-bold text-stone-900">
+                <h2 className="text-xl font-extrabold text-stone-900" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                   {activeTab === "listings"
                     ? activeFilter === "All" ? "Featured Services" : categories.find(c => c.slug === activeFilter)?.title || activeFilter
                     : "Campus Vendors"}
@@ -1230,7 +1230,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                 <div className="flex items-center justify-between mb-4">
                   <div>
                     <p className="text-red-600 text-xs tracking-widest uppercase font-bold">🏷️ {deals.length} deal{deals.length !== 1 ? "s" : ""}</p>
-                    <h3 className="text-lg font-bold text-stone-900 mt-0.5">Hot Deals</h3>
+                    <h3 className="text-lg font-extrabold text-stone-900 mt-0.5" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Hot Deals</h3>
                   </div>
                   <Link href="/deals" className="text-teal-600 text-sm font-semibold flex items-center gap-1 hover:text-teal-700 transition">
                     See all <ChevronRight className="w-4 h-4" />
