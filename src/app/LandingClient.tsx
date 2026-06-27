@@ -43,7 +43,12 @@ const DOT_BG: React.CSSProperties = {
 
 const JK: React.CSSProperties = { fontFamily: "'Plus Jakarta Sans', sans-serif" };
 
-const GRAD_TEXT: React.CSSProperties = { color: "#0D9488" };
+const GRAD_TEXT: React.CSSProperties = {
+  background: GRAD,
+  WebkitBackgroundClip: "text",
+  WebkitTextFillColor: "transparent",
+  backgroundClip: "text",
+};
 
 /* ─── HELPERS ─────────────────────────────────────────── */
 function Stars({ count }: { count: number }) {
@@ -96,36 +101,75 @@ function TestimonialCard({ review }: { review: typeof reviews[0] }) {
   );
 }
 
-function ScrollRow({ items }: { items: typeof reviews }) {
+function ScrollRow({ items, direction = "left" }: { items: typeof reviews; direction?: "left" | "right" }) {
   const ref = useRef<HTMLDivElement>(null);
-  const scroll = (dir: "left" | "right") =>
-    ref.current?.scrollBy({ left: dir === "left" ? -320 : 320, behavior: "smooth" });
+  const paused = useRef(false);
+  const rafRef = useRef<number>(0);
+
+  // Triple items so we always have content to loop through seamlessly
+  const tripled = [...items, ...items, ...items];
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    // Start in the middle third so user can scroll left or right
+    const jumpToMiddle = () => { el.scrollLeft = el.scrollWidth / 3; };
+    jumpToMiddle();
+
+    const SPEED = 0.5; // px per frame at 60fps
+    let lastTime = 0;
+
+    const tick = (time: number) => {
+      const delta = Math.min(time - lastTime, 50); // cap at 50ms to avoid jump on tab focus
+      lastTime = time;
+
+      if (!paused.current && el) {
+        if (direction === "left") {
+          el.scrollLeft += SPEED * (delta / 16);
+          // When we've scrolled into the last third, silently jump back to the first third
+          if (el.scrollLeft >= (el.scrollWidth * 2) / 3) {
+            el.scrollLeft -= el.scrollWidth / 3;
+          }
+        } else {
+          el.scrollLeft -= SPEED * (delta / 16);
+          // When we've scrolled into the first third, silently jump forward
+          if (el.scrollLeft <= el.scrollWidth / 3) {
+            el.scrollLeft += el.scrollWidth / 3;
+          }
+        }
+      }
+      rafRef.current = requestAnimationFrame(tick);
+    };
+
+    rafRef.current = requestAnimationFrame(tick);
+
+    let resumeTimer: ReturnType<typeof setTimeout>;
+    const pause  = () => { paused.current = true; clearTimeout(resumeTimer); };
+    const resume = () => { resumeTimer = setTimeout(() => { paused.current = false; }, 2000); };
+
+    el.addEventListener("mouseenter", pause);
+    el.addEventListener("mouseleave", resume);
+    el.addEventListener("touchstart", pause, { passive: true });
+    el.addEventListener("touchend",   resume);
+
+    return () => {
+      cancelAnimationFrame(rafRef.current);
+      clearTimeout(resumeTimer);
+      el.removeEventListener("mouseenter", pause);
+      el.removeEventListener("mouseleave", resume);
+      el.removeEventListener("touchstart", pause);
+      el.removeEventListener("touchend",   resume);
+    };
+  }, [direction]);
 
   return (
-    <div className="relative group">
-      {/* Left arrow */}
-      <button
-        onClick={() => scroll("left")}
-        className="hidden sm:flex absolute left-0 top-1/2 -translate-y-1/2 -translate-x-3 z-10 w-9 h-9 bg-white border border-stone-200 shadow-md rounded-full items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-stone-50"
-      >
-        <ChevronLeft className="w-4 h-4 text-stone-600" />
-      </button>
-
-      <div
-        ref={ref}
-        className="flex gap-4 overflow-x-auto pb-2"
-        style={{ scrollbarWidth: "none", msOverflowStyle: "none" } as React.CSSProperties}
-      >
-        {items.map((r, i) => <TestimonialCard key={i} review={r} />)}
-      </div>
-
-      {/* Right arrow */}
-      <button
-        onClick={() => scroll("right")}
-        className="hidden sm:flex absolute right-0 top-1/2 -translate-y-1/2 translate-x-3 z-10 w-9 h-9 bg-white border border-stone-200 shadow-md rounded-full items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-stone-50"
-      >
-        <ChevronRight className="w-4 h-4 text-stone-600" />
-      </button>
+    <div
+      ref={ref}
+      className="flex gap-4 overflow-x-auto"
+      style={{ scrollbarWidth: "none", msOverflowStyle: "none" } as React.CSSProperties}
+    >
+      {tripled.map((r, i) => <TestimonialCard key={i} review={r} />)}
     </div>
   );
 }
@@ -135,9 +179,9 @@ function TestimonialMarquee() {
   const row1 = reviews.slice(0, half);
   const row2 = reviews.slice(half);
   return (
-    <div className="space-y-4">
-      <ScrollRow items={row1} />
-      <ScrollRow items={row2} />
+    <div className="space-y-4 overflow-hidden">
+      <ScrollRow items={row1} direction="left" />
+      <ScrollRow items={row2} direction="right" />
     </div>
   );
 }

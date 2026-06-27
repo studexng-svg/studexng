@@ -91,10 +91,10 @@ const TRUST_ITEMS = [
   { icon: Zap,         title: "Fast Service",    desc: "Get it done on campus quickly" },
 ];
 
-const HERO_GRAD = "#0D9488";
+const HERO_GRAD = "linear-gradient(135deg,#0D9488 0%,#7C3AED 100%)";
 
 const heroBackgrounds = [
-  { type: "gradient", value: "#0D9488" },
+  { type: "gradient", value: "linear-gradient(135deg,#0D9488 0%,#7C3AED 100%)" },
   // Nails / nail art
   { type: "image", value: "https://images.unsplash.com/photo-1604654894610-df63bc536371?w=1200&q=80" },
   // Lashes / eye makeup close-up
@@ -824,7 +824,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                 <img src="/images/logo-1.jpg" alt="StudEx" loading="lazy" className="w-full h-full object-contain" />
               </div>
               <span className="font-black text-lg text-stone-900 hidden sm:block" style={SERIF}>
-                Stud<span style={{ color: "#0D9488" }}>Ex</span>
+                Stud<span className="text-transparent bg-clip-text" style={{ backgroundImage: GRAD }}>Ex</span>
               </span>
             </Link>
 
@@ -875,7 +875,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                               <p className="font-semibold text-stone-900 text-sm truncate">{item.title}</p>
                               <p className="text-xs text-stone-400">@{item.vendor?.username || item.vendor}</p>
                             </div>
-                            <p className="font-bold text-sm flex-shrink-0" style={{ color: "#0D9488" }}>₦{Number(item.price).toLocaleString()}</p>
+                            <p className="font-bold text-sm flex-shrink-0 text-transparent bg-clip-text" style={{ backgroundImage: GRAD }}>₦{Number(item.price).toLocaleString()}</p>
                           </div>
                         </Link>
                       ))}
@@ -958,13 +958,13 @@ export default function HomePageClient({ initialVendors, initialListings, initia
               className="absolute inset-0 transition-opacity duration-1000 pointer-events-none"
               style={{
                 opacity: heroBackgrounds[heroIndex]?.type === "image" ? 1 : 0,
-                background: "rgba(13,148,136,0.85)",
+                background: "linear-gradient(135deg,rgba(13,148,136,0.82) 0%,rgba(124,58,237,0.72) 100%)",
               }}
             />
 
             {/* Decorative blobs — visible on gradient slide */}
             <div className="absolute top-1/2 left-[45%] -translate-y-1/2 w-80 h-80 rounded-full pointer-events-none"
-              style={{ background: "radial-gradient(circle,rgba(13,148,136,0.18) 0%,transparent 70%)" }} />
+              style={{ background: "radial-gradient(circle,rgba(124,58,237,0.30) 0%,transparent 70%)" }} />
             <div className="absolute bottom-0 left-[20%] w-56 h-56 rounded-full pointer-events-none"
               style={{ background: "radial-gradient(circle,rgba(13,148,136,0.25) 0%,transparent 70%)" }} />
 
