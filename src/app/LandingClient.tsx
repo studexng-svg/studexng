@@ -360,12 +360,14 @@ export default function LandingClient({ initialListings }: { initialListings: an
 
                 {/* Left badge — avg rating */}
                 <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.65, duration: 0.4 }}
-                  className="hidden lg:flex flex-col items-center gap-1.5 bg-white rounded-2xl px-4 py-3 shadow-xl border border-stone-100 w-[110px]">
-                  <div className="w-10 h-10 rounded-full flex items-center justify-center bg-amber-400">
+                  className="hidden lg:flex flex-row items-center gap-3 bg-white rounded-2xl px-4 py-3 shadow-xl border border-stone-100 whitespace-nowrap">
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 bg-amber-400">
                     <Star className="w-5 h-5 text-white fill-white" />
                   </div>
-                  <p className="text-[11px] text-stone-400 leading-none">Avg Rating</p>
-                  <p className="text-base font-black text-stone-800">4.9 ★</p>
+                  <div>
+                    <p className="text-[11px] text-stone-400 leading-none mb-1">Avg Rating</p>
+                    <p className="text-base font-black text-stone-800 leading-none">4.9 ★</p>
+                  </div>
                 </motion.div>
 
                 {/* Phone frame */}
@@ -437,12 +439,14 @@ export default function LandingClient({ initialListings }: { initialListings: an
 
                 {/* Right badge — escrow safe */}
                 <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.6, duration: 0.4 }}
-                  className="hidden lg:flex flex-col items-center gap-1.5 bg-white rounded-2xl px-4 py-3 shadow-xl border border-stone-100 w-[110px]">
+                  className="hidden lg:flex flex-row items-center gap-3 bg-white rounded-2xl px-4 py-3 shadow-xl border border-stone-100 whitespace-nowrap">
                   <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: TEAL }}>
                     <ShieldCheck className="w-5 h-5 text-white" />
                   </div>
-                  <p className="text-[11px] text-stone-400 leading-none">Payment</p>
-                  <p className="text-base font-black text-stone-800">Escrow Safe</p>
+                  <div>
+                    <p className="text-[11px] text-stone-400 leading-none mb-1">Payment</p>
+                    <p className="text-base font-black text-stone-800 leading-none">Escrow Safe</p>
+                  </div>
                 </motion.div>
 
               </motion.div>
