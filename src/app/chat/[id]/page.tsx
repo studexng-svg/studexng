@@ -472,7 +472,7 @@ export default function ChatRoomPage() {
       )}
 
       {/* ── MESSAGES ── */}
-      <div className="flex-1 overflow-y-auto px-4 pt-5 pb-3 space-y-0.5">
+      <div className="flex-1 overflow-y-auto px-4 pt-5 pb-3 space-y-0.5" style={{ scrollbarWidth: "none", msOverflowStyle: "none" } as React.CSSProperties}>
         {messages.length === 0 && (
           <p className="text-center text-stone-400 text-sm py-16">No messages yet. Say hello! 👋</p>
         )}
