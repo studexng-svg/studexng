@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/lib/authStore";
-import { GRAD, toArray } from "@/lib/tokens";
+import { GRAD, TEAL, toArray } from "@/lib/tokens";
 import { ArrowLeft, MessageCircle, Check, CheckCheck, Send, Loader } from "lucide-react";
 
 function Avatar({ conv, size = "md" }: { conv: any; size?: "sm" | "md" }) {
@@ -13,7 +13,7 @@ function Avatar({ conv, size = "md" }: { conv: any; size?: "sm" | "md" }) {
     : "w-10 h-10 rounded-full text-sm font-bold flex-shrink-0";
   if (pic) return <img src={pic} alt={initial} className={`${cls} object-cover`} />;
   return (
-    <div className={`${cls} flex items-center justify-center text-white`} style={{ background: "linear-gradient(135deg,#0D9488 0%,#7C3AED 100%)" }}>
+    <div className={`${cls} flex items-center justify-center text-white`} style={{ background: TEAL }}>
       {initial}
     </div>
   );

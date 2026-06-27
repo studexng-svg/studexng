@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/authStore";
-import { GRAD } from "@/lib/tokens";
+import { GRAD, TEAL } from "@/lib/tokens";
 import { api } from "@/lib/api";
 import {
   MessageCircle, Calendar, DollarSign, Package, ShoppingBag,
@@ -112,7 +112,7 @@ export default function VendorDashboardLayout({ children }: { children: React.Re
               className="w-11 h-11 rounded-2xl object-cover flex-shrink-0 shadow-sm" />
           ) : (
             <div className="w-11 h-11 rounded-2xl flex items-center justify-center font-black text-white text-base flex-shrink-0 shadow-sm"
-              style={{ background: GRAD }}>
+              style={{ background: TEAL }}>
               {initials}
             </div>
           )}
@@ -236,7 +236,7 @@ export default function VendorDashboardLayout({ children }: { children: React.Re
                 className="w-9 h-9 rounded-xl object-cover" />
             ) : (
               <div className="w-9 h-9 rounded-xl flex items-center justify-center font-black text-white text-sm"
-                style={{ background: GRAD }}>
+                style={{ background: TEAL }}>
                 {initials}
               </div>
             )}

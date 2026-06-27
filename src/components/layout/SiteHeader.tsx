@@ -7,7 +7,7 @@ import { Search, ShoppingCart, Heart, Trophy, X } from "lucide-react";
 import Image from "next/image";
 import { useAuth } from "@/lib/authStore";
 import { useCart } from "@/lib/cartStore";
-import { GRAD } from "@/lib/tokens";
+import { GRAD, TEAL } from "@/lib/tokens";
 
 export default function SiteHeader() {
   const router   = useRouter();
@@ -84,7 +84,7 @@ export default function SiteHeader() {
                 <div className="relative">
                   <ShoppingCart className="w-5 h-5" />
                   {cart.length > 0 && (
-                    <span className="absolute -top-1.5 -right-1.5 w-4 h-4 text-xs font-bold text-white rounded-full flex items-center justify-center" style={{ background: GRAD }}>
+                    <span className="absolute -top-1.5 -right-1.5 w-4 h-4 text-xs font-bold text-white rounded-full flex items-center justify-center" style={{ background: TEAL }}>
                       {cart.length}
                     </span>
                   )}
@@ -95,7 +95,7 @@ export default function SiteHeader() {
                 {(user as any).profile_image ? (
                   <img src={(user as any).profile_image} alt={(user as any).username} className="w-8 h-8 rounded-full object-cover" />
                 ) : (
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0" style={{ background: GRAD }}>
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0" style={{ background: TEAL }}>
                     {((user as any).username?.[0] || "U").toUpperCase()}
                   </div>
                 )}

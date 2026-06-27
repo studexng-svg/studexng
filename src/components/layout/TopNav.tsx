@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Heart, ShoppingCart, ChevronLeft } from "lucide-react";
 import { useAuth } from "@/lib/authStore";
 import { useCart } from "@/lib/cartStore";
-import { GRAD } from "@/lib/tokens";
+import { GRAD, TEAL } from "@/lib/tokens";
 
 interface TopNavProps {
   showBack?: boolean;
@@ -72,7 +72,7 @@ export default function TopNav({ showBack = false, backHref, activeNav }: TopNav
               <Link href="/cart" className="p-2 rounded-xl hover:bg-stone-50 transition text-stone-500 hover:text-teal-600 relative">
                 <ShoppingCart className="w-5 h-5" />
                 {cart.length > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 w-4 h-4 text-xs font-bold text-white rounded-full flex items-center justify-center" style={{ background: GRAD }}>
+                  <span className="absolute -top-0.5 -right-0.5 w-4 h-4 text-xs font-bold text-white rounded-full flex items-center justify-center" style={{ background: TEAL }}>
                     {cart.length}
                   </span>
                 )}
@@ -81,7 +81,7 @@ export default function TopNav({ showBack = false, backHref, activeNav }: TopNav
                 {(user as any)?.profile_image ? (
                   <img src={(user as any).profile_image} alt={(user as any).username} className="w-7 h-7 rounded-full object-cover flex-shrink-0" />
                 ) : (
-                  <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0" style={{ background: GRAD }}>
+                  <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0" style={{ background: TEAL }}>
                     {((user as any)?.username?.[0] || "U").toUpperCase()}
                   </div>
                 )}

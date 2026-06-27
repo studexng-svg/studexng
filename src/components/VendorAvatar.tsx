@@ -1,4 +1,5 @@
-const FALLBACK_GRAD = "linear-gradient(135deg,#0D9488,#7C3AED)";
+import { TEAL } from "@/lib/tokens";
+const FALLBACK_GRAD = TEAL;
 
 interface Props {
   name: string;

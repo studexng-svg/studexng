@@ -2,6 +2,8 @@
 import type { CSSProperties } from "react";
 
 export const GRAD = "linear-gradient(135deg, #0D9488 0%, #7C3AED 100%)";
+export const TEAL   = "#0D9488";
+export const PURPLE = "#7C3AED";
 
 export const GRAD_DARK = "linear-gradient(135deg, #0b1a18 0%, #1a0b2e 100%)";
 
