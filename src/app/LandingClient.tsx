@@ -385,20 +385,25 @@ export default function LandingClient({ initialListings }: { initialListings: an
                     <div className="bg-stone-950 rounded-[51px] p-[5px]">
 
                       {/* Screen glass */}
-                      <div className="bg-white rounded-[46px] overflow-hidden flex flex-col">
+                      <div className="relative rounded-[46px] overflow-hidden flex flex-col bg-white">
 
-                          {/* Top half — header + vendor banner from screenshot 1 */}
-                        <div className="overflow-hidden" style={{ height: "250px" }}>
+                        {/* Dynamic Island — sits on top of the screenshot */}
+                        <div className="absolute top-[7px] left-1/2 -translate-x-1/2 z-20 rounded-full bg-stone-950"
+                          style={{ width: "88px", height: "26px" }} />
+
+                        {/* Screenshot 1 — status bar → filter tabs (crop bottom nav off) */}
+                        <div className="overflow-hidden flex-shrink-0" style={{ height: "330px" }}>
                           <img src="/images/app-screen-1.png" alt="StudEx home" className="w-full block" loading="lazy" />
                         </div>
-                        {/* Bottom half — listing cards from screenshot 2 */}
-                        <div className="overflow-hidden" style={{ height: "270px" }}>
+
+                        {/* Screenshot 2 — listing cards (skip its own status bar row) */}
+                        <div className="overflow-hidden flex-shrink-0" style={{ height: "220px" }}>
                           <img src="/images/app-screen-2.png" alt="StudEx listings" className="w-full block" loading="lazy" />
                         </div>
 
                         {/* Home indicator */}
                         <div className="bg-white pb-2 pt-1.5 flex justify-center flex-shrink-0">
-                          <div className="w-28 h-[5px] bg-stone-900 rounded-full opacity-20" />
+                          <div className="w-24 h-[4px] bg-stone-900 rounded-full opacity-25" />
                         </div>
 
                       </div>
