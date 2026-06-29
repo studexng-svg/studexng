@@ -15,13 +15,46 @@ class RateLimitMiddleware(MiddlewareMixin):
     Tracks requests per IP address and enforces limits
     """
 
+    ADMIN_PREFIX = '/studex-portal-9f3a2/'
+    # Max login attempts per IP before lockout
+    ADMIN_MAX_ATTEMPTS = 5
+    # Lockout window in seconds (15 minutes)
+    ADMIN_LOCKOUT_SECONDS = 900
+
     def process_request(self, request):
         # ── Completely skip rate limiting in development ──────────────────────
         if settings.DEBUG:
             return None
 
-        # Skip rate limiting for admin and static files
-        if request.path.startswith('/admin/') or request.path.startswith('/static/'):
+        # Skip rate limiting for static files
+        if request.path.startswith('/static/'):
+            return None
+
+        # ── Admin login brute-force protection ───────────────────────────────
+        if request.path.startswith(self.ADMIN_PREFIX) and request.method == 'POST':
+            ip = self.get_client_ip(request)
+            lockout_key = f'admin_lockout:{ip}'
+            attempt_key = f'admin_attempts:{ip}'
+
+            if cache.get(lockout_key):
+                return JsonResponse(
+                    {'error': 'Too many failed login attempts. Try again in 15 minutes.'},
+                    status=403
+                )
+
+            attempts = cache.get(attempt_key, 0) + 1
+            cache.set(attempt_key, attempts, self.ADMIN_LOCKOUT_SECONDS)
+
+            if attempts >= self.ADMIN_MAX_ATTEMPTS:
+                cache.set(lockout_key, True, self.ADMIN_LOCKOUT_SECONDS)
+                cache.delete(attempt_key)
+                return JsonResponse(
+                    {'error': 'Too many failed login attempts. Try again in 15 minutes.'},
+                    status=403
+                )
+
+        # Skip general rate limiting for admin pages (handled above)
+        if request.path.startswith(self.ADMIN_PREFIX):
             return None
 
         # Get client IP address
@@ -31,7 +64,6 @@ class RateLimitMiddleware(MiddlewareMixin):
         rate_limit = self.get_rate_limit(request.path)
 
         if rate_limit:
-            # Check if rate limit exceeded
             cache_key = f'rate_limit:{ip_address}:{request.path}'
             request_count = cache.get(cache_key, 0)
 
@@ -41,8 +73,7 @@ class RateLimitMiddleware(MiddlewareMixin):
                     'detail': f'Maximum {rate_limit} requests per minute allowed.'
                 }, status=429)
 
-            # Increment request count
-            cache.set(cache_key, request_count + 1, 60)  # 60 seconds = 1 minute
+            cache.set(cache_key, request_count + 1, 60)
 
         return None
 
