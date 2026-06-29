@@ -44,6 +44,22 @@ export default function OrderConfirmationPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  const [contactingVendor, setContactingVendor] = useState(false);
+
+  const contactSeller = async () => {
+    if (!orderId) return;
+    setContactingVendor(true);
+    try {
+      const res = await api.chat.forOrder(orderId);
+      if (res.ok) {
+        const data = await res.json();
+        router.push(`/chat/${data.id}`);
+      }
+    } finally {
+      setContactingVendor(false);
+    }
+  };
+
   const [feedbackRating, setFeedbackRating] = useState(0);
   const [feedbackHovered, setFeedbackHovered] = useState(0);
   const [feedbackComment, setFeedbackComment] = useState("");
@@ -235,10 +251,12 @@ export default function OrderConfirmationPage() {
         {/* CONTACT SELLER */}
         <div className="animate-fadeUp">
           <button
-            className="w-full py-3 rounded-full font-semibold text-stone-600 bg-white border border-stone-200 text-sm flex items-center justify-center gap-2 shadow-sm transition-all tap-scale"
+            onClick={contactSeller}
+            disabled={contactingVendor}
+            className="w-full py-3 rounded-full font-semibold text-stone-600 bg-white border border-stone-200 text-sm flex items-center justify-center gap-2 shadow-sm transition-all tap-scale disabled:opacity-60"
           >
             <MessageCircle className="w-4 h-4" />
-            Contact Seller
+            {contactingVendor ? "Opening chat..." : "Contact Seller"}
           </button>
         </div>
 
