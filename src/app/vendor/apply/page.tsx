@@ -135,7 +135,7 @@ export default function VendorApplyPage() {
               <Store className="w-12 h-12 text-teal-600" />
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-stone-900" style={SERIF}>Sell on StudEx</h2>
+              <h2 className="text-2xl font-bold text-stone-900" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Sell on StudEx</h2>
               <p className="text-sm text-stone-500 mt-2 leading-relaxed max-w-xs mx-auto">
                 Join campus sellers. Earn real money. Get verified in 24–48 hours.
               </p>
@@ -154,7 +154,7 @@ export default function VendorApplyPage() {
         {step === 2 && (
           <div className="animate-fadeUp space-y-6">
             <div>
-              <h2 className="text-xl font-bold text-stone-900" style={SERIF}>Verify Your Identity</h2>
+              <h2 className="text-xl font-bold text-stone-900" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Verify Your Identity</h2>
               <p className="text-sm text-stone-500 mt-1">Choose a document to verify your identity</p>
             </div>
 
@@ -373,7 +373,7 @@ export default function VendorApplyPage() {
             </div>
 
             <div>
-              <h2 className="text-2xl font-bold text-stone-900" style={SERIF}>
+              <h2 className="text-2xl font-bold text-stone-900" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                 {success ? "Application Submitted!" : "Ready to Submit?"}
               </h2>
             </div>

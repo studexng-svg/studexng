@@ -19,7 +19,7 @@ def maintenance_check(request):
 
 urlpatterns = [
     path('api/health/maintenance/', maintenance_check, name='maintenance-check'),
-    path('admin/', admin.site.urls),
+    path('studex-portal-9f3a2/', admin.site.urls),
     path('api/auth/', include('accounts.urls')),
     path('api/admin/', include('accounts.admin_urls')),
     path('api/services/', include('services.urls')),
