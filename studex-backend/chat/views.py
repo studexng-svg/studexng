@@ -42,13 +42,13 @@ def _has_suspicious_content(content: str):
     """
     if _NG_PHONE_RE.search(content):
         return (
-            "Phone numbers are not allowed in chat — all payments must go through "
-            "StudEx to keep your transaction protected."
+            "This message violates our rules and regulations. Sharing phone numbers "
+            "can lead to buying outside StudEx — all transactions must happen on the platform."
         )
     if _OFFPLATFORM_RE.search(content):
         return (
-            "Off-platform payment requests are not allowed. Use the StudEx checkout "
-            "to stay protected and eligible for dispute resolution."
+            "This message violates our rules and regulations. Requesting off-platform "
+            "payments can lead to buying outside StudEx — all transactions must happen on the platform."
         )
     return None
 

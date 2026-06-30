@@ -5,7 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import {
   ChevronLeft, Send, Loader, ImageIcon, X, Pin, Pencil,
   Trash2, Check, CheckCheck, PinOff, ChevronDown, UserX, Users,
-  CornerDownLeft, Copy, Mic,
+  CornerDownLeft, Copy, Mic, ShieldAlert,
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/lib/authStore";
@@ -75,7 +75,11 @@ export default function ChatRoomPage() {
   const [imageFile, setImageFile]         = useState<File | null>(null);
   const [imagePreview, setImagePreview]   = useState<string | null>(null);
   const [error, setError]                 = useState("");
-  const flash = (m: string) => { setError(m); setTimeout(() => setError(""), 2500); };
+  const [isPolicy, setIsPolicy]           = useState(false);
+  const flash = (m: string, policy = false) => {
+    setError(m); setIsPolicy(policy);
+    setTimeout(() => { setError(""); setIsPolicy(false); }, policy ? 6000 : 2500);
+  };
   const [actionMenu, setActionMenu]       = useState<ActionMenu | null>(null);
   const [editingId, setEditingId]         = useState<number | null>(null);
   const [editContent, setEditContent]     = useState("");
@@ -364,7 +368,12 @@ export default function ChatRoomPage() {
         fd.append("message_type", "image");
         if (input.trim()) fd.append("content", input.trim());
         const res = await api.chat.sendImage(conversationId as string, fd);
-        if (!res.ok) throw new Error();
+        if (!res.ok) {
+          const d = await res.json().catch(() => ({}));
+          const msg = d.error || "Failed to send. Try again.";
+          flash(msg, msg.includes("violates"));
+          return;
+        }
         cancelImage();
       } else {
         let content = input.trim();
@@ -373,11 +382,16 @@ export default function ChatRoomPage() {
           content = `[quoted:@${replyingTo.sender_username}|${mainText.substring(0, 100)}]\n${content}`;
         }
         const res = await api.chat.send(conversationId as string, { content, message_type: "text" });
-        if (!res.ok) throw new Error();
+        if (!res.ok) {
+          const d = await res.json().catch(() => ({}));
+          const msg = d.error || "Failed to send. Try again.";
+          flash(msg, msg.includes("violates"));
+          return;
+        }
       }
       setInput(""); setReplyingTo(null);
       await loadMessages();
-    } catch { setError("Failed to send. Try again."); setTimeout(() => setError(""), 3000); }
+    } catch { flash("Failed to send. Try again."); }
     finally { setSending(false); }
   };
 
@@ -468,7 +482,14 @@ export default function ChatRoomPage() {
 
       {/* ── ERROR ── */}
       {error && (
-        <div className="bg-red-500 text-white text-xs px-4 py-2 text-center font-semibold flex-shrink-0">{error}</div>
+        <div className={`text-xs px-4 py-2.5 flex items-start gap-2 flex-shrink-0 ${
+          isPolicy
+            ? "bg-amber-50 border-t border-amber-200 text-amber-900"
+            : "bg-red-500 text-white text-center font-semibold"
+        }`}>
+          {isPolicy && <ShieldAlert className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />}
+          <span className={isPolicy ? "font-medium leading-snug" : "w-full"}>{error}</span>
+        </div>
       )}
 
       {/* ── MESSAGES ── */}
