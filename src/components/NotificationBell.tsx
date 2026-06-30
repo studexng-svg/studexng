@@ -82,7 +82,16 @@ export function NotificationBell({
         );
       } catch {}
     }
-    if (n.action_url) router.push(n.action_url);
+    if (n.action_url) {
+      try {
+        const path = n.action_url.startsWith("http")
+          ? new URL(n.action_url).pathname
+          : n.action_url;
+        router.push(path);
+      } catch {
+        router.push(n.action_url);
+      }
+    }
   };
 
   const handleMarkAll = () => {
