@@ -64,10 +64,10 @@ export default function BottomNav() {
         >
           <Link href="/checkout">
             <motion.button
-              animate={{ x: [0, 0, -7, 7, -7, 7, -7, 7, -5, 5, -3, 0, 0] }}
+              animate={{ x: [0, 0, 8, -8, 8, -8, 8, -8, 8, -8, 8, -8, 8, -8, 0, 0] }}
               transition={{
                 duration: 4,
-                times: [0, 0.58, 0.61, 0.64, 0.67, 0.70, 0.73, 0.76, 0.79, 0.82, 0.85, 0.89, 1],
+                times: [0, 0.60, 0.613, 0.626, 0.639, 0.652, 0.665, 0.678, 0.691, 0.704, 0.717, 0.730, 0.743, 0.756, 0.770, 1],
                 repeat: Infinity,
                 ease: "linear",
               }}
