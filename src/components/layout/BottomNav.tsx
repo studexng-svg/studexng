@@ -64,12 +64,12 @@ export default function BottomNav() {
         >
           <Link href="/checkout">
             <motion.button
-              animate={{ rotate: [0, 0, -14, 14, -12, 12, -8, 8, -4, 4, 0, 0, 0, 0, 0] }}
+              animate={{ x: [0, 0, -7, 7, -7, 7, -7, 7, -5, 5, -3, 0, 0] }}
               transition={{
-                duration: 5,
-                times: [0, 0.36, 0.40, 0.44, 0.48, 0.52, 0.56, 0.60, 0.64, 0.68, 0.72, 0.80, 0.88, 0.94, 1],
+                duration: 4,
+                times: [0, 0.58, 0.61, 0.64, 0.67, 0.70, 0.73, 0.76, 0.79, 0.82, 0.85, 0.89, 1],
                 repeat: Infinity,
-                ease: "easeInOut",
+                ease: "linear",
               }}
               className="relative w-14 h-14 rounded-full flex items-center justify-center text-white"
               style={{ background: TEAL, boxShadow: `0 6px 24px rgba(13,148,136,0.55)` }}
