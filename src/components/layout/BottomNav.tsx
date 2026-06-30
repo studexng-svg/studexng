@@ -60,7 +60,7 @@ export default function BottomNav() {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 24 }}
           transition={{ type: "spring", stiffness: 420, damping: 28 }}
-          className="fixed bottom-[88px] left-4 right-4 z-50 max-w-lg mx-auto"
+          className="fixed bottom-[144px] left-5 right-5 z-50 max-w-lg mx-auto"
         >
           <Link href="/checkout">
             <motion.button
