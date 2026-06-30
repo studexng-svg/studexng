@@ -4,7 +4,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Home, Grid3x3, ShoppingCart, MessageCircle, User, ArrowRight } from "lucide-react";
+import { Home, Grid3x3, ShoppingCart, MessageCircle, User } from "lucide-react";
 import Image from "next/image";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/authStore";
@@ -25,7 +25,7 @@ export default function BottomNav() {
   const { isLoggedIn } = useAuth();
   const { cart } = useCart();
   const [unreadCount, setUnreadCount] = useState(0);
-  const showCheckout = cart.length > 0 && !pathname.startsWith("/cart") && !pathname.startsWith("/checkout");
+  const showCheckout = cart.length > 0 && pathname === "/home";
 
   // Poll unread count every 30s — must be before early returns (Rules of Hooks)
   useEffect(() => {
@@ -52,29 +52,32 @@ export default function BottomNav() {
 
   return (
     <>
-    {/* Floating checkout pill — sits just below the top nav */}
+    {/* Floating checkout FAB — home page only, bottom-right, periodic shake */}
     <AnimatePresence>
       {showCheckout && (
         <motion.div
-          initial={{ opacity: 0, y: -12 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -12 }}
-          transition={{ type: "spring", stiffness: 420, damping: 28 }}
-          className="fixed top-[68px] left-1/2 -translate-x-1/2 z-50"
+          initial={{ opacity: 0, scale: 0 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0 }}
+          transition={{ type: "spring", stiffness: 380, damping: 22 }}
+          className="fixed bottom-[100px] right-4 z-50"
         >
           <Link href="/checkout">
             <motion.button
-              animate={{ scale: [1, 1.03, 1] }}
-              transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
-              className="flex items-center gap-2.5 py-2 pl-3 pr-3 rounded-full text-white font-semibold text-sm shadow-lg"
-              style={{ background: TEAL, boxShadow: `0 6px 20px rgba(13,148,136,0.45)` }}
+              animate={{ rotate: [0, 0, -14, 14, -12, 12, -8, 8, -4, 4, 0, 0, 0, 0, 0] }}
+              transition={{
+                duration: 5,
+                times: [0, 0.36, 0.40, 0.44, 0.48, 0.52, 0.56, 0.60, 0.64, 0.68, 0.72, 0.80, 0.88, 0.94, 1],
+                repeat: Infinity,
+                ease: "easeInOut",
+              }}
+              className="relative w-14 h-14 rounded-full flex items-center justify-center text-white"
+              style={{ background: TEAL, boxShadow: `0 6px 24px rgba(13,148,136,0.55)` }}
             >
-              <ShoppingCart className="w-4 h-4" />
-              <span>Checkout</span>
-              <span className="bg-white/25 rounded-full px-2 py-0.5 text-xs font-black leading-none">
-                {cart.length}
+              <ShoppingCart className="w-6 h-6" />
+              <span className="absolute -top-1 -right-1 min-w-[20px] h-5 bg-red-500 rounded-full flex items-center justify-center px-1 text-xs font-black text-white leading-none">
+                {cart.length > 9 ? "9+" : cart.length}
               </span>
-              <ArrowRight className="w-3.5 h-3.5" />
             </motion.button>
           </Link>
         </motion.div>
