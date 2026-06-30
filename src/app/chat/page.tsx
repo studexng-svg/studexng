@@ -162,12 +162,12 @@ export default function ChatListPage() {
             </p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="bg-white rounded-2xl overflow-hidden border border-stone-100 shadow-sm divide-y divide-stone-100 animate-fadeUp">
             {filtered.map((conv) => {
               const pinned = isPinned(conv.id);
               const isSelected = selected?.id === conv.id;
               return (
-                <div key={conv.id} className="animate-fadeUp">
+                <div key={conv.id}>
                   <Link
                     href={`/chat/${conv.id}`}
                     onClick={e => { if (longPressFired.current) { e.preventDefault(); longPressFired.current = false; } }}
@@ -177,12 +177,12 @@ export default function ChatListPage() {
                       onPointerUp={cancelLongPress}
                       onPointerCancel={cancelLongPress}
                       onPointerLeave={cancelLongPress}
-                      className={`bg-white rounded-2xl p-4 flex items-center gap-3 shadow-sm border transition-all cursor-pointer select-none ${
+                      className={`p-4 flex items-center gap-3 transition-all cursor-pointer select-none ${
                         isSelected
-                          ? "border-teal-400 ring-2 ring-teal-400/25 bg-teal-50/40"
+                          ? "bg-teal-50/60"
                           : conv.unread_count > 0
-                          ? "border-teal-200 bg-teal-50/30"
-                          : "border-stone-200 hover:border-teal-300 hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98]"
+                          ? "bg-teal-50/30"
+                          : "hover:bg-stone-50 active:bg-stone-100"
                       }`}
                     >
                       {/* Avatar */}
