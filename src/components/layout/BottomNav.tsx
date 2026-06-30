@@ -52,33 +52,29 @@ export default function BottomNav() {
 
   return (
     <>
-    {/* Floating checkout button — appears above bottom nav when cart has items */}
+    {/* Floating checkout pill — sits just below the top nav */}
     <AnimatePresence>
       {showCheckout && (
         <motion.div
-          initial={{ opacity: 0, y: 24 }}
+          initial={{ opacity: 0, y: -12 }}
           animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: 24 }}
+          exit={{ opacity: 0, y: -12 }}
           transition={{ type: "spring", stiffness: 420, damping: 28 }}
-          className="fixed bottom-[144px] left-5 right-5 z-50 max-w-lg mx-auto"
+          className="fixed top-[68px] left-1/2 -translate-x-1/2 z-50"
         >
           <Link href="/checkout">
             <motion.button
-              animate={{ scale: [1, 1.025, 1] }}
-              transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
-              className="w-full py-4 rounded-2xl text-white font-bold text-base flex items-center justify-between px-5 shadow-lg"
-              style={{ background: TEAL, boxShadow: `0 8px 28px rgba(13,148,136,0.45)` }}
+              animate={{ scale: [1, 1.03, 1] }}
+              transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
+              className="flex items-center gap-2.5 py-2 pl-3 pr-3 rounded-full text-white font-semibold text-sm shadow-lg"
+              style={{ background: TEAL, boxShadow: `0 6px 20px rgba(13,148,136,0.45)` }}
             >
-              <span className="flex items-center gap-2">
-                <ShoppingCart className="w-5 h-5" />
-                Checkout
+              <ShoppingCart className="w-4 h-4" />
+              <span>Checkout</span>
+              <span className="bg-white/25 rounded-full px-2 py-0.5 text-xs font-black leading-none">
+                {cart.length}
               </span>
-              <span className="flex items-center gap-2">
-                <span className="bg-white/20 rounded-full px-2.5 py-0.5 text-sm font-black">
-                  {cart.length} {cart.length === 1 ? "item" : "items"}
-                </span>
-                <ArrowRight className="w-5 h-5" />
-              </span>
+              <ArrowRight className="w-3.5 h-3.5" />
             </motion.button>
           </Link>
         </motion.div>
