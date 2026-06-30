@@ -215,6 +215,7 @@ AUTH_USER_MODEL = 'accounts.User'
 _DEFAULT_ORIGINS = (
     'http://localhost:3000,'
     'http://127.0.0.1:3000,'
+    'http://localhost:8081,'
     'https://studex.com.ng,'
     'https://www.studex.com.ng,'
     'https://studexng.vercel.app'
