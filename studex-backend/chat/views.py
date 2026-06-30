@@ -41,15 +41,9 @@ def _has_suspicious_content(content: str):
     solicitation; otherwise returns None.
     """
     if _NG_PHONE_RE.search(content):
-        return (
-            "This message violates our rules and regulations. Sharing phone numbers "
-            "can lead to buying outside StudEx — all transactions must happen on the platform."
-        )
+        return "This message violates our rules and regulations."
     if _OFFPLATFORM_RE.search(content):
-        return (
-            "This message violates our rules and regulations. Requesting off-platform "
-            "payments can lead to buying outside StudEx — all transactions must happen on the platform."
-        )
+        return "All transactions must happen on the StudEx website."
     return None
 
 
