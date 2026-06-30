@@ -31,15 +31,16 @@ function ActivityStatus({ lastSeen }: { lastSeen?: string | null }) {
 }
 import AdminTopBar from "@/components/layout/AdminTopBar";
 import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { fetchAllPages, BASE_URL } from "@/lib/api";
 import { GRAD } from "@/lib/tokens";
 import { CampusPills, type Campus } from "@/components/admin/CampusPills";
 
 export default function AdminUsers() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [search, setSearch] = useState("");
-  const [campus, setCampus] = useState<Campus>("");
+  const [campus, setCampus] = useState<Campus>((searchParams.get("campus") || "") as Campus);
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -56,7 +57,13 @@ export default function AdminUsers() {
 
   useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleCampus = (c: Campus) => { setCampus(c); load(search, c); };
+  const handleCampus = (c: Campus) => {
+    setCampus(c);
+    const params = new URLSearchParams(searchParams.toString());
+    if (c) params.set("campus", c); else params.delete("campus");
+    router.replace(`/admin/users?${params.toString()}`);
+    load(search, c);
+  };
   const handleSearch = (s: string) => { setSearch(s); load(s, campus); };
 
   const vendors     = users.filter(u => u.user_type === "vendor").length;

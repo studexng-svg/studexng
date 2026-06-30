@@ -3,7 +3,7 @@
 
 import { Package, Search, CheckCircle, XCircle, Tag, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import AdminTopBar from "@/components/layout/AdminTopBar";
 import { api, fetchAllPages, BASE_URL } from "@/lib/api";
 import { CampusPills, type Campus } from "@/components/admin/CampusPills";
@@ -25,11 +25,12 @@ interface Category { id: number; title: string; slug: string; campus: string; }
 
 export default function AdminListingsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [listings, setListings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState("");
-  const [campus, setCampus] = useState<Campus>("");
+  const [campus, setCampus] = useState<Campus>((searchParams.get("campus") || "") as Campus);
   const [categoryFilter, setCategoryFilter] = useState("");
   const [categories, setCategories] = useState<Category[]>([]);
 
@@ -121,7 +122,13 @@ export default function AdminListingsPage() {
       <div className="px-6 pt-5 pb-28 space-y-3">
 
         {/* Campus filter */}
-        <CampusPills value={campus} onChange={c => { setCampus(c); load(search, tab, c, categoryFilter); }} />
+        <CampusPills value={campus} onChange={c => {
+          setCampus(c);
+          const params = new URLSearchParams(searchParams.toString());
+          if (c) params.set("campus", c); else params.delete("campus");
+          router.replace(`/admin/listings?${params.toString()}`);
+          load(search, tab, c, categoryFilter);
+        }} />
 
         {/* Search */}
         <div className="relative">
