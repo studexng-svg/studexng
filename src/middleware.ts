@@ -50,6 +50,16 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/maintenance", request.url));
   }
 
+  // Authenticated users hitting / should go straight to /home — no landing flash.
+  if (pathname === "/") {
+    const hasSession =
+      request.cookies.get("refresh_token")?.value ||
+      request.cookies.get("access_token")?.value;
+    if (hasSession) {
+      return NextResponse.redirect(new URL("/home", request.url));
+    }
+  }
+
   // Redirect all legacy /seller/* routes to their vendor equivalents.
   if (pathname.startsWith("/seller")) {
     const dest = pathname.startsWith("/seller/onboarding")
