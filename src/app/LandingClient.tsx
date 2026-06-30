@@ -114,18 +114,9 @@ function TestimonialGrid() {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 px-5 max-w-5xl mx-auto">
       {FEATURED_REVIEWS.map((review, i) => (
-        <motion.div
-          key={i}
-          animate={{ opacity: [1, 0.28, 1] }}
-          transition={{
-            duration: 2.8 + (i % 3) * 0.7,
-            delay: i * 0.35,
-            repeat: Infinity,
-            ease: "easeInOut",
-          }}
-        >
+        <div key={i}>
           <TestimonialCard review={review} />
-        </motion.div>
+        </div>
       ))}
     </div>
   );

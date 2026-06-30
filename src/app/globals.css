@@ -130,3 +130,14 @@
 .tap-scale:active {
   transform: scale(0.95);
 }
+
+/* FAB buzz — CSS compositor animation (no JS on main thread) */
+@keyframes studex-buzz {
+  0%, 55%, 100% { transform: translateX(0); }
+  57%, 61%, 65%, 69%, 73% { transform: translateX(-3px); }
+  59%, 63%, 67%, 71%, 75% { transform: translateX(3px); }
+}
+.animate-buzz {
+  animation: studex-buzz 4s linear infinite;
+  will-change: transform;
+}

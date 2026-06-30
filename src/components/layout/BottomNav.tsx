@@ -63,22 +63,15 @@ export default function BottomNav() {
           className="fixed bottom-[100px] right-4 z-50"
         >
           <Link href="/checkout">
-            <motion.button
-              animate={{ x: [0, 0, -3, 3, -3, 3, -3, 3, -3, 3, -3, 3, 0, 0] }}
-              transition={{
-                duration: 3.5,
-                times: [0, 0.60, 0.625, 0.65, 0.675, 0.70, 0.725, 0.75, 0.775, 0.80, 0.825, 0.85, 0.875, 1],
-                repeat: Infinity,
-                ease: "linear",
-              }}
-              className="relative w-14 h-14 rounded-full flex items-center justify-center text-white"
+            <button
+              className="animate-buzz relative w-14 h-14 rounded-full flex items-center justify-center text-white"
               style={{ background: TEAL, boxShadow: `0 6px 24px rgba(13,148,136,0.55)` }}
             >
               <ShoppingCart className="w-6 h-6" />
               <span className="absolute -top-1 -right-1 min-w-[20px] h-5 bg-red-500 rounded-full flex items-center justify-center px-1 text-xs font-black text-white leading-none">
                 {cart.length > 9 ? "9+" : cart.length}
               </span>
-            </motion.button>
+            </button>
           </Link>
         </motion.div>
       )}

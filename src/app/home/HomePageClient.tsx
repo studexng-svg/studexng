@@ -471,15 +471,15 @@ export default function HomePageClient({ initialVendors, initialListings, initia
               </div>
             ) : null}
 
-            <motion.button onClick={e => {
+            <button onClick={e => {
               e.preventDefault(); e.stopPropagation();
               const item = { id: listing.id, title: listing.title, price: effectivePrice, img: listing.image };
               if (wishlisted) { removeFromWishlist(listing.id); showToast("Removed from Wishlist"); }
               else { addToWishlist(item); showToast("Added to Wishlist ❤️"); }
-            }} whileTap={{ scale: 0.85 }}
-              className="absolute top-2.5 right-2.5 z-10 w-7 h-7 bg-white rounded-full shadow-sm flex items-center justify-center">
+            }}
+              className="absolute top-2.5 right-2.5 z-10 w-7 h-7 bg-white rounded-full shadow-sm flex items-center justify-center active:scale-90 transition-transform duration-150">
               <Heart className={`w-3.5 h-3.5 ${wishlisted ? "fill-red-500 text-red-500" : "text-stone-400"}`} />
-            </motion.button>
+            </button>
 
           </div>
 
@@ -621,15 +621,15 @@ export default function HomePageClient({ initialVendors, initialListings, initia
               </div>
             )}
 
-            <motion.button onClick={e => {
+            <button onClick={e => {
               e.preventDefault(); e.stopPropagation();
               const item = { id: listing.id, title: listing.title, price: dealPrice, img: listing.image };
               if (wishlisted) { removeFromWishlist(listing.id); showToast("Removed from Wishlist"); }
               else { addToWishlist(item); showToast("Added to Wishlist ❤️"); }
-            }} whileTap={{ scale: 0.85 }}
-              className="absolute top-2.5 right-2.5 z-10 w-7 h-7 bg-white rounded-full shadow-sm flex items-center justify-center">
+            }}
+              className="absolute top-2.5 right-2.5 z-10 w-7 h-7 bg-white rounded-full shadow-sm flex items-center justify-center active:scale-90 transition-transform duration-150">
               <Heart className={`w-3.5 h-3.5 ${wishlisted ? "fill-red-500 text-red-500" : "text-stone-400"}`} />
-            </motion.button>
+            </button>
           </div>
 
           <div className="p-3">
