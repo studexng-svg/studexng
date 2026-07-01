@@ -116,7 +116,7 @@ export default function AdminOrderDetail() {
           <Row label="Order ID"   value={`#${order.id}`} />
           <Row label="Reference"  value={order.reference} />
           <Row label="Listing"    value={order.listing?.title} />
-          <Row label="Buyer"      value={order.buyer?.username} />
+          <Row label="Buyer"      value={typeof order.buyer === 'string' ? order.buyer : order.buyer?.username} />
           <Row label="Vendor"     value={order.listing?.vendor?.username} />
           <Row label="Amount"           value={order.amount ? `₦${Number(order.amount).toLocaleString()}` : undefined} />
           <Row label="Delivery Location" value={order.delivery_location || "Not set"} />

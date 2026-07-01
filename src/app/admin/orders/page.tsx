@@ -69,7 +69,7 @@ export default function AdminOrders() {
         const q = search.toLowerCase();
         return String(o.id).includes(q) ||
           o.reference?.toLowerCase().includes(q) ||
-          o.buyer?.username?.toLowerCase().includes(q) ||
+          (typeof o.buyer === 'string' ? o.buyer : o.buyer?.username)?.toLowerCase().includes(q) ||
           o.listing?.title?.toLowerCase().includes(q);
       })
     : orders;
@@ -156,7 +156,7 @@ export default function AdminOrders() {
                       </span>
                     </div>
                     <p className="text-stone-400 text-xs">
-                      Buyer: {order.buyer?.username || "—"} · #{order.id}
+                      Buyer: {(typeof order.buyer === 'string' ? order.buyer : order.buyer?.username) || "—"} · #{order.id}
                     </p>
                     {order.created_at && (
                       <p className="text-stone-400 text-xs mt-0.5">
