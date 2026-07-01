@@ -28,7 +28,7 @@ export default function SuccessPage() {
         {/* HEADING */}
         <div className="text-center animate-fadeUp">
           <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold">Payment Successful</p>
-          <h2 className="text-2xl font-bold text-stone-900 mt-0.5" style={SERIF}>You're All Set!</h2>
+          <h2 className="text-2xl font-bold text-stone-900 mt-0.5" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>You're All Set!</h2>
           <p className="text-sm text-stone-400 mt-1">
             {booking ? `${booking.providerName} has been notified of your booking.` : "Your booking has been confirmed."}
           </p>

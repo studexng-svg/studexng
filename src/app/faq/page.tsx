@@ -133,7 +133,7 @@ export default function FAQPage() {
         {/* HERO */}
         <div className="rounded-2xl p-6 text-white text-center shadow-md animate-fadeUp" style={{ background: TEAL }}>
           <HelpCircle className="w-12 h-12 mx-auto mb-3 opacity-90" />
-          <h2 className="text-xl font-bold mb-1" style={SERIF}>
+          <h2 className="text-xl font-bold mb-1" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
             How can we help?
           </h2>
           <p className="text-sm opacity-80">Find answers to common questions about StudEx</p>
@@ -191,7 +191,7 @@ export default function FAQPage() {
         {/* CONTACT SUPPORT */}
         <div className="bg-white rounded-2xl p-5 shadow-sm border border-stone-200 text-center animate-fadeUp">
           <MessageCircle className="w-8 h-8 text-teal-600 mx-auto mb-2" />
-          <p className="font-bold text-stone-900 mb-1" style={SERIF}>
+          <p className="font-bold text-stone-900 mb-1" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
             Still need help?
           </p>
           <p className="text-sm text-stone-500 mb-4">

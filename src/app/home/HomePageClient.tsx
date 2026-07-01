@@ -774,7 +774,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-11 h-11 rounded-2xl bg-amber-100 flex items-center justify-center text-xl flex-shrink-0">⚠️</div>
                   <div>
-                    <h3 className="font-bold text-stone-900 text-base" style={SERIF}>StudEx Disclaimer</h3>
+                    <h3 className="font-bold text-stone-900 text-base" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>StudEx Disclaimer</h3>
                     <p className="text-xs text-stone-400">Please read and accept to continue</p>
                   </div>
                 </div>

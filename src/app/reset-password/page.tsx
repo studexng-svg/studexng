@@ -66,7 +66,7 @@ function ResetPasswordForm() {
           >
             <ChevronLeft className="w-5 h-5 text-stone-600" />
           </button>
-          <h1 className="text-base font-bold text-stone-900" style={SERIF}>
+          <h1 className="text-base font-bold text-stone-900" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
             Reset Password
           </h1>
           <div className="w-10" />
@@ -84,7 +84,7 @@ function ResetPasswordForm() {
               </div>
               <div>
                 <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold">Done!</p>
-                <h2 className="text-2xl font-bold text-stone-900 mt-0.5" style={SERIF}>Password Updated</h2>
+                <h2 className="text-2xl font-bold text-stone-900 mt-0.5" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Password Updated</h2>
                 <p className="text-sm text-stone-500 mt-2">Your password has been updated. Redirecting to login...</p>
               </div>
               <button
@@ -104,7 +104,7 @@ function ResetPasswordForm() {
                   <Lock className="w-7 h-7 text-white" />
                 </div>
                 <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold">Secure your account</p>
-                <h2 className="text-2xl font-bold text-stone-900 mt-0.5" style={SERIF}>Set New Password</h2>
+                <h2 className="text-2xl font-bold text-stone-900 mt-0.5" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Set New Password</h2>
                 <p className="text-sm text-stone-500 mt-1">Choose a strong password to protect your account.</p>
               </div>
 

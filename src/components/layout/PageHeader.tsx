@@ -76,7 +76,7 @@ export default function PageHeader({
 
         {/* Title Row */}
         <div>
-          <h1 className="text-base font-bold text-stone-900" style={SERIF}>
+          <h1 className="text-base font-bold text-stone-900" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
             {title}
           </h1>
           {subtitle && (

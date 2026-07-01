@@ -20,7 +20,7 @@ export default function HelpPage() {
         {/* HERO */}
         <div className="rounded-2xl p-6 text-white text-center shadow-md animate-fadeUp" style={{ background: TEAL }}>
           <Headphones className="w-12 h-12 mx-auto mb-3 opacity-90" />
-          <h2 className="text-xl font-bold mb-1" style={SERIF}>How Can We Help?</h2>
+          <h2 className="text-xl font-bold mb-1" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>How Can We Help?</h2>
           <p className="text-sm opacity-80">Fast, friendly support — available every day</p>
         </div>
 

@@ -95,7 +95,7 @@ export default function WishlistPage() {
         <div className="flex items-center justify-between">
           <div>
             <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold">Saved Items</p>
-            <h2 className="text-xl font-bold text-stone-900 mt-0.5" style={SERIF}>Wishlist ({wishlist.length})</h2>
+            <h2 className="text-xl font-bold text-stone-900 mt-0.5" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Wishlist ({wishlist.length})</h2>
           </div>
           <button onClick={clearWishlist} className="text-red-500 text-sm font-medium hover:text-red-600 transition">Clear</button>
         </div>

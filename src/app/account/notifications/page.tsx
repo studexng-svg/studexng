@@ -234,7 +234,7 @@ export default function NotificationsPage() {
                       </div>
                     );
                   })()}
-                  <h3 className="font-bold text-stone-900 text-sm" style={SERIF}>{detailNotif.title}</h3>
+                  <h3 className="font-bold text-stone-900 text-sm" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{detailNotif.title}</h3>
                 </div>
                 <button onClick={() => setDetailNotif(null)} className="w-8 h-8 rounded-full bg-stone-100 flex items-center justify-center text-stone-500 hover:bg-stone-200 transition">
                   <X className="w-4 h-4" />
@@ -364,7 +364,7 @@ export default function NotificationsPage() {
               <div className="w-20 h-20 rounded-full bg-stone-100 flex items-center justify-center mb-4">
                 <Bell className="w-9 h-9 text-stone-300" />
               </div>
-              <p className="font-bold text-stone-700 text-lg" style={SERIF}>All caught up</p>
+              <p className="font-bold text-stone-700 text-lg" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>All caught up</p>
               <p className="text-stone-400 text-sm mt-1">No notifications yet</p>
             </motion.div>
           ) : (

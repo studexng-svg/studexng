@@ -39,7 +39,7 @@ export default function ReviewForm({ orderId, vendorName, onSuccess }: {
     <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm space-y-4">
       <div>
         <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold">Leave a Review</p>
-        <h3 className="text-lg font-bold text-stone-900 mt-0.5" style={SERIF}>
+        <h3 className="text-lg font-bold text-stone-900 mt-0.5" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
           Rate your experience
         </h3>
         <p className="text-sm text-stone-400 mt-0.5">How was {vendorName}?</p>
