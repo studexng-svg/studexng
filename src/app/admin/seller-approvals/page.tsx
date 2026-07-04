@@ -111,9 +111,9 @@ export default function AdminSellerApprovals() {
         )}
 
         {loading ? (
-          <div className="space-y-3">
+          <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
             {[...Array(4)].map((_, i) => (
-              <div key={i} className="bg-white border border-stone-200 rounded-2xl h-16 animate-pulse" />
+              <div key={i} className="p-4 h-16 animate-pulse border-b border-stone-100 last:border-0 bg-stone-50/50" />
             ))}
           </div>
         ) : (() => {
@@ -125,14 +125,14 @@ export default function AdminSellerApprovals() {
               <p className="text-stone-400 text-sm mt-1">{statusFilter ? <button onClick={() => setStatusFilter("")} className="underline">Clear filter</button> : "Applications will appear here when sellers apply"}</p>
             </div>
           ) : (
-          <div className="space-y-2">
+          <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
             {visible.map(app => {
               const { bg, icon: Icon } = STATUS_STYLES[app.status];
               return (
                 <div
                   key={app.id}
                   onClick={() => router.push(`/admin/seller-approvals/${app.id}`)}
-                  className="bg-white border border-stone-200 hover:border-teal-300 rounded-2xl p-3.5 flex items-center gap-3 transition-all cursor-pointer active:scale-[0.98] shadow-sm"
+                  className="border-b border-stone-100 last:border-0 p-3.5 flex items-center gap-3 hover:bg-stone-50/50 cursor-pointer transition-colors"
                 >
                   <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
                     style={{ background: GRAD, boxShadow: "0 2px 12px rgba(13,148,136,0.35)" }}>

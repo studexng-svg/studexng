@@ -124,8 +124,8 @@ export default function AdminPickupPointsPage() {
 
         {/* List */}
         {loading ? (
-          <div className="space-y-2">
-            {[1, 2, 3].map(i => <div key={i} className="bg-white rounded-2xl p-4 animate-pulse border border-stone-100 h-16" />)}
+          <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
+            {[1, 2, 3].map(i => <div key={i} className="p-4 h-16 animate-pulse border-b border-stone-100 last:border-0 bg-stone-50/50" />)}
           </div>
         ) : points.length === 0 ? (
           <div className="bg-white rounded-2xl p-10 text-center border border-stone-100 shadow-sm">
@@ -133,9 +133,9 @@ export default function AdminPickupPointsPage() {
             <p className="text-stone-400 text-sm">No pickup points yet. Add one above.</p>
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
             {points.map(p => (
-              <div key={p.id} className="bg-white rounded-2xl border border-stone-100 shadow-sm p-4 flex items-center gap-3">
+              <div key={p.id} className="border-b border-stone-100 last:border-0 p-4 flex items-center gap-3">
                 <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: TEAL + "20" }}>
                   <MapPin className="w-4 h-4" style={{ color: TEAL }} />
                 </div>

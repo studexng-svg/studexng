@@ -55,9 +55,9 @@ export default function AdminBankAccountsPage() {
         {!loading && <p className="text-xs text-stone-400">{accounts.length} bank account{accounts.length !== 1 ? "s" : ""}</p>}
 
         {loading ? (
-          <div className="space-y-2">
+          <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
             {[...Array(4)].map((_, i) => (
-              <div key={i} className="bg-white border border-stone-200 rounded-2xl p-4 h-24 animate-pulse" />
+              <div key={i} className="p-4 h-24 animate-pulse border-b border-stone-100 last:border-0 bg-stone-50/50" />
             ))}
           </div>
         ) : accounts.length === 0 ? (
@@ -66,9 +66,9 @@ export default function AdminBankAccountsPage() {
             <p className="text-stone-400 text-sm">No bank accounts found</p>
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
             {accounts.map((a: any) => (
-              <div key={a.id} className="bg-white border border-stone-200 rounded-2xl p-4 shadow-sm">
+              <div key={a.id} className="border-b border-stone-100 last:border-0 p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">

@@ -126,9 +126,9 @@ export default function AdminOrders() {
         </div>
 
         {loading ? (
-          <div className="space-y-3">
+          <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
             {[...Array(4)].map((_, i) => (
-              <div key={i} className="bg-white border border-stone-200 rounded-2xl h-20 animate-pulse" />
+              <div key={i} className="p-4 h-20 animate-pulse border-b border-stone-100 last:border-0 bg-stone-50/50" />
             ))}
           </div>
         ) : filtered.length === 0 ? (
@@ -137,12 +137,12 @@ export default function AdminOrders() {
             <p className="text-stone-400 text-sm">No orders found</p>
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
             {filtered.map(order => (
               <div
                 key={order.id}
                 onClick={() => router.push(`/admin/orders/${order.id}`)}
-                className="bg-white border border-stone-200 hover:border-teal-300 rounded-2xl p-4 transition-all cursor-pointer active:scale-[0.98] shadow-sm"
+                className="border-b border-stone-100 last:border-0 p-4 hover:bg-stone-50/50 cursor-pointer transition-colors"
               >
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex-1 min-w-0">

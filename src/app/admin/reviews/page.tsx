@@ -70,9 +70,9 @@ export default function AdminReviewsPage() {
         {!loading && <p className="text-xs text-stone-400">{reviews.length} review{reviews.length !== 1 ? "s" : ""}</p>}
 
         {loading ? (
-          <div className="space-y-2">
+          <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
             {[...Array(4)].map((_, i) => (
-              <div key={i} className="bg-white border border-stone-200 rounded-2xl p-4 h-24 animate-pulse" />
+              <div key={i} className="p-4 h-24 animate-pulse border-b border-stone-100 last:border-0 bg-stone-50/50" />
             ))}
           </div>
         ) : reviews.length === 0 ? (
@@ -81,9 +81,9 @@ export default function AdminReviewsPage() {
             <p className="text-stone-400 text-sm">No reviews found</p>
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
             {reviews.map((r: any) => (
-              <div key={r.id} className="bg-white border border-stone-200 rounded-2xl p-4 shadow-sm">
+              <div key={r.id} className="border-b border-stone-100 last:border-0 p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">

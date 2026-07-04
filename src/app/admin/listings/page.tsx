@@ -199,9 +199,9 @@ export default function AdminListingsPage() {
 
         {/* List */}
         {loading ? (
-          <div className="space-y-2">
+          <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
             {[...Array(5)].map((_, i) => (
-              <div key={i} className="bg-white border border-stone-200 rounded-2xl p-4 h-20 animate-pulse" />
+              <div key={i} className="p-4 h-20 animate-pulse border-b border-stone-100 last:border-0 bg-stone-50/50" />
             ))}
           </div>
         ) : listings.length === 0 ? (
@@ -210,11 +210,11 @@ export default function AdminListingsPage() {
             <p className="text-stone-400 text-sm">No listings found</p>
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
             {listings.map((l: any) => (
               <div
                 key={l.id}
-                className={`flex items-start gap-3 bg-white border rounded-2xl p-4 transition ${selected.has(l.id) ? "border-teal-300 bg-teal-50/40" : "border-stone-200 hover:border-teal-200"}`}
+                className={`flex items-start gap-3 border-b border-stone-100 last:border-0 p-4 transition ${selected.has(l.id) ? "bg-teal-50/40" : "hover:bg-stone-50/50"}`}
               >
                 <input
                   type="checkbox"

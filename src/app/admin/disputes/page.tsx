@@ -85,9 +85,9 @@ export default function AdminDisputesPage() {
         {!loading && <p className="text-xs text-stone-400">{disputes.length} dispute{disputes.length !== 1 ? "s" : ""}</p>}
 
         {loading ? (
-          <div className="space-y-2">
+          <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
             {[...Array(4)].map((_, i) => (
-              <div key={i} className="bg-white border border-stone-200 rounded-2xl p-4 h-20 animate-pulse" />
+              <div key={i} className="p-4 h-20 animate-pulse border-b border-stone-100 last:border-0 bg-stone-50/50" />
             ))}
           </div>
         ) : disputes.length === 0 ? (
@@ -96,10 +96,10 @@ export default function AdminDisputesPage() {
             <p className="text-stone-400 text-sm">No disputes found</p>
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
             {disputes.map((d: any) => (
               <button key={d.id} onClick={() => router.push(`/admin/disputes/${d.id}`)}
-                className="w-full bg-white border border-stone-200 hover:border-teal-300 rounded-2xl p-4 text-left transition active:scale-[0.98]">
+                className="w-full border-b border-stone-100 last:border-0 p-4 text-left hover:bg-stone-50/50 cursor-pointer transition-colors">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-stone-900 text-sm">Dispute #{d.id}</p>

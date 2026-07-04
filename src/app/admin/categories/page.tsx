@@ -140,9 +140,9 @@ export default function AdminCategoriesPage() {
         {!loading && <p className="text-xs text-stone-400">{categories.length} categor{categories.length !== 1 ? "ies" : "y"}</p>}
 
         {loading ? (
-          <div className="space-y-2">
+          <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
             {[...Array(6)].map((_, i) => (
-              <div key={i} className="bg-white border border-stone-200 rounded-2xl p-4 h-16 animate-pulse" />
+              <div key={i} className="p-4 h-16 animate-pulse border-b border-stone-100 last:border-0 bg-stone-50/50" />
             ))}
           </div>
         ) : categories.length === 0 ? (
@@ -151,9 +151,9 @@ export default function AdminCategoriesPage() {
             <p className="text-stone-400 text-sm">No categories yet</p>
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
             {categories.map((cat) => (
-              <div key={cat.id} className="bg-white border border-stone-200 rounded-2xl p-4 shadow-sm">
+              <div key={cat.id} className="border-b border-stone-100 last:border-0 p-4">
                 {editId === cat.id ? (
                   <div className="space-y-2">
                     <input className="w-full border border-stone-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"

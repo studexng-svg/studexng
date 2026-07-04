@@ -83,8 +83,8 @@ export default function AdminDeliveriesPage() {
         </div>
 
         {loading ? (
-          <div className="space-y-2">
-            {[1, 2, 3].map(i => <div key={i} className="bg-white rounded-2xl p-4 animate-pulse border border-stone-100 h-20" />)}
+          <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
+            {[1, 2, 3].map(i => <div key={i} className="p-4 h-20 animate-pulse border-b border-stone-100 last:border-0 bg-stone-50/50" />)}
           </div>
         ) : deliveries.length === 0 ? (
           <div className="bg-white rounded-2xl p-10 text-center border border-stone-100 shadow-sm">
@@ -92,9 +92,9 @@ export default function AdminDeliveriesPage() {
             <p className="text-stone-400 text-sm">No deliveries found.</p>
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
             {deliveries.map(d => (
-              <div key={d.id} className="bg-white rounded-2xl border border-stone-100 shadow-sm p-4 space-y-2">
+              <div key={d.id} className="border-b border-stone-100 last:border-0 p-4 space-y-2">
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <p className="font-semibold text-stone-900 text-sm">{d.listing_title}</p>
