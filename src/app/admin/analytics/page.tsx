@@ -9,7 +9,6 @@ import {
 import { RefreshCw, TrendingUp, Users, Package, DollarSign, FileText } from "lucide-react";
 import AdminTopBar from "@/components/layout/AdminTopBar";
 import { api } from "@/lib/api";
-import { GRAD } from "@/lib/tokens";
 
 const TEAL  = "#0D9488";
 const PURPLE = "#7C3AED";
@@ -32,8 +31,8 @@ function SectionCard({ title, icon: Icon, children }: {
   return (
     <div className="bg-white border border-stone-200 rounded-2xl p-4 shadow-sm">
       <div className="flex items-center gap-2 mb-4">
-        <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: GRAD }}>
-          <Icon className="w-3.5 h-3.5 text-white" />
+        <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: "rgba(124,58,237,0.12)" }}>
+          <Icon className="w-3.5 h-3.5 text-purple-600" />
         </div>
         <p className="text-teal-600 text-xs tracking-[0.2em] uppercase font-semibold">{title}</p>
       </div>

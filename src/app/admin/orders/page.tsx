@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import AdminTopBar from "@/components/layout/AdminTopBar";
 import { useState, useEffect, useRef } from "react";
 import { fetchAllPages, BASE_URL } from "@/lib/api";
-import { GRAD } from "@/lib/tokens";
 import { CampusPills, type Campus } from "@/components/admin/CampusPills";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -119,7 +118,7 @@ export default function AdminOrders() {
               className={`px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition-all flex-shrink-0 ${
                 statusFilter === t.key ? "text-white shadow-sm" : "bg-white border border-stone-200 text-stone-600"
               }`}
-              style={statusFilter === t.key ? { background: GRAD } : {}}
+              style={statusFilter === t.key ? { background: "#0D9488" } : {}}
             >
               {t.label} ({counts[t.key] ?? 0})
             </button>

@@ -130,8 +130,8 @@ export default function AdminCategoriesPage() {
         ) : (
           <button onClick={() => setShowAdd(true)}
             className="w-full bg-white border border-stone-200 hover:border-teal-300 rounded-2xl p-4 flex items-center gap-3 transition active:scale-[0.98]">
-            <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: GRAD }}>
-              <Plus className="w-4 h-4 text-white" />
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: "rgba(124,58,237,0.12)" }}>
+              <Plus className="w-4 h-4 text-purple-600" />
             </div>
             <p className="font-semibold text-stone-900 text-sm">Add New Category</p>
           </button>

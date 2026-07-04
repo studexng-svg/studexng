@@ -171,7 +171,7 @@ export default function AdminVendorOfMonthPage() {
                   ? "text-white shadow-sm"
                   : "text-stone-500 hover:text-stone-700"
               }`}
-              style={campus === c.key ? { background: GRAD } : {}}
+              style={campus === c.key ? { background: "#0D9488" } : {}}
             >
               {c.label}
             </button>
@@ -207,7 +207,7 @@ export default function AdminVendorOfMonthPage() {
                     className="w-16 h-16 rounded-2xl object-cover" />
                 ) : (
                   <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-white font-bold text-xl"
-                    style={{ background: GRAD }}>
+                    style={{ background: GRAD, boxShadow: "0 2px 12px rgba(13,148,136,0.35)" }}>
                     {current.business_name.slice(0, 2).toUpperCase()}
                   </div>
                 )}
@@ -310,7 +310,7 @@ export default function AdminVendorOfMonthPage() {
                         <img src={v.profile_picture} alt={v.username} className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
                       ) : (
                         <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
-                          style={{ background: GRAD }}>
+                          style={{ background: GRAD, boxShadow: "0 2px 12px rgba(13,148,136,0.35)" }}>
                           {(v.business_name || v.username).slice(0, 2).toUpperCase()}
                         </div>
                       )}
@@ -341,7 +341,7 @@ export default function AdminVendorOfMonthPage() {
                       className="w-10 h-10 rounded-xl object-cover flex-shrink-0" />
                   ) : (
                     <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white text-sm font-bold flex-shrink-0"
-                      style={{ background: GRAD }}>
+                      style={{ background: GRAD, boxShadow: "0 2px 12px rgba(13,148,136,0.35)" }}>
                       {r.business_name.slice(0, 2).toUpperCase()}
                     </div>
                   )}

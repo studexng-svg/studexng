@@ -11,7 +11,7 @@ import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import AdminTopBar from "@/components/layout/AdminTopBar";
 import { api } from "@/lib/api";
-import { GRAD, SERIF } from "@/lib/tokens";
+import { SERIF } from "@/lib/tokens";
 
 interface DashStats {
   users: {
@@ -259,8 +259,8 @@ export default function AdminDashboard() {
               <Link key={href} href={href}>
                 <div className="bg-white border border-stone-200 hover:border-teal-300 rounded-2xl p-4 flex items-center justify-between transition-all active:scale-[0.98]">
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: GRAD }}>
-                      <Icon className="w-4 h-4 text-white" />
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(13,148,136,0.12)" }}>
+                      <Icon className="w-4 h-4 text-teal-600" />
                     </div>
                     <div>
                       <p className="font-semibold text-stone-900 text-sm">{label}</p>

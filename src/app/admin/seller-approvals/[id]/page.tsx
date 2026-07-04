@@ -239,7 +239,7 @@ export default function SellerApplicationDetail() {
         {/* Header card */}
         <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm flex items-center gap-4">
           <div className="w-16 h-16 rounded-full flex items-center justify-center text-white font-bold text-xl flex-shrink-0"
-            style={{ background: GRAD }}>
+            style={{ background: GRAD, boxShadow: "0 2px 12px rgba(13,148,136,0.35)" }}>
             {initials}
           </div>
           <div className="flex-1 min-w-0">

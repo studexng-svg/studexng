@@ -88,7 +88,7 @@ export default function AdminRewardsPage() {
           {(["all", "credits", "discount"] as const).map(f => (
             <button key={f} onClick={() => setFilter(f)}
               className={`px-4 py-2 rounded-full text-sm font-semibold capitalize transition ${filter === f ? "text-white" : "bg-white text-stone-500 border border-stone-200"}`}
-              style={filter === f ? { background: GRAD } : {}}>
+              style={filter === f ? { background: "#0D9488" } : {}}>
               {f === "all" ? "All" : f === "credits" ? "Has Credits" : "Used Discount"}
             </button>
           ))}

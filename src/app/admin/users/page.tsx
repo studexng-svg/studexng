@@ -100,7 +100,7 @@ export default function AdminUsers() {
                 className={`rounded-2xl p-3 text-center shadow-sm transition-all active:scale-95 border-2 ${
                   active ? "border-transparent" : "bg-white border-stone-200 hover:border-stone-300"
                 }`}
-                style={active ? { background: GRAD } : undefined}
+                style={active ? { background: "#0D9488" } : undefined}
               >
                 <Icon className="w-5 h-5 mx-auto mb-1" style={{ color: active ? "#fff" : color }} />
                 <p className={`text-xl font-bold ${active ? "text-white" : "text-stone-900"}`}>{loading ? "—" : value}</p>
@@ -145,7 +145,7 @@ export default function AdminUsers() {
                 className="bg-white border border-stone-200 hover:border-teal-300 rounded-2xl p-3.5 flex items-center gap-3 transition-all cursor-pointer active:scale-[0.98] shadow-sm"
               >
                 <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
-                  style={{ background: GRAD }}>
+                  style={{ background: GRAD, boxShadow: "0 2px 12px rgba(13,148,136,0.35)" }}>
                   {(user.business_name || user.username || "?")[0].toUpperCase()}
                 </div>
                 <div className="flex-1 min-w-0">
