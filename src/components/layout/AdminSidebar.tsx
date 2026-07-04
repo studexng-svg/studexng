@@ -11,7 +11,6 @@ import {
   ChevronDown, ChevronRight, Home, Truck, MapPin,
 } from "lucide-react";
 import { api } from "@/lib/api";
-import { GRAD } from "@/lib/tokens";
 
 const NAV: {
   group: string;
@@ -146,7 +145,7 @@ export default function AdminSidebar() {
       {/* Brand */}
       <div className="flex items-center gap-2.5 px-4 py-4 border-b border-stone-100 flex-shrink-0">
         <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm"
-          style={{ background: GRAD }}>
+          style={{ background: "#7C3AED" }}>
           <span className="text-white font-black text-xs">SX</span>
         </div>
         <div className="flex-1 min-w-0">
