@@ -5,7 +5,7 @@ import {
   Store, Clock, Banknote, LayoutDashboard,
   Calendar, Gift, Bell, X, CheckCheck, ExternalLink, Camera,
   Trash2, ZoomIn, Move, MessageCircle, ArrowUpRight, Pencil,
-  ShieldCheck, KeyRound,
+  ShieldCheck, KeyRound, Truck,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -305,6 +305,7 @@ export default function AccountPage() {
   const vendorApproved = isApprovedVendor(currentUser);
   const vendorPending  = isPendingVendor(currentUser);
   const isAdmin        = currentUser?.email === "studex.ng@gmail.com";
+  const isRider        = currentUser?.user_type === "rider";
   const initials       = (currentUser?.username?.[0] || currentUser?.email?.[0] || "U").toUpperCase();
   const pic            = profilePic ?? user?.profile_image;
 
@@ -543,6 +544,16 @@ export default function AccountPage() {
               <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
                 <Row href="/vendor/dashboard"   icon={LayoutDashboard} iconColor="#0d9488" label="Vendor Dashboard" />
                 <Row href="/account/bank-account" icon={Banknote}       iconColor={hasBankAccount ? "#10b981" : "#f59e0b"} label={hasBankAccount ? "Payout Account" : "Add Payout Account"} last />
+              </div>
+            </>
+          )}
+
+          {/* ── SECTION: Rider (if rider) ── */}
+          {isRider && (
+            <>
+              <p className="text-xs font-bold text-stone-400 uppercase tracking-widest pt-5 pb-2 px-1" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Rider Tools</p>
+              <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
+                <Row href="/rider" icon={Truck} iconColor="#3b82f6" label="Rider Dashboard" last />
               </div>
             </>
           )}

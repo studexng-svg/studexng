@@ -6,10 +6,13 @@ from django.db.models import Sum
 from datetime import timedelta
 import csv
 from .models import Order, Dispute
+from delivery.admin import DeliveryAssignmentInline, _notify_assignment
+from delivery.models import DeliveryAssignment
 
 
 @admin.register(Order)
 class OrderAdmin(admin.ModelAdmin):
+    inlines = [DeliveryAssignmentInline]
     list_display = [
         'reference', 'buyer', 'get_seller', 'listing',
         'amount', 'colored_status', 'created_at'
@@ -32,6 +35,28 @@ class OrderAdmin(admin.ModelAdmin):
     )
 
     actions = ['mark_as_completed', 'mark_as_cancelled', 'trigger_auto_complete', 'export_to_csv']
+
+    def save_formset(self, request, form, formset, change):
+        # Capture pre-save rider state and inject assigned_by for DeliveryAssignment inlines
+        to_check = []
+        for frm in formset.forms:
+            if not isinstance(frm.instance, DeliveryAssignment) or not frm.has_changed():
+                continue
+            frm.instance.assigned_by = request.user
+            old_rider_id = (
+                DeliveryAssignment.objects
+                .values_list('rider_id', flat=True)
+                .filter(pk=frm.instance.pk)
+                .first()
+            ) if frm.instance.pk else None
+            to_check.append((frm, old_rider_id))
+
+        super().save_formset(request, form, formset, change)
+
+        for frm, old_rider_id in to_check:
+            obj = frm.instance
+            if obj.pk and obj.rider and obj.pickup_point and obj.rider_id != old_rider_id:
+                _notify_assignment(obj.order, obj.rider, obj.pickup_point)
 
     def changelist_view(self, request, extra_context=None):
         o = Order.objects
