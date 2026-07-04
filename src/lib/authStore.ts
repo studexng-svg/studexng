@@ -215,28 +215,50 @@ const refreshAccessToken = async (): Promise<string | null> => {
 // ─────────────────────────────────────────
 /**
  * Fetches all pages of a paginated DRF list endpoint.
- * Keeps following `next` until exhausted, then returns the full results array.
+ * Fetches page 1 first to learn the total count, then fires all remaining
+ * pages in parallel — turning N sequential round trips into one + parallel.
  */
 export const fetchAllPages = async (url: string, maxPages = 20): Promise<any[]> => {
-  const all: any[] = [];
-  let nextUrl: string | null = url;
-  let pages = 0;
-  while (nextUrl && pages < maxPages) {
-    const res = await fetchWithAuth(nextUrl);
-    if (!res.ok) break;
-    const data = await res.json();
-    pages++;
-    if (Array.isArray(data)) {
-      all.push(...data);
-      break;
+  const firstRes = await fetchWithAuth(url);
+  if (!firstRes.ok) return [];
+  const firstData = await firstRes.json();
+
+  // Non-paginated endpoint — plain array
+  if (Array.isArray(firstData)) return firstData;
+  if (!Array.isArray(firstData.results)) return [];
+
+  const all: any[] = [...firstData.results];
+
+  // Single page or no count info — nothing more to fetch
+  if (!firstData.next || !firstData.count || all.length === 0) return all;
+
+  const pageSize = all.length;
+  const totalPages = Math.min(Math.ceil(firstData.count / pageSize), maxPages);
+  if (totalPages <= 1) return all;
+
+  // Build page URLs for pages 2..N
+  const pageUrl = (page: number): string => {
+    try {
+      const u = new URL(url);
+      u.searchParams.set('page', String(page));
+      return u.toString();
+    } catch {
+      // Fallback for relative URLs
+      const sep = url.includes('?') ? (url.endsWith('&') ? '' : '&') : '?';
+      return `${url}${sep}page=${page}`;
     }
-    if (Array.isArray(data.results)) {
-      all.push(...data.results);
-      nextUrl = data.next || null;
-    } else {
-      break;
-    }
+  };
+
+  const pageNums = Array.from({ length: totalPages - 1 }, (_, i) => i + 2);
+
+  // Fire all remaining pages simultaneously
+  const responses = await Promise.all(pageNums.map(p => fetchWithAuth(pageUrl(p))));
+  const pages = await Promise.all(responses.map(r => r.ok ? r.json() : null));
+
+  for (const data of pages) {
+    if (data?.results) all.push(...data.results);
   }
+
   return all;
 };
 

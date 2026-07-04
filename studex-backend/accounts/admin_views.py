@@ -14,6 +14,7 @@ from django.conf import settings
 from django.core.cache import cache
 
 from studex.permissions import IsAdminUser, IsSuperAdminUser
+from studex.pagination import AdminPagination
 from accounts.models import User, Profile
 from accounts.serializers import UserSerializer
 from accounts.analytics import AdminAnalytics
@@ -140,6 +141,7 @@ class AdminUserListView(generics.ListAPIView):
     """
     permission_classes = [IsAdminUser]
     serializer_class = UserSerializer
+    pagination_class = AdminPagination
 
     def get_queryset(self):
         """
@@ -342,6 +344,7 @@ try:
         """
         permission_classes = [IsAdminUser]
         serializer_class = ListingSerializer
+        pagination_class = AdminPagination
 
         def get_queryset(self):
             """Get filtered listings queryset."""
@@ -521,6 +524,7 @@ try:
         """
         permission_classes = [IsAdminUser]
         serializer_class = OrderSerializer
+        pagination_class = AdminPagination
 
         def get_queryset(self):
             """Get filtered orders queryset."""
