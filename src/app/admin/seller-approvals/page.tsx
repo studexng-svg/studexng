@@ -6,7 +6,6 @@ import AdminTopBar from "@/components/layout/AdminTopBar";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
-import { GRAD } from "@/lib/tokens";
 import { CampusPills, type Campus } from "@/components/admin/CampusPills";
 
 
@@ -135,7 +134,7 @@ export default function AdminSellerApprovals() {
                   className="border-b border-stone-100 last:border-0 p-3.5 flex items-center gap-3 hover:bg-stone-50/50 cursor-pointer transition-colors"
                 >
                   <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
-                    style={{ background: GRAD, boxShadow: "0 2px 12px rgba(13,148,136,0.35)" }}>
+                    style={{ background: "#7C3AED" }}>
                     {(app.applicant_business_name || app.applicant_name || "?")[0].toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">

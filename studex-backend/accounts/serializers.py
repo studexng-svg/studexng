@@ -363,14 +363,34 @@ class ProfileSerializer(serializers.ModelSerializer):
 class UserSerializer(serializers.ModelSerializer):
     """Serializer for admin user management endpoints"""
     profile = serializers.SerializerMethodField()
+    profile_picture = serializers.SerializerMethodField()
 
     class Meta:
         model = User
         fields = ['id', 'username', 'email', 'phone', 'user_type',
                   'is_active', 'is_staff', 'is_superuser', 'date_joined', 'last_login', 'last_seen',
                   'matric_number', 'nin', 'verification_type', 'hostel', 'business_name', 'school',
-                  'is_verified_vendor', 'wallet_balance', 'profile']
+                  'is_verified_vendor', 'wallet_balance', 'profile', 'profile_picture']
         read_only_fields = ['date_joined', 'last_login', 'last_seen', 'wallet_balance']
+
+    def get_profile_picture(self, obj):
+        if not obj.profile_image:
+            return None
+        name = getattr(obj.profile_image, 'name', None)
+        if not name or name == 'profiles/default.jpg':
+            return None
+        if name.startswith('http'):
+            return name
+        try:
+            url = obj.profile_image.url
+            if url and url.startswith('http'):
+                return url
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(url)
+        except Exception:
+            pass
+        return None
 
     def get_profile(self, obj):
         try:

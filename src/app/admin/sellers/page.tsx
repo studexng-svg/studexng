@@ -33,7 +33,6 @@ import AdminTopBar from "@/components/layout/AdminTopBar";
 import { useState, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { fetchAllPages, BASE_URL } from "@/lib/api";
-import { GRAD } from "@/lib/tokens";
 import { CampusPills, type Campus } from "@/components/admin/CampusPills";
 
 export default function AdminSellers() {
@@ -140,10 +139,15 @@ export default function AdminSellers() {
                 onClick={() => router.push(`/admin/users/${seller.id}`)}
                 className="border-b border-stone-100 last:border-0 p-4 flex items-center gap-3 hover:bg-stone-50/50 cursor-pointer transition-colors"
               >
-                <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
-                  style={{ background: GRAD, boxShadow: "0 2px 12px rgba(13,148,136,0.35)" }}>
-                  {(seller.business_name || seller.username || "?")[0].toUpperCase()}
-                </div>
+                {seller.profile_picture ? (
+                  <img src={seller.profile_picture} alt={seller.username}
+                    className="w-10 h-10 rounded-full object-cover flex-shrink-0" />
+                ) : (
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
+                    style={{ background: "#7C3AED" }}>
+                    {(seller.business_name || seller.username || "?")[0].toUpperCase()}
+                  </div>
+                )}
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-stone-900 text-sm truncate">
                     {seller.business_name || seller.username}

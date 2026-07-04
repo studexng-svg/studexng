@@ -10,7 +10,6 @@ import AdminTopBar from "@/components/layout/AdminTopBar";
 import { useParams, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
-import { GRAD } from "@/lib/tokens";
 
 function relativeTime(dateStr: string | null | undefined): string {
   if (!dateStr) return "Never";
@@ -146,10 +145,15 @@ export default function AdminUserDetail() {
 
         {/* Avatar + name card */}
         <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm flex items-center gap-4">
-          <div className="w-16 h-16 rounded-full flex items-center justify-center text-white font-bold text-xl flex-shrink-0"
-            style={{ background: GRAD, boxShadow: "0 2px 12px rgba(13,148,136,0.35)" }}>
-            {initials}
-          </div>
+          {user.profile_picture ? (
+            <img src={user.profile_picture} alt={user.username}
+              className="w-16 h-16 rounded-full object-cover flex-shrink-0 ring-2 ring-white shadow-md" />
+          ) : (
+            <div className="w-16 h-16 rounded-full flex items-center justify-center text-white font-bold text-xl flex-shrink-0"
+              style={{ background: "#7C3AED" }}>
+              {initials}
+            </div>
+          )}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <p className="font-bold text-stone-900 text-lg leading-tight">{user.username}</p>
@@ -243,7 +247,7 @@ export default function AdminUserDetail() {
               onClick={() => patch({ profile: { is_verified_vendor: true } })}
               disabled={actionLoading}
               className="w-full py-3.5 mb-2 text-white font-semibold rounded-xl flex items-center justify-center gap-2 text-sm transition hover:opacity-90 disabled:opacity-50"
-              style={{ background: GRAD }}
+              style={{ background: "#0D9488" }}
             >
               <ShieldCheck className="w-4 h-4" />
               {actionLoading ? "Saving…" : "Verify Vendor"}
