@@ -18,7 +18,6 @@ import { usePushNotifications } from "@/hooks/usePushNotifications";
 import DraggableAdminShield from "@/components/admin/DraggableAdminShield";
 import { useHeartbeat } from "@/hooks/useHeartbeat";
 import NavigationProgress from "@/components/NavigationProgress";
-import PushNotificationPrompt from "@/components/PushNotificationPrompt";
 
 function CartWishlistSync() {
   const { isLoggedIn, accessToken } = useAuth();
@@ -174,7 +173,6 @@ export default function LayoutClient({ children }: { children: React.ReactNode }
 
           {!hideNav && <BottomNav />}
 
-          <PushNotificationPrompt />
           <DraggableAdminShield />
           <CookieConsent />
           <Toaster position="top-center" richColors closeButton />
