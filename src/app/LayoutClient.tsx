@@ -17,6 +17,7 @@ import { NotificationToastContainer } from "@/components/NotificationToast";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import DraggableAdminShield from "@/components/admin/DraggableAdminShield";
 import { useHeartbeat } from "@/hooks/useHeartbeat";
+import NavigationProgress from "@/components/NavigationProgress";
 
 function CartWishlistSync() {
   const { isLoggedIn, accessToken } = useAuth();
@@ -157,6 +158,7 @@ export default function LayoutClient({ children }: { children: React.ReactNode }
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <NotificationProvider>
+          <NavigationProgress />
           <CartWishlistSync />
           {/* SiteHeader removed — TopNav handles all non-home pages on all screen sizes */}
           <main

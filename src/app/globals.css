@@ -28,6 +28,11 @@
     scroll-behavior: smooth;
   }
 
+  /* Remove the 300ms tap delay on mobile — makes every button/link respond instantly */
+  a, button, [role="button"], label[for], summary {
+    touch-action: manipulation;
+  }
+
   input,
   textarea,
   select {
