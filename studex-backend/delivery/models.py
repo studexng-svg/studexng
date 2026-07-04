@@ -6,11 +6,9 @@ User = settings.AUTH_USER_MODEL
 
 class CampusPickupPoint(models.Model):
     CAMPUS_CHOICES = (
-        ('FUTO', 'FUTO'),
-        ('IMSU', 'IMSU'),
-        ('UNIZIK', 'UNIZIK'),
-        ('ESUT', 'ESUT'),
-        ('UNN', 'UNN'),
+        ('pau', 'PAU'),
+        ('futo', 'FUTO'),
+        ('imsu', 'IMSU'),
     )
 
     name = models.CharField(max_length=150)

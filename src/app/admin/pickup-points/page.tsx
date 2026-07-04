@@ -14,9 +14,13 @@ interface PickupPoint {
   is_active: boolean;
 }
 
-const CAMPUSES = ["FUTO", "IMSU", "UNIZIK", "ESUT", "UNN"];
+const CAMPUSES = [
+  { value: "pau", label: "PAU" },
+  { value: "futo", label: "FUTO" },
+  { value: "imsu", label: "IMSU" },
+];
 
-const EMPTY = { name: "", campus: "FUTO", description: "", is_active: true };
+const EMPTY = { name: "", campus: "pau", description: "", is_active: true };
 
 export default function AdminPickupPointsPage() {
   const [points, setPoints] = useState<PickupPoint[]>([]);
@@ -111,10 +115,10 @@ export default function AdminPickupPointsPage() {
           >All</button>
           {CAMPUSES.map(c => (
             <button
-              key={c}
-              onClick={() => setCampus(c)}
-              className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition ${campus === c ? "border-teal-500 text-teal-700 bg-teal-50" : "border-stone-200 text-stone-500 bg-white"}`}
-            >{c}</button>
+              key={c.value}
+              onClick={() => setCampus(c.value)}
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition ${campus === c.value ? "border-teal-500 text-teal-700 bg-teal-50" : "border-stone-200 text-stone-500 bg-white"}`}
+            >{c.label}</button>
           ))}
         </div>
 
@@ -196,7 +200,7 @@ export default function AdminPickupPointsPage() {
                   onChange={e => setForm(f => ({ ...f, campus: e.target.value }))}
                   className="w-full px-4 py-2.5 rounded-xl border border-stone-200 text-stone-900 text-sm focus:outline-none focus:border-teal-500 bg-white"
                 >
-                  {CAMPUSES.map(c => <option key={c} value={c}>{c}</option>)}
+                  {CAMPUSES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
                 </select>
               </div>
               <div>
