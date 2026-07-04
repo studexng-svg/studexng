@@ -6,7 +6,7 @@ import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from "recharts";
-import { RefreshCw, TrendingUp, Users, Package, DollarSign, FileText } from "lucide-react";
+import { RefreshCw, TrendingUp, Users, Package, DollarSign, FileText, Activity, UserCheck, Zap } from "lucide-react";
 import AdminTopBar from "@/components/layout/AdminTopBar";
 import { api } from "@/lib/api";
 
@@ -156,6 +156,28 @@ export default function AdminAnalytics() {
                   ))}
                 </div>
 
+                {/* Weekly / daily activity cards */}
+                <div className="bg-white border border-stone-200 rounded-2xl p-4 shadow-sm">
+                  <p className="text-teal-600 text-xs tracking-[0.2em] uppercase font-semibold mb-3">User Activity</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    {[
+                      { label: "Online Today",   value: summary.users?.active_today ?? 0, icon: Zap,       color: "#10B981", sub: "seen in last 24h" },
+                      { label: "Active This Week",value: summary.users?.active_7d   ?? 0, icon: Activity,  color: TEAL,      sub: "seen in last 7 days" },
+                      { label: "Active This Month",value: summary.users?.active_30d ?? 0, icon: UserCheck, color: PURPLE,    sub: "seen in last 30 days" },
+                      { label: "New This Week",   value: summary.users?.new_users_7d ?? 0, icon: Users,   color: BLUE,      sub: "joined last 7 days" },
+                    ].map(({ label, value, icon: Icon, color, sub }) => (
+                      <div key={label} className="rounded-xl p-3 border border-stone-100" style={{ background: color + "10" }}>
+                        <div className="flex items-center gap-2 mb-1">
+                          <Icon className="w-3.5 h-3.5" style={{ color }} />
+                          <p className="text-xs font-semibold text-stone-500">{label}</p>
+                        </div>
+                        <p className="text-2xl font-bold" style={{ color }}>{value}</p>
+                        <p className="text-xs text-stone-400 mt-0.5">{sub}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
                 {/* Financial breakdown */}
                 {summary.payments && (
                   <div className="bg-white border border-stone-200 rounded-2xl p-4 shadow-sm">
@@ -194,6 +216,24 @@ export default function AdminAnalytics() {
                     <Line type="monotone" dataKey="new_users" name="New Users" stroke={PURPLE} strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
                   </LineChart>
                 </ResponsiveContainer>
+              </SectionCard>
+            )}
+
+            {/* Daily Active Users chart */}
+            {tsData?.series && (
+              <SectionCard title={`Daily Active Users — Last ${days} days`} icon={Activity}>
+                <ResponsiveContainer width="100%" height={200}>
+                  <LineChart data={tsData.series} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#F5F5F4" />
+                    <XAxis dataKey="label" tick={{ fontSize: 10, fill: "#A8A29E" }} interval={Math.floor(days / 7)} />
+                    <YAxis tick={{ fontSize: 10, fill: "#A8A29E" }} allowDecimals={false} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Line type="monotone" dataKey="active_users" name="Active Users" stroke={TEAL} strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+                    <Line type="monotone" dataKey="new_users" name="New Users" stroke={PURPLE} strokeWidth={1.5} dot={false} strokeDasharray="4 2" activeDot={{ r: 3 }} />
+                    <Legend wrapperStyle={{ fontSize: 10, paddingTop: 8 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+                <p className="text-xs text-stone-400 mt-2">Active = users who logged in that day · New = first-time signups</p>
               </SectionCard>
             )}
 
@@ -340,10 +380,13 @@ export default function AdminAnalytics() {
             {summary && (
               <SectionCard title="Full Statistics" icon={TrendingUp}>
                 <p className="text-teal-600 text-xs font-semibold mb-1 mt-1">Users</p>
-                <StatRow label="Total users"       value={summary.users?.total_users ?? 0} />
-                <StatRow label="Active users"      value={summary.users?.active_users ?? 0} sub={`${summary.users?.inactive_users ?? 0} inactive`} />
-                <StatRow label="New (last 30d)"    value={summary.users?.new_users_30d ?? 0} />
-                <StatRow label="Verified vendors"  value={summary.users?.verified_vendors ?? 0} sub={`${summary.users?.pending_vendors ?? 0} pending`} />
+                <StatRow label="Total users"         value={summary.users?.total_users ?? 0} />
+                <StatRow label="Online today"        value={summary.users?.active_today ?? 0} sub="seen in last 24h" />
+                <StatRow label="Active this week"    value={summary.users?.active_7d ?? 0} sub="seen in last 7 days" />
+                <StatRow label="Active this month"   value={summary.users?.active_30d ?? 0} sub="seen in last 30 days" />
+                <StatRow label="New this week"       value={summary.users?.new_users_7d ?? 0} sub="joined in last 7 days" />
+                <StatRow label="New this month"      value={summary.users?.new_users_30d ?? 0} />
+                <StatRow label="Verified vendors"    value={summary.users?.verified_vendors ?? 0} sub={`${summary.users?.pending_vendors ?? 0} pending`} />
                 <p className="text-teal-600 text-xs font-semibold mb-1 mt-4">Listings</p>
                 <StatRow label="Total listings"    value={summary.listings?.total_listings ?? 0} />
                 <StatRow label="Available / Live"  value={summary.listings?.available_listings ?? 0} />

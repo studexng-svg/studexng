@@ -78,6 +78,17 @@ class AdminAnalyticsTimeSeriesView(APIView):
             )
             user_by_day = {row['day']: row['count'] for row in user_qs}
 
+            # Daily active users (DAU) — users seen each day
+            dau_qs = (
+                UserModel.objects
+                .filter(last_seen__date__gte=start, last_seen__isnull=False)
+                .annotate(day=TruncDate('last_seen'))
+                .values('day')
+                .annotate(count=Count('id'))
+                .order_by('day')
+            )
+            dau_by_day = {row['day']: row['count'] for row in dau_qs}
+
             # Orders per day + revenue per day
             order_by_day = {}
             revenue_by_day = {}
@@ -104,6 +115,7 @@ class AdminAnalyticsTimeSeriesView(APIView):
                     'date': day_str,
                     'label': d.strftime('%b %d'),
                     'new_users': user_by_day.get(d, 0),
+                    'active_users': dau_by_day.get(d, 0),
                     'orders': order_by_day.get(d, 0),
                     'revenue': revenue_by_day.get(d, 0.0),
                 })

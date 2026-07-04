@@ -40,11 +40,18 @@ class AdminAnalytics:
             is_verified_vendor=True
         ).count()
 
-        # Users registered in the last 30 days
-        thirty_days_ago = timezone.now() - timedelta(days=30)
-        new_users = User.objects.filter(
-            date_joined__gte=thirty_days_ago
-        ).count()
+        now = timezone.now()
+        thirty_days_ago = now - timedelta(days=30)
+        seven_days_ago  = now - timedelta(days=7)
+        today_start     = now.replace(hour=0, minute=0, second=0, microsecond=0)
+
+        new_users_30d = User.objects.filter(date_joined__gte=thirty_days_ago).count()
+        new_users_7d  = User.objects.filter(date_joined__gte=seven_days_ago).count()
+
+        # Activity based on last_seen (real logins, not account status)
+        active_today  = User.objects.filter(last_seen__gte=today_start).count()
+        active_7d     = User.objects.filter(last_seen__gte=seven_days_ago).count()
+        active_30d    = User.objects.filter(last_seen__gte=thirty_days_ago).count()
 
         return {
             'total_users': total_users,
@@ -53,7 +60,11 @@ class AdminAnalytics:
             'vendors': vendors,
             'verified_vendors': verified_vendors,
             'pending_vendors': vendors - verified_vendors,
-            'new_users_30d': new_users,
+            'new_users_30d': new_users_30d,
+            'new_users_7d': new_users_7d,
+            'active_today': active_today,
+            'active_7d': active_7d,
+            'active_30d': active_30d,
         }
 
     @staticmethod
