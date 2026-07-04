@@ -25,6 +25,7 @@ class User(AbstractUser):
     USER_TYPE_CHOICES = (
         ('student', 'Student'),
         ('vendor', 'Vendor'),
+        ('rider', 'Rider'),
     )
 
     firebase_uid = models.CharField(

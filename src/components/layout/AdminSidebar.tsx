@@ -8,7 +8,7 @@ import {
   Users, Package, DollarSign, Store, FileText, Tag, TrendingUp,
   CreditCard, Star, AlertTriangle, ArrowUpRight, LayoutDashboard,
   ShoppingCart, MessageCircle, Send, Radio, Bot, Percent,
-  ChevronDown, ChevronRight, Home,
+  ChevronDown, ChevronRight, Home, Truck, MapPin,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { GRAD } from "@/lib/tokens";
@@ -37,8 +37,10 @@ const NAV: {
   {
     group: "Commerce",
     items: [
-      { label: "Orders",              href: "/admin/orders",        icon: ShoppingCart },
-      { label: "Disputes",            href: "/admin/disputes",      icon: AlertTriangle },
+      { label: "Orders",              href: "/admin/orders",         icon: ShoppingCart },
+      { label: "Disputes",            href: "/admin/disputes",       icon: AlertTriangle },
+      { label: "Pickup Points",       href: "/admin/pickup-points",  icon: MapPin },
+      { label: "Deliveries",          href: "/admin/deliveries",     icon: Truck },
       { label: "Payouts",             href: "/admin/payouts",       icon: DollarSign },
       { label: "Bank Accounts",       href: "/admin/bank-accounts", icon: CreditCard },
       { label: "Payout Transactions", href: "/admin/transactions",  icon: ArrowUpRight },

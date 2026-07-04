@@ -655,6 +655,78 @@ class AdminNotifyUserView(APIView):
         return Response({'status': 'sent'})
 
 
+class AdminPromoteToRiderView(APIView):
+    """
+    POST /api/admin/users/<user_id>/make-rider/
+    PATCH body: {} — promotes the user to rider and sends email.
+    DELETE — removes the rider role (reverts to student).
+    """
+    permission_classes = [IsAdminUser]
+
+    def post(self, request, user_id):
+        try:
+            user = User.objects.get(pk=user_id)
+        except User.DoesNotExist:
+            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        if user.user_type == 'rider':
+            return Response({'error': 'User is already a rider'}, status=status.HTTP_400_BAD_REQUEST)
+
+        user.user_type = 'rider'
+        user.save(update_fields=['user_type'])
+
+        # Send email notification
+        try:
+            from django.core.mail import send_mail
+            from django.conf import settings as django_settings
+            send_mail(
+                subject='You have been assigned as a StudEx Rider!',
+                message=(
+                    f'Hi {user.username},\n\n'
+                    f'You have been assigned as a delivery rider on StudEx. '
+                    f'Log in and visit /rider to see and manage your delivery assignments.\n\n'
+                    f'— The StudEx Team'
+                ),
+                from_email=getattr(django_settings, 'DEFAULT_FROM_EMAIL', 'noreply@studex.ng'),
+                recipient_list=[user.email],
+                fail_silently=True,
+            )
+        except Exception:
+            pass
+
+        # In-app notification
+        try:
+            from accounts.utils import send_notification
+            send_notification(
+                recipient=user,
+                notification_type='admin_message',
+                title='You are now a StudEx Rider!',
+                message='Your account has been upgraded. Visit the Rider Dashboard to manage deliveries.',
+                action_url='/rider',
+                send_email=False,
+            )
+        except Exception:
+            pass
+
+        from accounts.serializers import UserSerializer
+        return Response(UserSerializer(user).data)
+
+    def delete(self, request, user_id):
+        try:
+            user = User.objects.get(pk=user_id)
+        except User.DoesNotExist:
+            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        if user.user_type != 'rider':
+            return Response({'error': 'User is not a rider'}, status=status.HTTP_400_BAD_REQUEST)
+
+        user.user_type = 'student'
+        user.save(update_fields=['user_type'])
+
+        from accounts.serializers import UserSerializer
+        return Response(UserSerializer(user).data)
+
+
 # ============================================
 # DISPUTE MANAGEMENT
 # ============================================

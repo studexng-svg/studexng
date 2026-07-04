@@ -45,8 +45,8 @@ export default function BottomNav() {
     return () => clearInterval(interval);
   }, [isLoggedIn]);
 
-  // Hide on auth/admin pages and individual chat rooms (but show on /chat list)
-  if (pathname === "/" || pathname === "/auth" || pathname.startsWith("/admin") || pathname.startsWith("/chat/")) {
+  // Hide on auth/admin/rider pages and individual chat rooms (but show on /chat list)
+  if (pathname === "/" || pathname === "/auth" || pathname.startsWith("/admin") || pathname.startsWith("/chat/") || pathname.startsWith("/rider")) {
     return null;
   }
 

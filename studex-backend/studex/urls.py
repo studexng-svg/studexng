@@ -31,6 +31,7 @@ urlpatterns = [
     path('api/notifications/', include('notifications.urls')),
     path('api/cart/', include('cart.urls')),
     path('api/wishlist/', include('wishlist.urls')),
+    path('api/delivery/', include('delivery.urls')),
     path('api/wallet/balance/', WalletBalanceView.as_view(), name='wallet-balance'),
 
     # Admin notification bell

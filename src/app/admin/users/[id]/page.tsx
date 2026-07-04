@@ -4,7 +4,7 @@
 import {
   Mail, Phone, ShieldCheck, User, Ban, AlertTriangle, Users,
   Store, Hash, Home, MessageCircle, Instagram, Star,
-  ShoppingBag, Wallet, Calendar, BadgeCheck, Shield, Clock,
+  ShoppingBag, Wallet, Calendar, BadgeCheck, Shield, Clock, Truck,
 } from "lucide-react";
 import AdminTopBar from "@/components/layout/AdminTopBar";
 import { useParams, useRouter } from "next/navigation";
@@ -110,8 +110,26 @@ export default function AdminUserDetail() {
   }
 
   const isVendor = user.user_type === "vendor";
+  const isRider = user.user_type === "rider";
   const p = user.profile || {};
   const initials = (user.business_name || user.username || "?").slice(0, 2).toUpperCase();
+
+  const handleRiderToggle = async () => {
+    setActionLoading(true);
+    setError("");
+    try {
+      const res = isRider
+        ? await api.admin.removeRider(id as string)
+        : await api.admin.makeRider(id as string);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed");
+      setUser(data);
+    } catch (e: any) {
+      setError(e.message || "Action failed");
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
@@ -136,9 +154,11 @@ export default function AdminUserDetail() {
             <div className="flex items-center gap-2 flex-wrap">
               <p className="font-bold text-stone-900 text-lg leading-tight">{user.username}</p>
               <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
-                isVendor ? "bg-teal-100 text-teal-700" : "bg-stone-100 text-stone-600"
+                isVendor ? "bg-teal-100 text-teal-700"
+                : isRider ? "bg-blue-100 text-blue-700"
+                : "bg-stone-100 text-stone-600"
               }`}>
-                {isVendor ? "Vendor" : "Student"}
+                {isVendor ? "Vendor" : isRider ? "Rider" : "Student"}
               </span>
               {user.is_staff && (
                 <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-purple-100 text-purple-700">Staff</span>
@@ -206,6 +226,18 @@ export default function AdminUserDetail() {
 
         {/* Actions */}
         <Section title="Actions">
+          <button
+            onClick={handleRiderToggle}
+            disabled={actionLoading}
+            className={`w-full py-3.5 mb-2 font-semibold rounded-xl flex items-center justify-center gap-2 text-sm transition disabled:opacity-50 ${
+              isRider
+                ? "bg-red-50 text-red-600 hover:bg-red-100"
+                : "bg-blue-50 text-blue-700 hover:bg-blue-100"
+            }`}
+          >
+            <Truck className="w-4 h-4" />
+            {actionLoading ? "Saving…" : isRider ? "Remove Rider Role" : "Make Rider"}
+          </button>
           {isVendor && !p.is_verified_vendor && (
             <button
               onClick={() => patch({ profile: { is_verified_vendor: true } })}

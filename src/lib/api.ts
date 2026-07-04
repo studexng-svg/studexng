@@ -638,6 +638,33 @@ export const api = {
     notifyUser: (id: number | string, body: Record<string, unknown>) =>
       fetchWithAuth(u(`/api/admin/users/${id}/notify/`), { method: "POST", body: s(body) }),
 
+    makeRider: (id: number | string) =>
+      fetchWithAuth(u(`/api/admin/users/${id}/make-rider/`), { method: "POST" }),
+
+    removeRider: (id: number | string) =>
+      fetchWithAuth(u(`/api/admin/users/${id}/make-rider/`), { method: "DELETE" }),
+
+    riders: () => fetchWithAuth(u("/api/admin/riders/")),
+
+    // Pickup points
+    pickupPoints: (campus?: string) =>
+      fetchWithAuth(u(`/api/admin/pickup-points/${campus ? "?campus=" + campus : ""}`)),
+
+    createPickupPoint: (body: Record<string, unknown>) =>
+      fetchWithAuth(u("/api/admin/pickup-points/"), { method: "POST", body: s(body) }),
+
+    updatePickupPoint: (id: number | string, body: Record<string, unknown>) =>
+      fetchWithAuth(u(`/api/admin/pickup-points/${id}/`), { method: "PATCH", body: s(body) }),
+
+    deletePickupPoint: (id: number | string) =>
+      fetchWithAuth(u(`/api/admin/pickup-points/${id}/`), { method: "DELETE" }),
+
+    assignRider: (orderId: number | string, body: Record<string, unknown>) =>
+      fetchWithAuth(u(`/api/admin/orders/${orderId}/assign-rider/`), { method: "POST", body: s(body) }),
+
+    deliveries: (statusFilter?: string) =>
+      fetchWithAuth(u(`/api/admin/deliveries/${statusFilter ? "?status=" + statusFilter : ""}`)),
+
     searchUsers: (search: string, userType?: string) =>
       fetchWithAuth(
         u(
@@ -655,5 +682,21 @@ export const api = {
         method: "POST",
         body: s({ user_ids: userIds }),
       }),
+  },
+
+  delivery: {
+    pickupPoints: (campus?: string) =>
+      fetchWithAuth(u(`/api/delivery/pickup-points/${campus ? "?campus=" + campus : ""}`)),
+
+    myAssignments: () => fetchWithAuth(u("/api/delivery/my-assignments/")),
+
+    updateStatus: (assignmentId: number | string, newStatus: string) =>
+      fetchWithAuth(u(`/api/delivery/assignments/${assignmentId}/update-status/`), {
+        method: "POST",
+        body: s({ status: newStatus }),
+      }),
+
+    orderStatus: (orderId: number | string) =>
+      fetchWithAuth(u(`/api/delivery/order/${orderId}/`)),
   },
 };

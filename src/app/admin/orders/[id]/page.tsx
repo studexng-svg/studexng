@@ -1,7 +1,7 @@
 // src/app/admin/orders/[id]/page.tsx
 "use client";
 
-import { Package, Clock } from "lucide-react";
+import { Package, Clock, Truck, MapPin, User } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import AdminTopBar from "@/components/layout/AdminTopBar";
@@ -55,6 +55,12 @@ export default function AdminOrderDetail() {
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
+  const [delivery, setDelivery] = useState<any>(null);
+  const [riders, setRiders] = useState<any[]>([]);
+  const [pickupPoints, setPickupPoints] = useState<any[]>([]);
+  const [selectedRider, setSelectedRider] = useState("");
+  const [selectedPoint, setSelectedPoint] = useState("");
+  const [assigning, setAssigning] = useState(false);
   const sellerCompletedElapsed = useElapsed(order?.seller_completed_at);
 
   useEffect(() => {
@@ -62,13 +68,47 @@ export default function AdminOrderDetail() {
     const load = async () => {
       setLoading(true);
       try {
-        const orderRes = await api.admin.order(id as string);
-        if (orderRes.ok) setOrder(await orderRes.json());
+        const [orderRes, ridersRes, pointsRes] = await Promise.all([
+          api.admin.order(id as string),
+          api.admin.riders(),
+          api.admin.pickupPoints(),
+        ]);
+        if (orderRes.ok) {
+          const o = await orderRes.json();
+          setOrder(o);
+          // fetch delivery assignment separately — won't 404 the whole page
+          try {
+            const delivRes = await api.admin.deliveries();
+            if (delivRes.ok) {
+              const all = await delivRes.json();
+              const match = (Array.isArray(all) ? all : []).find((d: any) => d.order_id === o.id);
+              if (match) setDelivery(match);
+            }
+          } catch {}
+        }
+        if (ridersRes.ok) setRiders(await ridersRes.json());
+        if (pointsRes.ok) {
+          const pts = await pointsRes.json();
+          setPickupPoints(Array.isArray(pts) ? pts : []);
+        }
       } catch {}
       finally { setLoading(false); }
     };
     load();
   }, [id]);
+
+  const assignRider = async () => {
+    if (!selectedRider || !selectedPoint) return;
+    setAssigning(true);
+    try {
+      const res = await api.admin.assignRider(id as string, {
+        rider_id: Number(selectedRider),
+        pickup_point_id: Number(selectedPoint),
+      });
+      if (res.ok) setDelivery(await res.json());
+    } catch {}
+    setAssigning(false);
+  };
 
   const updateStatus = async (newStatus: string) => {
     if (!order) return;
@@ -137,6 +177,74 @@ export default function AdminOrderDetail() {
             </div>
           </div>
         )}
+
+        {/* Delivery Assignment */}
+        <div className="bg-white border border-stone-200 rounded-2xl p-4 shadow-sm space-y-3">
+          <div className="flex items-center gap-2 mb-1">
+            <Truck className="w-4 h-4 text-teal-600" />
+            <p className="text-teal-600 text-xs tracking-[0.2em] uppercase font-semibold">Delivery</p>
+          </div>
+
+          {delivery ? (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-sm">
+                <User className="w-3.5 h-3.5 text-stone-400" />
+                <span className="text-stone-500">Rider:</span>
+                <span className="font-semibold text-stone-900">@{delivery.rider_username}</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                <MapPin className="w-3.5 h-3.5 text-teal-500" />
+                <span className="text-stone-500">Drop-off:</span>
+                <span className="font-semibold text-stone-900">{delivery.pickup_point_name} · {delivery.pickup_point_campus}</span>
+              </div>
+              <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold mt-1 ${
+                delivery.status === "assigned" ? "bg-amber-100 text-amber-700"
+                : delivery.status === "picked_up" ? "bg-blue-100 text-blue-700"
+                : delivery.status === "at_pickup_point" ? "bg-teal-100 text-teal-700"
+                : "bg-stone-100 text-stone-600"
+              }`}>
+                {{assigned:"Assigned",picked_up:"Picked Up",at_pickup_point:"At Pickup Point",completed:"Completed"}[delivery.status as string] || delivery.status}
+              </span>
+              <p className="text-xs text-stone-400 mt-1">Reassign below if needed.</p>
+            </div>
+          ) : (
+            <p className="text-stone-400 text-sm">No rider assigned yet.</p>
+          )}
+
+          {/* Assign form */}
+          {riders.length > 0 && (
+            <div className="space-y-2 pt-2 border-t border-stone-100">
+              <select
+                value={selectedRider}
+                onChange={e => setSelectedRider(e.target.value)}
+                className="w-full px-3 py-2.5 rounded-xl border border-stone-200 text-sm text-stone-900 bg-white focus:outline-none focus:border-teal-500"
+              >
+                <option value="">Select rider…</option>
+                {riders.map((r: any) => (
+                  <option key={r.id} value={r.id}>@{r.username}{r.school ? ` (${r.school})` : ""}</option>
+                ))}
+              </select>
+              <select
+                value={selectedPoint}
+                onChange={e => setSelectedPoint(e.target.value)}
+                className="w-full px-3 py-2.5 rounded-xl border border-stone-200 text-sm text-stone-900 bg-white focus:outline-none focus:border-teal-500"
+              >
+                <option value="">Select pickup point…</option>
+                {pickupPoints.filter((p: any) => p.is_active).map((p: any) => (
+                  <option key={p.id} value={p.id}>{p.name} · {p.campus}</option>
+                ))}
+              </select>
+              <button
+                onClick={assignRider}
+                disabled={assigning || !selectedRider || !selectedPoint}
+                className="w-full py-3 rounded-xl text-white text-sm font-semibold disabled:opacity-50 transition"
+                style={{ background: "#0d9488" }}
+              >
+                {assigning ? "Assigning…" : delivery ? "Reassign Rider" : "Assign Rider"}
+              </button>
+            </div>
+          )}
+        </div>
 
         {/* Admin Actions */}
         {(order.status === "pending" || order.status === "paid" || order.status === "seller_completed") && (

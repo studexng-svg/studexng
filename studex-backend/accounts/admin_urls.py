@@ -9,6 +9,7 @@ from accounts.admin_views import (
     AdminUserListView,
     AdminUserDetailView,
     AdminNotifyUserView,
+    AdminPromoteToRiderView,
     AdminListingListView,
     AdminListingDetailView,
     AdminListingBulkUpdateCategoryView,
@@ -61,6 +62,7 @@ urlpatterns = [
     path('users/', AdminUserListView.as_view(), name='user-list'),
     path('users/<int:user_id>/', AdminUserDetailView.as_view(), name='user-detail'),
     path('users/<int:user_id>/notify/', AdminNotifyUserView.as_view(), name='notify-user'),
+    path('users/<int:user_id>/make-rider/', AdminPromoteToRiderView.as_view(), name='make-rider'),
 ]
 
 if AdminListingListView is not None:
@@ -132,6 +134,22 @@ urlpatterns += [
 urlpatterns += [
     path('deals/', AdminDealsListView.as_view(), name='deals-list'),
     path('deals/<int:deal_id>/', AdminDealDetailView.as_view(), name='deal-detail'),
+]
+
+# Delivery management
+from delivery.views import (
+    AdminPickupPointListView,
+    AdminPickupPointDetailView,
+    AdminAssignRiderView,
+    AdminDeliveryListView,
+    AdminRiderListView,
+)
+urlpatterns += [
+    path('pickup-points/', AdminPickupPointListView.as_view(), name='pickup-point-list'),
+    path('pickup-points/<int:pk>/', AdminPickupPointDetailView.as_view(), name='pickup-point-detail'),
+    path('orders/<int:order_id>/assign-rider/', AdminAssignRiderView.as_view(), name='assign-rider'),
+    path('deliveries/', AdminDeliveryListView.as_view(), name='delivery-list'),
+    path('riders/', AdminRiderListView.as_view(), name='rider-list'),
 ]
 
 if AdminCartListView is not None:
