@@ -16,11 +16,10 @@ class NotificationsConfig(AppConfig):
         # Signals must always be registered — no guard here.
         import notifications.admin_notify  # noqa: F401
 
-        import os
-        if os.environ.get("RUN_MAIN") != "true":
-            # Only run in the reloader child process (or in production where
-            # RUN_MAIN is not set at all — Render, Gunicorn, etc.)
-            return
-
+        # start_reminder_thread() has its own threading lock so it's
+        # safe to call unconditionally — it only ever starts one thread.
+        # In dev the autoreloader calls ready() twice but the lock prevents
+        # a second thread. In production (Gunicorn) it starts once per worker,
+        # but the global _thread_started flag gates it to one thread total.
         from notifications.reminders import start_reminder_thread
         start_reminder_thread()
