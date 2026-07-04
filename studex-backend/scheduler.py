@@ -24,6 +24,7 @@ def send_booking_reminders():
     """Notify vendors + buyers 5 min before bookings and right at start time."""
     from datetime import datetime
     from notifications.models import Notification
+    from accounts.utils import send_notification
 
     try:
         from orders.models import Booking
@@ -38,53 +39,81 @@ def send_booking_reminders():
             scheduled_time=five_min,
             status__in=["confirmed", "paid"],
         ).select_related("buyer", "listing__vendor"):
-            Notification.objects.get_or_create(
+            already_vendor = Notification.objects.filter(
                 recipient=booking.listing.vendor,
                 notification_type="booking_reminder_5min",
-                title=f"Booking in 5 minutes — {booking.listing.title}",
-                message=(
-                    f"Your booking with {booking.buyer.username} for "
-                    f'"{booking.listing.title}" starts at {booking.scheduled_time}. '
-                    f"Get ready!"
-                ),
-                action_url="/vendor/dashboard",
-            )
-            Notification.objects.get_or_create(
+                created_at__date=now_date,
+            ).exists()
+            if not already_vendor:
+                send_notification(
+                    recipient=booking.listing.vendor,
+                    notification_type="booking_reminder_5min",
+                    title=f"Booking in 5 minutes — {booking.listing.title}",
+                    message=(
+                        f"Your booking with {booking.buyer.username} for "
+                        f'"{booking.listing.title}" starts at {booking.scheduled_time}. '
+                        f"Get ready!"
+                    ),
+                    action_url="/vendor/dashboard",
+                    send_email=False,
+                )
+            already_buyer = Notification.objects.filter(
                 recipient=booking.buyer,
                 notification_type="booking_reminder_5min",
-                title="Your booking starts in 5 minutes!",
-                message=(
-                    f'"{booking.listing.title}" with {booking.listing.vendor.username} '
-                    f"starts at {booking.scheduled_time}. Head over now!"
-                ),
-                action_url="/account/bookings",
-            )
+                created_at__date=now_date,
+            ).exists()
+            if not already_buyer:
+                send_notification(
+                    recipient=booking.buyer,
+                    notification_type="booking_reminder_5min",
+                    title="Your booking starts in 5 minutes!",
+                    message=(
+                        f'"{booking.listing.title}" with {booking.listing.vendor.username} '
+                        f"starts at {booking.scheduled_time}. Head over now!"
+                    ),
+                    action_url="/account/bookings",
+                    send_email=False,
+                )
 
         for booking in Booking.objects.filter(
             scheduled_date=now_date,
             scheduled_time=now_time,
             status__in=["confirmed", "paid"],
         ).select_related("buyer", "listing__vendor"):
-            Notification.objects.get_or_create(
+            already_vendor = Notification.objects.filter(
                 recipient=booking.listing.vendor,
                 notification_type="booking_time_now",
-                title=f"Booking starting now — {booking.listing.title}",
-                message=(
-                    f"{booking.buyer.username}'s appointment for "
-                    f'"{booking.listing.title}" is starting right now.'
-                ),
-                action_url="/vendor/dashboard",
-            )
-            Notification.objects.get_or_create(
+                created_at__date=now_date,
+            ).exists()
+            if not already_vendor:
+                send_notification(
+                    recipient=booking.listing.vendor,
+                    notification_type="booking_time_now",
+                    title=f"Booking starting now — {booking.listing.title}",
+                    message=(
+                        f"{booking.buyer.username}'s appointment for "
+                        f'"{booking.listing.title}" is starting right now.'
+                    ),
+                    action_url="/vendor/dashboard",
+                    send_email=False,
+                )
+            already_buyer = Notification.objects.filter(
                 recipient=booking.buyer,
                 notification_type="booking_time_now",
-                title="Your booking is starting now!",
-                message=(
-                    f'Your appointment for "{booking.listing.title}" '
-                    f"with {booking.listing.vendor.username} is starting now."
-                ),
-                action_url="/account/bookings",
-            )
+                created_at__date=now_date,
+            ).exists()
+            if not already_buyer:
+                send_notification(
+                    recipient=booking.buyer,
+                    notification_type="booking_time_now",
+                    title="Your booking is starting now!",
+                    message=(
+                        f'Your appointment for "{booking.listing.title}" '
+                        f"with {booking.listing.vendor.username} is starting right now."
+                    ),
+                    action_url="/account/bookings",
+                    send_email=False,
+                )
 
     except Exception as e:
         logger.error(f"Booking reminder error: {e}", exc_info=True)
