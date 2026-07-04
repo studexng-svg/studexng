@@ -95,9 +95,9 @@ export default function AdminPlatformEarningsPage() {
         )}
 
         {loading ? (
-          <div className="space-y-2">
+          <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
             {[...Array(6)].map((_, i) => (
-              <div key={i} className="bg-white border border-stone-200 rounded-2xl p-4 h-24 animate-pulse" />
+              <div key={i} className="p-4 h-24 animate-pulse border-b border-stone-100 last:border-0 bg-stone-50/50" />
             ))}
           </div>
         ) : transactions.length === 0 ? (
@@ -106,9 +106,9 @@ export default function AdminPlatformEarningsPage() {
             <p className="text-stone-400 text-sm">No earnings data</p>
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
             {transactions.map(t => (
-              <div key={t.id} className="bg-white border border-stone-200 rounded-2xl p-4 shadow-sm">
+              <div key={t.id} className="border-b border-stone-100 last:border-0 p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-stone-900 text-sm font-mono truncate">{t.reference}</p>

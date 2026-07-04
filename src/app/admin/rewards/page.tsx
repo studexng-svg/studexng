@@ -102,14 +102,14 @@ export default function AdminRewardsPage() {
           className="w-full rounded-xl border border-stone-200 bg-white px-4 py-3 text-sm text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-teal-400"
         />
 
-        <div className="space-y-3">
-          {filtered.length === 0 && !loading && (
-            <div className="bg-white border border-stone-200 rounded-2xl p-8 text-center">
-              <p className="text-stone-400 text-sm">No users match this filter.</p>
-            </div>
-          )}
+        {filtered.length === 0 && !loading ? (
+          <div className="bg-white border border-stone-100 rounded-2xl p-8 text-center">
+            <p className="text-stone-400 text-sm">No users match this filter.</p>
+          </div>
+        ) : (
+        <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
           {filtered.map(u => (
-            <div key={u.username} className="bg-white border border-stone-200 rounded-2xl p-4 shadow-sm space-y-2">
+            <div key={u.username} className="border-b border-stone-100 last:border-0 p-4 space-y-2">
               <div className="flex items-center justify-between">
                 <p className="font-semibold text-stone-900 text-sm">@{u.username}</p>
                 <div className="flex items-center gap-1.5">
@@ -156,6 +156,7 @@ export default function AdminRewardsPage() {
             </div>
           ))}
         </div>
+        )}
 
       </div>
     </div>

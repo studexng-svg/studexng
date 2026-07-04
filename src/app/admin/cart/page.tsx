@@ -158,8 +158,8 @@ export default function AdminCartPage() {
             </div>
 
             {loading ? (
-              <div className="space-y-2">
-                {[...Array(5)].map((_, i) => <div key={i} className="bg-white border border-stone-200 rounded-2xl h-16 animate-pulse" />)}
+              <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
+                {[...Array(5)].map((_, i) => <div key={i} className="p-4 h-16 animate-pulse border-b border-stone-100 last:border-0 bg-stone-50/50" />)}
               </div>
             ) : items.length === 0 ? (
               <div className="bg-white border border-stone-100 rounded-2xl p-14 text-center">
@@ -167,9 +167,9 @@ export default function AdminCartPage() {
                 <p className="text-stone-400 text-sm">No cart items found</p>
               </div>
             ) : (
-              <div className="space-y-2">
+              <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
                 {items.map(item => (
-                  <div key={item.id} className="bg-white border border-stone-200 rounded-2xl p-3.5 shadow-sm">
+                  <div key={item.id} className="border-b border-stone-100 last:border-0 p-3.5">
                     <div className="flex items-center gap-3">
                       <div className="w-9 h-9 rounded-xl bg-teal-50 flex items-center justify-center flex-shrink-0">
                         <Package className="w-4 h-4 text-teal-600" />
@@ -225,8 +225,8 @@ export default function AdminCartPage() {
             </div>
 
             {abLoading ? (
-              <div className="space-y-2">
-                {[...Array(4)].map((_, i) => <div key={i} className="bg-white border border-stone-200 rounded-2xl h-20 animate-pulse" />)}
+              <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
+                {[...Array(4)].map((_, i) => <div key={i} className="p-4 h-20 animate-pulse border-b border-stone-100 last:border-0 bg-stone-50/50" />)}
               </div>
             ) : abandoned.length === 0 ? (
               <div className="bg-white border border-stone-100 rounded-2xl p-14 text-center">
@@ -235,13 +235,13 @@ export default function AdminCartPage() {
                 <p className="text-stone-400 text-sm mt-1">No users have items sitting in cart for 5+ hours</p>
               </div>
             ) : (
-              <div className="space-y-2">
+              <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
                 {abandoned.map((u: any) => {
                   const isSelected = selected.has(u.user_id);
                   const isExpanded = expanded.has(u.user_id);
                   return (
                     <div key={u.user_id}
-                      className={`bg-white border rounded-2xl shadow-sm overflow-hidden transition-all ${isSelected ? "border-teal-400 ring-2 ring-teal-400/20" : "border-stone-200"}`}>
+                      className={`border-b border-stone-100 last:border-0 overflow-hidden transition-colors ${isSelected ? "bg-teal-50/40" : ""}`}>
                       <div className="flex items-center gap-3 p-3.5">
                         {/* Checkbox */}
                         <button onClick={() => toggleSelect(u.user_id)} className="flex-shrink-0">

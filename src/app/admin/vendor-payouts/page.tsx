@@ -69,9 +69,9 @@ export default function AdminVendorPayoutsPage() {
         )}
 
         {loading ? (
-          <div className="space-y-2">
+          <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
             {[...Array(6)].map((_, i) => (
-              <div key={i} className="bg-white border border-stone-200 rounded-2xl p-4 h-20 animate-pulse" />
+              <div key={i} className="p-4 h-20 animate-pulse border-b border-stone-100 last:border-0 bg-stone-50/50" />
             ))}
           </div>
         ) : vendors.length === 0 ? (
@@ -80,9 +80,9 @@ export default function AdminVendorPayoutsPage() {
             <p className="text-stone-400 text-sm">No vendor payout data</p>
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
             {vendors.map((v, idx) => (
-              <div key={v.vendor_id} className="bg-white border border-stone-200 rounded-2xl p-4 shadow-sm">
+              <div key={v.vendor_id} className="border-b border-stone-100 last:border-0 p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-xl bg-teal-50 flex items-center justify-center flex-shrink-0">

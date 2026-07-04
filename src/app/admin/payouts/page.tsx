@@ -13,50 +13,52 @@ export default function AdminPayoutsPage() {
       <div className="px-6 pt-5 pb-28 space-y-3">
         <p className="text-teal-600 text-xs tracking-[0.2em] uppercase font-semibold">Payout Management</p>
 
-        <Link href="/admin/payments">
-          <div className="bg-white border border-stone-200 hover:border-teal-300 rounded-2xl p-4 flex items-center justify-between transition active:scale-[0.98]">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-teal-100 rounded-xl flex items-center justify-center">
-                <DollarSign className="w-5 h-5 text-teal-600" />
+        <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
+          <Link href="/admin/payments">
+            <div className="border-b border-stone-100 last:border-0 p-4 flex items-center justify-between hover:bg-stone-50/50 cursor-pointer transition-colors">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-teal-100 rounded-xl flex items-center justify-center">
+                  <DollarSign className="w-5 h-5 text-teal-600" />
+                </div>
+                <div>
+                  <p className="font-semibold text-stone-900 text-sm">Payment Transactions</p>
+                  <p className="text-stone-400 text-xs">All Paystack payments and transfer logs</p>
+                </div>
               </div>
-              <div>
-                <p className="font-semibold text-stone-900 text-sm">Payment Transactions</p>
-                <p className="text-stone-400 text-xs">All Paystack payments and transfer logs</p>
-              </div>
+              <ChevronRight className="w-4 h-4 text-stone-400" />
             </div>
-            <ChevronRight className="w-4 h-4 text-stone-400" />
-          </div>
-        </Link>
+          </Link>
 
-        <Link href="/admin/bank-accounts">
-          <div className="bg-white border border-stone-200 hover:border-teal-300 rounded-2xl p-4 flex items-center justify-between transition active:scale-[0.98]">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center">
-                <CreditCard className="w-5 h-5 text-purple-600" />
+          <Link href="/admin/bank-accounts">
+            <div className="border-b border-stone-100 last:border-0 p-4 flex items-center justify-between hover:bg-stone-50/50 cursor-pointer transition-colors">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center">
+                  <CreditCard className="w-5 h-5 text-purple-600" />
+                </div>
+                <div>
+                  <p className="font-semibold text-stone-900 text-sm">Seller Bank Accounts</p>
+                  <p className="text-stone-400 text-xs">Paystack recipient codes and account details</p>
+                </div>
               </div>
-              <div>
-                <p className="font-semibold text-stone-900 text-sm">Seller Bank Accounts</p>
-                <p className="text-stone-400 text-xs">Paystack recipient codes and account details</p>
-              </div>
+              <ChevronRight className="w-4 h-4 text-stone-400" />
             </div>
-            <ChevronRight className="w-4 h-4 text-stone-400" />
-          </div>
-        </Link>
+          </Link>
 
-        <Link href="/admin/transactions">
-          <div className="bg-white border border-stone-200 hover:border-teal-300 rounded-2xl p-4 flex items-center justify-between transition active:scale-[0.98]">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center">
-                <ArrowUpRight className="w-5 h-5 text-amber-600" />
+          <Link href="/admin/transactions">
+            <div className="border-b border-stone-100 last:border-0 p-4 flex items-center justify-between hover:bg-stone-50/50 cursor-pointer transition-colors">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center">
+                  <ArrowUpRight className="w-5 h-5 text-amber-600" />
+                </div>
+                <div>
+                  <p className="font-semibold text-stone-900 text-sm">Payout Transactions</p>
+                  <p className="text-stone-400 text-xs">Escrow → released → withdrawn flow</p>
+                </div>
               </div>
-              <div>
-                <p className="font-semibold text-stone-900 text-sm">Payout Transactions</p>
-                <p className="text-stone-400 text-xs">Escrow → released → withdrawn flow</p>
-              </div>
+              <ChevronRight className="w-4 h-4 text-stone-400" />
             </div>
-            <ChevronRight className="w-4 h-4 text-stone-400" />
-          </div>
-        </Link>
+          </Link>
+        </div>
       </div>
     </div>
   );

@@ -85,9 +85,9 @@ export default function AdminConversationsPage() {
         </div>
 
         {loading ? (
-          <div className="space-y-2">
+          <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
             {[...Array(5)].map((_, i) => (
-              <div key={i} className="bg-white border border-stone-200 rounded-2xl h-20 animate-pulse" />
+              <div key={i} className="p-4 h-20 animate-pulse border-b border-stone-100 last:border-0 bg-stone-50/50" />
             ))}
           </div>
         ) : convs.length === 0 ? (
@@ -96,12 +96,12 @@ export default function AdminConversationsPage() {
             <p className="text-stone-400 text-sm">No conversations found</p>
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
             {convs.map(conv => (
               <div
                 key={conv.id}
                 onClick={() => router.push(`/admin/conversations/${conv.id}`)}
-                className="bg-white border border-stone-200 hover:border-teal-300 rounded-2xl p-4 cursor-pointer transition-all active:scale-[0.98] shadow-sm"
+                className="border-b border-stone-100 last:border-0 p-4 hover:bg-stone-50/50 cursor-pointer transition-colors"
               >
                 <div className="flex items-start gap-3">
                   <div className="w-9 h-9 rounded-xl bg-purple-50 flex items-center justify-center flex-shrink-0">
