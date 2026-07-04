@@ -45,6 +45,8 @@ export default function CheckoutPage() {
   const [paystackLoaded, setPaystackLoaded] = useState(false);
   const [paymentError, setPaymentError] = useState("");
   const [deliveryLocation, setDeliveryLocation] = useState("");
+  const [pickupPoints, setPickupPoints] = useState<{ id: number; name: string; description: string }[]>([]);
+  const [pickupPointsLoaded, setPickupPointsLoaded] = useState(false);
   const [discount, setDiscount] = useState<{
     hasDiscount: boolean;
     discountAmount: number;
@@ -84,6 +86,14 @@ export default function CheckoutPage() {
       .then(d => { if (d) setLoyaltyBalance(parseFloat(d.credit_balance) || 0); })
       .catch(() => {});
   }, [isLoggedIn]);
+
+  useEffect(() => {
+    if (!isLoggedIn || !user?.school || !isFoodOrder) return;
+    api.delivery.pickupPoints(user.school)
+      .then(r => r.ok ? r.json() : [])
+      .then(data => { setPickupPoints(Array.isArray(data) ? data : []); setPickupPointsLoaded(true); })
+      .catch(() => setPickupPointsLoaded(true));
+  }, [isLoggedIn, user?.school, isFoodOrder]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -338,29 +348,38 @@ export default function CheckoutPage() {
             className="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm space-y-2">
             <div className="flex items-center gap-2 mb-1">
               <MapPin className="w-4 h-4 text-teal-600" />
-              <p className="font-semibold text-stone-900 text-sm">Delivery Location</p>
+              <p className="font-semibold text-stone-900 text-sm">Pickup Location</p>
             </div>
-            <p className="text-xs text-stone-400">Must be within school surroundings. Specify your hostel, hall, or landmark.</p>
-            {user?.school?.toLowerCase() === "futo" ? (
-              <select
-                value={deliveryLocation}
-                onChange={e => setDeliveryLocation(e.target.value)}
-                className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-teal-400 transition appearance-none"
-              >
-                <option value="">Select delivery location</option>
-                <option>Love Garden</option>
-                <option>Tetfund</option>
-                <option>SEET Roundabout</option>
-                <option>ICT</option>
-              </select>
+
+            {!pickupPointsLoaded ? (
+              <div className="h-11 rounded-xl bg-stone-100 animate-pulse" />
+            ) : pickupPoints.length > 0 ? (
+              <>
+                <p className="text-xs text-stone-400">Select your campus pickup point — a rider will bring your order there.</p>
+                <select
+                  value={deliveryLocation}
+                  onChange={e => setDeliveryLocation(e.target.value)}
+                  className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-teal-400 transition appearance-none"
+                >
+                  <option value="">Select pickup point…</option>
+                  {pickupPoints.map(p => (
+                    <option key={p.id} value={p.name}>
+                      {p.name}{p.description ? ` — ${p.description}` : ""}
+                    </option>
+                  ))}
+                </select>
+              </>
             ) : (
-              <input
-                type="text"
-                value={deliveryLocation}
-                onChange={e => setDeliveryLocation(e.target.value)}
-                placeholder={user?.school?.toLowerCase() === "imsu" ? "e.g. Orji, World Bank, Aladinma…" : "e.g. Love Garden"}
-                className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-teal-400 transition"
-              />
+              <>
+                <p className="text-xs text-stone-400">Enter your location within campus surroundings.</p>
+                <input
+                  type="text"
+                  value={deliveryLocation}
+                  onChange={e => setDeliveryLocation(e.target.value)}
+                  placeholder="e.g. Love Garden, Block B Hostel…"
+                  className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-teal-400 transition"
+                />
+              </>
             )}
           </motion.div>
         )}

@@ -121,18 +121,45 @@ class AdminAssignRiderView(APIView):
             },
         )
 
-        # Notify the rider
         try:
             from accounts.utils import send_notification
+
+            # Notify the rider
             send_notification(
                 recipient=rider,
                 notification_type='order',
                 title='New Delivery Assignment',
                 message=(
                     f'You have been assigned to deliver order #{order.reference}. '
-                    f'Collect from vendor "{order.listing.vendor.username}" and drop at "{point.name}".'
+                    f'Collect from vendor "@{order.listing.vendor.username}" and drop at "{point.name}".'
                 ),
-                action_url=f'/rider',
+                action_url='/rider',
+                send_email=False,
+            )
+
+            # Notify the vendor — package and hand off to rider
+            send_notification(
+                recipient=order.listing.vendor,
+                notification_type='order',
+                title='Rider Assigned — Package Your Order',
+                message=(
+                    f'A rider has been assigned to order #{order.reference}. '
+                    f'Please package the order and hand it to rider "@{rider.username}" when they arrive.'
+                ),
+                action_url=f'/vendor/dashboard/orders',
+                send_email=False,
+            )
+
+            # Notify the buyer — delivery is on the way
+            send_notification(
+                recipient=order.buyer,
+                notification_type='order',
+                title='Your delivery is on the way!',
+                message=(
+                    f'A rider has been assigned to your order #{order.reference}. '
+                    f'Your package will be delivered to "{point.name}". We\'ll notify you when it arrives.'
+                ),
+                action_url=f'/account/orders/{order.id}',
                 send_email=False,
             )
         except Exception:
