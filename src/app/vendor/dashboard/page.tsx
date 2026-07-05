@@ -260,23 +260,29 @@ export default function VendorOverviewPage() {
               {recentOrders.map((order: any) => {
                 const statusStyle = STATUS_STYLES[order.status] || "bg-stone-100 text-stone-500";
                 const isService   = order.listing_type === "service" || order.booking_id;
-                const initials    = (order.buyer_username?.[0] || order.customer_name?.[0] || "?").toUpperCase();
+                const buyerName   = order.buyer_username || order.buyer || order.customer_name || "?";
+                const initials    = buyerName[0].toUpperCase();
                 return (
                   <Link
                     key={order.id}
                     href={isService ? "/vendor/dashboard/bookings" : "/vendor/dashboard/orders"}
                     className="px-5 py-4 flex items-center gap-3 hover:bg-stone-50 transition-colors group"
                   >
-                    <div className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-black flex-shrink-0 shadow-sm"
-                      style={{ background: TEAL }}>
-                      {initials}
-                    </div>
+                    {order.buyer_profile_picture ? (
+                      <img src={order.buyer_profile_picture} alt={buyerName}
+                        className="w-9 h-9 rounded-full object-cover flex-shrink-0 shadow-sm" />
+                    ) : (
+                      <div className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-black flex-shrink-0 shadow-sm"
+                        style={{ background: TEAL }}>
+                        {initials}
+                      </div>
+                    )}
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-stone-900 text-sm truncate">
                         {order.listing_title || order.service_name || `Order #${order.id}`}
                       </p>
                       <p className="text-xs text-stone-400 truncate mt-0.5">
-                        @{order.buyer_username || order.customer_name}
+                        @{buyerName}
                         {isService ? <span className="ml-1 text-teal-500">· Booking</span> : null}
                       </p>
                     </div>

@@ -20,7 +20,29 @@ class OrderSerializer(serializers.ModelSerializer):
     listing_id = serializers.IntegerField(write_only=True)
     buyer = serializers.ReadOnlyField(source='buyer.username')
     buyer_id = serializers.ReadOnlyField(source='buyer.id')
+    buyer_username = serializers.ReadOnlyField(source='buyer.username')
+    buyer_profile_picture = serializers.SerializerMethodField()
     dispute = serializers.SerializerMethodField()
+
+    def get_buyer_profile_picture(self, obj):
+        try:
+            img = obj.buyer.profile_image
+            if not img:
+                return None
+            name = getattr(img, 'name', None)
+            if not name or name == 'profiles/default.jpg':
+                return None
+            if name.startswith('http'):
+                return name
+            url = img.url
+            if url and url.startswith('http'):
+                return url
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(url)
+        except Exception:
+            pass
+        return None
 
     def get_dispute(self, obj):
         d = obj.disputes.first()
@@ -44,6 +66,7 @@ class OrderSerializer(serializers.ModelSerializer):
         model = Order
         fields = [
             'id', 'reference', 'listing', 'listing_id', 'buyer', 'buyer_id',
+            'buyer_username', 'buyer_profile_picture',
             'amount', 'status', 'current_status', 'estimated_time',
             'delivery_location', 'created_at', 'paid_at', 'seller_completed_at',
             'delivery_proof_1', 'delivery_proof_2', 'dispute',
