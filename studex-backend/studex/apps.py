@@ -14,6 +14,8 @@ class StudexConfig(AppConfig):
             try:
                 from scheduler import start
                 start()
+                print("[studex] Scheduler started OK", flush=True)
             except Exception as e:
                 import logging
                 logging.getLogger(__name__).warning(f"Scheduler failed to start: {e}")
+                print(f"[studex] Scheduler FAILED to start: {e}", flush=True)
