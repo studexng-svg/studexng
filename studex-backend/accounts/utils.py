@@ -59,21 +59,6 @@ def send_notification(
             is_admin_notification=bool(getattr(recipient, 'is_staff', False)),
         )
 
-        # ── SSE real-time push ───────────────────────────────────────────────
-        try:
-            from notifications.views import push_notification_to_user
-            push_notification_to_user(recipient.id, {
-                "id": n.id,
-                "type": n.notification_type,
-                "title": n.title,
-                "message": n.message,
-                "is_read": False,
-                "action_url": n.action_url or "",
-                "created_at": n.created_at.isoformat(),
-            })
-        except Exception:
-            pass
-
         # ── FCM / Expo push to all registered devices ───────────────────────
         try:
             from notifications.models import FCMToken

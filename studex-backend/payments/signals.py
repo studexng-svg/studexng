@@ -1,16 +1,18 @@
+import threading
 from django.db.models.signals import pre_save, post_save
 from django.dispatch import receiver
 
 _prev_payment_status = {}
+_prev_status_lock = threading.Lock()
 
 
 @receiver(pre_save, sender='payments.PaymentTransaction')
 def cache_payment_status(sender, instance, **kwargs):
     if instance.pk:
         try:
-            _prev_payment_status[instance.pk] = (
-                sender.objects.values_list('status', flat=True).get(pk=instance.pk)
-            )
+            status = sender.objects.values_list('status', flat=True).get(pk=instance.pk)
+            with _prev_status_lock:
+                _prev_payment_status[instance.pk] = status
         except sender.DoesNotExist:
             pass
 
@@ -36,7 +38,8 @@ def notify_admin_bank_account(sender, instance, created, **kwargs):
 
 @receiver(post_save, sender='payments.PaymentTransaction')
 def notify_admin_payment(sender, instance, created, **kwargs):
-    prev = _prev_payment_status.pop(instance.pk, None)
+    with _prev_status_lock:
+        prev = _prev_payment_status.pop(instance.pk, None)
     if instance.status != 'success':
         return
     if not created and prev == 'success':
