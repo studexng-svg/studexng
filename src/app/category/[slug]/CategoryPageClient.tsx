@@ -12,23 +12,9 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/lib/authStore";
 import { useCart } from "@/lib/cartStore";
 import { TEAL } from "@/lib/tokens";
-import { SubcategoryPills } from "@/components/SubcategoryPills";
 
 function slugToTitle(slug: string) {
   return slug.split("-").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
-}
-
-function getCampus(): string {
-  try {
-    return (
-      document.cookie
-        .split(";")
-        .find(s => s.trim().startsWith("studex_campus="))
-        ?.split("=")?.[1] || "pau"
-    );
-  } catch {
-    return "pau";
-  }
 }
 
 function SafeImage({ src, alt }: { src: string | null | undefined; alt: string }) {
@@ -60,8 +46,6 @@ export default function CategoryPageClient({ slug, initialListings, initialNextP
   const [loading, setLoading] = useState(initialListings.length === 0);
   const [toast, setToast] = useState("");
   const [search, setSearch] = useState("");
-  const [subcategories, setSubcategories] = useState<{ id: number; title: string; slug: string }[]>([]);
-  const [selectedSub, setSelectedSub] = useState("");
 
   const title = slugToTitle(slug);
 
@@ -69,28 +53,13 @@ export default function CategoryPageClient({ slug, initialListings, initialNextP
 
   useEffect(() => {
     setMounted(true);
-    const campus = getCampus();
-    api.pub.categories({ campus })
-      .then(r => r.ok ? r.json() : null)
-      .then(d => {
-        const list = d?.results ?? d ?? [];
-        const match = list.find((c: any) => c.slug === slug);
-        setSubcategories(match?.subcategories ?? []);
-      })
-      .catch(() => {});
-  }, [slug]);
-
-  useEffect(() => {
-    setLoading(true);
-    const campus = getCampus();
-    const params: Record<string, string> = { campus, category: slug, page_size: "100" };
-    if (selectedSub) params.subcategory = selectedSub;
-    api.pub.listings(params)
+    const campus = document.cookie.split(";").find(s => s.trim().startsWith("studex_campus="))?.split("=")?.[1] || "pau";
+    api.pub.listings({ campus, category: slug, page_size: "100" })
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d) setListings(d.results || d || []); })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [slug, selectedSub]);
+  }, [slug]);
 
   const filteredListings = listings.filter(l =>
     !search.trim() ||
@@ -212,12 +181,6 @@ export default function CategoryPageClient({ slug, initialListings, initialNextP
             {!loading && <p className="text-stone-400 text-xs mt-0.5">{filteredListings.length} listing{filteredListings.length !== 1 ? "s" : ""}</p>}
           </div>
         </div>
-
-        {subcategories.length > 0 && (
-          <div className="px-4 pt-3 max-w-2xl mx-auto">
-            <SubcategoryPills subcategories={subcategories} value={selectedSub} onChange={setSelectedSub} />
-          </div>
-        )}
 
         <div className="px-4 pt-5 pb-28 max-w-2xl mx-auto">
           {loading ? (

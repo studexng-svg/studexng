@@ -1549,7 +1549,7 @@ except ImportError:
 # ============================================
 
 try:
-    from services.models import Category, Subcategory
+    from services.models import Category
 
     class AdminCategoryListView(APIView):
         """GET /api/admin/categories/  POST /api/admin/categories/"""
@@ -1630,89 +1630,14 @@ try:
         def delete(self, request, category_id):
             try:
                 cat = Category.objects.get(id=category_id)
-                sub_count = cat.subcategories.count()
-                if sub_count:
-                    return Response(
-                        {'error': f'Cannot delete — {sub_count} subcategor{"y" if sub_count == 1 else "ies"} still exist under this category.'},
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
                 cat.delete()
                 return Response({'message': 'Category deleted'}, status=status.HTTP_204_NO_CONTENT)
             except Category.DoesNotExist:
                 return Response({'error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
 
-    class AdminSubcategoryListView(APIView):
-        """GET /api/admin/subcategories/?category=<id>  POST /api/admin/subcategories/"""
-        permission_classes = [IsAdminUser]
-
-        def get(self, request):
-            qs = Subcategory.objects.select_related('category').annotate(listing_count=Count('listings')).order_by('category__title', 'title')
-            category_id = request.query_params.get('category')
-            if category_id:
-                qs = qs.filter(category_id=category_id)
-            return Response([
-                {
-                    'id': s.id, 'title': s.title, 'slug': s.slug,
-                    'category_id': s.category_id, 'category_title': s.category.title,
-                    'listing_count': s.listing_count,
-                }
-                for s in qs
-            ])
-
-        def post(self, request):
-            from django.utils.text import slugify
-            title = (request.data.get('title') or '').strip()
-            category_id = request.data.get('category_id') or request.data.get('category')
-            if not title or not category_id:
-                return Response({'error': 'title and category_id are required'}, status=status.HTTP_400_BAD_REQUEST)
-            try:
-                category = Category.objects.get(id=category_id)
-            except Category.DoesNotExist:
-                return Response({'error': 'Category not found'}, status=status.HTTP_404_NOT_FOUND)
-            try:
-                sub = Subcategory.objects.create(category=category, title=title, slug=slugify(title))
-            except Exception as e:
-                return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-            return Response(
-                {'id': sub.id, 'title': sub.title, 'slug': sub.slug, 'category_id': sub.category_id},
-                status=status.HTTP_201_CREATED,
-            )
-
-    class AdminSubcategoryDetailView(APIView):
-        """PATCH /api/admin/subcategories/{id}/  DELETE /api/admin/subcategories/{id}/"""
-        permission_classes = [IsAdminUser]
-
-        def patch(self, request, subcategory_id):
-            from django.utils.text import slugify
-            try:
-                sub = Subcategory.objects.get(id=subcategory_id)
-                if 'title' in request.data:
-                    sub.title = request.data['title']
-                    sub.slug = slugify(request.data['title'])
-                sub.save()
-                return Response({'id': sub.id, 'title': sub.title, 'slug': sub.slug, 'category_id': sub.category_id})
-            except Subcategory.DoesNotExist:
-                return Response({'error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
-
-        def delete(self, request, subcategory_id):
-            try:
-                sub = Subcategory.objects.get(id=subcategory_id)
-                listing_count = sub.listings.count()
-                if listing_count:
-                    return Response(
-                        {'error': f'Cannot delete — {listing_count} listing(s) still use this subcategory.'},
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
-                sub.delete()
-                return Response({'message': 'Subcategory deleted'}, status=status.HTTP_204_NO_CONTENT)
-            except Subcategory.DoesNotExist:
-                return Response({'error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
-
 except ImportError:
     AdminCategoryListView = None
     AdminCategoryDetailView = None
-    AdminSubcategoryListView = None
-    AdminSubcategoryDetailView = None
 
 
 # ============================================

@@ -67,13 +67,13 @@ class OrderSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'reference', 'listing', 'listing_id', 'buyer', 'buyer_id',
             'buyer_username', 'buyer_profile_picture',
-            'amount', 'status', 'current_status', 'estimated_time',
+            'amount', 'quantity', 'status', 'current_status', 'estimated_time',
             'delivery_location', 'created_at', 'paid_at',
             'vendor_accepted_at', 'service_started_at', 'seller_completed_at', 'buyer_confirmed_at',
             'delivery_proof_1', 'delivery_proof_2', 'dispute',
         ]
         read_only_fields = [
-            'reference', 'amount', 'status', 'current_status', 'estimated_time',
+            'reference', 'amount', 'quantity', 'status', 'current_status', 'estimated_time',
             'created_at', 'paid_at',
             'vendor_accepted_at', 'service_started_at', 'seller_completed_at', 'buyer_confirmed_at',
             'delivery_proof_1', 'delivery_proof_2',
@@ -250,21 +250,34 @@ class BookingSerializer(serializers.ModelSerializer):
     vendor_name = serializers.SerializerMethodField()
     note = serializers.CharField(max_length=250, allow_blank=True, required=False)
     reference_images = serializers.SerializerMethodField()
+    quantity = serializers.IntegerField(required=False, default=1, min_value=1)
 
     class Meta:
         model = Booking
         fields = [
             'id', 'buyer_username', 'buyer_id', 'vendor_username', 'listing', 'listing_id',
             'listing_title', 'listing_price', 'vendor_name',
-            'scheduled_date', 'scheduled_time', 'note', 'reference_images', 'status', 'created_at',
+            'scheduled_date', 'scheduled_time', 'quantity', 'note', 'reference_images', 'status', 'created_at',
         ]
         read_only_fields = ['id', 'buyer_username', 'buyer_id', 'vendor_username', 'listing_title', 'listing_id', 'listing_price', 'vendor_name', 'reference_images', 'status', 'created_at']
+
+    def validate(self, data):
+        listing = data.get('listing', getattr(self.instance, 'listing', None))
+        quantity = data.get('quantity', getattr(self.instance, 'quantity', 1))
+        if listing is not None and quantity > 1 and not listing.is_per_unit:
+            raise serializers.ValidationError(
+                {'quantity': "This listing is not priced per unit — quantity must be 1."}
+            )
+        return data
 
     def get_reference_images(self, obj):
         return [img.image_url for img in obj.reference_images.all()]
 
     def get_listing_price(self, obj):
         from decimal import Decimal
+        if obj.listing.is_per_unit and obj.quantity > 1:
+            from payments.pricing import calculate_final_price
+            return str(calculate_final_price(Decimal(str(obj.listing.payout_amount)) * obj.quantity))
         price = Decimal(str(obj.listing.price))
         try:
             deal = obj.listing.deal

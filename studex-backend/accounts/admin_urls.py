@@ -30,8 +30,6 @@ from accounts.admin_views import (
     AdminFeedbackListView,
     AdminCategoryListView,
     AdminCategoryDetailView,
-    AdminSubcategoryListView,
-    AdminSubcategoryDetailView,
     AdminCartListView,
     AdminAbandonedCartsView,
     AdminAbandonedCartReminderView,
@@ -118,8 +116,6 @@ if AdminCategoryListView is not None:
     urlpatterns += [
         path('categories/', AdminCategoryListView.as_view(), name='category-list'),
         path('categories/<int:category_id>/', AdminCategoryDetailView.as_view(), name='category-detail'),
-        path('subcategories/', AdminSubcategoryListView.as_view(), name='subcategory-list'),
-        path('subcategories/<int:subcategory_id>/', AdminSubcategoryDetailView.as_view(), name='subcategory-detail'),
     ]
 
 # Broadcast messaging

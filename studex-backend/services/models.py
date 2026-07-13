@@ -65,6 +65,13 @@ class Listing(models.Model):
     # Buyer-facing all-inclusive price = payout_amount + platform fee (see
     # payments/pricing.py). Computed automatically — no longer vendor-writable.
     price = models.DecimalField(max_digits=10, decimal_places=2)
+    # When set, payout_amount/price represent a per-unit rate (e.g. ₦500 per
+    # cloth) rather than a flat listing price. Booking.quantity carries how
+    # many units the buyer wants; the actual charge and vendor payout are
+    # computed fresh at booking time from payout_amount * quantity, not by
+    # multiplying the flat `price` (see payments/views.py).
+    is_per_unit = models.BooleanField(default=False)
+    unit_label = models.CharField(max_length=50, blank=True, default='')
     listing_type = models.CharField(
         max_length=10,
         choices=LISTING_TYPE_CHOICES,

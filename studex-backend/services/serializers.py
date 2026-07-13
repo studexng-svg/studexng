@@ -1,26 +1,15 @@
 # services/serializers.py
 from rest_framework import serializers
-from .models import Category, Subcategory, Listing, Transaction, Deal
+from .models import Category, Listing, Transaction, Deal
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
 
 
-class SubcategorySerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Subcategory
-        fields = ['id', 'title', 'slug', 'category']
-        read_only_fields = ['id']
-
-
 class CategorySerializer(serializers.ModelSerializer):
-    # Requires CategoryViewSet.get_queryset() to .prefetch_related('subcategories')
-    # so this stays a single query, not N+1.
-    subcategories = SubcategorySerializer(many=True, read_only=True)
-
     class Meta:
         model = Category
-        fields = ['id', 'title', 'slug', 'image', 'subcategories']
+        fields = ['id', 'title', 'slug', 'image']
         read_only_fields = ['id']
 
 
@@ -107,10 +96,6 @@ class ListingSerializer(serializers.ModelSerializer):
         queryset=Category.objects.all(),
         help_text="Category slug (e.g., 'food', 'nails')"
     )
-    # Subcategory slugs aren't globally unique (only unique per category), so this
-    # takes the numeric id rather than a SlugRelatedField like `category` does.
-    subcategory = serializers.PrimaryKeyRelatedField(queryset=Subcategory.objects.all(), required=True)
-    subcategory_title = serializers.CharField(source='subcategory.title', read_only=True, default=None)
     image = serializers.SerializerMethodField()
     image2 = serializers.SerializerMethodField()
     image3 = serializers.SerializerMethodField()
@@ -131,11 +116,12 @@ class ListingSerializer(serializers.ModelSerializer):
         model = Listing
         fields = [
             'id', 'title', 'description', 'payout_amount', 'price', 'platform_fee',
+            'is_per_unit', 'unit_label',
             'discount_percent', 'sale_price',
             'image', 'image2', 'image3', 'image4', 'image5', 'image_upload',
             'is_available', 'listing_type', 'track_inventory', 'stock_quantity',
             'is_reserved',
-            'category', 'subcategory', 'subcategory_title', 'vendor', 'vendor_is_verified',
+            'category', 'vendor', 'vendor_is_verified',
             'campus',
             'brand', 'condition', 'delivery_time', 'tags',
             'weekly_order_count', 'last_ordered_at',
@@ -269,11 +255,11 @@ class ListingSerializer(serializers.ModelSerializer):
         if not user.is_verified_vendor:
             raise serializers.ValidationError("You must be a verified vendor to post listings.")
 
-        category = data.get('category', getattr(self.instance, 'category', None))
-        subcategory = data.get('subcategory')
-        if subcategory is not None and category is not None and subcategory.category_id != category.id:
+        is_per_unit = data.get('is_per_unit', getattr(self.instance, 'is_per_unit', False))
+        unit_label = data.get('unit_label', getattr(self.instance, 'unit_label', ''))
+        if is_per_unit and not (unit_label or '').strip():
             raise serializers.ValidationError(
-                {'subcategory': "This subcategory does not belong to the selected category."}
+                {'unit_label': "A unit label (e.g. 'cloth') is required for per-unit pricing."}
             )
         return data
 

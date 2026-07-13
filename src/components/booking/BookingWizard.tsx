@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Calendar, Clock, FileText, Loader, CreditCard,
-  CheckCircle, AlertCircle, ChevronLeft, ChevronRight,
+  CheckCircle, AlertCircle, ChevronLeft, ChevronRight, Minus, Plus,
 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
@@ -27,6 +27,9 @@ interface BookingListing {
   id: number;
   title: string;
   price: number;
+  payout_amount?: number | string | null;
+  is_per_unit?: boolean;
+  unit_label?: string;
   deal?: { discounted_price: number } | null;
   sale_price?: number | null;
   vendor: { username: string; business_name?: string };
@@ -50,6 +53,9 @@ export default function BookingWizard({ listing, onClose, onSuccess }: BookingWi
   const [step, setStep] = useState(0);
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
+  const [quantity, setQuantity] = useState(1);
+  const [unitPreview, setUnitPreview] = useState<{ price: number } | null>(null);
+  const previewDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [images, setImages] = useState<File[]>([]);
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
@@ -62,7 +68,25 @@ export default function BookingWizard({ listing, onClose, onSuccess }: BookingWi
   // at listing-creation time) — no separate fee gets added at checkout.
   const effectivePrice = listing.deal?.discounted_price ?? listing.sale_price ?? listing.price;
   const price = Number(effectivePrice);
-  const total = price;
+  // Per-unit listings (e.g. laundry priced per cloth): the fee must apply once to
+  // the true quantity-scaled payout, not be multiplied along with a flat price —
+  // so the live total comes from the server preview, not price * quantity.
+  const total = listing.is_per_unit ? (unitPreview?.price ?? price * quantity) : price;
+
+  useEffect(() => {
+    if (!listing.is_per_unit) return;
+    if (previewDebounce.current) clearTimeout(previewDebounce.current);
+    const unitPayout = Number(listing.payout_amount);
+    if (!unitPayout || unitPayout <= 0) { setUnitPreview(null); return; }
+    previewDebounce.current = setTimeout(async () => {
+      try {
+        const res = await api.services.previewPrice(unitPayout * quantity);
+        if (res.ok) setUnitPreview(await res.json());
+      } catch { /* preview is best-effort */ }
+    }, 300);
+    return () => { if (previewDebounce.current) clearTimeout(previewDebounce.current); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quantity, listing.is_per_unit, listing.payout_amount]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -106,17 +130,19 @@ export default function BookingWizard({ listing, onClose, onSuccess }: BookingWi
       formData.append("listing", String(listing.id));
       formData.append("scheduled_date", date);
       formData.append("scheduled_time", time);
+      if (listing.is_per_unit) formData.append("quantity", String(quantity));
       formData.append("note", note);
       images.forEach((file) => formData.append("reference_images", file));
 
       const bookingRes = await api.orders.createBooking(formData);
+      const bookingData = await bookingRes.json().catch(() => ({}));
       if (!bookingRes.ok) {
-        const data = await bookingRes.json().catch(() => ({}));
-        throw new Error(data.detail || data.note?.[0] || Object.values(data).flat().join(" ") || "Could not create booking.");
+        throw new Error(bookingData.detail || bookingData.note?.[0] || Object.values(bookingData).flat().join(" ") || "Could not create booking.");
       }
+      const bookingId = bookingData.id;
 
       // 2. Initialize Paystack for this listing (same flow as account/bookings/page.tsx).
-      const initRes = await api.payments.initialize({ listing_id: listing.id });
+      const initRes = await api.payments.initialize({ listing_id: listing.id, booking_id: bookingId });
       const initData = await initRes.json();
       if (!initRes.ok) throw new Error(initData.error || "Failed to initialize payment.");
 
@@ -138,6 +164,7 @@ export default function BookingWizard({ listing, onClose, onSuccess }: BookingWi
             reference: response.reference,
             transaction_id: response.reference,
             listing_id: listing.id,
+            booking_id: bookingId,
             order_type: "service",
           }).then(async (res) => {
             const data = await res.json();
@@ -216,6 +243,25 @@ export default function BookingWizard({ listing, onClose, onSuccess }: BookingWi
                 ))}
               </div>
             </div>
+            {listing.is_per_unit && (
+              <div>
+                <label className="text-xs text-stone-500 font-bold uppercase tracking-wide mb-2 block">
+                  How many {listing.unit_label || "units"}?
+                </label>
+                <div className="flex items-center border border-stone-200 rounded-xl overflow-hidden w-fit">
+                  <button type="button" onClick={() => setQuantity((q) => Math.max(1, q - 1))} className="px-3 py-3 text-stone-500 hover:bg-stone-50 transition">
+                    <Minus className="w-3.5 h-3.5" />
+                  </button>
+                  <span className="px-4 text-sm font-bold text-stone-900 min-w-[2rem] text-center">{quantity}</span>
+                  <button type="button" onClick={() => setQuantity((q) => q + 1)} className="px-3 py-3 text-stone-500 hover:bg-stone-50 transition">
+                    <Plus className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                <p className="text-xs text-stone-400 mt-1.5">
+                  {unitPreview ? `₦${unitPreview.price.toLocaleString()} total` : "Calculating…"}
+                </p>
+              </div>
+            )}
           </div>
         )}
 
@@ -255,6 +301,9 @@ export default function BookingWizard({ listing, onClose, onSuccess }: BookingWi
             <div className="flex justify-between text-sm"><span className="text-stone-500">Vendor</span><span className="font-semibold text-stone-900">{vendorName}</span></div>
             <div className="flex justify-between text-sm"><span className="text-stone-500">Date</span><span className="font-semibold text-stone-900">{date}</span></div>
             <div className="flex justify-between text-sm"><span className="text-stone-500">Time</span><span className="font-semibold text-stone-900">{time}</span></div>
+            {listing.is_per_unit && (
+              <div className="flex justify-between text-sm"><span className="text-stone-500">Quantity</span><span className="font-semibold text-stone-900">{quantity} {listing.unit_label || "units"}</span></div>
+            )}
             {images.length > 0 && (
               <div className="flex justify-between text-sm"><span className="text-stone-500">Reference photos</span><span className="font-semibold text-stone-900">{images.length}</span></div>
             )}

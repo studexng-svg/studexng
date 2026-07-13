@@ -14,7 +14,8 @@ export default function ListingsPage() {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<any>(null);
   const [form, setForm] = useState({
-    title: "", description: "", payoutAmount: "", category: "", subcategory: "",
+    title: "", description: "", payoutAmount: "", category: "",
+    is_per_unit: false, unit_label: "",
     listing_type: "service", track_inventory: false,
     stock_quantity: 0, discount_percent: 0, images: Array(5).fill(null) as (File | null)[],
     brand: "", condition: "", delivery_time: "", tags: "",
@@ -63,14 +64,14 @@ export default function ListingsPage() {
   const listings: any[] = listingsData ?? [];
   const categories: any[] = categoriesData ?? [];
   const selectedCategory = categories.find((c: any) => c.slug === form.category);
-  const availableSubcategories: any[] = selectedCategory?.subcategories ?? [];
+  const isLaundryCategory = (selectedCategory?.title || "").toLowerCase().includes("laundry");
 
   const openEdit = (listing: any) => {
     setEditing(listing);
     setForm({
       title: listing.title, description: listing.description,
       payoutAmount: (listing.payout_amount ?? listing.price).toString(), category: listing.category,
-      subcategory: listing.subcategory ? listing.subcategory.toString() : "",
+      is_per_unit: listing.is_per_unit || false, unit_label: listing.unit_label || "",
       listing_type: listing.listing_type || "service",
       track_inventory: listing.track_inventory || false,
       stock_quantity: listing.stock_quantity || 0,
@@ -85,7 +86,7 @@ export default function ListingsPage() {
   };
 
   const resetForm = () => {
-    setForm({ title: "", description: "", payoutAmount: "", category: "", subcategory: "", listing_type: "service", track_inventory: false, stock_quantity: 0, discount_percent: 0, images: Array(5).fill(null), brand: "", condition: "", delivery_time: "", tags: "" });
+    setForm({ title: "", description: "", payoutAmount: "", category: "", is_per_unit: false, unit_label: "", listing_type: "service", track_inventory: false, stock_quantity: 0, discount_percent: 0, images: Array(5).fill(null), brand: "", condition: "", delivery_time: "", tags: "" });
     setEditing(null);
     setShowForm(false);
     setPricePreview(null);
@@ -94,7 +95,8 @@ export default function ListingsPage() {
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 2500); };
 
   const handleSave = async () => {
-    if (!form.title || !form.payoutAmount || !form.category || !form.subcategory) return;
+    if (!form.title || !form.payoutAmount || !form.category) return;
+    if (form.is_per_unit && !form.unit_label.trim()) return;
     setSaving(true);
     try {
       const fd = new FormData();
@@ -102,7 +104,8 @@ export default function ListingsPage() {
       fd.append("description", form.description);
       fd.append("payout_amount", form.payoutAmount);
       fd.append("category", form.category);
-      fd.append("subcategory", form.subcategory);
+      fd.append("is_per_unit", form.is_per_unit ? "true" : "false");
+      fd.append("unit_label", form.is_per_unit ? form.unit_label.trim() : "");
       fd.append("listing_type", form.listing_type);
       const isInventoryType = form.listing_type === "food" || form.listing_type === "product";
       fd.append("track_inventory", isInventoryType ? "true" : "false");
@@ -196,16 +199,17 @@ export default function ListingsPage() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <input type="number" value={form.payoutAmount} onChange={e => setForm(f => ({ ...f, payoutAmount: e.target.value }))}
-                  placeholder="Amount you want to receive (₦)"
+                  placeholder={form.is_per_unit ? `Amount per ${form.unit_label.trim() || "unit"} (₦)` : "Amount you want to receive (₦)"}
                   className="w-full bg-white border border-stone-200 rounded-xl px-4 py-3 text-stone-900 text-base focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 transition" />
                 {pricePreview && (
                   <p className="text-xs text-stone-400 mt-1.5 px-1">
                     Buyer pays <span className="font-semibold text-stone-600">₦{pricePreview.price.toLocaleString()}</span>
+                    {form.is_per_unit ? ` per ${form.unit_label.trim() || "unit"}` : ""}
                     {" "}· platform fee ₦{pricePreview.platform_fee.toLocaleString()}
                   </p>
                 )}
               </div>
-              <select value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value, subcategory: "" }))}
+              <select value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
                 className="bg-white border border-stone-200 rounded-xl px-4 py-3 text-stone-900 text-base focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 transition">
                 <option value="">Select category</option>
                 {categories.map((cat: any) => (
@@ -213,14 +217,24 @@ export default function ListingsPage() {
                 ))}
               </select>
             </div>
-            <select value={form.subcategory} disabled={!form.category}
-              onChange={e => setForm(f => ({ ...f, subcategory: e.target.value }))}
-              className="w-full bg-white border border-stone-200 rounded-xl px-4 py-3 text-stone-900 text-base focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 transition disabled:opacity-50 disabled:cursor-not-allowed">
-              <option value="">{form.category ? "Select subcategory" : "Select category first"}</option>
-              {availableSubcategories.map((sub: any) => (
-                <option key={sub.id} value={sub.id}>{sub.title}</option>
-              ))}
-            </select>
+            {isLaundryCategory && (
+              <div className="bg-stone-50 border border-stone-100 rounded-xl px-4 py-3 flex items-center gap-4">
+                <div className="flex-1">
+                  <p className="text-stone-800 text-sm font-semibold">Price per unit <span className="font-normal text-stone-400">(e.g. per cloth)</span></p>
+                  <p className="text-stone-400 text-xs">Buyer picks a quantity when booking; you get paid per unit</p>
+                  {form.is_per_unit && (
+                    <input value={form.unit_label} onChange={e => setForm(f => ({ ...f, unit_label: e.target.value }))}
+                      placeholder="Unit label (e.g. cloth)"
+                      className="mt-2 w-full bg-white border border-stone-200 rounded-lg px-3 py-2 text-stone-900 text-sm focus:outline-none focus:border-teal-500 transition placeholder:text-stone-400" />
+                  )}
+                </div>
+                <button type="button" onClick={() => setForm(f => ({ ...f, is_per_unit: !f.is_per_unit }))}>
+                  {form.is_per_unit
+                    ? <ToggleRight className="w-8 h-8 text-teal-600" />
+                    : <ToggleLeft className="w-8 h-8 text-stone-300" />}
+                </button>
+              </div>
+            )}
             {/* Discount */}
             <div className="bg-stone-50 border border-stone-100 rounded-xl px-4 py-3 flex items-center gap-4">
               <div className="flex-1">
@@ -329,7 +343,7 @@ export default function ListingsPage() {
             </div>
 
             <div className="flex gap-3">
-              <button onClick={handleSave} disabled={saving || !form.title || !form.payoutAmount || !form.category || !form.subcategory}
+              <button onClick={handleSave} disabled={saving || !form.title || !form.payoutAmount || !form.category || (form.is_per_unit && !form.unit_label.trim())}
                 className="flex-1 py-3 text-white disabled:opacity-40 rounded-full font-semibold text-sm transition active:scale-[0.98]"
                 style={{ background: TEAL }}>
                 {saving ? "Saving..." : editing ? "Update" : "Create Listing"}

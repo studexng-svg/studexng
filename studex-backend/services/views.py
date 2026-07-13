@@ -109,7 +109,7 @@ class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
             campus_param = self.request.query_params.get('campus', '').lower()
             if campus_param in ('pau', 'futo', 'imsu'):
                 campus = campus_param
-        return Category.objects.filter(**{f'is_{campus}': True}).prefetch_related('subcategories').order_by('title')
+        return Category.objects.filter(**{f'is_{campus}': True}).order_by('title')
 
     def list(self, request, *args, **kwargs):
         user = request.user
@@ -153,8 +153,7 @@ class ListingViewSet(viewsets.ModelViewSet):
         if (request.user.is_authenticated and request.user.is_staff
                 or request.query_params.get('search')
                 or request.query_params.get('vendor_username')
-                or request.query_params.get('category')
-                or request.query_params.get('subcategory')):
+                or request.query_params.get('category')):
             return super().list(request, *args, **kwargs)
 
         user = request.user
@@ -213,20 +212,8 @@ class ListingViewSet(viewsets.ModelViewSet):
                 Q(title__icontains=search) |
                 Q(description__icontains=search) |
                 Q(vendor__username__icontains=search) |
-                Q(vendor__business_name__icontains=search) |
-                Q(subcategory__title__icontains=search)
+                Q(vendor__business_name__icontains=search)
             )
-            # Prioritize exact subcategory-name matches (e.g. searching "nail" should
-            # surface Nail Technician listings first), single annotated query — no
-            # second round trip.
-            from django.db.models import Case, When, Value, IntegerField
-            qs = qs.annotate(
-                _subcategory_match=Case(
-                    When(subcategory__title__icontains=search, then=Value(0)),
-                    default=Value(1),
-                    output_field=IntegerField(),
-                )
-            ).order_by('_subcategory_match', '-created_at')
 
         category_param = self.request.query_params.get('category')
         if category_param:
@@ -235,14 +222,7 @@ class ListingViewSet(viewsets.ModelViewSet):
             else:
                 qs = qs.filter(category__slug=category_param)
 
-        subcategory_param = self.request.query_params.get('subcategory')
-        if subcategory_param:
-            if subcategory_param.isdigit():
-                qs = qs.filter(subcategory__id=subcategory_param)
-            else:
-                qs = qs.filter(subcategory__slug=subcategory_param)
-
-        return qs.select_related('vendor', 'category', 'subcategory').prefetch_related('vendor__profile')
+        return qs.select_related('vendor', 'category').prefetch_related('vendor__profile')
 
     def update(self, request, *args, **kwargs):
         instance = self.get_object()

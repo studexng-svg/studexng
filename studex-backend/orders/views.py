@@ -784,12 +784,19 @@ class BookingViewSet(viewsets.ModelViewSet):
         from decimal import Decimal
         # booking.listing.price is already all-inclusive (vendor payout + platform
         # fee baked in at listing-creation time) — no fee gets added at checkout.
-        checkout_amount = Decimal(str(booking.listing.price))
+        # Per-unit listings (e.g. laundry priced per cloth) instead compute the fee
+        # once against the true quantity-scaled payout, not the flat listing price.
+        if booking.listing.is_per_unit:
+            from payments.pricing import calculate_final_price
+            checkout_amount = calculate_final_price(Decimal(str(booking.listing.payout_amount)) * booking.quantity)
+        else:
+            checkout_amount = Decimal(str(booking.listing.price))
 
         return Response({
             'booking_id': booking.id,
             'listing_id': booking.listing.id,
             'listing_title': booking.listing.title,
+            'quantity': booking.quantity,
             'listing_price': float(checkout_amount),
             'checkout_amount': float(checkout_amount),
             'checkout_amount_kobo': int(checkout_amount * 100),

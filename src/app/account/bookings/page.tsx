@@ -22,6 +22,7 @@ interface Booking {
   listing: number;
   listing_title: string;
   listing_price: string;
+  quantity: number;
   vendor_name: string;
   vendor_image?: string | null;
   listing_image?: string | null;
@@ -212,7 +213,7 @@ export default function BuyerBookingsPage() {
     // Full credits coverage — skip Paystack entirely
     if (isFullyCoveredByCredits) {
       try {
-        const res = await api.payments.payWithCredits({ listing_id: activeBooking.listing });
+        const res = await api.payments.payWithCredits({ listing_id: activeBooking.listing, booking_id: activeBooking.id });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Payment failed");
         setPayingId(null);
@@ -232,6 +233,7 @@ export default function BuyerBookingsPage() {
     try {
       const initRes = await api.payments.initialize({
         listing_id: bookingToCharge.listing,
+        booking_id: bookingToCharge.id,
         ...(useCredits && creditsToApply > 0 ? { use_credits: true } : {}),
       });
       const initData = await initRes.json();
@@ -258,6 +260,7 @@ export default function BuyerBookingsPage() {
               reference: response.reference,
               transaction_id: response.reference,
               listing_id: bookingToCharge.listing,
+              booking_id: bookingToCharge.id,
               order_type: "service",
               use_credits: appliedCredits > 0,
               credits_applied: appliedCredits,
@@ -372,6 +375,12 @@ export default function BuyerBookingsPage() {
                   <span className="text-stone-500">Time</span>
                   <span className="font-semibold text-stone-900">{activeBooking.scheduled_time}</span>
                 </div>
+                {activeBooking.quantity > 1 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-stone-500">Quantity</span>
+                    <span className="font-semibold text-stone-900">{activeBooking.quantity}</span>
+                  </div>
+                )}
                 <div className="border-t border-stone-200 pt-2 flex justify-between">
                   <span className="font-semibold text-stone-900">Total</span>
                   <span className="font-bold text-teal-600 text-lg">₦{totalWithFee.toLocaleString()}</span>
@@ -513,7 +522,7 @@ export default function BuyerBookingsPage() {
                     <p className="text-xs font-semibold text-stone-700">{booking.scheduled_time}</p>
                   </div>
                   <div className="bg-white/60 rounded-xl p-2.5 text-center">
-                    <p className="text-xs text-stone-400 mb-1">Price</p>
+                    <p className="text-xs text-stone-400 mb-1">{booking.quantity > 1 ? `Price (x${booking.quantity})` : "Price"}</p>
                     <p className="text-xs font-semibold text-teal-600">₦{Number(booking.listing_price).toLocaleString()}</p>
                   </div>
                 </div>

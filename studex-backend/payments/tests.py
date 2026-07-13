@@ -3,7 +3,10 @@ Test suite for payments app - the glue between a successful Paystack charge and
 Booking/Order/Conversation state (see payments/views.py _create_order_from_paystack_data).
 """
 from decimal import Decimal
-from django.test import TestCase
+from unittest.mock import patch, MagicMock
+from django.test import TestCase, override_settings
+from rest_framework.test import APIClient, APITestCase
+from rest_framework import status
 
 from accounts.models import User
 from services.models import Category, Listing
@@ -216,3 +219,191 @@ class PricingTests(TestCase):
         self.assertEqual(count, 1)  # only listings with payout_amount set are touched
         self.assertEqual(listing.price, Decimal('11000.00'))  # 10000 + 10%
         self.assertEqual(listing_no_payout.price, Decimal('5000'))  # untouched, no payout_amount
+
+
+class PerUnitBookingSettlementTests(TestCase):
+    """
+    _create_order_from_paystack_data — vendor payout must scale with
+    Booking.quantity for per-unit listings (e.g. laundry priced per cloth),
+    and threading a real booking_id through must fix the pre-existing "blind
+    filter" bug where paying for one booking flipped every pending booking
+    for that listing to paid.
+    """
+
+    def setUp(self):
+        from payments.models import PricingSettings
+        PricingSettings.objects.update_or_create(pk=1, defaults={'service_fee_percent': Decimal('8.00')})
+
+        self.buyer = User.objects.create_user(
+            username='pu_buyer', email='pu_buyer@pau.edu.ng', password='pass123'
+        )
+        self.seller = User.objects.create_user(
+            username='pu_seller', email='pu_seller@pau.edu.ng', password='pass123',
+            user_type='vendor', is_verified_vendor=True
+        )
+        self.category = Category.objects.create(title='Laundry Settlement', slug='laundry-settlement')
+        self.listing = Listing.objects.create(
+            title='Washing & Ironing', description='Per cloth', payout_amount=Decimal('500.00'),
+            price=Decimal('600.00'), is_per_unit=True, unit_label='cloth',
+            vendor=self.seller, category=self.category, is_available=True,
+        )
+
+    def _fake_paystack_data(self, reference, amount_kobo):
+        return {
+            'amount': amount_kobo,
+            'reference': reference,
+            'id': 999999,
+            'customer': {'email': self.buyer.email},
+            'metadata': {},
+        }
+
+    def test_vendor_payout_scales_with_quantity_not_flat_payout(self):
+        booking = Booking.objects.create(
+            buyer=self.buyer, listing=self.listing, scheduled_date='2099-01-01',
+            scheduled_time='2:30 PM', status='pending', quantity=4,
+        )
+        # Fee applied ONCE to the true total (payout*4=2000 -> 8%=160 -> 2160),
+        # not 4x the per-unit floored fee (500 -> 600 -> x4 = 2400, which is wrong).
+        order_id, error = _create_order_from_paystack_data(
+            self._fake_paystack_data('ORD-PERUNIT-0001', 216000), self.buyer, self.listing.id, 'service',
+            booking_id=booking.id,
+        )
+        self.assertIsNone(error)
+        order = Order.objects.get(id=order_id)
+        self.assertEqual(order.quantity, 4)
+
+        from payments.models import PaymentTransaction
+        txn = PaymentTransaction.objects.get(order_id=order_id)
+        self.assertEqual(txn.seller_amount, Decimal('2000.00'))  # payout_amount * quantity, not flat 500
+        self.assertEqual(txn.platform_amount, Decimal('160.00'))
+
+        booking.refresh_from_db()
+        self.assertEqual(booking.status, 'paid')
+
+    def test_regression_default_quantity_one_unaffected(self):
+        """A per-unit listing booked with quantity=1 (the default) behaves
+        identically to a flat listing — vendor gets exactly payout_amount."""
+        booking = Booking.objects.create(
+            buyer=self.buyer, listing=self.listing, scheduled_date='2099-01-01',
+            scheduled_time='2:30 PM', status='pending', quantity=1,
+        )
+        order_id, error = _create_order_from_paystack_data(
+            self._fake_paystack_data('ORD-PERUNIT-0002', 60000), self.buyer, self.listing.id, 'service',
+            booking_id=booking.id,
+        )
+        self.assertIsNone(error)
+        from payments.models import PaymentTransaction
+        txn = PaymentTransaction.objects.get(order_id=order_id)
+        self.assertEqual(txn.seller_amount, Decimal('500.00'))
+
+    def test_no_booking_id_falls_back_to_legacy_blind_update(self):
+        """Deploy-safety: a payment with no booking_id (in-flight session from an
+        older frontend bundle, or a direct-listing/cart purchase) must still
+        complete successfully via the pre-existing blind-filter behavior."""
+        booking = Booking.objects.create(
+            buyer=self.buyer, listing=self.listing, scheduled_date='2099-01-01',
+            scheduled_time='2:30 PM', status='pending', quantity=1,
+        )
+        order_id, error = _create_order_from_paystack_data(
+            self._fake_paystack_data('ORD-PERUNIT-0003', 60000), self.buyer, self.listing.id, 'service',
+        )
+        self.assertIsNone(error)
+        booking.refresh_from_db()
+        self.assertEqual(booking.status, 'paid')
+
+    def test_specific_booking_id_flips_only_that_booking(self):
+        """Two pending bookings for the same buyer+listing — paying via a specific
+        booking_id must not blindly flip the other pending booking too (the bug
+        found during investigation, fixed as a side effect of quantity threading)."""
+        booking1 = Booking.objects.create(
+            buyer=self.buyer, listing=self.listing, scheduled_date='2099-01-01',
+            scheduled_time='2:30 PM', status='pending', quantity=2,
+        )
+        booking2 = Booking.objects.create(
+            buyer=self.buyer, listing=self.listing, scheduled_date='2099-02-01',
+            scheduled_time='3:00 PM', status='pending', quantity=3,
+        )
+        order_id, error = _create_order_from_paystack_data(
+            self._fake_paystack_data('ORD-PERUNIT-0004', 110000), self.buyer, self.listing.id, 'service',
+            booking_id=booking1.id,
+        )
+        self.assertIsNone(error)
+        booking1.refresh_from_db()
+        booking2.refresh_from_db()
+        self.assertEqual(booking1.status, 'paid')
+        self.assertEqual(booking2.status, 'pending')  # NOT blindly flipped
+
+
+@override_settings(PAYSTACK_SECRET_KEY='test-secret-key')
+class InitializePaymentPerUnitTests(APITestCase):
+    """
+    POST /api/payments/initialize/ — for a per-unit booking, the amount sent to
+    Paystack must be calculate_final_price(payout_amount * quantity), not the
+    flat listing.price (which would apply the fee floor per-unit and undercharge
+    or overcharge depending on rounding).
+    """
+
+    def setUp(self):
+        from payments.models import PricingSettings
+        PricingSettings.objects.update_or_create(pk=1, defaults={'service_fee_percent': Decimal('8.00')})
+
+        self.client = APIClient()
+        self.buyer = User.objects.create_user(
+            username='init_buyer', email='init_buyer@pau.edu.ng', password='pass123'
+        )
+        self.seller = User.objects.create_user(
+            username='init_seller', email='init_seller@pau.edu.ng', password='pass123',
+            user_type='vendor', is_verified_vendor=True
+        )
+        self.category = Category.objects.create(title='Init Laundry', slug='init-laundry')
+        self.listing = Listing.objects.create(
+            title='Washing & Ironing', description='Per cloth', payout_amount=Decimal('500.00'),
+            price=Decimal('600.00'), is_per_unit=True, unit_label='cloth',
+            vendor=self.seller, category=self.category, is_available=True,
+        )
+        self.booking = Booking.objects.create(
+            buyer=self.buyer, listing=self.listing, scheduled_date='2099-01-01',
+            scheduled_time='2:30 PM', status='pending', quantity=4,
+        )
+
+    def _mock_paystack_response(self):
+        mock_res = MagicMock()
+        mock_res.status_code = 200
+        mock_res.json.return_value = {
+            'status': True,
+            'data': {'access_code': 'test_code', 'authorization_url': 'https://paystack.test/pay', 'reference': 'STX-TEST'},
+        }
+        return mock_res
+
+    @patch('payments.views.requests.post')
+    def test_charges_quantity_scaled_amount_not_flat_price(self, mock_post):
+        mock_post.return_value = self._mock_paystack_response()
+        self.client.force_authenticate(user=self.buyer)
+
+        response = self.client.post('/api/payments/initialize/', {
+            'listing_id': self.listing.id, 'booking_id': self.booking.id,
+        })
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        sent_payload = mock_post.call_args.kwargs['json']
+        # Correct: fee applied once to (500*4=2000) -> 160 -> 2160 -> 216000 kobo.
+        # Buggy (flat price * quantity) would send 600*4*100 = 240000 kobo instead.
+        self.assertEqual(sent_payload['amount'], 216000)
+        self.assertEqual(sent_payload['metadata']['booking_id'], str(self.booking.id))
+
+    @patch('payments.views.requests.post')
+    def test_flat_listing_without_booking_id_unaffected(self, mock_post):
+        """Regression: a plain listing purchase with no booking_id still charges
+        the flat listing.price, exactly as before this feature existed."""
+        mock_post.return_value = self._mock_paystack_response()
+        flat_listing = Listing.objects.create(
+            title='Gel Manicure', description='Flat', payout_amount=Decimal('1000.00'),
+            price=Decimal('1100.00'), vendor=self.seller, category=self.category, is_available=True,
+        )
+        self.client.force_authenticate(user=self.buyer)
+
+        response = self.client.post('/api/payments/initialize/', {'listing_id': flat_listing.id})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        sent_payload = mock_post.call_args.kwargs['json']
+        self.assertEqual(sent_payload['amount'], 110000)

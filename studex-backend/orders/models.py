@@ -23,6 +23,10 @@ class Order(models.Model):
     buyer = models.ForeignKey(User, on_delete=models.CASCADE, related_name='orders')
     listing = models.ForeignKey(Listing, on_delete=models.CASCADE)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
+    # Receipt/history snapshot for per-unit listings (e.g. "4 clothes"). Not
+    # used in settlement math — that's computed from Booking.quantity at
+    # payout-split time (see payments/views.py).
+    quantity = models.PositiveIntegerField(default=1)
     status = models.CharField(max_length=30, choices=STATUS_CHOICES, default='pending')
     current_status = models.CharField(max_length=30, default='paid')
     estimated_time = models.PositiveIntegerField(null=True, blank=True, help_text="Estimated minutes to completion")
@@ -169,6 +173,9 @@ class Booking(models.Model):
     )
     scheduled_date = models.DateField()
     scheduled_time = models.CharField(max_length=20)
+    # Only meaningful when listing.is_per_unit is True (e.g. "4 clothes").
+    # Defaults to 1 for ordinary flat-priced service bookings.
+    quantity = models.PositiveIntegerField(default=1)
     note = models.TextField(blank=True, validators=[MaxLengthValidator(250)])
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     confirmed_at = models.DateTimeField(null=True, blank=True)

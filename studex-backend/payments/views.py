@@ -368,6 +368,19 @@ def initialize_payment(request):
         return Response({"error": "Listing not found."}, status=404)
 
     buyer = request.user
+
+    # Per-unit listings (e.g. laundry priced per cloth): the buyer picked a
+    # quantity on a specific Booking, so the real payout base is
+    # payout_amount * quantity, not the flat listing.price.
+    booking_id = request.data.get("booking_id")
+    booking = None
+    if booking_id:
+        from orders.models import Booking
+        try:
+            booking = Booking.objects.select_related("listing").get(id=booking_id, buyer=buyer)
+        except Booking.DoesNotExist:
+            return Response({"error": "Booking not found."}, status=404)
+
     # cart_amount lets the frontend pass the true multi-item cart total so the
     # discount base is correct; fall back to the single listing price otherwise.
     # Compute cart total server-side — never trust client-supplied totals.
@@ -416,7 +429,12 @@ def initialize_payment(request):
                 amount = Decimal(str(listing.price))
         else:
             # Single listing — apply deal discount if active
-            amount = Decimal(str(listing.price))
+            if booking is not None and booking.listing.is_per_unit:
+                from payments.pricing import calculate_final_price
+                total_payout = Decimal(str(listing.payout_amount)) * booking.quantity
+                amount = calculate_final_price(total_payout)
+            else:
+                amount = Decimal(str(listing.price))
             try:
                 deal = listing.deal
                 if deal.is_active:
@@ -499,6 +517,7 @@ def initialize_payment(request):
         "reference": reference,
         "metadata": {
             "listing_id": listing_id,
+            "booking_id": str(booking_id) if booking_id else "",
             "buyer_id": buyer.id,
             "type": "service",
             "discount_amount": str(discount_amount),
@@ -600,6 +619,7 @@ def verify_payment(request):
 
     paystack_data = verify_data["data"]
     actual_listing_id = listing_id or (items[0]["listing_id"] if items else None)
+    booking_id = request.data.get("booking_id") or (paystack_data.get("metadata") or {}).get("booking_id") or None
 
     # ── Ownership check ───────────────────────────────────────────────────────
     # The email Paystack recorded for this transaction must match the caller.
@@ -651,7 +671,15 @@ def verify_payment(request):
         try:
             from services.models import Listing
             _listing = Listing.objects.get(id=actual_listing_id)
-            _base = Decimal(str(_listing.price))
+            _booking = None
+            if booking_id and _listing.is_per_unit:
+                from orders.models import Booking as _Booking
+                _booking = _Booking.objects.filter(id=booking_id, listing=_listing).first()
+            if _booking is not None:
+                from payments.pricing import calculate_final_price as _cfp
+                _base = _cfp(Decimal(str(_listing.payout_amount)) * _booking.quantity)
+            else:
+                _base = Decimal(str(_listing.price))
             try:
                 _deal = _listing.deal
                 if _deal.is_active:
@@ -700,6 +728,7 @@ def verify_payment(request):
         order_type=_normalize_order_type(order_type),
         credits_applied=credits_applied,
         delivery_location=request.data.get("delivery_location", ""),
+        booking_id=booking_id,
     )
 
     if error:
@@ -749,7 +778,26 @@ def pay_with_credits(request):
         return Response({"error": "Listing not found."}, status=404)
 
     buyer = request.user
-    listing_price = Decimal(str(listing.price))
+
+    # Per-unit listings (e.g. laundry priced per cloth): the buyer picked a
+    # quantity on a specific Booking — the real price base is
+    # payout_amount * quantity, not the flat listing.price.
+    booking_id = request.data.get("booking_id")
+    booking = None
+    if booking_id:
+        from orders.models import Booking
+        try:
+            booking = Booking.objects.select_related("listing").get(id=booking_id, buyer=buyer)
+        except Booking.DoesNotExist:
+            return Response({"error": "Booking not found."}, status=404)
+
+    quantity = booking.quantity if (booking is not None and booking.listing.is_per_unit) else 1
+
+    if booking is not None and booking.listing.is_per_unit:
+        from payments.pricing import calculate_final_price
+        listing_price = calculate_final_price(Decimal(str(listing.payout_amount)) * quantity)
+    else:
+        listing_price = Decimal(str(listing.price))
     deal_discount_amount = Decimal("0")
     vendor_discount_currency = Decimal("0")
     deal_absorbed = False
@@ -785,6 +833,7 @@ def pay_with_credits(request):
             buyer=buyer,
             listing=listing,
             amount=listing_price,
+            quantity=quantity,
             reference=reference,
             status="paid",
             paid_at=timezone.now(),
@@ -801,9 +850,12 @@ def pay_with_credits(request):
 
     try:
         from orders.models import Booking
-        Booking.objects.filter(
-            buyer=buyer, listing=listing, status__in=["pending", "confirmed"]
-        ).update(status="paid")
+        if booking is not None:
+            Booking.objects.filter(id=booking.id).update(status="paid")
+        else:
+            Booking.objects.filter(
+                buyer=buyer, listing=listing, status__in=["pending", "confirmed"]
+            ).update(status="paid")
     except Exception as e:
         logger.warning(f"pay_with_credits: booking update failed: {e}")
 
@@ -821,7 +873,9 @@ def pay_with_credits(request):
 
     # listing_price is already all-inclusive (fee baked in) and already net of any
     # Deal/vendor discount above — no separate fee gets added on top anymore.
+    # Scaled by quantity for per-unit listings (e.g. laundry priced per cloth).
     payout_amount = listing.payout_amount if listing.payout_amount is not None else Decimal(str(listing.price))
+    payout_amount = payout_amount * quantity
     vendor_amount, platform_amount = split_settlement(
         listing_price, payout_amount,
         vendor_discount_currency=vendor_discount_currency,
@@ -1101,6 +1155,7 @@ def paystack_webhook(request):
         customer_email = data.get("customer", {}).get("email", "")
         meta = data.get("metadata", {}) or {}
         listing_id = meta.get("listing_id")
+        booking_id = meta.get("booking_id") or None
         raw_type = meta.get("type", "service")
         order_type = _normalize_order_type(raw_type)
 
@@ -1119,6 +1174,7 @@ def paystack_webhook(request):
                 order_type=order_type,
                 credits_applied=Decimal(str(meta.get("credits_applied", "0") or "0")),
                 delivery_location=meta.get("delivery_location", ""),
+                booking_id=booking_id,
             )
             if error:
                 logger.error(f"Webhook order creation failed: {error}")
@@ -1233,8 +1289,9 @@ def paystack_webhook(request):
 # INTERNAL: create order from Paystack data
 # ─────────────────────────────────────────
 
-def _create_order_from_paystack_data(paystack_data, buyer, listing_id, order_type, credits_applied=Decimal("0"), delivery_location=""):
+def _create_order_from_paystack_data(paystack_data, buyer, listing_id, order_type, credits_applied=Decimal("0"), delivery_location="", booking_id=None):
     from services.models import Listing
+    from orders.models import Booking
 
     # Paystack amounts are in kobo — divide by 100 to get naira
     amount_paid = Decimal(str(paystack_data["amount"])) / 100
@@ -1253,6 +1310,19 @@ def _create_order_from_paystack_data(paystack_data, buyer, listing_id, order_typ
         except Exception:
             pass
 
+    # Resolve the exact Booking this payment is for, if any. Threaded through
+    # so per-unit quantity scales the vendor payout correctly, and so the
+    # status update below targets this booking specifically rather than
+    # blindly flipping every pending/confirmed booking for this listing.
+    booking = None
+    if booking_id:
+        try:
+            booking = Booking.objects.select_related("listing").get(id=booking_id)
+        except Booking.DoesNotExist:
+            booking = None
+
+    quantity = booking.quantity if (booking is not None and booking.listing.is_per_unit) else 1
+
     if listing is not None:
         meta = paystack_data.get("metadata") or {}
         listing_deal_discount = Decimal(str(meta.get("listing_deal_discount", "0") or "0"))
@@ -1260,8 +1330,10 @@ def _create_order_from_paystack_data(paystack_data, buyer, listing_id, order_typ
         deal_discount_amount = Decimal(str(meta.get("deal_discount_amount", "0") or "0"))
         # Vendor bears only their own discount; admin deal discount is absorbed by
         # platform. payout_amount falls back to price for any listing that somehow
-        # missed the payout_amount backfill migration.
+        # missed the payout_amount backfill migration. Scaled by quantity for
+        # per-unit listings (e.g. laundry priced per cloth).
         payout_amount = listing.payout_amount if listing.payout_amount is not None else Decimal(str(listing.price))
+        payout_amount = payout_amount * quantity
         vendor_amount, platform_amount = split_settlement(
             amount_paid, payout_amount,
             vendor_discount_currency=listing_vendor_discount,
@@ -1314,6 +1386,7 @@ def _create_order_from_paystack_data(paystack_data, buyer, listing_id, order_typ
                 buyer=buyer,
                 listing=listing,
                 amount=amount_paid,
+                quantity=quantity,
                 reference=ref_key,
                 status="paid",
                 paid_at=timezone.now(),
@@ -1322,14 +1395,19 @@ def _create_order_from_paystack_data(paystack_data, buyer, listing_id, order_typ
             order_id = order.id
 
             try:
-                # 'pending' is included because the new booking flow charges the buyer
-                # immediately — there is no pre-payment vendor-confirm step anymore, so a
-                # booking may still be 'pending' at the moment payment clears. 'confirmed'
-                # is kept for any booking created under the old pre-payment-approval flow.
-                from orders.models import Booking
-                Booking.objects.filter(
-                    buyer=buyer, listing=listing, status__in=["pending", "confirmed"]
-                ).update(status="paid")
+                if booking is not None:
+                    # Exact match — flips only the booking this payment is actually for.
+                    Booking.objects.filter(id=booking.id).update(status="paid")
+                else:
+                    # 'pending' is included because the new booking flow charges the buyer
+                    # immediately — there is no pre-payment vendor-confirm step anymore, so a
+                    # booking may still be 'pending' at the moment payment clears. 'confirmed'
+                    # is kept for any booking created under the old pre-payment-approval flow.
+                    # Fallback for payments without a booking_id (cart/direct-listing
+                    # purchases, or an in-flight session from before booking_id existed).
+                    Booking.objects.filter(
+                        buyer=buyer, listing=listing, status__in=["pending", "confirmed"]
+                    ).update(status="paid")
             except Exception as e:
                 logger.warning(f"Booking status update failed: {e}")
 

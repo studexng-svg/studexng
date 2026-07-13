@@ -784,3 +784,65 @@ class BookingReferenceDataTests(APITestCase):
         booking = Booking.objects.get(id=response.data['id'])
         self.assertEqual(booking.reference_images.count(), 0)
         mock_upload.assert_not_called()
+
+
+class BookingQuantityTests(APITestCase):
+    """Booking.quantity — only meaningful (and only settable above 1) for
+    per-unit listings, e.g. laundry priced per cloth."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.buyer = User.objects.create_user(
+            username='qty_buyer', email='qty_buyer@pau.edu.ng', password='pass123'
+        )
+        self.seller = User.objects.create_user(
+            username='qty_seller', email='qty_seller@pau.edu.ng', password='pass123',
+            user_type='vendor', is_verified_vendor=True
+        )
+        self.category = Category.objects.create(title='Laundry Test Cat', slug='laundry-test-cat')
+        self.per_unit_listing = Listing.objects.create(
+            title='Washing & Ironing', description='Per cloth', payout_amount=Decimal('500.00'),
+            price=Decimal('600.00'), is_per_unit=True, unit_label='cloth',
+            vendor=self.seller, category=self.category, is_available=True,
+        )
+        self.flat_listing = Listing.objects.create(
+            title='Gel Manicure', description='Flat price', payout_amount=Decimal('1000.00'),
+            price=Decimal('1100.00'), vendor=self.seller, category=self.category, is_available=True,
+        )
+        self.booking_url = '/api/orders/bookings/'
+
+    def _payload(self, listing_id, quantity=None):
+        from datetime import date, timedelta
+        data = {
+            'listing': listing_id,
+            'scheduled_date': str(date.today() + timedelta(days=1)),
+            'scheduled_time': '2:30 PM',
+        }
+        if quantity is not None:
+            data['quantity'] = quantity
+        return data
+
+    def test_quantity_defaults_to_one(self):
+        self.client.force_authenticate(user=self.buyer)
+        response = self.client.post(self.booking_url, self._payload(self.flat_listing.id))
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        booking = Booking.objects.get(id=response.data['id'])
+        self.assertEqual(booking.quantity, 1)
+
+    def test_quantity_above_one_accepted_for_per_unit_listing(self):
+        self.client.force_authenticate(user=self.buyer)
+        response = self.client.post(self.booking_url, self._payload(self.per_unit_listing.id, quantity=4))
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        booking = Booking.objects.get(id=response.data['id'])
+        self.assertEqual(booking.quantity, 4)
+
+    def test_quantity_above_one_rejected_for_flat_listing(self):
+        self.client.force_authenticate(user=self.buyer)
+        response = self.client.post(self.booking_url, self._payload(self.flat_listing.id, quantity=4))
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('quantity', response.data)
+
+    def test_quantity_of_one_accepted_regardless_of_listing_type(self):
+        self.client.force_authenticate(user=self.buyer)
+        response = self.client.post(self.booking_url, self._payload(self.flat_listing.id, quantity=1))
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)

@@ -374,19 +374,10 @@ class ListingAPITests(APITestCase):
             title='Food',
             slug='food'
         )
-        self.subcategory = Subcategory.objects.create(
-            category=self.category, title='Rice Dishes', slug='rice-dishes'
-        )
-        self.other_category = Category.objects.create(title='Nails', slug='nails')
-        self.other_subcategory = Subcategory.objects.create(
-            category=self.other_category, title='Manicure', slug='manicure'
-        )
-
         # Create listings
         self.listing = Listing.objects.create(
             vendor=self.vendor,
             category=self.category,
-            subcategory=self.subcategory,
             title='Jollof Rice',
             description='Delicious jollof rice',
             price=Decimal('1000.00'),
@@ -430,7 +421,6 @@ class ListingAPITests(APITestCase):
         """Test creating listing fails without authentication"""
         listing_data = {
             'category': 'food',
-            'subcategory': self.subcategory.id,
             'title': 'Fried Rice',
             'description': 'Delicious fried rice',
             'payout_amount': '1200.00'
@@ -445,7 +435,6 @@ class ListingAPITests(APITestCase):
 
         listing_data = {
             'category': 'food',
-            'subcategory': self.subcategory.id,
             'title': 'Fried Rice',
             'description': 'Delicious fried rice',
             'payout_amount': '1200.00'
@@ -460,7 +449,6 @@ class ListingAPITests(APITestCase):
 
         listing_data = {
             'category': 'food',
-            'subcategory': self.subcategory.id,
             'title': 'Fried Rice',
             'description': 'Delicious fried rice',
             'payout_amount': '1200.00'
@@ -475,7 +463,6 @@ class ListingAPITests(APITestCase):
 
         listing_data = {
             'category': 'food',
-            'subcategory': self.subcategory.id,
             'title': 'Fried Rice',
             'description': 'Delicious fried rice',
             'payout_amount': '1200.00'
@@ -497,7 +484,6 @@ class ListingAPITests(APITestCase):
 
         listing_data = {
             'category': 'food',
-            'subcategory': self.subcategory.id,
             'title': 'Suya',
             'description': 'Spicy suya',
             'payout_amount': '1000.00',
@@ -515,7 +501,6 @@ class ListingAPITests(APITestCase):
 
         update_data = {
             'category': 'food',
-            'subcategory': self.subcategory.id,
             'title': 'Jollof Rice Special',
             'description': 'Extra special jollof rice',
             'payout_amount': '1500.00'
@@ -864,6 +849,53 @@ class PreviewPriceAPITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
 
+class PerUnitListingTests(APITestCase):
+    """Listing.is_per_unit / unit_label — e.g. laundry priced per cloth."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.vendor = User.objects.create_user(
+            username='per_unit_vendor', email='per_unit_vendor@pau.edu.ng', password='pass123',
+            user_type='vendor', is_verified_vendor=True,
+        )
+        self.category = Category.objects.create(title='Per Unit Test Cat', slug='per-unit-test-cat')
+        self.listing_url = '/api/services/listings/'
+
+    def _payload(self, **overrides):
+        data = {
+            'category': 'per-unit-test-cat', 'title': 'Washing & Ironing',
+            'description': 'Per cloth', 'payout_amount': '500.00',
+        }
+        data.update(overrides)
+        return data
+
+    def test_is_per_unit_requires_unit_label(self):
+        self.client.force_authenticate(user=self.vendor)
+        response = self.client.post(self.listing_url, self._payload(is_per_unit=True))
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('unit_label', response.data)
+
+    def test_is_per_unit_with_unit_label_succeeds(self):
+        self.client.force_authenticate(user=self.vendor)
+        response = self.client.post(self.listing_url, self._payload(is_per_unit=True, unit_label='cloth'))
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(response.data['is_per_unit'])
+        self.assertEqual(response.data['unit_label'], 'cloth')
+
+    def test_default_is_per_unit_false_backward_compatible(self):
+        """Existing create payloads with no is_per_unit/unit_label at all still work."""
+        self.client.force_authenticate(user=self.vendor)
+        response = self.client.post(self.listing_url, self._payload())
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertFalse(response.data['is_per_unit'])
+        self.assertEqual(response.data['unit_label'], '')
+
+    def test_is_per_unit_false_does_not_require_unit_label(self):
+        self.client.force_authenticate(user=self.vendor)
+        response = self.client.post(self.listing_url, self._payload(is_per_unit=False))
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+
 class PayoutAmountMigrationTests(TestCase):
     """
     services/migrations/0021_backfill_payout_amount.py — historical listings backfill.
@@ -962,151 +994,6 @@ class SubcategoryModelTests(TestCase):
         # rows for every other (real, legacy) category already in the DB.
         count = Subcategory.objects.filter(slug='uncategorized', category__in=[self.category, self.other_category]).count()
         self.assertEqual(count, 2)
-
-
-class SubcategoryListingAPITests(APITestCase):
-    """Listing creation/update requires a subcategory that belongs to the chosen category."""
-
-    def setUp(self):
-        self.client = APIClient()
-        self.vendor = User.objects.create_user(
-            username='subcat_vendor', email='subcat_vendor@pau.edu.ng', password='pass123',
-            user_type='vendor', is_verified_vendor=True,
-        )
-        self.category_a = Category.objects.create(title='Beauty Cat', slug='beauty-cat')
-        self.category_b = Category.objects.create(title='Laundry Cat', slug='laundry-cat')
-        self.sub_a = Subcategory.objects.create(category=self.category_a, title='Nail Technician', slug='nail-technician')
-        self.sub_b = Subcategory.objects.create(category=self.category_b, title='Dry Cleaning', slug='dry-cleaning')
-        self.url = '/api/services/listings/'
-
-    def test_subcategory_required(self):
-        self.client.force_authenticate(user=self.vendor)
-        response = self.client.post(self.url, {
-            'category': 'beauty-cat', 'title': 'Gel Nails', 'description': 'x', 'payout_amount': '1000',
-        })
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn('subcategory', response.data)
-
-    def test_subcategory_must_belong_to_chosen_category(self):
-        self.client.force_authenticate(user=self.vendor)
-        response = self.client.post(self.url, {
-            'category': 'beauty-cat', 'subcategory': self.sub_b.id,  # belongs to category_b, not beauty-cat
-            'title': 'Gel Nails', 'description': 'x', 'payout_amount': '1000',
-        })
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-
-    def test_matching_category_and_subcategory_succeeds(self):
-        self.client.force_authenticate(user=self.vendor)
-        response = self.client.post(self.url, {
-            'category': 'beauty-cat', 'subcategory': self.sub_a.id,
-            'title': 'Gel Nails', 'description': 'x', 'payout_amount': '1000',
-        })
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(response.data['subcategory'], self.sub_a.id)
-        self.assertEqual(response.data['subcategory_title'], 'Nail Technician')
-
-
-class SubcategoryFilteringAndSearchTests(APITestCase):
-    def setUp(self):
-        self.client = APIClient()
-        self.vendor = User.objects.create_user(
-            username='filter_vendor', email='filter_vendor@pau.edu.ng', password='pass123',
-            user_type='vendor', is_verified_vendor=True,
-        )
-        self.category = Category.objects.create(title='Beauty Filter Cat', slug='beauty-filter-cat', is_pau=True)
-        self.sub_nails = Subcategory.objects.create(category=self.category, title='Nail Technician', slug='nail-technician')
-        self.sub_lash = Subcategory.objects.create(category=self.category, title='Lash Technician', slug='lash-technician')
-
-        self.nail_listing = Listing.objects.create(
-            vendor=self.vendor, category=self.category, subcategory=self.sub_nails,
-            title='Classic Manicure', description='Great nails', price=Decimal('1000'), is_available=True, campus='pau',
-        )
-        self.lash_listing = Listing.objects.create(
-            vendor=self.vendor, category=self.category, subcategory=self.sub_lash,
-            title='Lash Extensions', description='Full set of lashes', price=Decimal('2000'), is_available=True, campus='pau',
-        )
-        self.url = '/api/services/listings/'
-
-    def test_filter_by_subcategory_slug(self):
-        response = self.client.get(self.url, {'subcategory': 'nail-technician'})
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        titles = [l['title'] for l in response.data['results']]
-        self.assertIn('Classic Manicure', titles)
-        self.assertNotIn('Lash Extensions', titles)
-
-    def test_filter_by_subcategory_id(self):
-        response = self.client.get(self.url, {'subcategory': str(self.sub_lash.id)})
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        titles = [l['title'] for l in response.data['results']]
-        self.assertIn('Lash Extensions', titles)
-        self.assertNotIn('Classic Manicure', titles)
-
-    def test_search_prioritizes_exact_subcategory_match(self):
-        """Searching 'nail' should surface the Nail Technician listing first, even though
-        the Lash listing's description doesn't mention nails at all."""
-        response = self.client.get(self.url, {'search': 'nail'})
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        titles = [l['title'] for l in response.data['results']]
-        self.assertEqual(titles[0], 'Classic Manicure')
-
-
-class AdminSubcategoryAPITests(APITestCase):
-    def setUp(self):
-        self.client = APIClient()
-        self.admin = User.objects.create_user(
-            username='subcat_admin', email='subcat_admin@pau.edu.ng', password='pass123', is_staff=True,
-        )
-        self.non_admin = User.objects.create_user(
-            username='subcat_regular', email='subcat_regular@pau.edu.ng', password='pass123',
-        )
-        self.category = Category.objects.create(title='Admin Sub Cat', slug='admin-sub-cat')
-        self.subcategory = Subcategory.objects.create(category=self.category, title='Test Sub', slug='test-sub')
-
-    def test_non_admin_forbidden(self):
-        self.client.force_authenticate(user=self.non_admin)
-        response = self.client.get('/api/admin/subcategories/')
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-
-    def test_admin_can_create_subcategory(self):
-        self.client.force_authenticate(user=self.admin)
-        response = self.client.post('/api/admin/subcategories/', {
-            'title': 'New Sub', 'category_id': self.category.id,
-        })
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertTrue(Subcategory.objects.filter(title='New Sub', category=self.category).exists())
-
-    def test_admin_can_edit_subcategory(self):
-        self.client.force_authenticate(user=self.admin)
-        response = self.client.patch(f'/api/admin/subcategories/{self.subcategory.id}/', {'title': 'Renamed Sub'})
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.subcategory.refresh_from_db()
-        self.assertEqual(self.subcategory.title, 'Renamed Sub')
-
-    def test_delete_blocked_when_listings_exist(self):
-        vendor = User.objects.create_user(
-            username='delete_block_vendor', email='delete_block_vendor@pau.edu.ng', password='pass123',
-            user_type='vendor', is_verified_vendor=True,
-        )
-        Listing.objects.create(
-            vendor=vendor, category=self.category, subcategory=self.subcategory,
-            title='X', description='x', price=Decimal('1000'),
-        )
-        self.client.force_authenticate(user=self.admin)
-        response = self.client.delete(f'/api/admin/subcategories/{self.subcategory.id}/')
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertTrue(Subcategory.objects.filter(id=self.subcategory.id).exists())
-
-    def test_delete_succeeds_when_no_listings(self):
-        self.client.force_authenticate(user=self.admin)
-        response = self.client.delete(f'/api/admin/subcategories/{self.subcategory.id}/')
-        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
-        self.assertFalse(Subcategory.objects.filter(id=self.subcategory.id).exists())
-
-    def test_category_delete_blocked_when_subcategories_exist(self):
-        self.client.force_authenticate(user=self.admin)
-        response = self.client.delete(f'/api/admin/categories/{self.category.id}/')
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertTrue(Category.objects.filter(id=self.category.id).exists())
 
 
 class SubcategoryBackfillMigrationTests(TestCase):
