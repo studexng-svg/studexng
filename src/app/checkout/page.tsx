@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import {
-  Package, CreditCard, Shield, Lock, Check,
+  Package, CreditCard, Shield, Lock, Check, RotateCcw, ShieldCheck,
   Calendar, MapPin, Clock, Loader, Sparkles, ArrowRight, AlertCircle
 } from "lucide-react";
 import { useCartStore } from "@/lib/cartStore";
@@ -487,19 +487,30 @@ export default function CheckoutPage() {
           </div>
         </motion.div>
 
-        {/* ── SERVICE FEE INFO ── */}
+        {/* ── BUYER PROTECTION ── */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
           className="bg-teal-50 border border-teal-200 rounded-2xl p-4">
-          <div className="flex items-start gap-3">
-            <div>
-              <p className="font-semibold text-teal-800 text-sm">Transparent Pricing</p>
-              <p className="text-xs text-teal-600 mt-0.5 leading-relaxed">
-                Our <strong>8% service fee</strong> (min ₦100, max ₦3,500) covers both the StudEx platform and Paystack's payment processing cost so there are <strong>no hidden charges</strong> on top of what you see here.
-                {dealSavings > 0 && " Deal discounts are already reflected in your items total."}
-                {discount?.hasDiscount && " Your 5% profile completion bonus has been applied."}
-              </p>
+          <p className="font-semibold text-teal-800 text-sm mb-3">You're Protected</p>
+          <div className="space-y-2.5">
+            <div className="flex items-start gap-2.5">
+              <Lock className="w-4 h-4 text-teal-600 flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-teal-700 leading-relaxed"><strong>Escrow Protection</strong> — your payment is held securely until you confirm you're satisfied.</p>
+            </div>
+            <div className="flex items-start gap-2.5">
+              <RotateCcw className="w-4 h-4 text-teal-600 flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-teal-700 leading-relaxed"><strong>Fast Refunds</strong> — didn't like what you got? Get a quick, hassle-free refund.</p>
+            </div>
+            <div className="flex items-start gap-2.5">
+              <ShieldCheck className="w-4 h-4 text-teal-600 flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-teal-700 leading-relaxed"><strong>Buyer Protection</strong> — every order on StudEx is protected end-to-end, no hidden charges.</p>
             </div>
           </div>
+          {(dealSavings > 0 || discount?.hasDiscount) && (
+            <p className="text-xs text-teal-600 mt-2.5 pt-2.5 border-t border-teal-100 leading-relaxed">
+              {dealSavings > 0 && "Deal discounts are already reflected in your items total. "}
+              {discount?.hasDiscount && "Your 5% profile completion bonus has been applied."}
+            </p>
+          )}
         </motion.div>
 
         {/* ── PAYMENT ERROR ── */}
