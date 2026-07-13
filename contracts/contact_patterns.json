@@ -1,0 +1,94 @@
+{
+  "_comment": "Single source of truth for off-platform contact-sharing detection in chat. Loaded by studex-backend/chat/views.py (Python) and the Next.js chat UI (TypeScript) so both sides enforce identical rules. Edit here only — do not hand-copy these patterns into either app.",
+  "contact_info_message": "For your safety, please keep communication on StudEx until your order is completed.",
+  "off_platform_message": "All transactions must happen on the StudEx website.",
+  "categories": [
+    {
+      "key": "phone",
+      "reason": "contact_info",
+      "patterns": [
+        "(?<!\\d)(?:0[789][01]\\d{8}|\\+?234[789][01]\\d{8})(?!\\d)",
+        "\\+?\\d[\\d\\-\\s]{8,}\\d"
+      ]
+    },
+    {
+      "key": "email",
+      "reason": "contact_info",
+      "patterns": [
+        "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}"
+      ]
+    },
+    {
+      "key": "whatsapp",
+      "reason": "contact_info",
+      "patterns": [
+        "wa\\.me/\\S+",
+        "\\bwhatsapp\\b"
+      ]
+    },
+    {
+      "key": "telegram",
+      "reason": "contact_info",
+      "patterns": [
+        "t\\.me/\\S+",
+        "\\btelegram\\b"
+      ]
+    },
+    {
+      "key": "instagram",
+      "reason": "contact_info",
+      "patterns": [
+        "instagram\\.com/\\S+",
+        "\\bIG:?\\s*@?\\w+",
+        "\\binsta(?:gram)?\\b"
+      ]
+    },
+    {
+      "key": "tiktok",
+      "reason": "contact_info",
+      "patterns": [
+        "tiktok\\.com/@\\S+",
+        "\\btiktok\\b"
+      ]
+    },
+    {
+      "key": "facebook",
+      "reason": "contact_info",
+      "patterns": [
+        "facebook\\.com/\\S+",
+        "fb\\.com/\\S+",
+        "\\bfacebook\\b"
+      ]
+    },
+    {
+      "key": "url",
+      "reason": "contact_info",
+      "patterns": [
+        "https?://\\S+",
+        "\\bwww\\.\\S+\\.\\w+"
+      ]
+    },
+    {
+      "key": "qr_code",
+      "reason": "contact_info",
+      "patterns": [
+        "\\bqr\\s*code\\b",
+        "\\bscan\\s+(?:this|my)\\s+code\\b"
+      ]
+    },
+    {
+      "key": "off_platform",
+      "reason": "off_platform",
+      "patterns": [
+        "pay\\s+me\\s+(?:directly|outside|off[\\s-]*platform)",
+        "send\\s+(?:the\\s+)?money\\s+(?:to\\s+my|directly)",
+        "transfer\\s+(?:to\\s+my\\s+(?:account|number)|directly)",
+        "my\\s+account\\s+number\\s+is",
+        "my\\s+(?:opay|palmpay|kuda|moniepoint)\\s+(?:number|account)",
+        "pay\\s+(?:via|through|using)\\s+(?:opay|palmpay|kuda|moniepoint|bank\\s+transfer|whatsapp)",
+        "bypass\\s+(?:studex|the\\s+platform|platform)",
+        "outside\\s+(?:studex|the\\s+platform|platform)"
+      ]
+    }
+  ]
+}

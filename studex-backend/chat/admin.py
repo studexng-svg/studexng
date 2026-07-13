@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.utils import timezone
 from django.utils.html import format_html
-from .models import Conversation, Message
+from .models import Conversation, Message, BlockedMessageAttempt
 
 
 @admin.register(Conversation)
@@ -129,3 +129,22 @@ class MessageAdmin(admin.ModelAdmin):
         updated = queryset.filter(is_read=True).update(is_read=False, read_at=None)
         self.message_user(request, f"{updated} message(s) marked as unread.")
     mark_as_unread.short_description = "Mark as unread"
+
+
+@admin.register(BlockedMessageAttempt)
+class BlockedMessageAttemptAdmin(admin.ModelAdmin):
+    list_display = ['id', 'sender', 'reason', 'content_preview', 'conversation', 'created_at']
+    list_filter = ['reason', 'created_at']
+    search_fields = ['sender__username', 'attempted_content']
+    readonly_fields = ['sender', 'conversation', 'attempted_content', 'reason', 'created_at']
+    ordering = ['-created_at']
+    date_hierarchy = 'created_at'
+    list_per_page = 50
+
+    def content_preview(self, obj):
+        preview = obj.attempted_content[:60]
+        return f"{preview}..." if len(obj.attempted_content) > 60 else preview
+    content_preview.short_description = 'Attempted Content'
+
+    def has_add_permission(self, request):
+        return False

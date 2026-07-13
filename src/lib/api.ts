@@ -267,6 +267,18 @@ export const api = {
     confirm: (id: number | string) =>
       fetchWithAuth(u(`/api/orders/orders/${id}/confirm/`), { method: "POST" }),
 
+    tracking: (id: number | string) =>
+      fetchWithAuth(u(`/api/orders/orders/${id}/tracking/`)),
+
+    vendorAccept: (id: number | string) =>
+      fetchWithAuth(u(`/api/orders/orders/${id}/vendor-accept/`), { method: "POST" }),
+
+    vendorDecline: (id: number | string) =>
+      fetchWithAuth(u(`/api/orders/orders/${id}/vendor-decline/`), { method: "POST" }),
+
+    startService: (id: number | string) =>
+      fetchWithAuth(u(`/api/orders/orders/${id}/start-service/`), { method: "POST" }),
+
     markComplete: (id: number | string, body?: FormData | Record<string, unknown>) =>
       fetchWithAuth(u(`/api/orders/orders/${id}/mark-complete/`), {
         method: "PATCH",
@@ -275,8 +287,11 @@ export const api = {
 
     bookings: () => fetchWithAuth(u("/api/orders/bookings/")),
 
-    createBooking: (body: Record<string, unknown>) =>
-      fetchWithAuth(u("/api/orders/bookings/"), { method: "POST", body: s(body) }),
+    createBooking: (body: FormData | Record<string, unknown>) =>
+      fetchWithAuth(u("/api/orders/bookings/"), {
+        method: "POST",
+        body: body instanceof FormData ? body : s(body),
+      }),
 
     bookingAction: (id: number | string, action: string) =>
       fetchWithAuth(u(`/api/orders/bookings/${id}/${action}/`), { method: "POST" }),
@@ -294,6 +309,16 @@ export const api = {
         method: "POST",
         body: s({ provider_response: response }),
       }),
+  },
+
+  // ─── Vendor Customers ─────────────────────────────────────────────────────
+
+  customers: {
+    list: (sort?: "total_spent" | "last_purchase") =>
+      fetchWithAuth(u(`/api/vendor/customers/${sort ? "?sort=" + sort : ""}`)),
+
+    detail: (customerId: number | string) =>
+      fetchWithAuth(u(`/api/vendor/customers/${customerId}/`)),
   },
 
   // ─── Payments ─────────────────────────────────────────────────────────────

@@ -10,6 +10,7 @@ export function StatusBadge({ status }: { status: string }) {
     paid:      "bg-blue-50 text-blue-700",
     seller_completed: "bg-purple-50 text-purple-700",
     disputed:  "bg-red-50 text-red-600",
+    vendor_declined: "bg-stone-100 text-stone-500",
   };
   return (
     <span className={`${map[status] || "bg-stone-100 text-stone-500"} text-xs px-3 py-1 rounded-full font-medium capitalize`}>

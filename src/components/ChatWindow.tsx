@@ -5,13 +5,15 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   X, Send, Loader, ImageIcon,
   Pin, PinOff, Pencil, Trash2, Check, CheckCheck,
-  UserX, Users, ChevronDown, ChevronLeft, Copy,
+  UserX, Users, ChevronDown, ChevronLeft, Copy, Lock, Shield,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/lib/authStore";
 import { api } from "@/lib/api";
 import { TEAL, PURPLE } from "@/lib/tokens";
+import { checkContactInfo } from "@/lib/contactPatterns";
 const DELETE_EVERYONE_LIMIT_HOURS = 60;
+const MESSAGE_MAX_LENGTH = 250;
 
 interface ChatWindowProps {
   sellerId: number;
@@ -49,19 +51,8 @@ interface ActionMenu {
 }
 
 const isMessageAllowed = (msg: string): "allow" | "offer" | "block" => {
+  if (checkContactInfo(msg)) return "block";
   const lower = msg.toLowerCase();
-  const blocked = [
-    /\b(\+?234|0)[789]\d{9}\b/,
-    /whatsapp/i,
-    /pay.*outside/i,
-    /transfer.*direct/i,
-    /cashapp/i,
-    /opay.*number/i,
-    /palmpay.*number/i,
-  ];
-  for (const pattern of blocked) {
-    if (pattern.test(msg)) return "block";
-  }
   if (/\b\d[\d,]*k?\b/.test(lower) && /(last|offer|take|give|do|accept|how about)/i.test(lower)) {
     return "offer";
   }
@@ -105,6 +96,8 @@ export default function ChatWindow({
 
   const [otherUserLastSeen, setOtherUserLastSeen] = useState<string | null>(null);
   const [otherUserOnline, setOtherUserOnline] = useState(false);
+  const [isExpired, setIsExpired] = useState(false);
+  const [lockedMessage, setLockedMessage] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -150,11 +143,16 @@ export default function ChatWindow({
     const init = async () => {
       try {
         const res = await api.chat.start({ listing_id: listingId, seller_id: sellerId });
-        if (!res.ok) throw new Error('Could not start conversation');
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          setLockedMessage(data.error || "Chat becomes available after payment to protect both buyers and vendors.");
+          return;
+        }
         const conv = await res.json();
         setConversationId(conv.id);
         setOtherUserLastSeen(conv.other_user?.last_seen || null);
         setOtherUserOnline(conv.other_user?.is_online || false);
+        setIsExpired(!!conv.is_expired);
         const msgRes = await api.chat.messages(conv.id);
         const raw = await msgRes.json();
         const mapped = mapMessages(Array.isArray(raw) ? raw : raw.results || []);
@@ -203,6 +201,7 @@ export default function ChatWindow({
     if (!presenceData) return;
     setOtherUserLastSeen(presenceData.other_user?.last_seen || null);
     setOtherUserOnline(presenceData.other_user?.is_online || false);
+    setIsExpired(!!presenceData.is_expired);
   }, [presenceData]);
 
   const formatLastSeen = (lastSeen: string | null): string => {
@@ -332,11 +331,16 @@ export default function ChatWindow({
   };
 
   const handleSend = async () => {
-    if ((!message.trim() && !imageFile) || !conversationId || sending) return;
+    if ((!message.trim() && !imageFile) || !conversationId || sending || isExpired) return;
+    if (message.trim().length > MESSAGE_MAX_LENGTH) {
+      setError(`Messages are limited to ${MESSAGE_MAX_LENGTH} characters.`);
+      setTimeout(() => setError(""), 3000);
+      return;
+    }
     if (message.trim() && !imageFile) {
-      const result = isMessageAllowed(message);
-      if (result === "block") {
-        setError("Outside payment details are not allowed. Violators get banned.");
+      const blocked = checkContactInfo(message);
+      if (blocked) {
+        setError(blocked.message);
         setTimeout(() => setError(""), 3000);
         return;
       }
@@ -413,6 +417,19 @@ export default function ChatWindow({
         "
         style={{ fontFamily: "'DM Sans', sans-serif" }}
       >
+        {lockedMessage ? (
+          <div className="flex-1 flex flex-col items-center justify-center text-center p-8 gap-4">
+            <div className="w-14 h-14 rounded-full bg-stone-100 flex items-center justify-center">
+              <Lock className="w-6 h-6 text-stone-400" />
+            </div>
+            <p className="font-bold text-stone-900 text-lg" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Chat Locked</p>
+            <p className="text-stone-500 text-sm max-w-xs">{lockedMessage}</p>
+            <button onClick={onClose} className="mt-2 px-6 py-2.5 text-white font-medium rounded-full text-sm" style={{ background: TEAL }}>
+              Got it
+            </button>
+          </div>
+        ) : (
+        <>
         {/* ── HEADER ── */}
         <div className="bg-white border-b border-stone-100 px-4 py-3 flex items-center gap-3 flex-shrink-0 shadow-sm">
           <button
@@ -608,32 +625,57 @@ export default function ChatWindow({
           </div>
         )}
 
+        {/* ── ESCROW / EXPIRED BANNER ── */}
+        {isExpired ? (
+          <div className="bg-stone-100 border-t border-stone-200 px-4 py-2.5 flex items-center gap-2 flex-shrink-0">
+            <Lock className="w-3.5 h-3.5 text-stone-400 flex-shrink-0" />
+            <p className="text-xs text-stone-500 font-medium">This chat has ended — the order was completed and payment released.</p>
+          </div>
+        ) : conversationId && (
+          <div className="bg-teal-50 border-t border-teal-100 px-4 py-2 flex items-center gap-2 flex-shrink-0">
+            <Shield className="w-3.5 h-3.5 text-teal-600 flex-shrink-0" />
+            <p className="text-xs text-teal-700 font-semibold">Payment Protected by StudEx · Escrow Active</p>
+          </div>
+        )}
+
         {/* ── INPUT BAR ── */}
-        <div className="bg-white border-t border-stone-100 px-4 py-3 flex items-center gap-2 flex-shrink-0">
-          <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageSelect} />
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className="p-2.5 bg-teal-50 text-teal-600 rounded-xl hover:bg-teal-100 transition flex-shrink-0"
-          >
-            <ImageIcon className="w-5 h-5" />
-          </button>
-          <input
-            type="text"
-            value={message}
-            onChange={e => setMessage(e.target.value)}
-            onKeyDown={e => e.key === "Enter" && !e.shiftKey && (e.preventDefault(), handleSend())}
-            placeholder={imageFile ? 'Add a caption (optional)...' : 'Type a message...'}
-            className="flex-1 px-4 py-2.5 bg-stone-50 text-stone-900 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/30 border border-stone-200 placeholder-stone-400 transition"
-          />
-          <button
-            onClick={handleSend}
-            disabled={sending || !conversationId || (!message.trim() && !imageFile)}
-            className="p-2.5 text-white rounded-xl disabled:opacity-40 flex-shrink-0 transition active:scale-95"
-            style={{ background: TEAL }}
-          >
-            {sending ? <Loader className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
-          </button>
+        <div className="bg-white border-t border-stone-100 px-4 py-3 flex-shrink-0">
+          <div className="flex items-center gap-2">
+            <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageSelect} disabled={isExpired} />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isExpired}
+              className="p-2.5 bg-teal-50 text-teal-600 rounded-xl hover:bg-teal-100 transition flex-shrink-0 disabled:opacity-40"
+            >
+              <ImageIcon className="w-5 h-5" />
+            </button>
+            <input
+              type="text"
+              value={message}
+              maxLength={MESSAGE_MAX_LENGTH}
+              disabled={isExpired}
+              onChange={e => setMessage(e.target.value.slice(0, MESSAGE_MAX_LENGTH))}
+              onKeyDown={e => e.key === "Enter" && !e.shiftKey && (e.preventDefault(), handleSend())}
+              placeholder={isExpired ? 'This chat has ended' : imageFile ? 'Add a caption (optional)...' : 'Type a message...'}
+              className="flex-1 px-4 py-2.5 bg-stone-50 text-stone-900 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/30 border border-stone-200 placeholder-stone-400 transition disabled:opacity-60"
+            />
+            <button
+              onClick={handleSend}
+              disabled={sending || !conversationId || isExpired || (!message.trim() && !imageFile)}
+              className="p-2.5 text-white rounded-xl disabled:opacity-40 flex-shrink-0 transition active:scale-95"
+              style={{ background: TEAL }}
+            >
+              {sending ? <Loader className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
+            </button>
+          </div>
+          {!isExpired && message.length > 0 && (
+            <p className={`text-xs mt-1 text-right ${message.length >= MESSAGE_MAX_LENGTH ? "text-red-500" : "text-stone-400"}`}>
+              {message.length}/{MESSAGE_MAX_LENGTH}
+            </p>
+          )}
         </div>
+        </>
+        )}
       </div>
 
       {/* ── ACTION MENU ── */}

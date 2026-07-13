@@ -4,9 +4,11 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.utils import timezone
 from django.db.models import Q
+from django.conf import settings as django_settings
 from datetime import timedelta
-from .models import Conversation, Message
+from .models import Conversation, Message, BlockedMessageAttempt
 from .serializers import ConversationSerializer, MessageSerializer
+import json
 import logging
 import re
 
@@ -16,35 +18,36 @@ logger = logging.getLogger(__name__)
 # Kept tight so bad actors cannot delete scam evidence before a buyer files a dispute.
 DELETE_FOR_EVERYONE_LIMIT_MINUTES = 10
 
-# ─── Off-platform payment detection ─────────────────────────────────────────
-_NG_PHONE_RE = re.compile(
-    r'(?<!\d)(?:0[789][01]\d{8}|\+?234[789][01]\d{8})(?!\d)'
-)
-_OFFPLATFORM_RE = re.compile(
-    r'\b(?:'
-    r'pay\s+me\s+(?:directly|outside|off[\s-]*platform)|'
-    r'send\s+(?:the\s+)?money\s+(?:to\s+my|directly)|'
-    r'transfer\s+(?:to\s+my\s+(?:account|number)|directly)|'
-    r'my\s+account\s+number\s+is|'
-    r'my\s+(?:opay|palmpay|kuda|moniepoint)\s+(?:number|account)|'
-    r'pay\s+(?:via|through|using)\s+(?:opay|palmpay|kuda|moniepoint|bank\s+transfer|whatsapp)|'
-    r'bypass\s+(?:studex|the\s+platform|platform)|'
-    r'outside\s+(?:studex|the\s+platform|platform)'
-    r')\b',
-    re.IGNORECASE,
-)
+# ─── Contact-info / off-platform detection ──────────────────────────────────
+# Patterns live in contracts/contact_patterns.json (repo root) — the single source
+# of truth shared with the frontend's pre-submit check. Edit the JSON, not this file.
+_CONTACT_PATTERNS_PATH = django_settings.BASE_DIR.parent / 'contracts' / 'contact_patterns.json'
+
+
+def _load_contact_pattern_categories():
+    with open(_CONTACT_PATTERNS_PATH, encoding='utf-8') as f:
+        data = json.load(f)
+    categories = []
+    for cat in data['categories']:
+        message = data['contact_info_message'] if cat['reason'] == 'contact_info' else data['off_platform_message']
+        compiled = [re.compile(p, re.IGNORECASE) for p in cat['patterns']]
+        categories.append({'key': cat['key'], 'reason': cat['reason'], 'message': message, 'patterns': compiled})
+    return categories
+
+
+_CONTACT_CATEGORIES = _load_contact_pattern_categories()
 
 
 def _has_suspicious_content(content: str):
     """
-    Returns a user-facing error string if content looks like off-platform payment
-    solicitation; otherwise returns None.
+    Returns (message, reason) if content looks like contact-info sharing or
+    off-platform payment solicitation; otherwise returns (None, None).
     """
-    if _NG_PHONE_RE.search(content):
-        return "This message violates our rules and regulations."
-    if _OFFPLATFORM_RE.search(content):
-        return "All transactions must happen on the StudEx website."
-    return None
+    for category in _CONTACT_CATEGORIES:
+        for pattern in category['patterns']:
+            if pattern.search(content):
+                return category['message'], category['reason']
+    return None, None
 
 
 class ConversationViewSet(viewsets.ModelViewSet):
@@ -52,15 +55,34 @@ class ConversationViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
     http_method_names = ['get', 'post', 'delete', 'head', 'options']
 
+    # Order/Booking statuses that count as "paid enough" to unlock chat history.
+    UNLOCKED_ORDER_STATUSES = {'paid', 'seller_completed', 'completed', 'disputed'}
+    # Once the order is fully completed (buyer confirmed, payout released), the chat
+    # expires permanently — history stays visible to the two participants and to
+    # admin, but no new messages can be sent.
+    EXPIRED_ORDER_STATUSES = {'completed'}
+
+    def _is_unlocked(self, conversation):
+        return conversation.order_id is not None and conversation.order.status in self.UNLOCKED_ORDER_STATUSES
+
+    def _is_expired(self, conversation):
+        return conversation.order_id is not None and conversation.order.status in self.EXPIRED_ORDER_STATUSES
+
     def get_queryset(self):
         user = self.request.user
         return Conversation.objects.filter(
             Q(buyer=user) | Q(seller=user)
         ).filter(
             Q(listing__isnull=True) | Q(listing__campus__iexact=user.school)
-        ).select_related('buyer', 'seller', 'listing').order_by('-updated_at')
+        ).select_related('buyer', 'seller', 'listing', 'order').order_by('-updated_at')
 
     def create(self, request, *args, **kwargs):
+        """
+        Chat is payment-gated: a conversation can only be created for a listing
+        where the requesting buyer already has a qualifying (paid+) order. Vendors
+        wire this up automatically via for_order/for_booking after payment succeeds —
+        this direct path exists only as a fallback lookup, not a way to bypass payment.
+        """
         listing_id = request.data.get('listing_id')
         seller_id = request.data.get('seller_id')
 
@@ -68,6 +90,7 @@ class ConversationViewSet(viewsets.ModelViewSet):
             return Response({'error': 'listing_id and seller_id are required'}, status=400)
 
         from services.models import Listing
+        from orders.models import Order
         from django.contrib.auth import get_user_model
         User = get_user_model()
 
@@ -83,11 +106,26 @@ class ConversationViewSet(viewsets.ModelViewSet):
         if listing.campus and request.user.school and listing.campus.lower() != request.user.school.lower():
             return Response({'error': 'You can only message vendors from your campus.'}, status=403)
 
+        qualifying_order = Order.objects.filter(
+            buyer=request.user, listing=listing, status__in=self.UNLOCKED_ORDER_STATUSES
+        ).order_by('-paid_at').first()
+
+        if qualifying_order is None:
+            BlockedMessageAttempt.objects.create(sender=request.user, reason='unpaid')
+            return Response(
+                {'error': 'Chat becomes available after payment to protect both buyers and vendors.'},
+                status=403,
+            )
+
         conversation, created = Conversation.objects.get_or_create(
             buyer=request.user,
             seller=seller,
             listing=listing,
+            defaults={'order': qualifying_order},
         )
+        if conversation.order_id != qualifying_order.id:
+            conversation.order = qualifying_order
+            conversation.save(update_fields=['order'])
 
         serializer = self.get_serializer(conversation)
         return Response(serializer.data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
@@ -135,7 +173,11 @@ class ConversationViewSet(viewsets.ModelViewSet):
             buyer=order.buyer,
             seller=order.listing.vendor,
             listing=order.listing,
+            defaults={'order': order},
         )
+        if conversation.order_id != order.id:
+            conversation.order = order
+            conversation.save(update_fields=['order'])
         serializer = self.get_serializer(conversation)
         return Response(serializer.data)
 
@@ -143,14 +185,15 @@ class ConversationViewSet(viewsets.ModelViewSet):
     def for_booking(self, request):
         """
         POST /api/chat/conversations/for-booking/
-        Vendor-side: get or create the conversation for a confirmed booking.
-        Preserves correct buyer/seller roles regardless of who initiates.
+        Get or create the conversation for a booking. The conversation only unlocks
+        once a qualifying (paid+) Order exists for the same buyer+listing — a booking
+        on its own (pending/cancelled/vendor_declined) does not unlock chat.
         """
         booking_id = request.data.get('booking_id')
         if not booking_id:
             return Response({'error': 'booking_id is required'}, status=400)
         try:
-            from orders.models import Booking
+            from orders.models import Booking, Order
             booking = Booking.objects.select_related('buyer', 'listing', 'listing__vendor').get(id=booking_id)
         except Exception:
             return Response({'error': 'Booking not found'}, status=404)
@@ -158,16 +201,29 @@ class ConversationViewSet(viewsets.ModelViewSet):
         if booking.listing.vendor != request.user and booking.buyer != request.user:
             return Response({'error': 'Not a participant in this booking'}, status=403)
 
+        qualifying_order = Order.objects.filter(
+            buyer=booking.buyer, listing=booking.listing, status__in=self.UNLOCKED_ORDER_STATUSES
+        ).order_by('-paid_at').first()
+
         conversation, _ = Conversation.objects.get_or_create(
             buyer=booking.buyer,
             seller=booking.listing.vendor,
             listing=booking.listing,
+            defaults={'order': qualifying_order},
         )
+        if qualifying_order and conversation.order_id != qualifying_order.id:
+            conversation.order = qualifying_order
+            conversation.save(update_fields=['order'])
         serializer = self.get_serializer(conversation)
         return Response(serializer.data)
 
     def destroy(self, request, *args, **kwargs):
         conversation = self.get_object()
+        if self._is_expired(conversation):
+            return Response(
+                {'error': 'This chat has ended and is kept for order history — it can no longer be deleted.'},
+                status=403,
+            )
         conversation.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -205,15 +261,41 @@ class ConversationViewSet(viewsets.ModelViewSet):
         if request.user not in [conversation.buyer, conversation.seller]:
             return Response({'error': 'Not a participant'}, status=403)
 
+        if not self._is_unlocked(conversation):
+            BlockedMessageAttempt.objects.create(
+                sender=request.user, conversation=conversation, reason='unpaid',
+                attempted_content=request.data.get('content', '')[:250],
+            )
+            return Response(
+                {'error': 'Chat becomes available after payment to protect both buyers and vendors.'},
+                status=403,
+            )
+
+        if self._is_expired(conversation):
+            BlockedMessageAttempt.objects.create(
+                sender=request.user, conversation=conversation, reason='expired',
+                attempted_content=request.data.get('content', '')[:250],
+            )
+            return Response(
+                {'error': 'This chat has ended — the order was completed and payment released.'},
+                status=403,
+            )
+
         content = request.data.get('content', '').strip()
         image = request.FILES.get('image')
 
         if not content and not image:
             return Response({'error': 'Message content or image is required'}, status=400)
 
+        if len(content) > 250:
+            return Response({'error': 'Messages are limited to 250 characters.'}, status=400)
+
         if content:
-            warning = _has_suspicious_content(content)
+            warning, reason = _has_suspicious_content(content)
             if warning:
+                BlockedMessageAttempt.objects.create(
+                    sender=request.user, conversation=conversation, reason=reason, attempted_content=content[:250],
+                )
                 return Response({'error': warning}, status=400)
 
         message_type = 'image' if image else request.data.get('message_type', 'text')

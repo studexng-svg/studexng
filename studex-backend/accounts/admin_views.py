@@ -1807,7 +1807,7 @@ except ImportError:
 # ============================================
 
 try:
-    from chat.models import Conversation, Message as ChatMessage
+    from chat.models import Conversation, Message as ChatMessage, BlockedMessageAttempt
 
     class AdminConversationListView(APIView):
         """GET /api/admin/conversations/ — all conversations."""
@@ -1901,9 +1901,47 @@ try:
                 'messages': msgs_data,
             })
 
+    class AdminBlockedMessagesView(APIView):
+        """
+        GET /api/admin/blocked-messages/ — blocked contact-info/off-platform/unpaid-chat
+        attempts, newest first, plus a per-user offender count so repeat offenders are
+        visible without a separate model.
+        """
+        permission_classes = [IsAdminUser]
+
+        def get(self, request):
+            reason = request.query_params.get('reason', '')
+            sender_id = request.query_params.get('sender_id', '')
+
+            qs = BlockedMessageAttempt.objects.select_related('sender', 'conversation').order_by('-created_at')
+            if reason:
+                qs = qs.filter(reason=reason)
+            if sender_id:
+                qs = qs.filter(sender_id=sender_id)
+
+            attempts = [{
+                'id': a.id,
+                'sender_id': a.sender.id,
+                'sender': a.sender.username,
+                'conversation_id': a.conversation_id,
+                'attempted_content': a.attempted_content,
+                'reason': a.reason,
+                'created_at': a.created_at.isoformat(),
+            } for a in qs[:200]]
+
+            repeat_offenders = list(
+                BlockedMessageAttempt.objects.values('sender_id', 'sender__username')
+                .annotate(attempt_count=Count('id'))
+                .filter(attempt_count__gte=2)
+                .order_by('-attempt_count')[:50]
+            )
+
+            return Response({'attempts': attempts, 'repeat_offenders': repeat_offenders})
+
 except ImportError:
     AdminConversationListView = None
     AdminConversationDetailView = None
+    AdminBlockedMessagesView = None
 
 
 # ============================================

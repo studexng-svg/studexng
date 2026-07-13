@@ -4,49 +4,26 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Home, Grid3x3, ShoppingCart, MessageCircle, User } from "lucide-react";
+import { Home, Grid3x3, ShoppingCart, ClipboardList, User } from "lucide-react";
 import Image from "next/image";
-import { useState, useEffect } from "react";
-import { useAuth } from "@/lib/authStore";
 import { useCart } from "@/lib/cartStore";
-import { api } from "@/lib/api";
 import { TEAL } from "@/lib/tokens";
 
 const navItems = [
-  { href: "/home",       icon: Home,          label: "Home"     },
-  { href: "/categories", icon: Grid3x3,       label: "Shop"     },
-  { href: "/cart",       icon: ShoppingCart,  label: "Cart"     },
-  { href: "/chat",       icon: MessageCircle, label: "Messages" },
-  { href: "/account",   icon: User,          label: "Account"  },
+  { href: "/home",          icon: Home,          label: "Home"   },
+  { href: "/categories",    icon: Grid3x3,       label: "Shop"   },
+  { href: "/cart",          icon: ShoppingCart,  label: "Cart"   },
+  { href: "/account/orders", icon: ClipboardList, label: "Orders" },
+  { href: "/account",       icon: User,          label: "Account" },
 ];
 
 export default function BottomNav() {
   const pathname = usePathname();
-  const { isLoggedIn } = useAuth();
   const { cart } = useCart();
-  const [unreadCount, setUnreadCount] = useState(0);
   const showCheckout = cart.length > 0 && pathname === "/home";
 
-  // Poll unread count every 30s — must be before early returns (Rules of Hooks)
-  useEffect(() => {
-    if (!isLoggedIn) return;
-    const fetchUnread = async () => {
-      try {
-        const res = await api.chat.conversations();
-        if (!res.ok) return;
-        const data = await res.json();
-        const convs = data.results || data;
-        const total = convs.reduce((sum: number, c: any) => sum + (c.unread_count || 0), 0);
-        setUnreadCount(total);
-      } catch {}
-    };
-    fetchUnread();
-    const interval = setInterval(() => { if (document.visibilityState !== 'hidden') fetchUnread(); }, 30000);
-    return () => clearInterval(interval);
-  }, [isLoggedIn]);
-
-  // Hide on auth/admin/rider pages and individual chat rooms (but show on /chat list)
-  if (pathname === "/" || pathname === "/auth" || pathname.startsWith("/admin") || pathname.startsWith("/chat/") || pathname.startsWith("/rider")) {
+  // Hide on auth/admin/rider pages and individual chat rooms
+  if (pathname === "/" || pathname === "/auth" || pathname.startsWith("/admin") || pathname.startsWith("/chat") || pathname.startsWith("/rider")) {
     return null;
   }
 
@@ -87,7 +64,6 @@ export default function BottomNav() {
         {navItems.map((item) => {
           const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
           const Icon = item.icon;
-          const isChat = item.href === "/chat";
 
           return (
             <Link key={item.href} href={item.href} className="flex flex-col items-center justify-center min-w-0 flex-1">
@@ -103,13 +79,6 @@ export default function BottomNav() {
                     stroke={isActive ? "#0D9488" : "rgba(120,113,108,0.6)"}
                     fill={isActive ? "#0D9488" : "none"}
                   />
-                  {isChat && unreadCount > 0 && (
-                    <div className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 bg-red-500 rounded-full flex items-center justify-center px-1">
-                      <span className="text-white text-xs font-black leading-none">
-                        {unreadCount > 9 ? "9+" : unreadCount}
-                      </span>
-                    </div>
-                  )}
                 </motion.div>
                 <span className={`text-xs font-semibold mt-1 ${isActive ? "text-teal-600" : "text-stone-400"}`}>
                   {item.label}

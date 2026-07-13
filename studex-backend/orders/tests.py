@@ -4,13 +4,14 @@ Test suite for orders app - order creation, management, disputes
 from django.test import TestCase
 from django.utils import timezone
 from unittest import skip
+from unittest.mock import patch
 from rest_framework.test import APIClient, APITestCase
 from rest_framework import status
 from decimal import Decimal
 
 from accounts.models import User
 from services.models import Category, Listing
-from orders.models import Order, Dispute
+from orders.models import Order, Dispute, Booking, BookingReferenceImage
 
 
 class OrderModelTests(TestCase):
@@ -583,3 +584,203 @@ class DisputeResolutionTests(TestCase):
 
         self.assertIsNotNone(self.dispute.appeal_text)
         self.assertIsNotNone(self.dispute.appealed_at)
+
+
+class VendorOrderActionTests(APITestCase):
+    """Test vendor-accept/vendor-decline/start-service (OrderViewSet, orders/views.py)"""
+
+    def setUp(self):
+        self.client = APIClient()
+
+        self.buyer = User.objects.create_user(
+            username='buyer', email='buyer@pau.edu.ng', password='pass123'
+        )
+        self.seller = User.objects.create_user(
+            username='seller', email='seller@pau.edu.ng', password='pass123',
+            user_type='vendor', is_verified_vendor=True
+        )
+        self.other_vendor = User.objects.create_user(
+            username='other_vendor', email='other_vendor@pau.edu.ng', password='pass123',
+            user_type='vendor', is_verified_vendor=True
+        )
+        self.category = Category.objects.create(title='Beauty', slug='beauty')
+        self.listing = Listing.objects.create(
+            title='Lash Extensions', description='Full set', price=Decimal('5000.00'),
+            vendor=self.seller, category=self.category, is_available=True
+        )
+        self.order = Order.objects.create(
+            reference='ORD-VENDORACTION-0001', buyer=self.buyer, listing=self.listing,
+            amount=Decimal('5000.00'), status='paid',
+        )
+
+    def _url(self, action):
+        return f'/api/orders/orders/{self.order.id}/{action}/'
+
+    # ── vendor-accept ────────────────────────────────────────────────
+    def test_vendor_accept_success(self):
+        self.client.force_authenticate(user=self.seller)
+        response = self.client.post(self._url('vendor-accept'))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.order.refresh_from_db()
+        self.assertIsNotNone(self.order.vendor_accepted_at)
+
+    def test_vendor_accept_rejects_non_vendor(self):
+        # OrderViewSet.get_queryset() scopes to buyer/listing-vendor only, so an
+        # unrelated vendor gets 404 (order doesn't exist for them) before the
+        # explicit vendor check in the action ever runs — same pattern as the
+        # existing test_seller_can_access_their_sale test above.
+        self.client.force_authenticate(user=self.other_vendor)
+        response = self.client.post(self._url('vendor-accept'))
+        self.assertIn(response.status_code, [status.HTTP_403_FORBIDDEN, status.HTTP_404_NOT_FOUND])
+
+    def test_vendor_accept_rejects_double_accept(self):
+        self.client.force_authenticate(user=self.seller)
+        self.client.post(self._url('vendor-accept'))
+        response = self.client.post(self._url('vendor-accept'))
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_vendor_accept_requires_paid_status(self):
+        self.order.status = 'seller_completed'
+        self.order.save()
+        self.client.force_authenticate(user=self.seller)
+        response = self.client.post(self._url('vendor-accept'))
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    # ── vendor-decline ───────────────────────────────────────────────
+    @patch('payments.views._refund_paystack_transaction', return_value=True)
+    def test_vendor_decline_success_triggers_refund(self, mock_refund):
+        self.client.force_authenticate(user=self.seller)
+        response = self.client.post(self._url('vendor-decline'))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.status, 'vendor_declined')
+        mock_refund.assert_called_once_with(self.order.reference)
+
+    @patch('payments.views._refund_paystack_transaction', return_value=False)
+    def test_vendor_decline_returns_502_if_refund_fails(self, mock_refund):
+        self.client.force_authenticate(user=self.seller)
+        response = self.client.post(self._url('vendor-decline'))
+        self.assertEqual(response.status_code, 502)
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.status, 'paid')  # unchanged — refund failed
+
+    def test_vendor_decline_rejects_non_vendor(self):
+        self.client.force_authenticate(user=self.buyer)
+        response = self.client.post(self._url('vendor-decline'))
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    @patch('payments.views._refund_paystack_transaction', return_value=True)
+    def test_vendor_decline_rejects_after_accept(self, mock_refund):
+        self.order.vendor_accepted_at = timezone.now()
+        self.order.save()
+        self.client.force_authenticate(user=self.seller)
+        response = self.client.post(self._url('vendor-decline'))
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        mock_refund.assert_not_called()
+
+    # ── start-service ────────────────────────────────────────────────
+    def test_start_service_requires_prior_acceptance(self):
+        self.client.force_authenticate(user=self.seller)
+        response = self.client.post(self._url('start-service'))
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_start_service_success_after_accept(self):
+        self.order.vendor_accepted_at = timezone.now()
+        self.order.save()
+        self.client.force_authenticate(user=self.seller)
+        response = self.client.post(self._url('start-service'))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.order.refresh_from_db()
+        self.assertIsNotNone(self.order.service_started_at)
+
+    def test_start_service_rejects_non_vendor(self):
+        self.order.vendor_accepted_at = timezone.now()
+        self.order.save()
+        self.client.force_authenticate(user=self.buyer)
+        response = self.client.post(self._url('start-service'))
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_start_service_rejects_double_start(self):
+        self.order.vendor_accepted_at = timezone.now()
+        self.order.save()
+        self.client.force_authenticate(user=self.seller)
+        self.client.post(self._url('start-service'))
+        response = self.client.post(self._url('start-service'))
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class BookingReferenceDataTests(APITestCase):
+    """Test Booking.note length cap and BookingReferenceImage upload cap (orders app)"""
+
+    def setUp(self):
+        self.client = APIClient()
+
+        self.buyer = User.objects.create_user(
+            username='buyer', email='buyer@pau.edu.ng', password='pass123'
+        )
+        self.seller = User.objects.create_user(
+            username='seller', email='seller@pau.edu.ng', password='pass123',
+            user_type='vendor', is_verified_vendor=True
+        )
+        self.category = Category.objects.create(title='Beauty', slug='beauty')
+        self.listing = Listing.objects.create(
+            title='Lash Extensions', description='Full set', price=Decimal('5000.00'),
+            vendor=self.seller, category=self.category, is_available=True
+        )
+        self.booking_url = '/api/orders/bookings/'
+
+    def _booking_payload(self, note=''):
+        from datetime import date, timedelta
+        return {
+            'listing': self.listing.id,
+            'scheduled_date': str(date.today() + timedelta(days=1)),
+            'scheduled_time': '2:30 PM',
+            'note': note,
+        }
+
+    def test_note_at_250_chars_accepted(self):
+        self.client.force_authenticate(user=self.buyer)
+        response = self.client.post(self.booking_url, self._booking_payload(note='a' * 250))
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_note_over_250_chars_rejected(self):
+        self.client.force_authenticate(user=self.buyer)
+        response = self.client.post(self.booking_url, self._booking_payload(note='a' * 251))
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_reference_image_cap_enforced_at_five(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from unittest.mock import patch as _patch
+
+        self.client.force_authenticate(user=self.buyer)
+        payload = self._booking_payload()
+        images = [
+            SimpleUploadedFile(f'ref{i}.jpg', b'fake-image-bytes', content_type='image/jpeg')
+            for i in range(7)
+        ]
+        payload_with_files = {**payload, 'reference_images': images}
+
+        with _patch('services.views.upload_to_cloudinary', return_value='https://cdn.example.com/fake.jpg') as mock_upload:
+            response = self.client.post(self.booking_url, payload_with_files, format='multipart')
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        booking = Booking.objects.get(id=response.data['id'])
+        self.assertEqual(booking.reference_images.count(), 5)
+        self.assertEqual(mock_upload.call_count, 5)
+
+    def test_reference_image_rejects_disallowed_type(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from unittest.mock import patch as _patch
+
+        self.client.force_authenticate(user=self.buyer)
+        payload = self._booking_payload()
+        bad_file = SimpleUploadedFile('doc.pdf', b'not-an-image', content_type='application/pdf')
+        payload_with_files = {**payload, 'reference_images': [bad_file]}
+
+        with _patch('services.views.upload_to_cloudinary', return_value='https://cdn.example.com/fake.jpg') as mock_upload:
+            response = self.client.post(self.booking_url, payload_with_files, format='multipart')
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        booking = Booking.objects.get(id=response.data['id'])
+        self.assertEqual(booking.reference_images.count(), 0)
+        mock_upload.assert_not_called()

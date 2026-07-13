@@ -7,6 +7,7 @@ class MessageSerializer(serializers.ModelSerializer):
     sender_username = serializers.CharField(source='sender.username', read_only=True)
     is_mine = serializers.SerializerMethodField()
     image_url = serializers.SerializerMethodField()
+    content = serializers.CharField(max_length=250, allow_blank=True, required=False)
 
     class Meta:
         model = Message
@@ -34,16 +35,30 @@ class ConversationSerializer(serializers.ModelSerializer):
     listing_image = serializers.ImageField(source='listing.image', read_only=True)
     unread_count = serializers.SerializerMethodField()
     other_user = serializers.SerializerMethodField()
+    is_unlocked = serializers.SerializerMethodField()
+    is_expired = serializers.SerializerMethodField()
+    order_status = serializers.SerializerMethodField()
 
     class Meta:
         model = Conversation
         fields = [
             'id', 'buyer', 'buyer_username', 'seller', 'seller_username',
-            'listing', 'listing_title', 'listing_image',
+            'listing', 'listing_title', 'listing_image', 'order', 'order_status', 'is_unlocked', 'is_expired',
             'last_message', 'last_message_at', 'unread_count',
             'other_user', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'last_message', 'last_message_at', 'created_at', 'updated_at']
+
+    def get_is_unlocked(self, obj):
+        from .views import ConversationViewSet
+        return obj.order_id is not None and obj.order.status in ConversationViewSet.UNLOCKED_ORDER_STATUSES
+
+    def get_is_expired(self, obj):
+        from .views import ConversationViewSet
+        return obj.order_id is not None and obj.order.status in ConversationViewSet.EXPIRED_ORDER_STATUSES
+
+    def get_order_status(self, obj):
+        return obj.order.status if obj.order_id else None
 
     def get_unread_count(self, obj):
         request = self.context.get('request')

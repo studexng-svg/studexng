@@ -794,9 +794,23 @@ def pay_with_credits(request):
 
     try:
         from orders.models import Booking
-        Booking.objects.filter(buyer=buyer, listing=listing, status="confirmed").update(status="paid")
+        Booking.objects.filter(
+            buyer=buyer, listing=listing, status__in=["pending", "confirmed"]
+        ).update(status="paid")
     except Exception as e:
         logger.warning(f"pay_with_credits: booking update failed: {e}")
+
+    try:
+        from chat.models import Conversation
+        conversation, _ = Conversation.objects.get_or_create(
+            buyer=buyer, seller=listing.vendor, listing=listing,
+            defaults={'order': order},
+        )
+        if conversation.order_id != order.id:
+            conversation.order = order
+            conversation.save(update_fields=['order'])
+    except Exception as e:
+        logger.warning(f"pay_with_credits: conversation unlock failed: {e}")
 
     service_fee = calc_service_fee(listing_price)
     total_charge = listing_price + service_fee
@@ -1287,12 +1301,30 @@ def _create_order_from_paystack_data(paystack_data, buyer, listing_id, order_typ
             order_id = order.id
 
             try:
+                # 'pending' is included because the new booking flow charges the buyer
+                # immediately — there is no pre-payment vendor-confirm step anymore, so a
+                # booking may still be 'pending' at the moment payment clears. 'confirmed'
+                # is kept for any booking created under the old pre-payment-approval flow.
                 from orders.models import Booking
                 Booking.objects.filter(
-                    buyer=buyer, listing=listing, status="confirmed"
+                    buyer=buyer, listing=listing, status__in=["pending", "confirmed"]
                 ).update(status="paid")
             except Exception as e:
                 logger.warning(f"Booking status update failed: {e}")
+
+            try:
+                # Chat is locked until payment clears — this is the moment it unlocks.
+                # Reuses the same get-or-create shape as chat.views.ConversationViewSet.for_order.
+                from chat.models import Conversation
+                conversation, _ = Conversation.objects.get_or_create(
+                    buyer=buyer, seller=listing.vendor, listing=listing,
+                    defaults={'order': order},
+                )
+                if conversation.order_id != order.id:
+                    conversation.order = order
+                    conversation.save(update_fields=['order'])
+            except Exception as e:
+                logger.warning(f"Conversation unlock failed: {e}")
 
             try:
                 listing.reduce_stock(1)

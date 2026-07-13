@@ -6,10 +6,10 @@ import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Star, MessageCircle, ShoppingCart, Calendar,
-  Clock, FileText, CheckCircle, AlertCircle,
-  ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Send, MapPin, Sparkles, ZoomIn, X as XIcon,
+  Clock, CheckCircle, AlertCircle,
+  ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Sparkles, ZoomIn, X as XIcon,
   Shield, Share2, Tag, Truck, Package, Heart, Minus, Plus,
-  BadgeCheck, Zap,
+  BadgeCheck, Zap, Lock,
 } from "lucide-react";
 import TopNav from "@/components/layout/TopNav";
 import { useAuth } from "@/lib/authStore";
@@ -18,6 +18,7 @@ import { api } from "@/lib/api";
 import { GRAD, TEAL, PURPLE } from "@/lib/tokens";
 import VendorBadge from "@/components/VendorBadge";
 import ChatWindow from "@/components/ChatWindow";
+import BookingWizard from "@/components/booking/BookingWizard";
 import { useAdminMode } from "@/hooks/useAdminMode";
 
 interface Review {
@@ -28,12 +29,6 @@ interface Review {
   created_at: string;
   listing_title: string;
 }
-
-const TIME_SLOTS = [
-  "6:00 AM","7:00 AM","8:00 AM","9:00 AM","10:00 AM","11:00 AM",
-  "12:00 PM","1:00 PM","2:00 PM","3:00 PM","4:00 PM","5:00 PM",
-  "6:00 PM","7:00 PM","8:00 PM","9:00 PM","10:00 PM","11:00 PM","12:00 AM",
-];
 
 interface Listing {
   id: number;
@@ -127,13 +122,11 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
   const [reviews]                         = useState<Review[]>(initialReviews);
   const [stockWarning,  setStockWarning]  = useState(() => getStockWarning(initialListing));
   const [showChat,      setShowChat]      = useState(false);
-  const [showBooking,   setShowBooking]   = useState(false);
-  const [bookingDate,   setBookingDate]   = useState("");
-  const [bookingTime,   setBookingTime]   = useState("");
-  const [bookingNote,   setBookingNote]   = useState("");
-  const [bookingLocation, setBookingLocation] = useState("");
-  const [bookingStep,   setBookingStep]   = useState<"form"|"confirming"|"done">("form");
-  const [bookingError,  setBookingError]  = useState("");
+  const [showBookingWizard, setShowBookingWizard] = useState(false);
+  // Chat is payment-gated (see chat/views.py ConversationViewSet). A buyer can only
+  // message the vendor once a paid order already exists for this listing — check for
+  // an existing unlocked conversation rather than assuming every visit is pre-payment.
+  const [unlockedConversationId, setUnlockedConversationId] = useState<number | null>(null);
   const [toast,         setToast]         = useState("");
   const [imageOpen,     setImageOpen]     = useState(false);
   const [activeIdx,     setActiveIdx]     = useState(0);
@@ -189,6 +182,18 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
       .catch(()=>{}).finally(()=>setAlsoLikeLoading(false));
   }, [listing?.campus, listing?.id]);
 
+  useEffect(() => {
+    if (!isLoggedIn || !listing?.id) { setUnlockedConversationId(null); return; }
+    api.chat.conversations()
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(d => {
+        const list = d.results || d || [];
+        const match = list.find((c: any) => c.listing === listing.id && c.is_unlocked);
+        setUnlockedConversationId(match ? match.id : null);
+      })
+      .catch(() => setUnlockedConversationId(null));
+  }, [isLoggedIn, listing?.id]);
+
   const handleAddToCart = async () => {
     if (!listing) return;
     if (!isLoggedIn) { router.push("/auth"); return; }
@@ -210,38 +215,14 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
     } catch { showToast("Could not add to cart. Please try again."); }
   };
 
-  const handleBooking = async () => {
+  const openBookingWizard = () => {
     if (!isLoggedIn) { router.push("/auth"); return; }
-    if (!bookingDate)           { setBookingError("Please pick a date."); return; }
-    if (!bookingTime)           { setBookingError("Please pick a time slot."); return; }
-    if (!bookingLocation.trim()){ setBookingError("Please enter a location."); return; }
-    setBookingError(""); setBookingStep("confirming");
-    try {
-      const freshRes = await api.pub.listing(listing!.id);
-      if (freshRes.ok) {
-        const fresh = await freshRes.json();
-        if (!fresh.is_available || (fresh.track_inventory && fresh.stock_quantity === 0)) {
-          setBookingError("Sorry, this item is no longer available."); setBookingStep("form"); setListing(fresh); return;
-        }
-      }
-    } catch {}
-    try {
-      const res = await api.orders.createBooking({ listing: listing!.id, scheduled_date: bookingDate, scheduled_time: bookingTime, note: bookingNote, location: bookingLocation.trim() });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.detail||data.scheduled_date?.[0]||data.listing?.[0]||data.scheduled_time?.[0]||data.location?.[0]||data.non_field_errors?.[0]||Object.values(data).flat().join(" ")||"Booking failed");
-      }
-      setBookingStep("done");
-    } catch (err: unknown) {
-      setBookingError(err instanceof Error ? err.message : "Could not place booking. Try again.");
-      setBookingStep("form");
-    }
+    setShowBookingWizard(true);
   };
 
-  const openBooking = () => {
-    if (!isLoggedIn) { router.push("/auth"); return; }
-    setShowBooking(true);
-    setTimeout(() => document.getElementById("booking-panel")?.scrollIntoView({ behavior: "smooth", block: "start" }), 150);
+  const handleBookingSuccess = (orderId: number) => {
+    setShowBookingWizard(false);
+    router.push(`/order-confirmation/${orderId}`);
   };
 
   const handleAdminToggle = async () => {
@@ -274,7 +255,6 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
     else { await navigator.clipboard.writeText(url); showToast("Link copied!"); }
   };
 
-  const today = new Date().toISOString().split("T")[0];
   const isService = (listing?.listing_type || "").toLowerCase() === "service";
 
   /* ── not found ── */
@@ -567,10 +547,10 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
               )}
 
               {/* ── CTA: service ── */}
-              {isService && listing.is_available && !showBooking && (
+              {isService && listing.is_available && (
                 <div className="flex gap-3 pt-2">
                   <motion.button whileHover={{ scale:1.02 }} whileTap={{ scale:0.97 }}
-                    onClick={openBooking}
+                    onClick={openBookingWizard}
                     className="flex-1 py-3.5 text-white font-bold rounded-2xl flex items-center justify-center gap-2 text-sm shadow-lg"
                     style={{ background: TEAL }}>
                     <Calendar className="w-4 h-4" /> Book Now
@@ -620,11 +600,24 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
                     <p className="text-xs text-stone-400">{completionRate}% completion rate</p>
                   )}
                 </div>
-                <motion.button whileHover={{ scale:1.03 }} whileTap={{ scale:0.97 }}
-                  onClick={() => { if (!isLoggedIn) { router.push("/auth"); return; } setShowChat(true); }}
-                  className="flex items-center gap-1.5 px-3 py-2 border border-stone-200 hover:border-teal-400 text-stone-600 hover:text-teal-600 rounded-xl text-xs font-semibold transition-all flex-shrink-0">
-                  <MessageCircle className="w-3.5 h-3.5" /> Message
-                </motion.button>
+                {unlockedConversationId ? (
+                  <motion.button whileHover={{ scale:1.03 }} whileTap={{ scale:0.97 }}
+                    onClick={() => setShowChat(true)}
+                    className="flex items-center gap-1.5 px-3 py-2 border border-stone-200 hover:border-teal-400 text-stone-600 hover:text-teal-600 rounded-xl text-xs font-semibold transition-all flex-shrink-0">
+                    <MessageCircle className="w-3.5 h-3.5" /> Message
+                  </motion.button>
+                ) : (
+                  <motion.button whileHover={{ scale:1.03 }} whileTap={{ scale:0.97 }}
+                    onClick={() => {
+                      if (!isLoggedIn) { router.push("/auth"); return; }
+                      if (isService) { openBookingWizard(); return; }
+                      showToast("Chat becomes available after payment to protect both buyers and vendors.");
+                    }}
+                    title="Chat becomes available after payment to protect both buyers and vendors."
+                    className="flex items-center gap-1.5 px-3 py-2 border border-stone-200 text-stone-400 rounded-xl text-xs font-semibold transition-all flex-shrink-0">
+                    <Lock className="w-3.5 h-3.5" /> Chat locked
+                  </motion.button>
+                )}
               </div>
 
               {/* Admin controls */}
@@ -652,74 +645,20 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
             </div>
           </div>
 
-          {/* ══════════ BOOKING FORM (services) ══════════ */}
-          {isService && showBooking && (
-            <div id="booking-panel" className="mt-10 max-w-2xl bg-white border border-stone-200 rounded-2xl shadow-sm overflow-hidden">
-              <div className="flex items-center justify-between px-5 py-4 border-b border-stone-100">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: PURPLE }}>
-                    <Calendar className="w-4 h-4 text-white" />
-                  </div>
-                  <span className="font-bold text-stone-900">Book a Date & Time</span>
-                </div>
-                <button onClick={() => setShowBooking(false)} className="p-1.5 rounded-full hover:bg-stone-100">
-                  <XIcon className="w-4 h-4 text-stone-400" />
-                </button>
-              </div>
-              <div className="p-5 space-y-4">
-                {bookingStep === "done" ? (
-                  <div className="text-center py-8 space-y-3">
-                    <div className="w-16 h-16 mx-auto rounded-full bg-teal-50 flex items-center justify-center">
-                      <CheckCircle className="w-8 h-8 text-teal-500" />
-                    </div>
-                    <p className="font-bold text-stone-900 text-lg" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Booking Request Sent!</p>
-                    <p className="text-stone-400 text-sm">The vendor will confirm your booking. You'll get a notification when they do.</p>
-                    <button onClick={() => router.push("/account/bookings")} className="mt-2 px-6 py-2.5 text-white font-medium rounded-full text-sm" style={{ background: TEAL }}>View My Bookings</button>
-                  </div>
-                ) : (
-                  <>
-                    <div>
-                      <label className="text-xs text-stone-500 font-bold uppercase tracking-wide mb-2 flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5 text-teal-500" />Pick a Date</label>
-                      <input type="date" min={today} value={bookingDate} onChange={e => setBookingDate(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-stone-200 text-sm focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20" />
-                    </div>
-                    <div>
-                      <label className="text-xs text-stone-500 font-bold uppercase tracking-wide mb-2 flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-teal-500" />Time Slot</label>
-                      <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                        {TIME_SLOTS.map(slot => (
-                          <button key={slot} type="button" onClick={() => setBookingTime(slot)}
-                            className={`py-2 rounded-xl text-xs font-medium border transition ${bookingTime===slot ? "text-white border-transparent" : "bg-stone-50 text-stone-600 border-stone-200 hover:border-teal-300"}`}
-                            style={bookingTime===slot ? { background: TEAL } : {}}>
-                            {slot}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    <div>
-                      <label className="text-xs text-stone-500 font-bold uppercase tracking-wide mb-2 flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5 text-teal-500" />Location</label>
-                      <input type="text" value={bookingLocation} onChange={e => setBookingLocation(e.target.value)} placeholder="e.g. Cedar hostel, room 12"
-                        className="w-full px-4 py-3 rounded-xl border border-stone-200 text-sm focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 placeholder:text-stone-400" />
-                    </div>
-                    <div>
-                      <label className="text-xs text-stone-500 font-bold uppercase tracking-wide mb-2 flex items-center gap-1.5"><FileText className="w-3.5 h-3.5 text-teal-500" />Note (optional)</label>
-                      <textarea value={bookingNote} onChange={e => setBookingNote(e.target.value)} placeholder="Any special requests…" rows={3} className="w-full px-4 py-3 rounded-xl border border-stone-200 text-sm focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 resize-none placeholder:text-stone-400" />
-                    </div>
-                    {bookingError && (
-                      <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex items-center gap-2">
-                        <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
-                        <p className="text-red-600 text-sm">{bookingError}</p>
-                      </div>
-                    )}
-                    <motion.button whileTap={{ scale:0.97 }} onClick={handleBooking}
-                      disabled={bookingStep==="confirming"||!bookingDate||!bookingTime||!bookingLocation.trim()}
-                      className="w-full py-4 rounded-2xl font-bold text-white text-sm flex items-center justify-center gap-2 shadow-lg disabled:opacity-50"
-                      style={{ background: TEAL }}>
-                      {bookingStep==="confirming" ? <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin inline-block" /> Sending…</> : <><Send className="w-4 h-4" /> Send Booking Request</>}
-                    </motion.button>
-                    <p className="text-xs text-stone-400 text-center">Vendor must confirm before it's finalised.</p>
-                  </>
-                )}
-              </div>
-            </div>
+          {/* ══════════ BOOKING WIZARD (services) ══════════ */}
+          {isService && showBookingWizard && (
+            <BookingWizard
+              listing={{
+                id: listing.id,
+                title: listing.title,
+                price: listing.price,
+                deal: listing.deal,
+                sale_price: listing.sale_price,
+                vendor: listing.vendor,
+              }}
+              onClose={() => setShowBookingWizard(false)}
+              onSuccess={handleBookingSuccess}
+            />
           )}
 
           {/* ══════════ BELOW FOLD ══════════ */}

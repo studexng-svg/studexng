@@ -1,6 +1,6 @@
 # orders/serializers.py
 from rest_framework import serializers
-from .models import Order, OrderStatus, Dispute, Booking
+from .models import Order, OrderStatus, Dispute, Booking, BookingReferenceImage
 from services.serializers import ListingSerializer
 from services.models import Listing
 import uuid
@@ -68,12 +68,14 @@ class OrderSerializer(serializers.ModelSerializer):
             'id', 'reference', 'listing', 'listing_id', 'buyer', 'buyer_id',
             'buyer_username', 'buyer_profile_picture',
             'amount', 'status', 'current_status', 'estimated_time',
-            'delivery_location', 'created_at', 'paid_at', 'seller_completed_at',
+            'delivery_location', 'created_at', 'paid_at',
+            'vendor_accepted_at', 'service_started_at', 'seller_completed_at', 'buyer_confirmed_at',
             'delivery_proof_1', 'delivery_proof_2', 'dispute',
         ]
         read_only_fields = [
             'reference', 'amount', 'status', 'current_status', 'estimated_time',
-            'created_at', 'paid_at', 'seller_completed_at',
+            'created_at', 'paid_at',
+            'vendor_accepted_at', 'service_started_at', 'seller_completed_at', 'buyer_confirmed_at',
             'delivery_proof_1', 'delivery_proof_2',
         ]
 
@@ -256,15 +258,20 @@ class BookingSerializer(serializers.ModelSerializer):
     listing_price = serializers.SerializerMethodField()
     listing_id = serializers.IntegerField(source='listing.id', read_only=True)
     vendor_name = serializers.SerializerMethodField()
+    note = serializers.CharField(max_length=250, allow_blank=True, required=False)
+    reference_images = serializers.SerializerMethodField()
 
     class Meta:
         model = Booking
         fields = [
             'id', 'buyer_username', 'buyer_id', 'vendor_username', 'listing', 'listing_id',
             'listing_title', 'listing_price', 'vendor_name',
-            'scheduled_date', 'scheduled_time', 'note', 'status', 'created_at',
+            'scheduled_date', 'scheduled_time', 'note', 'reference_images', 'status', 'created_at',
         ]
-        read_only_fields = ['id', 'buyer_username', 'buyer_id', 'vendor_username', 'listing_title', 'listing_id', 'listing_price', 'vendor_name', 'status', 'created_at']
+        read_only_fields = ['id', 'buyer_username', 'buyer_id', 'vendor_username', 'listing_title', 'listing_id', 'listing_price', 'vendor_name', 'reference_images', 'status', 'created_at']
+
+    def get_reference_images(self, obj):
+        return [img.image_url for img in obj.reference_images.all()]
 
     def get_listing_price(self, obj):
         from decimal import Decimal

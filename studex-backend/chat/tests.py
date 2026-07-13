@@ -10,7 +10,8 @@ from decimal import Decimal
 
 from accounts.models import User
 from services.models import Category, Listing
-from chat.models import Conversation, Message
+from chat.models import Conversation, Message, BlockedMessageAttempt
+from orders.models import Order
 
 
 class ConversationModelTests(TestCase):
@@ -492,11 +493,22 @@ class MessageAPITests(APITestCase):
             price=Decimal('1000.00')
         )
 
+        # Paid order — chat is payment-gated (ConversationViewSet.UNLOCKED_ORDER_STATUSES
+        # in chat/views.py), so a conversation needs a paid+ order to allow send().
+        self.order = Order.objects.create(
+            reference='ORD-CHATTEST-0001',
+            buyer=self.buyer,
+            listing=self.listing,
+            amount=Decimal('1000.00'),
+            status='paid',
+        )
+
         # Create conversation
         self.conversation = Conversation.objects.create(
             buyer=self.buyer,
             seller=self.seller,
-            listing=self.listing
+            listing=self.listing,
+            order=self.order,
         )
 
         self.message_url = '/api/chat/messages/'
@@ -528,6 +540,18 @@ class MessageAPITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         # send() returns the flat MessageSerializer payload, not a {'data': ...} envelope
         self.assertEqual(response.data['content'], 'Is this available?')
+
+    def test_send_message_at_250_chars_succeeds(self):
+        """Test message at exactly the 250-char limit is accepted"""
+        self.client.force_authenticate(user=self.buyer)
+        response = self.client.post(self.send_url, {'content': 'a' * 250})
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_send_message_over_250_chars_rejected(self):
+        """Test message over the 250-char limit is rejected"""
+        self.client.force_authenticate(user=self.buyer)
+        response = self.client.post(self.send_url, {'content': 'a' * 251})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     @skip(
         "ConversationViewSet.send() (chat/views.py) never sets offer_amount/"
@@ -617,6 +641,257 @@ class MessageAPITests(APITestCase):
         response = self.client.patch(f'{self.message_url}{message.id}/mark_read/')
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class ChatPaymentGateTests(APITestCase):
+    """Test that chat is locked until payment clears (ConversationViewSet.send/create)"""
+
+    def setUp(self):
+        self.client = APIClient()
+
+        self.buyer = User.objects.create_user(
+            username='buyer', email='buyer@pau.edu.ng', password='pass123', school='pau'
+        )
+        self.seller = User.objects.create_user(
+            username='seller', email='seller@pau.edu.ng', password='pass123',
+            user_type='vendor', is_verified_vendor=True, school='pau'
+        )
+        self.category = Category.objects.create(title='Food', slug='food')
+        self.listing = Listing.objects.create(
+            vendor=self.seller, category=self.category, title='Jollof Rice',
+            description='Delicious jollof rice', price=Decimal('1000.00')
+        )
+
+    def _make_conversation(self, order=None):
+        return Conversation.objects.create(buyer=self.buyer, seller=self.seller, listing=self.listing, order=order)
+
+    def test_send_blocked_when_no_order(self):
+        """No order at all — chat stays locked"""
+        conversation = self._make_conversation(order=None)
+        self.client.force_authenticate(user=self.buyer)
+
+        response = self.client.post(f'/api/chat/conversations/{conversation.id}/send/', {'content': 'Hi'})
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(BlockedMessageAttempt.objects.filter(reason='unpaid').count(), 1)
+
+    def test_send_blocked_when_order_pending(self):
+        """Order exists but hasn't been paid — chat stays locked"""
+        order = Order.objects.create(
+            reference='ORD-GATE-0001', buyer=self.buyer, listing=self.listing,
+            amount=Decimal('1000.00'), status='pending',
+        )
+        conversation = self._make_conversation(order=order)
+        self.client.force_authenticate(user=self.buyer)
+
+        response = self.client.post(f'/api/chat/conversations/{conversation.id}/send/', {'content': 'Hi'})
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_send_allowed_once_order_paid(self):
+        order = Order.objects.create(
+            reference='ORD-GATE-0002', buyer=self.buyer, listing=self.listing,
+            amount=Decimal('1000.00'), status='paid',
+        )
+        conversation = self._make_conversation(order=order)
+        self.client.force_authenticate(user=self.buyer)
+
+        response = self.client.post(f'/api/chat/conversations/{conversation.id}/send/', {'content': 'Hi'})
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_create_blocked_without_paid_order(self):
+        """ConversationViewSet.create() also requires a qualifying order, not just send()"""
+        self.client.force_authenticate(user=self.buyer)
+        response = self.client.post('/api/chat/conversations/', {
+            'listing_id': self.listing.id, 'seller_id': self.seller.id,
+        })
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_create_allowed_with_paid_order(self):
+        Order.objects.create(
+            reference='ORD-GATE-0003', buyer=self.buyer, listing=self.listing,
+            amount=Decimal('1000.00'), status='paid',
+        )
+        self.client.force_authenticate(user=self.buyer)
+        response = self.client.post('/api/chat/conversations/', {
+            'listing_id': self.listing.id, 'seller_id': self.seller.id,
+        })
+        self.assertIn(response.status_code, [status.HTTP_200_OK, status.HTTP_201_CREATED])
+        self.assertTrue(Conversation.objects.get(id=response.data['id']).order_id is not None)
+
+    def test_send_blocked_once_order_completed(self):
+        """Chat expires permanently once the buyer confirms and payout is released."""
+        order = Order.objects.create(
+            reference='ORD-GATE-0004', buyer=self.buyer, listing=self.listing,
+            amount=Decimal('1000.00'), status='completed',
+        )
+        conversation = self._make_conversation(order=order)
+        self.client.force_authenticate(user=self.buyer)
+
+        response = self.client.post(f'/api/chat/conversations/{conversation.id}/send/', {'content': 'Hi'})
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(BlockedMessageAttempt.objects.filter(reason='expired').count(), 1)
+
+    def test_expired_conversation_cannot_be_deleted(self):
+        """History must survive for admin visibility — block destroy() once expired."""
+        order = Order.objects.create(
+            reference='ORD-GATE-0005', buyer=self.buyer, listing=self.listing,
+            amount=Decimal('1000.00'), status='completed',
+        )
+        conversation = self._make_conversation(order=order)
+        self.client.force_authenticate(user=self.buyer)
+
+        response = self.client.delete(f'/api/chat/conversations/{conversation.id}/')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertTrue(Conversation.objects.filter(id=conversation.id).exists())
+
+    def test_non_expired_conversation_can_still_be_deleted(self):
+        order = Order.objects.create(
+            reference='ORD-GATE-0006', buyer=self.buyer, listing=self.listing,
+            amount=Decimal('1000.00'), status='paid',
+        )
+        conversation = self._make_conversation(order=order)
+        self.client.force_authenticate(user=self.buyer)
+
+        response = self.client.delete(f'/api/chat/conversations/{conversation.id}/')
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+
+
+class ContactPatternsContractTests(TestCase):
+    """
+    Validates contracts/contact_patterns.json directly (not through chat/views.py),
+    proving the shared-source file itself is well-formed and behaves as intended —
+    this is what both the Python backend and the TypeScript frontend load, so a
+    broken or ambiguous pattern here would silently diverge behavior between them.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        import json
+        import re
+        from pathlib import Path
+        from django.conf import settings
+
+        path = Path(settings.BASE_DIR).parent / 'contracts' / 'contact_patterns.json'
+        assert path.exists(), f"contracts/contact_patterns.json not found at {path}"
+        with open(path, encoding='utf-8') as f:
+            cls.data = json.load(f)
+        cls.compiled = {
+            cat['key']: [re.compile(p, re.IGNORECASE) for p in cat['patterns']]
+            for cat in cls.data['categories']
+        }
+
+    def _matches(self, key, text):
+        return any(p.search(text) for p in self.compiled[key])
+
+    def test_every_category_has_at_least_one_pattern(self):
+        for cat in self.data['categories']:
+            self.assertTrue(cat['patterns'], f"category '{cat['key']}' has no patterns")
+
+    def test_every_category_has_a_valid_reason(self):
+        for cat in self.data['categories']:
+            self.assertIn(cat['reason'], ('contact_info', 'off_platform'))
+
+    def test_phone_pattern_matches_nigerian_number(self):
+        self.assertTrue(self._matches('phone', 'call 08012345678 now'))
+
+    def test_email_pattern_matches(self):
+        self.assertTrue(self._matches('email', 'reach me at test@example.com'))
+
+    def test_whatsapp_pattern_matches(self):
+        self.assertTrue(self._matches('whatsapp', 'wa.me/2348012345678'))
+        self.assertTrue(self._matches('whatsapp', 'message me on whatsapp'))
+
+    def test_instagram_pattern_matches(self):
+        self.assertTrue(self._matches('instagram', 'instagram.com/myshop'))
+
+    def test_url_pattern_matches(self):
+        self.assertTrue(self._matches('url', 'visit https://example.com'))
+
+    def test_plain_sentence_does_not_match_any_category(self):
+        plain = "Is this available in a medium size?"
+        for key in self.compiled:
+            self.assertFalse(self._matches(key, plain), f"'{plain}' unexpectedly matched category '{key}'")
+
+    def test_backend_runtime_loads_same_categories_as_the_contract_file(self):
+        """
+        chat/views.py loads this same file at import time into _CONTACT_CATEGORIES —
+        confirm the runtime object actually reflects the file on disk (proves there's
+        no second, hand-copied pattern list drifting out of sync in chat/views.py).
+        """
+        from chat.views import _CONTACT_CATEGORIES
+        runtime_keys = {cat['key'] for cat in _CONTACT_CATEGORIES}
+        file_keys = {cat['key'] for cat in self.data['categories']}
+        self.assertEqual(runtime_keys, file_keys)
+
+
+class ContactInfoFilterTests(APITestCase):
+    """Test each contact-info category is blocked and logged (chat/views.py _has_suspicious_content)"""
+
+    def setUp(self):
+        self.client = APIClient()
+
+        self.buyer = User.objects.create_user(
+            username='buyer', email='buyer@pau.edu.ng', password='pass123', school='pau'
+        )
+        self.seller = User.objects.create_user(
+            username='seller', email='seller@pau.edu.ng', password='pass123',
+            user_type='vendor', is_verified_vendor=True, school='pau'
+        )
+        self.category = Category.objects.create(title='Food', slug='food')
+        self.listing = Listing.objects.create(
+            vendor=self.seller, category=self.category, title='Jollof Rice',
+            description='Delicious jollof rice', price=Decimal('1000.00')
+        )
+        self.order = Order.objects.create(
+            reference='ORD-FILTER-0001', buyer=self.buyer, listing=self.listing,
+            amount=Decimal('1000.00'), status='paid',
+        )
+        self.conversation = Conversation.objects.create(
+            buyer=self.buyer, seller=self.seller, listing=self.listing, order=self.order
+        )
+        self.send_url = f'/api/chat/conversations/{self.conversation.id}/send/'
+        self.client.force_authenticate(user=self.buyer)
+
+    def _assert_blocked(self, content, expected_reason):
+        response = self.client.post(self.send_url, {'content': content})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, f"expected block for: {content!r}")
+        attempt = BlockedMessageAttempt.objects.filter(sender=self.buyer, attempted_content=content).first()
+        self.assertIsNotNone(attempt, f"expected a BlockedMessageAttempt row for: {content!r}")
+        self.assertEqual(attempt.reason, expected_reason)
+
+    def test_phone_number_blocked(self):
+        self._assert_blocked("call me on 08012345678", 'contact_info')
+
+    def test_email_blocked(self):
+        self._assert_blocked("reach me at buyer@example.com", 'contact_info')
+
+    def test_whatsapp_blocked(self):
+        self._assert_blocked("message me on whatsapp instead", 'contact_info')
+
+    def test_telegram_blocked(self):
+        self._assert_blocked("find me on telegram", 'contact_info')
+
+    def test_instagram_blocked(self):
+        self._assert_blocked("follow my insta for updates", 'contact_info')
+
+    def test_tiktok_blocked(self):
+        self._assert_blocked("check my tiktok page", 'contact_info')
+
+    def test_facebook_blocked(self):
+        self._assert_blocked("add me on facebook", 'contact_info')
+
+    def test_url_blocked(self):
+        self._assert_blocked("see https://example.com/mystore for more", 'contact_info')
+
+    def test_qr_code_blocked(self):
+        self._assert_blocked("just scan this code to pay", 'contact_info')
+
+    def test_off_platform_phrase_blocked(self):
+        self._assert_blocked("please pay me directly instead", 'off_platform')
+
+    def test_plain_message_not_blocked(self):
+        response = self.client.post(self.send_url, {'content': 'Is this still available?'})
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
 
 @skip(

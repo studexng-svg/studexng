@@ -1,12 +1,19 @@
 # chat/models.py
 from django.db import models
 from django.conf import settings
+from django.core.validators import MaxLengthValidator
 
 
 class Conversation(models.Model):
     buyer = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='buyer_conversations')
     seller = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='seller_conversations')
     listing = models.ForeignKey('services.Listing', on_delete=models.SET_NULL, null=True, blank=True)
+    # Set once the buyer has paid (see chat/views.py ConversationViewSet.for_order) — this is
+    # what gates whether messages can be sent. Chat is locked while this is null or the order
+    # is still pending/cancelled/declined.
+    order = models.ForeignKey(
+        'orders.Order', on_delete=models.SET_NULL, null=True, blank=True, related_name='conversations'
+    )
     last_message = models.TextField(blank=True, default='')
     last_message_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -30,7 +37,7 @@ class Message(models.Model):
     conversation = models.ForeignKey(Conversation, on_delete=models.CASCADE, related_name='messages')
     sender = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='sent_messages')
     message_type = models.CharField(max_length=20, choices=MESSAGE_TYPES, default='text')
-    content = models.TextField(blank=True, default='')
+    content = models.TextField(blank=True, default='', validators=[MaxLengthValidator(250)])
     image = models.ImageField(upload_to='chat_images/', null=True, blank=True)
     image_url = models.URLField(blank=True, default='')
     offer_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
@@ -72,3 +79,28 @@ class Message(models.Model):
         if self.image:
             return self.image.url
         return None
+
+
+class BlockedMessageAttempt(models.Model):
+    REASON_CHOICES = [
+        ('contact_info', 'Contact Info Sharing'),
+        ('off_platform', 'Off-Platform Payment Solicitation'),
+        ('unpaid', 'Chat Not Yet Unlocked'),
+        ('expired', 'Chat Expired (Order Completed)'),
+    ]
+
+    sender = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='blocked_message_attempts'
+    )
+    conversation = models.ForeignKey(
+        Conversation, on_delete=models.SET_NULL, null=True, blank=True, related_name='blocked_attempts'
+    )
+    attempted_content = models.TextField(blank=True, default='')
+    reason = models.CharField(max_length=20, choices=REASON_CHOICES)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Blocked ({self.reason}) from {self.sender.username}"

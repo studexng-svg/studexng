@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { TEAL, toArray } from "@/lib/tokens";
-import { ShoppingBag, MapPin, Camera, X, ImagePlus, Clock, MessageCircle } from "lucide-react";
+import { ShoppingBag, MapPin, Camera, X, ImagePlus, Clock, MessageCircle, CheckCircle2, XCircle, Play } from "lucide-react";
 import { StatusBadge, EmptyState, LoadingSpinner, HEADING_FONT } from "../_shared";
 import { api } from "@/lib/api";
 
@@ -134,6 +134,36 @@ export default function OrdersPage() {
   const [proofOrder, setProofOrder] = useState<any | null>(null);
   const [tick, setTick] = useState(0);
   const [chatLoading, setChatLoading] = useState<number | null>(null);
+  const [actionLoading, setActionLoading] = useState<number | null>(null);
+
+  const runOrderAction = async (
+    order: any,
+    action: (id: number | string) => Promise<Response>,
+    patch: Record<string, unknown>,
+  ) => {
+    setActionLoading(order.id);
+    setError("");
+    try {
+      const res = await action(order.id);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { setError(data.detail || "Action failed. Please try again."); return; }
+      queryClient.setQueryData<any[]>(["vendor-orders"], prev =>
+        prev ? prev.map(o => o.id === order.id ? { ...o, ...patch } : o) : prev
+      );
+    } catch { setError("Network error. Please try again."); }
+    finally { setActionLoading(null); }
+  };
+
+  const handleVendorAccept = (order: any) =>
+    runOrderAction(order, api.orders.vendorAccept, { vendor_accepted_at: new Date().toISOString() });
+
+  const handleVendorDecline = (order: any) => {
+    if (!confirm("Decline this order? The buyer will be fully refunded immediately.")) return;
+    return runOrderAction(order, api.orders.vendorDecline, { status: "vendor_declined" });
+  };
+
+  const handleStartService = (order: any) =>
+    runOrderAction(order, api.orders.startService, { service_started_at: new Date().toISOString() });
 
   const handleMessageBuyer = async (order: any) => {
     setChatLoading(order.id);
@@ -163,7 +193,7 @@ export default function OrdersPage() {
 
   if (loading) return <LoadingSpinner />;
 
-  const activeOrders = orders.filter(o => !["completed", "cancelled"].includes(o.status));
+  const activeOrders = orders.filter(o => !["completed", "cancelled", "vendor_declined"].includes(o.status));
 
   return (
     <div className="pb-4">
@@ -223,7 +253,36 @@ export default function OrdersPage() {
                   {order.delivery_location || <span className="text-stone-400 italic">No delivery location set</span>}
                 </p>
               </div>
-              {order.status === "paid" && (() => {
+              {order.status === "paid" && !order.vendor_accepted_at && (
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleVendorAccept(order)}
+                    disabled={actionLoading === order.id}
+                    className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50"
+                    style={{ background: TEAL }}
+                  >
+                    <CheckCircle2 className="w-4 h-4" /> Accept
+                  </button>
+                  <button
+                    onClick={() => handleVendorDecline(order)}
+                    disabled={actionLoading === order.id}
+                    className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-red-600 bg-red-50 border border-red-200 flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50 hover:bg-red-100"
+                  >
+                    <XCircle className="w-4 h-4" /> Decline
+                  </button>
+                </div>
+              )}
+              {order.status === "paid" && order.vendor_accepted_at && !order.service_started_at && (
+                <button
+                  onClick={() => handleStartService(order)}
+                  disabled={actionLoading === order.id}
+                  className="w-full py-2.5 rounded-xl text-sm font-semibold text-white flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50"
+                  style={{ background: TEAL }}
+                >
+                  <Play className="w-4 h-4" /> Start Service
+                </button>
+              )}
+              {order.status === "paid" && order.vendor_accepted_at && order.service_started_at && (() => {
                 void tick;
                 const { canMark, label } = getCountdown(order.paid_at);
                 return (

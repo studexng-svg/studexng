@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import {
   Package, CheckCircle, Clock, AlertCircle, MessageCircle, XCircle, MapPin, Timer,
-  Camera, ImagePlus, X,
+  Camera, ImagePlus, X, Lock,
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/lib/authStore";
@@ -11,6 +11,8 @@ import { TEAL, PURPLE } from "@/lib/tokens";
 import ReviewForm from "@/components/ReviewForm";
 import TopNav from "@/components/layout/TopNav";
 import { api } from "@/lib/api";
+import { escrowStatusLabel } from "@/lib/orderStatusLabels";
+import OrderTimeline from "@/components/orders/OrderTimeline";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 const AUTO_RELEASE_HOURS = 24;
@@ -60,8 +62,10 @@ interface Order {
   amount: number;
   created_at: string;
   paid_at?: string | null;
+  vendor_accepted_at?: string | null;
+  service_started_at?: string | null;
   seller_completed_at?: string | null;
-  status: "pending" | "paid" | "seller_completed" | "completed" | "disputed" | "cancelled";
+  status: "pending" | "paid" | "seller_completed" | "completed" | "disputed" | "cancelled" | "vendor_declined";
   current_status: string;
   delivery_location?: string;
   delivery_proof_1?: string | null;
@@ -242,16 +246,8 @@ export default function OrderDetailPage() {
     completed: "bg-emerald-100 text-emerald-700",
     disputed: "bg-red-100 text-red-700",
     cancelled: "bg-stone-100 text-stone-500",
+    vendor_declined: "bg-stone-100 text-stone-500",
   }[s] || "bg-stone-100 text-stone-500");
-
-  const statusLabel = (s: string) => ({
-    pending: "Pending Payment",
-    paid: "In Progress",
-    seller_completed: "Ready — Confirm Receipt",
-    completed: "Completed",
-    disputed: "Disputed",
-    cancelled: "Cancelled",
-  }[s] || s);
 
   if (!isHydrated || isPending) return (
     <div className="min-h-screen flex items-center justify-center bg-[#F5F5F5]">
@@ -277,6 +273,9 @@ export default function OrderDetailPage() {
   const awaitingVendor = order.status === "paid";
   const isCompleted = order.status === "completed";
   const isCancelled = order.status === "cancelled" || order.current_status === "cancelled";
+  // Chat is payment-gated (see chat/views.py ConversationViewSet) — locked before payment,
+  // available while active, and read-only (expired) once the order is fully completed.
+  const chatLocked = order.status === "pending" || order.status === "vendor_declined";
 
   return (
     <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
@@ -284,9 +283,19 @@ export default function OrderDetailPage() {
 
       <div className="px-4 pt-6 pb-24 space-y-4 max-w-4xl mx-auto">
         <div className="flex justify-end">
-          <button onClick={handleOpenChat} className="flex items-center gap-1.5 px-4 py-2 bg-white border border-stone-200 rounded-full shadow-sm text-sm font-semibold text-teal-600 hover:border-teal-300 transition">
-            <MessageCircle className="w-4 h-4" /> Chat Vendor
-          </button>
+          {chatLocked ? (
+            <button
+              disabled
+              title="Chat becomes available after payment to protect both buyers and vendors."
+              className="flex items-center gap-1.5 px-4 py-2 bg-white border border-stone-200 rounded-full shadow-sm text-sm font-semibold text-stone-400 cursor-not-allowed"
+            >
+              <Lock className="w-4 h-4" /> Chat Locked
+            </button>
+          ) : (
+            <button onClick={handleOpenChat} className="flex items-center gap-1.5 px-4 py-2 bg-white border border-stone-200 rounded-full shadow-sm text-sm font-semibold text-teal-600 hover:border-teal-300 transition">
+              <MessageCircle className="w-4 h-4" /> {isCompleted ? "View Chat (Ended)" : "Chat Vendor"}
+            </button>
+          )}
         </div>
 
         {/* LOYALTY REWARD BANNER */}
@@ -312,9 +321,15 @@ export default function OrderDetailPage() {
             </div>
             <div className={`px-3 py-1.5 rounded-full font-semibold text-xs flex items-center gap-1.5 ${statusColor(order.status)}`}>
               {isCompleted ? <CheckCircle className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
-              {statusLabel(order.status)}
+              {escrowStatusLabel(order)}
             </div>
           </div>
+        </div>
+
+        {/* ORDER TIMELINE */}
+        <div className="bg-white rounded-2xl p-5 shadow-sm border border-stone-200 animate-fadeUp">
+          <p className="text-xs text-stone-400 font-bold uppercase tracking-wide mb-4">Order Timeline</p>
+          <OrderTimeline orderId={order.id} />
         </div>
 
         {isCancelled && (

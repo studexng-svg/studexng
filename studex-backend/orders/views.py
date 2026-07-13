@@ -7,7 +7,7 @@ from django.db import models
 from django.utils import timezone
 from django.contrib.auth import get_user_model
 from decimal import Decimal
-from .models import Order, OrderStatus, Booking, Dispute
+from .models import Order, OrderStatus, Booking, BookingReferenceImage, Dispute
 from .serializers import OrderSerializer, OrderStatusSerializer, DisputeSerializer, BookingSerializer
 import logging
 
@@ -67,6 +67,94 @@ class OrderViewSet(viewsets.ModelViewSet):
         ).select_related('buyer', 'listing').order_by('-created_at')
         serializer = self.get_serializer(qs, many=True)
         return Response(serializer.data)
+
+    @action(detail=True, methods=['post'], url_path='vendor-accept')
+    def vendor_accept(self, request, pk=None):
+        """
+        Vendor accepts an already-paid order. Under the payment-first booking flow the
+        buyer pays immediately with no pre-payment vendor approval, so this is the
+        vendor's first chance to act on the order — it unlocks nothing by itself (chat
+        unlocks at payment, not at acceptance) but confirms the vendor will do the work.
+        """
+        order = self.get_object()
+        if order.listing.vendor != request.user:
+            return Response({"detail": "You are not the vendor for this order."}, status=403)
+        if order.status != 'paid':
+            return Response({"detail": f"Cannot accept an order with status '{order.status}'."}, status=400)
+        if order.vendor_accepted_at is not None:
+            return Response({"detail": "Order already accepted."}, status=400)
+
+        order.vendor_accepted_at = timezone.now()
+        order.save(update_fields=['vendor_accepted_at'])
+
+        _notify(
+            recipient=order.buyer,
+            notification_type='order_update',
+            title=f'✅ Vendor Accepted — {order.listing.title}',
+            message=f'{request.user.username} has accepted your order for "{order.listing.title}" and will begin shortly.',
+            action_url=f'/account/orders/{order.id}',
+        )
+        return Response({"message": "Order accepted.", "order": self.get_serializer(order).data})
+
+    @action(detail=True, methods=['post'], url_path='vendor-decline')
+    def vendor_decline(self, request, pk=None):
+        """
+        Vendor declines an already-paid order (e.g. can't make the slot). Since payout is
+        deferred to buyer confirmation, no money has left StudEx's Paystack balance yet —
+        a full refund is safe with no dispute needed.
+        """
+        order = self.get_object()
+        if order.listing.vendor != request.user:
+            return Response({"detail": "You are not the vendor for this order."}, status=403)
+        if order.status != 'paid':
+            return Response({"detail": f"Cannot decline an order with status '{order.status}'."}, status=400)
+        if order.vendor_accepted_at is not None:
+            return Response({"detail": "Order was already accepted and can no longer be declined."}, status=400)
+
+        from payments.views import _refund_paystack_transaction
+        refunded = _refund_paystack_transaction(order.reference)
+        if not refunded:
+            return Response({"detail": "Refund could not be initiated. Please try again shortly."}, status=502)
+
+        order.status = 'vendor_declined'
+        order.save(update_fields=['status'])
+
+        _notify(
+            recipient=order.buyer,
+            notification_type='order_update',
+            title=f'Order Declined — {order.listing.title}',
+            message=(
+                f'{request.user.username} is unable to fulfil your order for "{order.listing.title}". '
+                f'A full refund has been issued.'
+            ),
+            action_url='/account/orders',
+        )
+        return Response({"message": "Order declined and buyer refunded.", "order": self.get_serializer(order).data})
+
+    @action(detail=True, methods=['post'], url_path='start-service')
+    def start_service(self, request, pk=None):
+        """Vendor marks that they've begun work — distinct from acceptance and completion."""
+        order = self.get_object()
+        if order.listing.vendor != request.user:
+            return Response({"detail": "You are not the vendor for this order."}, status=403)
+        if order.vendor_accepted_at is None:
+            return Response({"detail": "Accept the order before starting the service."}, status=400)
+        if order.status != 'paid':
+            return Response({"detail": f"Cannot start service on an order with status '{order.status}'."}, status=400)
+        if order.service_started_at is not None:
+            return Response({"detail": "Service already started."}, status=400)
+
+        order.service_started_at = timezone.now()
+        order.save(update_fields=['service_started_at'])
+
+        _notify(
+            recipient=order.buyer,
+            notification_type='order_update',
+            title=f'🚀 Service Started — {order.listing.title}',
+            message=f'{request.user.username} has started your service for "{order.listing.title}".',
+            action_url=f'/account/orders/{order.id}',
+        )
+        return Response({"message": "Service started.", "order": self.get_serializer(order).data})
 
     @action(detail=True, methods=['patch'], url_path='mark-complete')
     def mark_complete(self, request, pk=None):
@@ -215,8 +303,38 @@ class OrderViewSet(viewsets.ModelViewSet):
             "current_status": order.current_status,
             "estimated_time": order.estimated_time,
             "history": history,
+            "timeline": self._booking_timeline(order),
             "order": self.get_serializer(order).data,
         })
+
+    def _booking_timeline(self, order):
+        """
+        The 7-step buyer-facing timeline (distinct from the delivery-tracking `history`
+        above). Every step is derived from an existing timestamp — no separate history
+        table for this, it's presentation logic over Order/Booking fields.
+        """
+        booking = Booking.objects.filter(buyer=order.buyer, listing=order.listing).order_by('-created_at').first()
+        payout_released = order.status == 'completed' and order.buyer_confirmed_at is not None
+        steps = [
+            {"key": "booking_created", "label": "Booking Created",
+             "done": booking is not None, "at": booking.created_at.isoformat() if booking else None},
+            {"key": "payment_completed", "label": "Payment Completed",
+             "done": order.paid_at is not None, "at": order.paid_at.isoformat() if order.paid_at else None},
+            {"key": "chat_unlocked", "label": "Chat Unlocked",
+             "done": order.paid_at is not None, "at": order.paid_at.isoformat() if order.paid_at else None},
+            {"key": "vendor_accepted", "label": "Vendor Accepted",
+             "done": order.vendor_accepted_at is not None,
+             "at": order.vendor_accepted_at.isoformat() if order.vendor_accepted_at else None},
+            {"key": "service_started", "label": "Service Started",
+             "done": order.service_started_at is not None,
+             "at": order.service_started_at.isoformat() if order.service_started_at else None},
+            {"key": "completed", "label": "Completed",
+             "done": order.seller_completed_at is not None,
+             "at": order.seller_completed_at.isoformat() if order.seller_completed_at else None},
+            {"key": "payment_released", "label": "Payment Released",
+             "done": payout_released, "at": order.buyer_confirmed_at.isoformat() if payout_released else None},
+        ]
+        return steps
 
     @action(detail=True, methods=['post'])
     def confirm(self, request, pk=None):
@@ -550,8 +668,22 @@ class BookingViewSet(viewsets.ModelViewSet):
             models.Q(buyer=user) | models.Q(listing__id__in=vendor_listing_ids)
         ).select_related('buyer', 'listing', 'listing__vendor')
 
+    MAX_REFERENCE_IMAGES = 5
+    ALLOWED_REFERENCE_IMAGE_TYPES = {'image/jpeg', 'image/png', 'image/webp'}
+
     def perform_create(self, serializer):
         booking = serializer.save(buyer=self.request.user)
+
+        images = self.request.FILES.getlist('reference_images')[:self.MAX_REFERENCE_IMAGES]
+        if images:
+            from services.views import upload_to_cloudinary
+            for image in images:
+                if image.content_type not in self.ALLOWED_REFERENCE_IMAGE_TYPES:
+                    continue
+                url = upload_to_cloudinary(image, folder='studex/booking_references')
+                if url:
+                    BookingReferenceImage.objects.create(booking=booking, image_url=url)
+
         _notify(
             recipient=booking.listing.vendor,
             notification_type='new_booking_request',
@@ -632,8 +764,10 @@ class BookingViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['get'], url_path='checkout-config')
     def checkout_config(self, request, pk=None):
         """
-        Returns Paystack checkout parameters for a confirmed booking.
-        Only callable when booking.status == 'confirmed' and by the buyer.
+        Returns Paystack checkout parameters for a booking. Callable from 'pending'
+        (the normal case under the payment-first flow — buyer pays immediately after
+        booking, no vendor pre-approval) or 'confirmed' (legacy bookings that went
+        through the old pre-payment vendor-approval step). Buyer-only.
         Feeds directly into the standard initialize_payment flow.
         """
         booking = self.get_object()
@@ -641,7 +775,7 @@ class BookingViewSet(viewsets.ModelViewSet):
         if booking.buyer != request.user:
             return Response({'detail': 'Only the buyer can pay for a booking.'}, status=403)
 
-        if booking.status != 'confirmed':
+        if booking.status not in ('pending', 'confirmed'):
             return Response(
                 {'detail': f'This booking cannot be paid — current status: {booking.status}.'},
                 status=400,

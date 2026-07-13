@@ -2,6 +2,7 @@
 from django.db import models
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.core.validators import MaxLengthValidator
 from services.models import Listing
 
 User = get_user_model()
@@ -15,6 +16,7 @@ class Order(models.Model):
         ('completed', 'Buyer Confirmed - Complete'),         # ← was "Buyer Confirmed - Released"
         ('disputed', 'Disputed'),
         ('cancelled', 'Cancelled'),
+        ('vendor_declined', 'Vendor Declined'),
     )
 
     reference = models.CharField(max_length=100, unique=True)
@@ -26,6 +28,8 @@ class Order(models.Model):
     estimated_time = models.PositiveIntegerField(null=True, blank=True, help_text="Estimated minutes to completion")
     created_at = models.DateTimeField(auto_now_add=True)
     paid_at = models.DateTimeField(null=True, blank=True)
+    vendor_accepted_at = models.DateTimeField(null=True, blank=True)
+    service_started_at = models.DateTimeField(null=True, blank=True)
     seller_completed_at = models.DateTimeField(null=True, blank=True)
     buyer_confirmed_at = models.DateTimeField(null=True, blank=True)
     auto_released = models.BooleanField(default=False)
@@ -165,7 +169,7 @@ class Booking(models.Model):
     )
     scheduled_date = models.DateField()
     scheduled_time = models.CharField(max_length=20)
-    note = models.TextField(blank=True)
+    note = models.TextField(blank=True, validators=[MaxLengthValidator(250)])
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     confirmed_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -176,3 +180,15 @@ class Booking(models.Model):
 
     def __str__(self):
         return f"Booking by {self.buyer.username} for {self.listing.title} on {self.scheduled_date}"
+
+
+class BookingReferenceImage(models.Model):
+    booking = models.ForeignKey(Booking, on_delete=models.CASCADE, related_name='reference_images')
+    image_url = models.URLField(max_length=500)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at']
+
+    def __str__(self):
+        return f"Reference image for booking #{self.booking_id}"

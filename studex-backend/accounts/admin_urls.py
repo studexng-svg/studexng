@@ -35,6 +35,7 @@ from accounts.admin_views import (
     AdminAbandonedCartReminderView,
     AdminConversationListView,
     AdminConversationDetailView,
+    AdminBlockedMessagesView,
     AdminBroadcastMessageView,
     AdminBroadcastPreviewView,
     AdminBroadcastCountsView,
@@ -163,4 +164,9 @@ if AdminConversationListView is not None:
     urlpatterns += [
         path('conversations/', AdminConversationListView.as_view(), name='conversation-list'),
         path('conversations/<int:conversation_id>/', AdminConversationDetailView.as_view(), name='conversation-detail'),
+    ]
+
+if AdminBlockedMessagesView is not None:
+    urlpatterns += [
+        path('blocked-messages/', AdminBlockedMessagesView.as_view(), name='blocked-messages'),
     ]

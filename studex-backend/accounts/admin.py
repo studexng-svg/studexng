@@ -47,10 +47,24 @@ class UserAdmin(BaseUserAdmin):
             return []
         return [ProfileInline]
 
-    list_display = ['username', 'email', 'school', 'user_type', 'verification_type', 'matric_number', 'nin_display', 'business_name', 'hostel', 'wallet_balance', 'is_verified_vendor', 'is_staff', 'is_active', 'created_at']
+    list_display = ['username', 'email', 'school', 'user_type', 'verification_type', 'matric_number', 'nin_display', 'business_name', 'hostel', 'wallet_balance', 'is_verified_vendor', 'blocked_attempts_count', 'is_staff', 'is_active', 'created_at']
     list_filter = ['school', 'user_type', 'is_verified_vendor', 'is_staff', 'is_active', 'hostel']
     search_fields = ['username', 'email', 'phone', 'business_name', 'matric_number', 'school']
     readonly_fields = ['wallet_balance', 'created_at', 'updated_at', 'nin_display']
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).annotate(_blocked_attempts_count=Count('blocked_message_attempts'))
+
+    def blocked_attempts_count(self, obj):
+        count = obj._blocked_attempts_count
+        if count > 0:
+            return format_html(
+                '<span style="background-color: #b91c1c; color: white; padding: 2px 8px; border-radius: 10px; font-weight: bold;">{}</span>',
+                count
+            )
+        return '0'
+    blocked_attempts_count.short_description = 'Blocked Attempts'
+    blocked_attempts_count.admin_order_field = '_blocked_attempts_count'
 
     fieldsets = (
         (None, {'fields': ('username', 'password')}),
@@ -68,7 +82,17 @@ class UserAdmin(BaseUserAdmin):
     )
 
     ordering = ['-created_at']
-    actions = ['approve_vendors', 'unverify_vendors', 'export_to_csv', 'send_custom_notification']
+    actions = ['approve_vendors', 'unverify_vendors', 'export_to_csv', 'send_custom_notification', 'suspend_users', 'reactivate_users']
+
+    def suspend_users(self, request, queryset):
+        updated = queryset.update(is_active=False)
+        self.message_user(request, f"{updated} account(s) suspended.")
+    suspend_users.short_description = "Suspend selected accounts"
+
+    def reactivate_users(self, request, queryset):
+        updated = queryset.update(is_active=True)
+        self.message_user(request, f"{updated} account(s) reactivated.")
+    reactivate_users.short_description = "Reactivate selected accounts"
 
     def nin_display(self, obj):
         from accounts.fields import decrypt_field

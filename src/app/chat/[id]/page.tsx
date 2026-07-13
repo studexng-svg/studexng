@@ -5,7 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import {
   ChevronLeft, Send, Loader, ImageIcon, X, Pin, Pencil,
   Trash2, Check, CheckCheck, PinOff, ChevronDown, UserX, Users,
-  CornerDownLeft, Copy, Mic, ShieldAlert,
+  CornerDownLeft, Copy, Mic, ShieldAlert, Lock, Shield,
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/lib/authStore";
@@ -13,6 +13,7 @@ import { TEAL, PURPLE } from "@/lib/tokens";
 import { api } from "@/lib/api";
 
 const DELETE_EVERYONE_LIMIT_HOURS = 60;
+const MESSAGE_MAX_LENGTH = 250;
 
 function stripQuotedMarkup(text: string): string {
   return text.replace(/\[quoted:@[^\n]*/g, '').replace(/\s+/g, ' ').trim();
@@ -76,6 +77,7 @@ export default function ChatRoomPage() {
   const [imagePreview, setImagePreview]   = useState<string | null>(null);
   const [error, setError]                 = useState("");
   const [isPolicy, setIsPolicy]           = useState(false);
+  const [isExpired, setIsExpired]         = useState(false);
   const flash = (m: string, policy = false) => {
     setError(m); setIsPolicy(policy);
     setTimeout(() => { setError(""); setIsPolicy(false); }, policy ? 6000 : 2500);
@@ -151,6 +153,7 @@ export default function ChatRoomPage() {
           setOtherUserPicture(conv.other_user?.profile_picture || null);
           setOtherUserLastSeen(conv.other_user?.last_seen || null);
           setOtherUserOnline(conv.other_user?.is_online || false);
+          setIsExpired(!!conv.is_expired);
         }
       } catch {}
     }, 15000);
@@ -220,6 +223,7 @@ export default function ChatRoomPage() {
         setListingTitle(convData.listing_title || "");
         setOtherUserLastSeen(convData.other_user?.last_seen || null);
         setOtherUserOnline(convData.other_user?.is_online || false);
+        setIsExpired(!!convData.is_expired);
       }
       await loadMessages();
       await loadPinned();
@@ -359,7 +363,11 @@ export default function ChatRoomPage() {
   };
 
   const handleSend = async () => {
-    if (sending || (!input.trim() && !imageFile)) return;
+    if (sending || isExpired || (!input.trim() && !imageFile)) return;
+    if (input.trim().length > MESSAGE_MAX_LENGTH) {
+      flash(`Messages are limited to ${MESSAGE_MAX_LENGTH} characters.`);
+      return;
+    }
     setSending(true);
     try {
       if (imageFile) {
@@ -715,6 +723,19 @@ export default function ChatRoomPage() {
         </div>
       )}
 
+      {/* ── ESCROW / EXPIRED BANNER ── */}
+      {isExpired ? (
+        <div className="flex-shrink-0 bg-stone-100 border-t border-stone-200 px-4 py-2.5 flex items-center gap-2">
+          <Lock className="w-3.5 h-3.5 text-stone-400 flex-shrink-0" />
+          <p className="text-xs text-stone-500 font-medium">This chat has ended — the order was completed and payment released.</p>
+        </div>
+      ) : (
+        <div className="flex-shrink-0 bg-teal-50 border-t border-teal-100 px-4 py-2 flex items-center gap-2">
+          <Shield className="w-3.5 h-3.5 text-teal-600 flex-shrink-0" />
+          <p className="text-xs text-teal-700 font-semibold">Payment Protected by StudEx · Escrow Active</p>
+        </div>
+      )}
+
       {/* ── INPUT BAR ── */}
       <div className="flex-shrink-0 bg-white border-t border-stone-100">
         {/* Reply preview */}
@@ -732,39 +753,46 @@ export default function ChatRoomPage() {
         )}
 
         <div className="px-4 py-3 flex items-center gap-2">
-          <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageSelect} />
+          <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageSelect} disabled={isExpired} />
 
           {/* Pill input */}
           <div className="flex-1 flex items-center bg-stone-100 rounded-full px-4 py-2 gap-2">
             <input
               ref={inputRef}
               value={input}
-              onChange={e => handleTyping(e.target.value)}
+              maxLength={MESSAGE_MAX_LENGTH}
+              disabled={isExpired}
+              onChange={e => handleTyping(e.target.value.slice(0, MESSAGE_MAX_LENGTH))}
               onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-              placeholder={imageFile ? "Add a caption..." : replyingTo ? "Write your reply..." : "Type message..."}
-              className="flex-1 bg-transparent text-stone-900 text-sm focus:outline-none placeholder-stone-400"
+              placeholder={isExpired ? "This chat has ended" : imageFile ? "Add a caption..." : replyingTo ? "Write your reply..." : "Type message..."}
+              className="flex-1 bg-transparent text-stone-900 text-sm focus:outline-none placeholder-stone-400 disabled:opacity-60"
             />
             {/* Image attach inside pill */}
-            <button onClick={() => fileInputRef.current?.click()}
-              className="text-stone-400 hover:text-teal-500 transition flex-shrink-0">
+            <button onClick={() => fileInputRef.current?.click()} disabled={isExpired}
+              className="text-stone-400 hover:text-teal-500 transition flex-shrink-0 disabled:opacity-40">
               <ImageIcon className="w-4.5 h-4.5" />
             </button>
           </div>
 
           {/* Mic */}
-          <button onClick={() => flash("Voice messages coming soon")}
-            className="w-11 h-11 rounded-full bg-stone-100 flex items-center justify-center text-stone-500 hover:bg-stone-200 transition active:scale-95 flex-shrink-0">
+          <button onClick={() => flash("Voice messages coming soon")} disabled={isExpired}
+            className="w-11 h-11 rounded-full bg-stone-100 flex items-center justify-center text-stone-500 hover:bg-stone-200 transition active:scale-95 flex-shrink-0 disabled:opacity-40">
             <Mic className="w-5 h-5" />
           </button>
 
           {/* Send */}
           <button onClick={handleSend}
-            disabled={sending || (!input.trim() && !imageFile)}
+            disabled={sending || isExpired || (!input.trim() && !imageFile)}
             className="w-11 h-11 rounded-full flex items-center justify-center text-white disabled:opacity-40 flex-shrink-0 transition active:scale-95 shadow-md"
             style={{ background: "#0d9488" }}>
             {sending ? <Loader className="w-4.5 h-4.5 animate-spin" /> : <Send className="w-4.5 h-4.5" />}
           </button>
         </div>
+        {!isExpired && input.length > 0 && (
+          <p className={`text-xs text-right px-4 pb-2 -mt-1 ${input.length >= MESSAGE_MAX_LENGTH ? "text-red-500" : "text-stone-400"}`}>
+            {input.length}/{MESSAGE_MAX_LENGTH}
+          </p>
+        )}
       </div>
     </div>
   );
