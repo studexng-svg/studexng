@@ -215,9 +215,10 @@ export default function ListingsPage() {
                   className="w-full bg-white border border-stone-200 rounded-xl px-4 py-3 text-stone-900 text-base focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 transition" />
                 {pricePreview && (
                   <p className="text-xs text-stone-400 mt-1.5 px-1">
-                    Buyer pays <span className="font-semibold text-stone-600">₦{pricePreview.price.toLocaleString()}</span>
+                    You get <span className="font-semibold text-stone-600">₦{Number(form.payoutAmount).toLocaleString()}</span>
+                    {" "}+ ₦{pricePreview.platform_fee.toLocaleString()} fee{" "}
+                    = Buyer pays <span className="font-semibold text-teal-600">₦{pricePreview.price.toLocaleString()}</span>
                     {form.is_per_unit ? ` per ${form.unit_label.trim() || "unit"}` : ""}
-                    {" "}· platform fee ₦{pricePreview.platform_fee.toLocaleString()}
                   </p>
                 )}
               </div>
@@ -433,21 +434,64 @@ export default function ListingsPage() {
               <div className="p-4">
                 <div className="flex items-start justify-between gap-2 mb-1">
                   <h3 className="font-semibold text-stone-900 text-sm">{listing.title}</h3>
-                  <div className="text-right">
-                    {listing.discount_percent > 0 ? (
-                      <>
-                        <span className="text-stone-400 text-xs line-through block">₦{Number(listing.price).toLocaleString()}</span>
-                        <span className="font-bold text-red-600 text-sm whitespace-nowrap">
-                          ₦{Math.round(Number(listing.price) * (1 - listing.discount_percent / 100)).toLocaleString()}
-                        </span>
-                        <span className="ml-1 text-xs bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full font-bold">-{listing.discount_percent}%</span>
-                      </>
-                    ) : (
-                      <span className="font-bold text-teal-600 text-sm whitespace-nowrap">₦{Number(listing.price).toLocaleString()}</span>
-                    )}
-                  </div>
+                  {listing.discount_percent > 0 && (
+                    <span className="flex-shrink-0 text-xs bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full font-bold">-{listing.discount_percent}%</span>
+                  )}
                 </div>
                 <p className="text-stone-400 text-xs mb-2 line-clamp-2">{listing.description}</p>
+
+                {/* Payout / fee / buyer-price breakdown */}
+                {listing.variants?.length > 0 ? (
+                  <div className="bg-stone-50 border border-stone-100 rounded-lg p-2 mb-2 space-y-2">
+                    {listing.variants.map((v: any) => {
+                      const fee = Number(v.price) - Number(v.payout_amount);
+                      const unitSuffix = listing.is_per_unit ? `/${listing.unit_label || "unit"}` : "";
+                      return (
+                        <div key={v.id} className="text-xs">
+                          <p className="font-semibold text-stone-700 mb-0.5">{v.title}</p>
+                          <div className="flex items-center justify-between text-stone-400">
+                            <span>You get ₦{Number(v.payout_amount).toLocaleString()}{unitSuffix}</span>
+                            <span>+₦{fee.toLocaleString()} fee</span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-stone-400">Buyer pays</span>
+                            <span className="font-bold text-teal-600">₦{Number(v.price).toLocaleString()}{unitSuffix}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="bg-stone-50 border border-stone-100 rounded-lg px-2.5 py-2 mb-2 text-xs space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-stone-400">You get</span>
+                      <span className="font-semibold text-stone-700">
+                        ₦{Number(listing.payout_amount ?? listing.price).toLocaleString()}
+                        {listing.is_per_unit ? `/${listing.unit_label || "unit"}` : ""}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-stone-400">Platform fee</span>
+                      <span className="font-semibold text-stone-700">+₦{Number(listing.platform_fee ?? 0).toLocaleString()}</span>
+                    </div>
+                    <div className="flex items-center justify-between pt-1 mt-1 border-t border-stone-200">
+                      <span className="text-stone-400">Buyer pays</span>
+                      {listing.discount_percent > 0 ? (
+                        <span className="flex items-center gap-1.5">
+                          <span className="text-stone-400 line-through">₦{Number(listing.price).toLocaleString()}</span>
+                          <span className="font-bold text-red-600">
+                            ₦{Math.round(Number(listing.price) * (1 - listing.discount_percent / 100)).toLocaleString()}
+                          </span>
+                        </span>
+                      ) : (
+                        <span className="font-bold text-teal-600">
+                          ₦{Number(listing.price).toLocaleString()}{listing.is_per_unit ? `/${listing.unit_label || "unit"}` : ""}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 {listing.track_inventory && (
                   <p className={`text-xs font-semibold mb-2 ${listing.stock_quantity <= 3 ? "text-amber-600" : "text-teal-600"}`}>
                     📦 Stock: {listing.stock_quantity} remaining
