@@ -1,9 +1,12 @@
 """
 Test suite for accounts app - authentication, user management, permissions
 """
+from decimal import Decimal
 from django.test import TestCase
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
+from django.utils import timezone
+from datetime import timedelta
 from rest_framework.test import APIClient, APITestCase
 from rest_framework import status
 from accounts.models import User, Profile, SellerApplication
@@ -486,3 +489,122 @@ class AdminListingDetailFeeCalculationTests(APITestCase):
         self.listing.refresh_from_db()
         self.assertEqual(self.listing.title, 'Renamed Item')
         self.assertFalse(self.listing.is_available)
+
+
+class AdminAnalyticsProductStatsTests(TestCase):
+    """Test the most-searched / most-ordered product admin analytics."""
+
+    def setUp(self):
+        from services.models import Category, Listing
+        self.vendor = User.objects.create_user(
+            username='vendor', email='vendor@pau.edu.ng', password='pass123',
+            user_type='vendor', is_verified_vendor=True,
+        )
+        self.buyer = User.objects.create_user(
+            username='buyer', email='buyer@pau.edu.ng', password='pass123',
+        )
+        self.category = Category.objects.create(title='Food', slug='food')
+        self.listing_a = Listing.objects.create(
+            vendor=self.vendor, category=self.category, title='Jollof Rice',
+            description='desc', price=Decimal('1000.00'), is_available=True,
+        )
+        self.listing_b = Listing.objects.create(
+            vendor=self.vendor, category=self.category, title='Fried Rice',
+            description='desc', price=Decimal('1200.00'), is_available=True,
+        )
+
+    def test_most_searched_products_counts_by_query_frequency(self):
+        from services.models import SearchQuery
+        from accounts.analytics import AdminAnalytics
+
+        SearchQuery.objects.create(query='rice')
+        SearchQuery.objects.create(query='rice')
+        SearchQuery.objects.create(query='chicken')
+
+        results = AdminAnalytics.get_most_searched_products()
+
+        self.assertEqual(results[0]['query'], 'rice')
+        self.assertEqual(results[0]['count'], 2)
+
+    def test_most_searched_products_respects_days_window(self):
+        from services.models import SearchQuery
+        from accounts.analytics import AdminAnalytics
+
+        old = SearchQuery.objects.create(query='old term')
+        SearchQuery.objects.filter(id=old.id).update(created_at=timezone.now() - timedelta(days=60))
+        SearchQuery.objects.create(query='recent term')
+
+        results = AdminAnalytics.get_most_searched_products(days=30)
+        queries = [r['query'] for r in results]
+
+        self.assertIn('recent term', queries)
+        self.assertNotIn('old term', queries)
+
+    def test_most_ordered_products_excludes_pending_and_cancelled(self):
+        from orders.models import Order
+        from accounts.analytics import AdminAnalytics
+
+        Order.objects.create(
+            reference='ORD-STAT-01', buyer=self.buyer, listing=self.listing_a,
+            amount=Decimal('1000.00'), status='paid',
+        )
+        Order.objects.create(
+            reference='ORD-STAT-02', buyer=self.buyer, listing=self.listing_a,
+            amount=Decimal('1000.00'), status='completed',
+        )
+        Order.objects.create(
+            reference='ORD-STAT-03', buyer=self.buyer, listing=self.listing_a,
+            amount=Decimal('1000.00'), status='pending',
+        )
+        Order.objects.create(
+            reference='ORD-STAT-04', buyer=self.buyer, listing=self.listing_b,
+            amount=Decimal('1200.00'), status='cancelled',
+        )
+
+        results = AdminAnalytics.get_most_ordered_products()
+        by_listing = {r['listing_id']: r['count'] for r in results}
+
+        self.assertEqual(by_listing.get(self.listing_a.id), 2)
+        self.assertNotIn(self.listing_b.id, by_listing)
+
+
+class ListingSearchLoggingTests(APITestCase):
+    """Test that ListingViewSet.list() logs non-empty searches for analytics."""
+
+    def setUp(self):
+        from services.models import Category, Listing
+        self.client = APIClient()
+        self.vendor = User.objects.create_user(
+            username='vendor', email='vendor@pau.edu.ng', password='pass123',
+            user_type='vendor', is_verified_vendor=True,
+        )
+        self.category = Category.objects.create(title='Food', slug='food')
+        Listing.objects.create(
+            vendor=self.vendor, category=self.category, title='Jollof Rice',
+            description='desc', price=Decimal('1000.00'), is_available=True,
+        )
+
+    def test_search_creates_search_query_row(self):
+        from services.models import SearchQuery
+
+        response = self.client.get('/api/services/listings/', {'search': 'Jollof'})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(SearchQuery.objects.count(), 1)
+        logged = SearchQuery.objects.first()
+        self.assertEqual(logged.query, 'jollof')
+        self.assertEqual(logged.results_count, 1)
+
+    def test_empty_search_param_does_not_log(self):
+        from services.models import SearchQuery
+
+        self.client.get('/api/services/listings/', {'search': ''})
+
+        self.assertEqual(SearchQuery.objects.count(), 0)
+
+    def test_listing_request_without_search_does_not_log(self):
+        from services.models import SearchQuery
+
+        self.client.get('/api/services/listings/')
+
+        self.assertEqual(SearchQuery.objects.count(), 0)

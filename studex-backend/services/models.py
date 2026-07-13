@@ -301,3 +301,23 @@ class Deal(models.Model):
         from decimal import Decimal
         discount_amount = self.listing.price * Decimal(self.discount_percent) / 100
         return self.listing.price - discount_amount
+
+
+class SearchQuery(models.Model):
+    """
+    One row per non-empty ?search= call against ListingViewSet — logged for
+    "most searched" admin analytics. Deliberately lightweight: no FK to a
+    specific Listing, since a search term doesn't resolve to one product.
+    """
+    query = models.CharField(max_length=200, db_index=True)
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    results_count = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = "Search Query"
+        verbose_name_plural = "Search Queries"
+
+    def __str__(self):
+        return self.query

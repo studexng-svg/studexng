@@ -6,7 +6,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.pagination import PageNumberPagination
 from django.db.models import Q
 from django.core.cache import cache
-from .models import Category, Listing, Transaction, VendorOfTheMonth
+from .models import Category, Listing, Transaction, VendorOfTheMonth, SearchQuery
 from .serializers import CategorySerializer, ListingSerializer, TransactionSerializer
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
@@ -148,13 +148,18 @@ class ListingViewSet(viewsets.ModelViewSet):
         return [perm() for perm in permission_classes]
 
     def list(self, request, *args, **kwargs):
+        search_term = request.query_params.get('search', '').strip()
+
         # Never cache staff requests (they see unavailable listings too)
         # Never cache filtered/search queries — those are too varied to key efficiently
         if (request.user.is_authenticated and request.user.is_staff
-                or request.query_params.get('search')
+                or search_term
                 or request.query_params.get('vendor_username')
                 or request.query_params.get('category')):
-            return super().list(request, *args, **kwargs)
+            response = super().list(request, *args, **kwargs)
+            if search_term:
+                self._log_search(request, search_term, response)
+            return response
 
         user = request.user
         if user.is_authenticated:
@@ -171,6 +176,18 @@ class ListingViewSet(viewsets.ModelViewSet):
         response = super().list(request, *args, **kwargs)
         cache.set(cache_key, response.data, 60)  # 1 minute
         return response
+
+    def _log_search(self, request, term, response):
+        # Analytics-only — must never break the actual search response.
+        try:
+            results_count = response.data.get('count') if isinstance(response.data, dict) else None
+            SearchQuery.objects.create(
+                query=term.lower()[:200],
+                user=request.user if request.user.is_authenticated else None,
+                results_count=results_count or 0,
+            )
+        except Exception:
+            pass
 
     def get_queryset(self):
         user = self.request.user

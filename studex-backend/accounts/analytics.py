@@ -288,6 +288,58 @@ class AdminAnalytics:
             return []
 
     @staticmethod
+    def get_most_searched_products(limit=10, days=None):
+        """
+        Top search terms by frequency (services.models.SearchQuery, logged from
+        ListingViewSet.list() on every non-empty ?search= call). days=None means
+        all-time; pass e.g. days=30 to scope to a recent window.
+        """
+        try:
+            from services.models import SearchQuery
+            qs = SearchQuery.objects.all()
+            if days:
+                cutoff = timezone.now() - timedelta(days=days)
+                qs = qs.filter(created_at__gte=cutoff)
+            rows = (
+                qs.values('query')
+                .annotate(count=Count('id'))
+                .order_by('-count')[:limit]
+            )
+            return [{'query': r['query'], 'count': r['count']} for r in rows]
+        except Exception:
+            return []
+
+    @staticmethod
+    def get_most_ordered_products(limit=10, days=None):
+        """
+        Top listings by order count. Excludes pending (never paid) and cancelled
+        orders — only counts orders that represent a real purchase attempt.
+        days=None means all-time; pass e.g. days=30 to scope to a recent window.
+        """
+        try:
+            from orders.models import Order
+            qs = Order.objects.exclude(status__in=['pending', 'cancelled'])
+            if days:
+                cutoff = timezone.now() - timedelta(days=days)
+                qs = qs.filter(created_at__gte=cutoff)
+            rows = (
+                qs.values('listing_id', 'listing__title', 'listing__vendor__username')
+                .annotate(count=Count('id'))
+                .order_by('-count')[:limit]
+            )
+            return [
+                {
+                    'listing_id': r['listing_id'],
+                    'title': r['listing__title'],
+                    'vendor': r['listing__vendor__username'],
+                    'count': r['count'],
+                }
+                for r in rows
+            ]
+        except Exception:
+            return []
+
+    @staticmethod
     def get_dashboard_summary():
         """
         Get complete dashboard summary combining all stats.
@@ -302,5 +354,7 @@ class AdminAnalytics:
             'payments': AdminAnalytics.get_payment_stats(),
             'category_orders': AdminAnalytics.get_category_order_stats(),
             'churning_vendors': AdminAnalytics.get_churning_vendors(),
+            'most_searched_products': AdminAnalytics.get_most_searched_products(),
+            'most_ordered_products': AdminAnalytics.get_most_ordered_products(),
             'timestamp': timezone.now().isoformat(),
         }

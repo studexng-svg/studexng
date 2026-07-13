@@ -6,7 +6,7 @@ import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from "recharts";
-import { RefreshCw, TrendingUp, Users, Package, DollarSign, FileText, Activity, UserCheck, Zap } from "lucide-react";
+import { RefreshCw, TrendingUp, Users, Package, DollarSign, FileText, Activity, UserCheck, Zap, Search } from "lucide-react";
 import AdminTopBar from "@/components/layout/AdminTopBar";
 import { api } from "@/lib/api";
 
@@ -353,6 +353,45 @@ export default function AdminAnalytics() {
                     <Bar dataKey="orders" name="Orders" fill={TEAL} radius={[0, 4, 4, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
+              </SectionCard>
+            )}
+
+            {/* Most searched products (search terms) */}
+            {summary?.most_searched_products?.length > 0 && (
+              <SectionCard title="Most Searched" icon={Search}>
+                <ResponsiveContainer width="100%" height={180}>
+                  <BarChart
+                    data={summary.most_searched_products.map((s: any) => ({
+                      name: s.query.length > 14 ? `${s.query.slice(0, 14)}…` : s.query,
+                      count: s.count,
+                    }))}
+                    layout="vertical"
+                    margin={{ top: 0, right: 8, left: 0, bottom: 0 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#F5F5F4" horizontal={false} />
+                    <XAxis type="number" tick={{ fontSize: 10, fill: "#A8A29E" }} allowDecimals={false} />
+                    <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: "#A8A29E" }} width={90} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Bar dataKey="count" name="Searches" fill={BLUE} radius={[0, 4, 4, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </SectionCard>
+            )}
+
+            {/* Most ordered products (listings) */}
+            {summary?.most_ordered_products?.length > 0 && (
+              <SectionCard title="Most Ordered Products" icon={Package}>
+                <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                  {summary.most_ordered_products.map((p: any) => (
+                    <div key={p.listing_id} className="flex items-center justify-between py-1.5 border-b border-stone-100 last:border-0">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-stone-800 truncate">{p.title}</p>
+                        <p className="text-xs text-stone-400">by @{p.vendor}</p>
+                      </div>
+                      <p className="font-bold text-stone-900 text-sm flex-shrink-0 ml-2">{p.count}</p>
+                    </div>
+                  ))}
+                </div>
               </SectionCard>
             )}
 
