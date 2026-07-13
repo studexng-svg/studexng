@@ -422,3 +422,67 @@ class AdminPricingSettingsTests(APITestCase):
         self.client.force_authenticate(user=self.admin)
         response = self.client.patch(self.url, {'service_fee_percent': '150'})
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class AdminListingDetailFeeCalculationTests(APITestCase):
+    """
+    PATCH /api/admin/listings/{id}/ (accounts/admin_views.py:AdminListingDetailView)
+    — the admin panel's own listing edit page. Bug: this endpoint let admins set
+    `price` directly with no `payout_amount` field at all, silently dropping the
+    platform fee — same class of bug already fixed on the Django admin form.
+    """
+
+    def setUp(self):
+        from decimal import Decimal
+        from services.models import Category, Listing
+        self.client = APIClient()
+        self.admin = User.objects.create_user(
+            username='listing_admin', email='listing_admin@pau.edu.ng', password='pass123', is_staff=True,
+        )
+        self.vendor = User.objects.create_user(
+            username='admin_edit_vendor', email='admin_edit_vendor@pau.edu.ng', password='pass123',
+            user_type='vendor', is_verified_vendor=True,
+        )
+        category = Category.objects.create(title='Admin Listing Edit Cat', slug='admin-listing-edit-cat')
+        self.listing = Listing.objects.create(
+            vendor=self.vendor, category=category, title='Item', description='x',
+            payout_amount=Decimal('1000.00'), price=Decimal('1100.00'), is_available=True,
+        )
+        self.url = f'/api/admin/listings/{self.listing.id}/'
+
+    def test_price_is_not_directly_settable(self):
+        """Sending a raw `price` must not change price at all — it's ignored,
+        not silently accepted and desynced from payout_amount."""
+        from decimal import Decimal
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.patch(self.url, {'price': '999999.00'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.listing.refresh_from_db()
+        self.assertEqual(self.listing.price, Decimal('1100.00'))  # unchanged
+
+    def test_editing_payout_amount_recomputes_price(self):
+        from decimal import Decimal
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.patch(self.url, {'payout_amount': '2000.00'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.listing.refresh_from_db()
+        self.assertEqual(self.listing.payout_amount, Decimal('2000.00'))
+        # 8% of 2000 = 160 (above the ₦100 floor) -> price = 2160.
+        self.assertEqual(self.listing.price, Decimal('2160.00'))
+
+    def test_rejects_zero_or_negative_payout_amount(self):
+        from decimal import Decimal
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.patch(self.url, {'payout_amount': '0'})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.listing.refresh_from_db()
+        self.assertEqual(self.listing.price, Decimal('1100.00'))  # unchanged
+
+    def test_title_and_availability_still_editable(self):
+        """Regression: this fix must not break the other editable fields."""
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.patch(self.url, {'title': 'Renamed Item', 'is_available': False})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.listing.refresh_from_db()
+        self.assertEqual(self.listing.title, 'Renamed Item')
+        self.assertFalse(self.listing.is_available)

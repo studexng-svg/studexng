@@ -429,7 +429,13 @@ try:
 
             Allowed fields:
                 - is_available: Enable/disable listing
-                - title, description, price: Update details
+                - title, description, payout_amount: Update details
+
+            `price` is never set directly here — it's always derived from
+            payout_amount via payments.pricing.calculate_final_price, the same
+            rule the vendor-facing API and Django admin both enforce. Letting
+            an admin edit price directly desyncs it from payout_amount and
+            silently drops the platform fee.
             """
             try:
                 listing = Listing.objects.get(id=listing_id)
@@ -449,8 +455,17 @@ try:
                 if 'description' in request.data:
                     listing.description = request.data['description']
 
-                if 'price' in request.data:
-                    listing.price = request.data['price']
+                if 'payout_amount' in request.data:
+                    from decimal import Decimal, InvalidOperation
+                    from payments.pricing import calculate_final_price
+                    try:
+                        payout_amount = Decimal(str(request.data['payout_amount']))
+                    except InvalidOperation:
+                        return Response({'error': 'payout_amount must be a number.'}, status=status.HTTP_400_BAD_REQUEST)
+                    if payout_amount <= 0:
+                        return Response({'error': 'payout_amount must be greater than zero.'}, status=status.HTTP_400_BAD_REQUEST)
+                    listing.payout_amount = payout_amount
+                    listing.price = calculate_final_price(payout_amount)
 
                 listing.save()
 

@@ -25,7 +25,7 @@ export default function AdminListingDetail() {
   const [toast, setToast] = useState("");
 
   const [title, setTitle] = useState("");
-  const [price, setPrice] = useState("");
+  const [payoutAmount, setPayoutAmount] = useState("");
   const [description, setDescription] = useState("");
   const [stock, setStock] = useState("");
 
@@ -41,7 +41,7 @@ export default function AdminListingDetail() {
       .then(d => {
         setListing(d);
         setTitle(d.title || "");
-        setPrice(d.price || "");
+        setPayoutAmount(d.payout_amount || "");
         setDescription(d.description || "");
         setStock(String(d.stock_quantity ?? ""));
       })
@@ -63,7 +63,7 @@ export default function AdminListingDetail() {
   };
 
   const saveEdit = async () => {
-    const updated = await patch({ title, description, price: Number(price), stock_quantity: Number(stock) }, "save");
+    const updated = await patch({ title, description, payout_amount: Number(payoutAmount), stock_quantity: Number(stock) }, "save");
     if (updated) {
       setEditing(false);
       showToast("Changes saved!");
@@ -199,6 +199,50 @@ export default function AdminListingDetail() {
               </>
             )}
           </div>
+
+          {/* Payout / fee / buyer-price breakdown */}
+          {listing.variants?.length > 0 ? (
+            <div className="bg-stone-50 border border-stone-100 rounded-xl p-3 space-y-2">
+              {listing.variants.map((v: any) => {
+                const fee = Number(v.price) - Number(v.payout_amount);
+                const unitSuffix = listing.is_per_unit ? `/${listing.unit_label || "unit"}` : "";
+                return (
+                  <div key={v.id} className="text-xs">
+                    <p className="font-semibold text-stone-700 mb-0.5">{v.title}</p>
+                    <div className="flex items-center justify-between text-stone-400">
+                      <span>Vendor gets ₦{Number(v.payout_amount).toLocaleString()}{unitSuffix}</span>
+                      <span>+₦{fee.toLocaleString()} fee</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-stone-400">Buyer pays</span>
+                      <span className="font-bold text-teal-600">₦{Number(v.price).toLocaleString()}{unitSuffix}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="bg-stone-50 border border-stone-100 rounded-xl px-3 py-2 text-xs space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-stone-400">Vendor gets</span>
+                <span className="font-semibold text-stone-700">
+                  ₦{Number(listing.payout_amount ?? listing.price).toLocaleString()}
+                  {listing.is_per_unit ? `/${listing.unit_label || "unit"}` : ""}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-stone-400">Platform fee</span>
+                <span className="font-semibold text-stone-700">+₦{Number(listing.platform_fee ?? 0).toLocaleString()}</span>
+              </div>
+              <div className="flex items-center justify-between pt-1 mt-1 border-t border-stone-200">
+                <span className="text-stone-400">Buyer pays</span>
+                <span className="font-bold text-teal-600">
+                  ₦{Number(listing.price).toLocaleString()}{listing.is_per_unit ? `/${listing.unit_label || "unit"}` : ""}
+                </span>
+              </div>
+            </div>
+          )}
+
           {/* Status pill */}
           <div>
             <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${listing.is_available ? "bg-teal-100 text-teal-700" : "bg-amber-100 text-amber-700"}`}>
@@ -226,9 +270,14 @@ export default function AdminListingDetail() {
                   value={title} onChange={e => setTitle(e.target.value)} />
               </div>
               <div>
-                <label className="text-xs text-stone-500 mb-1 block font-medium">Price (₦)</label>
+                <label className="text-xs text-stone-500 mb-1 block font-medium">
+                  Vendor payout (₦){listing.is_per_unit ? ` per ${listing.unit_label || "unit"}` : ""}
+                </label>
                 <input type="number" className="w-full border border-stone-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
-                  value={price} onChange={e => setPrice(e.target.value)} />
+                  value={payoutAmount} onChange={e => setPayoutAmount(e.target.value)} />
+                <p className="text-xs text-stone-400 mt-1">
+                  Buyer price is computed automatically (payout + platform fee) — it's never entered directly.
+                </p>
               </div>
               {listing.track_inventory && (
                 <div>
