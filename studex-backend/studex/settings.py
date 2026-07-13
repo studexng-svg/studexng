@@ -79,6 +79,7 @@ INSTALLED_APPS = [
     'loyalty',
     'notifications',
     'delivery',
+    'customers',
 ]
 
 MIDDLEWARE = [

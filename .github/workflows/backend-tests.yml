@@ -72,7 +72,7 @@ jobs:
           # NOTE: `wallet` is intentionally excluded — it is not registered in
           # INSTALLED_APPS (studex/settings.py) so `manage.py test wallet`
           # ImportErrors. See CI-repair report for details.
-          python -m coverage run --source='.' manage.py test accounts orders services chat payments
+          python -m coverage run --source='.' manage.py test accounts orders services chat payments customers
           python -m coverage combine
           python -m coverage report
           python -m coverage xml

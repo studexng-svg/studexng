@@ -54,3 +54,20 @@ def sync_payout_transaction(sender, instance, **kwargs):
             txn.save(update_fields=['status', 'released_at'])
     except Exception:
         pass
+
+
+@receiver(post_save, sender='orders.Order')
+def update_vendor_customer_stats(sender, instance, **kwargs):
+    """
+    Keep customers.VendorCustomer in sync whenever an order reaches 'completed'.
+    Signal-based (not just hooked into OrderViewSet.confirm()) because there are
+    multiple paths to 'completed' — buyer confirm, the scheduler's auto-release,
+    and admin force-complete actions — and all of them must update this stat.
+    """
+    if instance.status != 'completed' or not instance.listing_id:
+        return
+    try:
+        from customers.services import recompute_vendor_customer
+        recompute_vendor_customer(instance.listing.vendor_id, instance.buyer_id)
+    except Exception:
+        pass
