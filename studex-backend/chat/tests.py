@@ -718,7 +718,11 @@ class ChatPaymentGateTests(APITestCase):
         self.assertTrue(Conversation.objects.get(id=response.data['id']).order_id is not None)
 
     def test_send_blocked_once_order_completed(self):
-        """Chat expires permanently once the buyer confirms and payout is released."""
+        """
+        Chat expires permanently once the buyer confirms and payout is released —
+        it disappears entirely for the buyer/seller (excluded from get_queryset()),
+        so send() 404s rather than reaching a reachable-but-blocked 403.
+        """
         order = Order.objects.create(
             reference='ORD-GATE-0004', buyer=self.buyer, listing=self.listing,
             amount=Decimal('1000.00'), status='completed',
@@ -727,11 +731,17 @@ class ChatPaymentGateTests(APITestCase):
         self.client.force_authenticate(user=self.buyer)
 
         response = self.client.post(f'/api/chat/conversations/{conversation.id}/send/', {'content': 'Hi'})
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-        self.assertEqual(BlockedMessageAttempt.objects.filter(reason='expired').count(), 1)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        # The 'expired' BlockedMessageAttempt branch in send() is now unreachable —
+        # get_object() 404s before ever getting there.
+        self.assertEqual(BlockedMessageAttempt.objects.filter(reason='expired').count(), 0)
 
-    def test_expired_conversation_cannot_be_deleted(self):
-        """History must survive for admin visibility — block destroy() once expired."""
+    def test_expired_conversation_invisible_to_participants(self):
+        """
+        Once expired, the conversation disappears entirely for buyer/seller (404 on
+        retrieve/delete/etc — excluded from get_queryset()), but the row itself is
+        untouched in the DB so admin (a separate, unrestricted view) still sees it.
+        """
         order = Order.objects.create(
             reference='ORD-GATE-0005', buyer=self.buyer, listing=self.listing,
             amount=Decimal('1000.00'), status='completed',
@@ -740,7 +750,7 @@ class ChatPaymentGateTests(APITestCase):
         self.client.force_authenticate(user=self.buyer)
 
         response = self.client.delete(f'/api/chat/conversations/{conversation.id}/')
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
         self.assertTrue(Conversation.objects.filter(id=conversation.id).exists())
 
     def test_non_expired_conversation_can_still_be_deleted(self):

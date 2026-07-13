@@ -57,16 +57,19 @@ class ConversationViewSet(viewsets.ModelViewSet):
 
     # Order/Booking statuses that count as "paid enough" to unlock chat history.
     UNLOCKED_ORDER_STATUSES = {'paid', 'seller_completed', 'completed', 'disputed'}
+    # Subset that justifies creating/reactivating a conversation. 'completed' is
+    # deliberately excluded here — it's the status that expires a conversation, so
+    # it must never be treated as grounds for (re)creating access to one.
+    ACTIVE_ORDER_STATUSES = {'paid', 'seller_completed', 'disputed'}
     # Once the order is fully completed (buyer confirmed, payout released), the chat
-    # expires permanently — history stays visible to the two participants and to
-    # admin, but no new messages can be sent.
+    # expires permanently — it disappears entirely for the buyer and seller (excluded
+    # below in get_queryset). Only admin retains access, via AdminConversationListView/
+    # AdminConversationDetailView (accounts/admin_views.py), which query Conversation
+    # directly and don't go through this ViewSet.
     EXPIRED_ORDER_STATUSES = {'completed'}
 
     def _is_unlocked(self, conversation):
         return conversation.order_id is not None and conversation.order.status in self.UNLOCKED_ORDER_STATUSES
-
-    def _is_expired(self, conversation):
-        return conversation.order_id is not None and conversation.order.status in self.EXPIRED_ORDER_STATUSES
 
     def get_queryset(self):
         user = self.request.user
@@ -74,6 +77,8 @@ class ConversationViewSet(viewsets.ModelViewSet):
             Q(buyer=user) | Q(seller=user)
         ).filter(
             Q(listing__isnull=True) | Q(listing__campus__iexact=user.school)
+        ).exclude(
+            order__status__in=self.EXPIRED_ORDER_STATUSES
         ).select_related('buyer', 'seller', 'listing', 'order').order_by('-updated_at')
 
     def create(self, request, *args, **kwargs):
@@ -107,7 +112,7 @@ class ConversationViewSet(viewsets.ModelViewSet):
             return Response({'error': 'You can only message vendors from your campus.'}, status=403)
 
         qualifying_order = Order.objects.filter(
-            buyer=request.user, listing=listing, status__in=self.UNLOCKED_ORDER_STATUSES
+            buyer=request.user, listing=listing, status__in=self.ACTIVE_ORDER_STATUSES
         ).order_by('-paid_at').first()
 
         if qualifying_order is None:
@@ -169,6 +174,12 @@ class ConversationViewSet(viewsets.ModelViewSet):
         if order.listing.vendor != request.user and order.buyer != request.user:
             return Response({'error': 'Not a participant in this order'}, status=403)
 
+        if order.status in self.EXPIRED_ORDER_STATUSES:
+            return Response(
+                {'error': 'This order is complete — its chat has expired and is no longer accessible.'},
+                status=403,
+            )
+
         conversation, _ = Conversation.objects.get_or_create(
             buyer=order.buyer,
             seller=order.listing.vendor,
@@ -202,7 +213,7 @@ class ConversationViewSet(viewsets.ModelViewSet):
             return Response({'error': 'Not a participant in this booking'}, status=403)
 
         qualifying_order = Order.objects.filter(
-            buyer=booking.buyer, listing=booking.listing, status__in=self.UNLOCKED_ORDER_STATUSES
+            buyer=booking.buyer, listing=booking.listing, status__in=self.ACTIVE_ORDER_STATUSES
         ).order_by('-paid_at').first()
 
         conversation, _ = Conversation.objects.get_or_create(
@@ -218,12 +229,9 @@ class ConversationViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
     def destroy(self, request, *args, **kwargs):
+        # Expired conversations are excluded from get_queryset() entirely, so
+        # get_object() already 404s before we'd ever get here for one of those.
         conversation = self.get_object()
-        if self._is_expired(conversation):
-            return Response(
-                {'error': 'This chat has ended and is kept for order history — it can no longer be deleted.'},
-                status=403,
-            )
         conversation.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -271,15 +279,8 @@ class ConversationViewSet(viewsets.ModelViewSet):
                 status=403,
             )
 
-        if self._is_expired(conversation):
-            BlockedMessageAttempt.objects.create(
-                sender=request.user, conversation=conversation, reason='expired',
-                attempted_content=request.data.get('content', '')[:250],
-            )
-            return Response(
-                {'error': 'This chat has ended — the order was completed and payment released.'},
-                status=403,
-            )
+        # No expiry check needed here — expired conversations are excluded from
+        # get_queryset() entirely, so get_object() above already 404s for them.
 
         content = request.data.get('content', '').strip()
         image = request.FILES.get('image')

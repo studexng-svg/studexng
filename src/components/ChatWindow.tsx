@@ -96,7 +96,6 @@ export default function ChatWindow({
 
   const [otherUserLastSeen, setOtherUserLastSeen] = useState<string | null>(null);
   const [otherUserOnline, setOtherUserOnline] = useState(false);
-  const [isExpired, setIsExpired] = useState(false);
   const [lockedMessage, setLockedMessage] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -152,7 +151,6 @@ export default function ChatWindow({
         setConversationId(conv.id);
         setOtherUserLastSeen(conv.other_user?.last_seen || null);
         setOtherUserOnline(conv.other_user?.is_online || false);
-        setIsExpired(!!conv.is_expired);
         const msgRes = await api.chat.messages(conv.id);
         const raw = await msgRes.json();
         const mapped = mapMessages(Array.isArray(raw) ? raw : raw.results || []);
@@ -201,7 +199,6 @@ export default function ChatWindow({
     if (!presenceData) return;
     setOtherUserLastSeen(presenceData.other_user?.last_seen || null);
     setOtherUserOnline(presenceData.other_user?.is_online || false);
-    setIsExpired(!!presenceData.is_expired);
   }, [presenceData]);
 
   const formatLastSeen = (lastSeen: string | null): string => {
@@ -331,7 +328,7 @@ export default function ChatWindow({
   };
 
   const handleSend = async () => {
-    if ((!message.trim() && !imageFile) || !conversationId || sending || isExpired) return;
+    if ((!message.trim() && !imageFile) || !conversationId || sending) return;
     if (message.trim().length > MESSAGE_MAX_LENGTH) {
       setError(`Messages are limited to ${MESSAGE_MAX_LENGTH} characters.`);
       setTimeout(() => setError(""), 3000);
@@ -625,13 +622,8 @@ export default function ChatWindow({
           </div>
         )}
 
-        {/* ── ESCROW / EXPIRED BANNER ── */}
-        {isExpired ? (
-          <div className="bg-stone-100 border-t border-stone-200 px-4 py-2.5 flex items-center gap-2 flex-shrink-0">
-            <Lock className="w-3.5 h-3.5 text-stone-400 flex-shrink-0" />
-            <p className="text-xs text-stone-500 font-medium">This chat has ended — the order was completed and payment released.</p>
-          </div>
-        ) : conversationId && (
+        {/* ── ESCROW BANNER ── */}
+        {conversationId && (
           <div className="bg-teal-50 border-t border-teal-100 px-4 py-2 flex items-center gap-2 flex-shrink-0">
             <Shield className="w-3.5 h-3.5 text-teal-600 flex-shrink-0" />
             <p className="text-xs text-teal-700 font-semibold">Payment Protected by StudEx · Escrow Active</p>
@@ -641,10 +633,9 @@ export default function ChatWindow({
         {/* ── INPUT BAR ── */}
         <div className="bg-white border-t border-stone-100 px-4 py-3 flex-shrink-0">
           <div className="flex items-center gap-2">
-            <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageSelect} disabled={isExpired} />
+            <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageSelect} />
             <button
               onClick={() => fileInputRef.current?.click()}
-              disabled={isExpired}
               className="p-2.5 bg-teal-50 text-teal-600 rounded-xl hover:bg-teal-100 transition flex-shrink-0 disabled:opacity-40"
             >
               <ImageIcon className="w-5 h-5" />
@@ -653,22 +644,21 @@ export default function ChatWindow({
               type="text"
               value={message}
               maxLength={MESSAGE_MAX_LENGTH}
-              disabled={isExpired}
               onChange={e => setMessage(e.target.value.slice(0, MESSAGE_MAX_LENGTH))}
               onKeyDown={e => e.key === "Enter" && !e.shiftKey && (e.preventDefault(), handleSend())}
-              placeholder={isExpired ? 'This chat has ended' : imageFile ? 'Add a caption (optional)...' : 'Type a message...'}
+              placeholder={imageFile ? 'Add a caption (optional)...' : 'Type a message...'}
               className="flex-1 px-4 py-2.5 bg-stone-50 text-stone-900 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/30 border border-stone-200 placeholder-stone-400 transition disabled:opacity-60"
             />
             <button
               onClick={handleSend}
-              disabled={sending || !conversationId || isExpired || (!message.trim() && !imageFile)}
+              disabled={sending || !conversationId || (!message.trim() && !imageFile)}
               className="p-2.5 text-white rounded-xl disabled:opacity-40 flex-shrink-0 transition active:scale-95"
               style={{ background: TEAL }}
             >
               {sending ? <Loader className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
             </button>
           </div>
-          {!isExpired && message.length > 0 && (
+          {message.length > 0 && (
             <p className={`text-xs mt-1 text-right ${message.length >= MESSAGE_MAX_LENGTH ? "text-red-500" : "text-stone-400"}`}>
               {message.length}/{MESSAGE_MAX_LENGTH}
             </p>

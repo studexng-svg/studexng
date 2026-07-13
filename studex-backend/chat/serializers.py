@@ -36,14 +36,13 @@ class ConversationSerializer(serializers.ModelSerializer):
     unread_count = serializers.SerializerMethodField()
     other_user = serializers.SerializerMethodField()
     is_unlocked = serializers.SerializerMethodField()
-    is_expired = serializers.SerializerMethodField()
     order_status = serializers.SerializerMethodField()
 
     class Meta:
         model = Conversation
         fields = [
             'id', 'buyer', 'buyer_username', 'seller', 'seller_username',
-            'listing', 'listing_title', 'listing_image', 'order', 'order_status', 'is_unlocked', 'is_expired',
+            'listing', 'listing_title', 'listing_image', 'order', 'order_status', 'is_unlocked',
             'last_message', 'last_message_at', 'unread_count',
             'other_user', 'created_at', 'updated_at'
         ]
@@ -52,10 +51,6 @@ class ConversationSerializer(serializers.ModelSerializer):
     def get_is_unlocked(self, obj):
         from .views import ConversationViewSet
         return obj.order_id is not None and obj.order.status in ConversationViewSet.UNLOCKED_ORDER_STATUSES
-
-    def get_is_expired(self, obj):
-        from .views import ConversationViewSet
-        return obj.order_id is not None and obj.order.status in ConversationViewSet.EXPIRED_ORDER_STATUSES
 
     def get_order_status(self, obj):
         return obj.order.status if obj.order_id else None

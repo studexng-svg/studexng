@@ -77,7 +77,7 @@ export default function ChatRoomPage() {
   const [imagePreview, setImagePreview]   = useState<string | null>(null);
   const [error, setError]                 = useState("");
   const [isPolicy, setIsPolicy]           = useState(false);
-  const [isExpired, setIsExpired]         = useState(false);
+  const [notFound, setNotFound]           = useState(false);
   const flash = (m: string, policy = false) => {
     setError(m); setIsPolicy(policy);
     setTimeout(() => { setError(""); setIsPolicy(false); }, policy ? 6000 : 2500);
@@ -153,7 +153,9 @@ export default function ChatRoomPage() {
           setOtherUserPicture(conv.other_user?.profile_picture || null);
           setOtherUserLastSeen(conv.other_user?.last_seen || null);
           setOtherUserOnline(conv.other_user?.is_online || false);
-          setIsExpired(!!conv.is_expired);
+        } else if (res.status === 404) {
+          // Conversation expired while this page was open (order just completed).
+          setNotFound(true);
         }
       } catch {}
     }, 15000);
@@ -223,10 +225,13 @@ export default function ChatRoomPage() {
         setListingTitle(convData.listing_title || "");
         setOtherUserLastSeen(convData.other_user?.last_seen || null);
         setOtherUserOnline(convData.other_user?.is_online || false);
-        setIsExpired(!!convData.is_expired);
+        await loadMessages();
+        await loadPinned();
+      } else {
+        // Not found here means either it never existed, or it expired — completed
+        // orders' chats disappear entirely for the buyer/seller (admin still sees them).
+        setNotFound(true);
       }
-      await loadMessages();
-      await loadPinned();
     } catch (e) {
       console.error("Failed to load conversation", e);
     } finally {
@@ -363,7 +368,7 @@ export default function ChatRoomPage() {
   };
 
   const handleSend = async () => {
-    if (sending || isExpired || (!input.trim() && !imageFile)) return;
+    if (sending || (!input.trim() && !imageFile)) return;
     if (input.trim().length > MESSAGE_MAX_LENGTH) {
       flash(`Messages are limited to ${MESSAGE_MAX_LENGTH} characters.`);
       return;
@@ -426,6 +431,23 @@ export default function ChatRoomPage() {
   if (loading) return (
     <div className="flex justify-center items-center min-h-screen" style={{ background: "#F5F5F5" }}>
       <Loader className="w-8 h-8 text-teal-600 animate-spin" />
+    </div>
+  );
+
+  if (notFound) return (
+    <div className="flex flex-col justify-center items-center min-h-screen gap-4 px-6 text-center" style={{ background: "#F5F5F5" }}>
+      <div className="w-14 h-14 rounded-full bg-stone-200 flex items-center justify-center">
+        <Lock className="w-6 h-6 text-stone-400" />
+      </div>
+      <div>
+        <p className="font-bold text-stone-900 text-base">This conversation is no longer available</p>
+        <p className="text-sm text-stone-500 mt-1">Chats close once an order is completed and payment is released.</p>
+      </div>
+      <button onClick={() => router.push("/chat")}
+        className="mt-2 px-5 py-2.5 rounded-full text-white text-sm font-semibold active:scale-95 transition"
+        style={{ background: "#0d9488" }}>
+        Back to messages
+      </button>
     </div>
   );
 
@@ -723,18 +745,11 @@ export default function ChatRoomPage() {
         </div>
       )}
 
-      {/* ── ESCROW / EXPIRED BANNER ── */}
-      {isExpired ? (
-        <div className="flex-shrink-0 bg-stone-100 border-t border-stone-200 px-4 py-2.5 flex items-center gap-2">
-          <Lock className="w-3.5 h-3.5 text-stone-400 flex-shrink-0" />
-          <p className="text-xs text-stone-500 font-medium">This chat has ended — the order was completed and payment released.</p>
-        </div>
-      ) : (
-        <div className="flex-shrink-0 bg-teal-50 border-t border-teal-100 px-4 py-2 flex items-center gap-2">
-          <Shield className="w-3.5 h-3.5 text-teal-600 flex-shrink-0" />
-          <p className="text-xs text-teal-700 font-semibold">Payment Protected by StudEx · Escrow Active</p>
-        </div>
-      )}
+      {/* ── ESCROW BANNER ── */}
+      <div className="flex-shrink-0 bg-teal-50 border-t border-teal-100 px-4 py-2 flex items-center gap-2">
+        <Shield className="w-3.5 h-3.5 text-teal-600 flex-shrink-0" />
+        <p className="text-xs text-teal-700 font-semibold">Payment Protected by StudEx · Escrow Active</p>
+      </div>
 
       {/* ── INPUT BAR ── */}
       <div className="flex-shrink-0 bg-white border-t border-stone-100">
@@ -753,7 +768,7 @@ export default function ChatRoomPage() {
         )}
 
         <div className="px-4 py-3 flex items-center gap-2">
-          <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageSelect} disabled={isExpired} />
+          <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageSelect} />
 
           {/* Pill input */}
           <div className="flex-1 flex items-center bg-stone-100 rounded-full px-4 py-2 gap-2">
@@ -761,34 +776,33 @@ export default function ChatRoomPage() {
               ref={inputRef}
               value={input}
               maxLength={MESSAGE_MAX_LENGTH}
-              disabled={isExpired}
               onChange={e => handleTyping(e.target.value.slice(0, MESSAGE_MAX_LENGTH))}
               onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-              placeholder={isExpired ? "This chat has ended" : imageFile ? "Add a caption..." : replyingTo ? "Write your reply..." : "Type message..."}
+              placeholder={imageFile ? "Add a caption..." : replyingTo ? "Write your reply..." : "Type message..."}
               className="flex-1 bg-transparent text-stone-900 text-sm focus:outline-none placeholder-stone-400 disabled:opacity-60"
             />
             {/* Image attach inside pill */}
-            <button onClick={() => fileInputRef.current?.click()} disabled={isExpired}
+            <button onClick={() => fileInputRef.current?.click()}
               className="text-stone-400 hover:text-teal-500 transition flex-shrink-0 disabled:opacity-40">
               <ImageIcon className="w-4.5 h-4.5" />
             </button>
           </div>
 
           {/* Mic */}
-          <button onClick={() => flash("Voice messages coming soon")} disabled={isExpired}
+          <button onClick={() => flash("Voice messages coming soon")}
             className="w-11 h-11 rounded-full bg-stone-100 flex items-center justify-center text-stone-500 hover:bg-stone-200 transition active:scale-95 flex-shrink-0 disabled:opacity-40">
             <Mic className="w-5 h-5" />
           </button>
 
           {/* Send */}
           <button onClick={handleSend}
-            disabled={sending || isExpired || (!input.trim() && !imageFile)}
+            disabled={sending || (!input.trim() && !imageFile)}
             className="w-11 h-11 rounded-full flex items-center justify-center text-white disabled:opacity-40 flex-shrink-0 transition active:scale-95 shadow-md"
             style={{ background: "#0d9488" }}>
             {sending ? <Loader className="w-4.5 h-4.5 animate-spin" /> : <Send className="w-4.5 h-4.5" />}
           </button>
         </div>
-        {!isExpired && input.length > 0 && (
+        {input.length > 0 && (
           <p className={`text-xs text-right px-4 pb-2 -mt-1 ${input.length >= MESSAGE_MAX_LENGTH ? "text-red-500" : "text-stone-400"}`}>
             {input.length}/{MESSAGE_MAX_LENGTH}
           </p>

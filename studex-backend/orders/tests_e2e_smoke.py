@@ -116,17 +116,17 @@ class FullLifecycleSmokeTest(TestCase):
         step("12. Chat has now EXPIRED — buyer can no longer send messages")
         res = client.post(f'/api/chat/conversations/{conversation.id}/send/', {'content': 'thanks!'})
         print(res.status_code, res.data)
-        self.assertEqual(res.status_code, 403)
+        self.assertEqual(res.status_code, 404)
 
-        step("13. Conversation history is still fully readable")
+        step("13. Conversation has disappeared entirely for the participant")
         res = client.get(f'/api/chat/conversations/{conversation.id}/messages/')
-        print(f"{len(res.data)} messages still visible to participant")
-        self.assertGreaterEqual(len(res.data), 1)
+        print(res.status_code, "— no longer visible to participant")
+        self.assertEqual(res.status_code, 404)
 
-        step("14. Participant cannot delete the expired conversation")
+        step("14. Participant cannot even see the expired conversation to delete it")
         res = client.delete(f'/api/chat/conversations/{conversation.id}/')
         print(res.status_code, res.data)
-        self.assertEqual(res.status_code, 403)
+        self.assertEqual(res.status_code, 404)
         self.assertTrue(Conversation.objects.filter(id=conversation.id).exists())
 
         step("15. Admin can still see the full conversation regardless of expiry")
