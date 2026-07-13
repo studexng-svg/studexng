@@ -3,6 +3,7 @@ Test suite for orders app - order creation, management, disputes
 """
 from django.test import TestCase
 from django.utils import timezone
+from datetime import timedelta
 from unittest import skip
 from unittest.mock import patch
 from rest_framework.test import APIClient, APITestCase
@@ -923,3 +924,79 @@ class BookingVariantTests(APITestCase):
         self.client.force_authenticate(user=self.buyer)
         response = self.client.post(self.booking_url, self._payload(self.no_variant_listing.id))
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+
+class AutoReleaseOrdersPayoutTests(TestCase):
+    """
+    scheduler.auto_release_orders() must trigger the same vendor payout as
+    OrderViewSet.confirm() — a buyer who goes silent for 24h+ shouldn't cost
+    the vendor their payout. Regression test for the bug where auto-release
+    only flipped Order.status/Transaction.status without ever calling
+    payments.views._transfer_to_vendor (the real Paystack Transfer API call).
+    """
+
+    def setUp(self):
+        from payments.models import PaymentTransaction
+
+        self.buyer = User.objects.create_user(
+            username='buyer', email='buyer@pau.edu.ng', password='pass123',
+        )
+        self.seller = User.objects.create_user(
+            username='seller', email='seller@pau.edu.ng', password='pass123',
+            user_type='vendor', is_verified_vendor=True,
+        )
+        self.category = Category.objects.create(title='Food', slug='food')
+        self.listing = Listing.objects.create(
+            vendor=self.seller, category=self.category, title='Test Product',
+            description='desc', price=Decimal('1000.00'), is_available=True,
+        )
+        self.order = Order.objects.create(
+            reference='ORD-AUTOREL-01', buyer=self.buyer, listing=self.listing,
+            amount=Decimal('1000.00'), status='seller_completed',
+        )
+        # Backdate seller_completed_at past the 24h auto-release cutoff.
+        Order.objects.filter(id=self.order.id).update(
+            seller_completed_at=timezone.now() - timedelta(hours=25)
+        )
+        self.txn = PaymentTransaction.objects.create(
+            reference=self.order.reference, buyer=self.buyer, seller=self.seller,
+            amount=Decimal('1000.00'), seller_amount=Decimal('950.00'),
+            platform_amount=Decimal('50.00'), buyer_email=self.buyer.email,
+            status='success',
+        )
+
+    def test_auto_release_triggers_vendor_payout(self):
+        from scheduler import auto_release_orders
+
+        with patch('payments.views._transfer_to_vendor') as mock_transfer:
+            auto_release_orders()
+
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.status, 'completed')
+        self.assertTrue(self.order.auto_released)
+        mock_transfer.assert_called_once()
+
+    def test_auto_release_skips_payout_if_already_transferred(self):
+        from scheduler import auto_release_orders
+
+        self.txn.transfer_reference = 'ALREADY-PAID-REF'
+        self.txn.save(update_fields=['transfer_reference'])
+
+        with patch('payments.views._transfer_to_vendor') as mock_transfer:
+            auto_release_orders()
+
+        mock_transfer.assert_not_called()
+
+    def test_auto_release_does_not_touch_recent_orders(self):
+        from scheduler import auto_release_orders
+
+        Order.objects.filter(id=self.order.id).update(
+            seller_completed_at=timezone.now() - timedelta(hours=2)
+        )
+
+        with patch('payments.views._transfer_to_vendor') as mock_transfer:
+            auto_release_orders()
+
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.status, 'seller_completed')
+        mock_transfer.assert_not_called()

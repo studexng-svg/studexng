@@ -126,13 +126,16 @@ def send_booking_reminders():
 def auto_release_orders():
     """
     Auto-completes orders stuck in seller_completed for 24 h+ with no buyer
-    confirmation and no open dispute. Vendor was already paid via Paystack
-    Transfer at order time — this just closes the order record.
+    confirmation and no open dispute, and triggers the same vendor payout that
+    OrderViewSet.confirm() would have (the vendor did the work — a buyer who
+    just goes silent shouldn't cost the vendor their payout).
     Idempotent: auto_released=True prevents double-processing.
     """
     from django.db import transaction as db_tx
     from orders.models import Order
     from accounts.utils import send_notification
+    from payments.models import PaymentTransaction
+    from payments.views import _transfer_to_vendor
 
     cutoff = timezone.now() - timedelta(hours=24)
 
@@ -159,6 +162,17 @@ def auto_release_orders():
                 locked.auto_released = True
                 locked.buyer_confirmed_at = timezone.now()
                 locked.save(update_fields=['status', 'auto_released', 'buyer_confirmed_at'])
+
+            # Same payout trigger as OrderViewSet.confirm() — outside the lock,
+            # same as the view does, since it's an external API call.
+            try:
+                txn = PaymentTransaction.objects.filter(
+                    reference=order.reference, status="success"
+                ).first()
+                if txn and not txn.transfer_reference:
+                    _transfer_to_vendor(txn, order.listing.title)
+            except Exception as pe:
+                logger.warning(f"Auto-release payout trigger failed for order {order.id}: {pe}")
 
             send_notification(
                 recipient=order.listing.vendor,
