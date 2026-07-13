@@ -9,7 +9,7 @@ from rest_framework.test import APIClient, APITestCase
 from rest_framework import status
 
 from accounts.models import User
-from services.models import Category, Listing
+from services.models import Category, Listing, ListingVariant
 from orders.models import Order, Booking
 from chat.models import Conversation
 from payments.views import _create_order_from_paystack_data
@@ -332,6 +332,78 @@ class PerUnitBookingSettlementTests(TestCase):
         booking2.refresh_from_db()
         self.assertEqual(booking1.status, 'paid')
         self.assertEqual(booking2.status, 'pending')  # NOT blindly flipped
+
+
+class VariantBookingSettlementTests(TestCase):
+    """
+    _create_order_from_paystack_data — when a booking picked a named variant
+    (e.g. "Washing Only" vs "Washing & Ironing" under one listing), settlement
+    must use the variant's payout_amount, not the listing's own.
+    """
+
+    def setUp(self):
+        from payments.models import PricingSettings
+        PricingSettings.objects.update_or_create(pk=1, defaults={'service_fee_percent': Decimal('8.00')})
+
+        self.buyer = User.objects.create_user(
+            username='variant_settle_buyer', email='variant_settle_buyer@pau.edu.ng', password='pass123'
+        )
+        self.seller = User.objects.create_user(
+            username='variant_settle_seller', email='variant_settle_seller@pau.edu.ng', password='pass123',
+            user_type='vendor', is_verified_vendor=True
+        )
+        self.category = Category.objects.create(title='Variant Settlement', slug='variant-settlement')
+        self.listing = Listing.objects.create(
+            title='Laundry Service', description='x', payout_amount=Decimal('500.00'),
+            price=Decimal('600.00'), is_per_unit=True, unit_label='cloth',
+            vendor=self.seller, category=self.category, is_available=True,
+        )
+        self.variant = ListingVariant.objects.create(
+            listing=self.listing, title='Washing Only',
+            payout_amount=Decimal('300.00'), price=Decimal('400.00'),
+        )
+
+    def _fake_paystack_data(self, reference, amount_kobo):
+        return {
+            'amount': amount_kobo,
+            'reference': reference,
+            'id': 888888,
+            'customer': {'email': self.buyer.email},
+            'metadata': {},
+        }
+
+    def test_settlement_uses_variant_payout_not_listing_payout(self):
+        booking = Booking.objects.create(
+            buyer=self.buyer, listing=self.listing, variant=self.variant, scheduled_date='2099-01-01',
+            scheduled_time='2:30 PM', status='pending', quantity=4,
+        )
+        # variant payout=300 * qty 4 = 1200 -> 8% fee = 96, below floor -> 100 -> total 1300.
+        order_id, error = _create_order_from_paystack_data(
+            self._fake_paystack_data('ORD-VARIANT-0001', 130000), self.buyer, self.listing.id, 'service',
+            booking_id=booking.id,
+        )
+        self.assertIsNone(error)
+        from payments.models import PaymentTransaction
+        txn = PaymentTransaction.objects.get(order_id=order_id)
+        # Vendor gets variant.payout_amount * quantity = 1200, NOT the listing's
+        # own payout_amount (500) * quantity (which would be 2000).
+        self.assertEqual(txn.seller_amount, Decimal('1200.00'))
+
+    def test_regression_no_variant_uses_listing_payout(self):
+        """A booking on the same listing with no variant still uses the
+        listing's own payout_amount, exactly as before variants existed."""
+        booking = Booking.objects.create(
+            buyer=self.buyer, listing=self.listing, scheduled_date='2099-01-01',
+            scheduled_time='2:30 PM', status='pending', quantity=4,
+        )
+        order_id, error = _create_order_from_paystack_data(
+            self._fake_paystack_data('ORD-VARIANT-0002', 216000), self.buyer, self.listing.id, 'service',
+            booking_id=booking.id,
+        )
+        self.assertIsNone(error)
+        from payments.models import PaymentTransaction
+        txn = PaymentTransaction.objects.get(order_id=order_id)
+        self.assertEqual(txn.seller_amount, Decimal('2000.00'))
 
 
 @override_settings(PAYSTACK_SECRET_KEY='test-secret-key')

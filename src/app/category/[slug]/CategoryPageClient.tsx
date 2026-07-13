@@ -128,7 +128,11 @@ export default function CategoryPageClient({ slug, initialListings, initialNextP
               }
               return null;
             })()}
-            <p className="font-bold text-stone-900 text-base mt-1.5">₦{Number(listing.price).toLocaleString()}</p>
+            <p className="font-bold text-stone-900 text-base mt-1.5">
+              {listing.variants?.length
+                ? `From ₦${Math.min(...listing.variants.map((v: any) => Number(v.price))).toLocaleString()}`
+                : `₦${Number(listing.price).toLocaleString()}`}
+            </p>
           </div>
         </Link>
         {!isOwn && listing.is_available && !isReserved && (

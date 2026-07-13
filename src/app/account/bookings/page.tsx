@@ -23,6 +23,7 @@ interface Booking {
   listing_title: string;
   listing_price: string;
   quantity: number;
+  variant_title?: string | null;
   vendor_name: string;
   vendor_image?: string | null;
   listing_image?: string | null;
@@ -363,6 +364,12 @@ export default function BuyerBookingsPage() {
                   <span className="text-stone-500 flex-shrink-0">Service</span>
                   <span className="font-semibold text-stone-900 text-right">{activeBooking.listing_title}</span>
                 </div>
+                {activeBooking.variant_title && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-stone-500">Option</span>
+                    <span className="font-semibold text-stone-900">{activeBooking.variant_title}</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-sm">
                   <span className="text-stone-500">Vendor</span>
                   <span className="font-semibold text-stone-900">{activeBooking.vendor_name}</span>
@@ -503,7 +510,9 @@ export default function BuyerBookingsPage() {
                       </div>
                     )}
                     <div className="min-w-0">
-                      <p className="font-semibold text-stone-900 text-base leading-tight">{booking.listing_title}</p>
+                      <p className="font-semibold text-stone-900 text-base leading-tight">
+                        {booking.listing_title}{booking.variant_title ? ` — ${booking.variant_title}` : ""}
+                      </p>
                       <p className="text-sm text-stone-500 mt-0.5">by <span className="font-semibold">{booking.vendor_name}</span></p>
                     </div>
                   </div>

@@ -4,6 +4,7 @@ Central email utility — tries Resend first, falls back to Brevo.
 Use send_email() from anywhere in the codebase.
 """
 import logging
+import sys
 import threading
 
 logger = logging.getLogger(__name__)
@@ -11,6 +12,12 @@ logger = logging.getLogger(__name__)
 FROM_NAME  = "StudEx"
 FROM_EMAIL = "noreply@studex.com.ng"
 FROM_ADDR  = f"{FROM_NAME} <{FROM_EMAIL}>"
+
+# `manage.py test` must never hit the real Resend/Brevo APIs — every test run
+# (creating users, orders, bookings) fires send_notification() with
+# send_email defaulting to True, and nothing else in the stack stops that
+# from reaching the live provider and burning the real daily send quota.
+_IS_TEST_RUN = 'test' in sys.argv or 'pytest' in sys.modules
 
 
 def _html_wrapper(title: str, body_html: str) -> str:
@@ -34,6 +41,9 @@ def _html_wrapper(title: str, body_html: str) -> str:
 
 
 def _try_resend(to: str, subject: str, html: str) -> bool:
+    if _IS_TEST_RUN:
+        logger.info(f"[email] Test run — skipped Resend send to {to}: {subject}")
+        return True
     try:
         import resend
         from django.conf import settings
@@ -51,6 +61,9 @@ def _try_resend(to: str, subject: str, html: str) -> bool:
 
 
 def _try_brevo(to: str, subject: str, html: str) -> bool:
+    if _IS_TEST_RUN:
+        logger.info(f"[email] Test run — skipped Brevo send to {to}: {subject}")
+        return True
     try:
         import requests as http
         from django.conf import settings

@@ -126,7 +126,9 @@ export default function CategoriesClient({ categories }: { categories: Category[
         @{listing.vendor?.username ?? listing.vendor}
       </p>
       <p className="font-semibold text-stone-800 text-sm mt-1">
-        ₦{Number(listing.price).toLocaleString()}
+        {listing.variants?.length
+          ? `From ₦${Math.min(...listing.variants.map((v: any) => Number(v.price))).toLocaleString()}`
+          : `₦${Number(listing.price).toLocaleString()}`}
       </p>
     </Link>
   );

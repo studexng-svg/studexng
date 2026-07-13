@@ -377,7 +377,7 @@ def initialize_payment(request):
     if booking_id:
         from orders.models import Booking
         try:
-            booking = Booking.objects.select_related("listing").get(id=booking_id, buyer=buyer)
+            booking = Booking.objects.select_related("listing", "variant").get(id=booking_id, buyer=buyer)
         except Booking.DoesNotExist:
             return Response({"error": "Booking not found."}, status=404)
 
@@ -429,9 +429,11 @@ def initialize_payment(request):
                 amount = Decimal(str(listing.price))
         else:
             # Single listing — apply deal discount if active
-            if booking is not None and booking.listing.is_per_unit:
+            if booking is not None and (booking.listing.is_per_unit or booking.variant_id):
                 from payments.pricing import calculate_final_price
-                total_payout = Decimal(str(listing.payout_amount)) * booking.quantity
+                unit_payout = booking.variant.payout_amount if booking.variant_id else listing.payout_amount
+                qty = booking.quantity if booking.listing.is_per_unit else 1
+                total_payout = Decimal(str(unit_payout)) * qty
                 amount = calculate_final_price(total_payout)
             else:
                 amount = Decimal(str(listing.price))
@@ -672,12 +674,14 @@ def verify_payment(request):
             from services.models import Listing
             _listing = Listing.objects.get(id=actual_listing_id)
             _booking = None
-            if booking_id and _listing.is_per_unit:
+            if booking_id:
                 from orders.models import Booking as _Booking
-                _booking = _Booking.objects.filter(id=booking_id, listing=_listing).first()
-            if _booking is not None:
+                _booking = _Booking.objects.select_related('variant').filter(id=booking_id, listing=_listing).first()
+            if _booking is not None and (_listing.is_per_unit or _booking.variant_id):
                 from payments.pricing import calculate_final_price as _cfp
-                _base = _cfp(Decimal(str(_listing.payout_amount)) * _booking.quantity)
+                _unit_payout = _booking.variant.payout_amount if _booking.variant_id else _listing.payout_amount
+                _qty = _booking.quantity if _listing.is_per_unit else 1
+                _base = _cfp(Decimal(str(_unit_payout)) * _qty)
             else:
                 _base = Decimal(str(_listing.price))
             try:
@@ -787,15 +791,16 @@ def pay_with_credits(request):
     if booking_id:
         from orders.models import Booking
         try:
-            booking = Booking.objects.select_related("listing").get(id=booking_id, buyer=buyer)
+            booking = Booking.objects.select_related("listing", "variant").get(id=booking_id, buyer=buyer)
         except Booking.DoesNotExist:
             return Response({"error": "Booking not found."}, status=404)
 
     quantity = booking.quantity if (booking is not None and booking.listing.is_per_unit) else 1
 
-    if booking is not None and booking.listing.is_per_unit:
+    if booking is not None and (booking.listing.is_per_unit or booking.variant_id):
         from payments.pricing import calculate_final_price
-        listing_price = calculate_final_price(Decimal(str(listing.payout_amount)) * quantity)
+        unit_payout = booking.variant.payout_amount if booking.variant_id else listing.payout_amount
+        listing_price = calculate_final_price(Decimal(str(unit_payout)) * quantity)
     else:
         listing_price = Decimal(str(listing.price))
     deal_discount_amount = Decimal("0")
@@ -873,8 +878,12 @@ def pay_with_credits(request):
 
     # listing_price is already all-inclusive (fee baked in) and already net of any
     # Deal/vendor discount above — no separate fee gets added on top anymore.
-    # Scaled by quantity for per-unit listings (e.g. laundry priced per cloth).
-    payout_amount = listing.payout_amount if listing.payout_amount is not None else Decimal(str(listing.price))
+    # Scaled by quantity for per-unit listings (e.g. laundry priced per cloth);
+    # uses the variant's payout_amount when the booking picked one.
+    if booking is not None and booking.variant_id:
+        payout_amount = booking.variant.payout_amount
+    else:
+        payout_amount = listing.payout_amount if listing.payout_amount is not None else Decimal(str(listing.price))
     payout_amount = payout_amount * quantity
     vendor_amount, platform_amount = split_settlement(
         listing_price, payout_amount,
@@ -1317,7 +1326,7 @@ def _create_order_from_paystack_data(paystack_data, buyer, listing_id, order_typ
     booking = None
     if booking_id:
         try:
-            booking = Booking.objects.select_related("listing").get(id=booking_id)
+            booking = Booking.objects.select_related("listing", "variant").get(id=booking_id)
         except Booking.DoesNotExist:
             booking = None
 
@@ -1331,8 +1340,12 @@ def _create_order_from_paystack_data(paystack_data, buyer, listing_id, order_typ
         # Vendor bears only their own discount; admin deal discount is absorbed by
         # platform. payout_amount falls back to price for any listing that somehow
         # missed the payout_amount backfill migration. Scaled by quantity for
-        # per-unit listings (e.g. laundry priced per cloth).
-        payout_amount = listing.payout_amount if listing.payout_amount is not None else Decimal(str(listing.price))
+        # per-unit listings (e.g. laundry priced per cloth); uses the variant's
+        # payout_amount when the booking picked one.
+        if booking is not None and booking.variant_id:
+            payout_amount = booking.variant.payout_amount
+        else:
+            payout_amount = listing.payout_amount if listing.payout_amount is not None else Decimal(str(listing.price))
         payout_amount = payout_amount * quantity
         vendor_amount, platform_amount = split_settlement(
             amount_paid, payout_amount,

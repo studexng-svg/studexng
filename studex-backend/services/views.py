@@ -179,12 +179,12 @@ class ListingViewSet(viewsets.ModelViewSet):
         vendor_username = self.request.query_params.get('vendor_username')
         if vendor_username:
             qs = Listing.objects.filter(vendor__username__iexact=vendor_username, is_available=True)
-            return qs.select_related('vendor', 'category').prefetch_related('vendor__profile')
+            return qs.select_related('vendor', 'category').prefetch_related('vendor__profile', 'variants')
 
         # For retrieve/update/delete — no campus filter so any listing is accessible
         # by ID regardless of which campus the requester is on (fixes SSR 404 for FUTO listings)
         if self.action != 'list':
-            return Listing.objects.all().select_related('vendor', 'category').prefetch_related('vendor__profile')
+            return Listing.objects.all().select_related('vendor', 'category').prefetch_related('vendor__profile', 'variants')
 
         # List action only — campus-scoped listings
         campus = 'pau'
@@ -222,7 +222,7 @@ class ListingViewSet(viewsets.ModelViewSet):
             else:
                 qs = qs.filter(category__slug=category_param)
 
-        return qs.select_related('vendor', 'category').prefetch_related('vendor__profile')
+        return qs.select_related('vendor', 'category').prefetch_related('vendor__profile', 'variants')
 
     def update(self, request, *args, **kwargs):
         instance = self.get_object()

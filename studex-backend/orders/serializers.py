@@ -2,7 +2,7 @@
 from rest_framework import serializers
 from .models import Order, OrderStatus, Dispute, Booking, BookingReferenceImage
 from services.serializers import ListingSerializer
-from services.models import Listing
+from services.models import Listing, ListingVariant
 import uuid
 
 
@@ -251,23 +251,36 @@ class BookingSerializer(serializers.ModelSerializer):
     note = serializers.CharField(max_length=250, allow_blank=True, required=False)
     reference_images = serializers.SerializerMethodField()
     quantity = serializers.IntegerField(required=False, default=1, min_value=1)
+    variant = serializers.PrimaryKeyRelatedField(queryset=ListingVariant.objects.all(), required=False, allow_null=True)
+    variant_title = serializers.CharField(source='variant.title', read_only=True, default=None)
 
     class Meta:
         model = Booking
         fields = [
             'id', 'buyer_username', 'buyer_id', 'vendor_username', 'listing', 'listing_id',
-            'listing_title', 'listing_price', 'vendor_name',
+            'listing_title', 'listing_price', 'vendor_name', 'variant', 'variant_title',
             'scheduled_date', 'scheduled_time', 'quantity', 'note', 'reference_images', 'status', 'created_at',
         ]
-        read_only_fields = ['id', 'buyer_username', 'buyer_id', 'vendor_username', 'listing_title', 'listing_id', 'listing_price', 'vendor_name', 'reference_images', 'status', 'created_at']
+        read_only_fields = ['id', 'buyer_username', 'buyer_id', 'vendor_username', 'listing_title', 'listing_id', 'listing_price', 'vendor_name', 'variant_title', 'reference_images', 'status', 'created_at']
 
     def validate(self, data):
         listing = data.get('listing', getattr(self.instance, 'listing', None))
         quantity = data.get('quantity', getattr(self.instance, 'quantity', 1))
+        variant = data.get('variant', getattr(self.instance, 'variant', None))
+
         if listing is not None and quantity > 1 and not listing.is_per_unit:
             raise serializers.ValidationError(
                 {'quantity': "This listing is not priced per unit — quantity must be 1."}
             )
+        if listing is not None:
+            if listing.variants.exists() and variant is None:
+                raise serializers.ValidationError(
+                    {'variant': "This listing offers multiple options — please choose one."}
+                )
+            if variant is not None and variant.listing_id != listing.id:
+                raise serializers.ValidationError(
+                    {'variant': "This option does not belong to the selected listing."}
+                )
         return data
 
     def get_reference_images(self, obj):
@@ -275,6 +288,12 @@ class BookingSerializer(serializers.ModelSerializer):
 
     def get_listing_price(self, obj):
         from decimal import Decimal
+        if obj.variant_id:
+            payout_amount = obj.variant.payout_amount
+            if obj.listing.is_per_unit and obj.quantity > 1:
+                from payments.pricing import calculate_final_price
+                return str(calculate_final_price(Decimal(str(payout_amount)) * obj.quantity))
+            return str(obj.variant.price)
         if obj.listing.is_per_unit and obj.quantity > 1:
             from payments.pricing import calculate_final_price
             return str(calculate_final_price(Decimal(str(obj.listing.payout_amount)) * obj.quantity))

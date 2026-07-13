@@ -1,7 +1,7 @@
 """
 Test suite for services app - categories, listings, transactions
 """
-from django.test import TestCase
+from django.test import TestCase, Client
 from django.utils import timezone
 from unittest import skip
 from rest_framework.test import APIClient, APITestCase
@@ -10,7 +10,7 @@ from decimal import Decimal
 from django.core.files.uploadedfile import SimpleUploadedFile
 
 from accounts.models import User
-from services.models import Category, Subcategory, Listing, Transaction
+from services.models import Category, Subcategory, Listing, ListingVariant, Transaction
 from orders.models import Order
 
 
@@ -894,6 +894,189 @@ class PerUnitListingTests(APITestCase):
         self.client.force_authenticate(user=self.vendor)
         response = self.client.post(self.listing_url, self._payload(is_per_unit=False))
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+
+class ListingVariantSyncTests(APITestCase):
+    """
+    ListingSerializer's variants sync (services/serializers.py) — a listing can
+    offer named, differently-priced options (e.g. "Washing Only" vs "Washing &
+    Ironing") submitted as a raw JSON string in the same multipart request the
+    vendor form already posts, not a nested DRF serializer.
+    """
+
+    def setUp(self):
+        self.client = APIClient()
+        self.vendor = User.objects.create_user(
+            username='variant_vendor', email='variant_vendor@pau.edu.ng', password='pass123',
+            user_type='vendor', is_verified_vendor=True,
+        )
+        self.category = Category.objects.create(title='Variant Test Cat', slug='variant-test-cat')
+        self.listing_url = '/api/services/listings/'
+
+    def _payload(self, variants=None, **overrides):
+        import json
+        data = {
+            'category': 'variant-test-cat', 'title': 'Laundry Service',
+            'description': 'x', 'payout_amount': '500.00',
+            'is_per_unit': 'true', 'unit_label': 'cloth',
+        }
+        if variants is not None:
+            data['variants'] = json.dumps(variants)
+        data.update(overrides)
+        return data
+
+    def test_create_listing_with_variants(self):
+        self.client.force_authenticate(user=self.vendor)
+        response = self.client.post(self.listing_url, self._payload(variants=[
+            {'title': 'Washing Only', 'payout_amount': '300'},
+            {'title': 'Washing & Ironing', 'payout_amount': '500'},
+        ]))
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        variants = response.data['variants']
+        self.assertEqual(len(variants), 2)
+        titles = {v['title'] for v in variants}
+        self.assertEqual(titles, {'Washing Only', 'Washing & Ironing'})
+        # 8% of 300 = 24, below the ₦100 floor -> price 400.
+        washing_only = next(v for v in variants if v['title'] == 'Washing Only')
+        self.assertEqual(Decimal(str(washing_only['price'])), Decimal('400.00'))
+
+    def test_update_variant_by_id_updates_in_place(self):
+        self.client.force_authenticate(user=self.vendor)
+        create_res = self.client.post(self.listing_url, self._payload(variants=[
+            {'title': 'Washing Only', 'payout_amount': '300'},
+        ]))
+        listing_id = create_res.data['id']
+        variant_id = create_res.data['variants'][0]['id']
+
+        update_res = self.client.patch(f'{self.listing_url}{listing_id}/', self._payload(variants=[
+            {'id': variant_id, 'title': 'Washing Only (Updated)', 'payout_amount': '350'},
+        ]), format='multipart')
+        self.assertEqual(update_res.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(update_res.data['variants']), 1)
+        self.assertEqual(update_res.data['variants'][0]['id'], variant_id)
+        self.assertEqual(update_res.data['variants'][0]['title'], 'Washing Only (Updated)')
+        self.assertEqual(Decimal(str(update_res.data['variants'][0]['price'])), Decimal('450.00'))
+
+    def test_update_adds_new_and_removes_missing_variant(self):
+        self.client.force_authenticate(user=self.vendor)
+        create_res = self.client.post(self.listing_url, self._payload(variants=[
+            {'title': 'Washing Only', 'payout_amount': '300'},
+            {'title': 'Ironing Only', 'payout_amount': '300'},
+        ]))
+        listing_id = create_res.data['id']
+        keep_id = create_res.data['variants'][0]['id']
+
+        update_res = self.client.patch(f'{self.listing_url}{listing_id}/', self._payload(variants=[
+            {'id': keep_id, 'title': 'Washing Only', 'payout_amount': '300'},
+            {'title': 'Washing & Ironing', 'payout_amount': '500'},
+        ]), format='multipart')
+        self.assertEqual(update_res.status_code, status.HTTP_200_OK)
+        titles = {v['title'] for v in update_res.data['variants']}
+        self.assertEqual(titles, {'Washing Only', 'Washing & Ironing'})
+        self.assertEqual(len(update_res.data['variants']), 2)
+
+    def test_removing_variant_with_existing_bookings_is_blocked_not_500(self):
+        from orders.models import Booking
+        self.client.force_authenticate(user=self.vendor)
+        create_res = self.client.post(self.listing_url, self._payload(variants=[
+            {'title': 'Washing Only', 'payout_amount': '300'},
+        ]))
+        listing_id = create_res.data['id']
+        variant_id = create_res.data['variants'][0]['id']
+
+        buyer = User.objects.create_user(username='variant_buyer', email='variant_buyer@pau.edu.ng', password='pass123')
+        Booking.objects.create(
+            buyer=buyer, listing_id=listing_id, variant_id=variant_id,
+            scheduled_date='2099-01-01', scheduled_time='2:30 PM',
+        )
+
+        update_res = self.client.patch(f'{self.listing_url}{listing_id}/', self._payload(variants=[]), format='multipart')
+        self.assertEqual(update_res.status_code, status.HTTP_200_OK)  # not a 500
+        self.assertIn('variant_warnings', update_res.data)
+        self.assertTrue(ListingVariant.objects.filter(id=variant_id).exists())  # not deleted
+
+    def test_patch_without_variants_key_leaves_existing_variants_untouched(self):
+        self.client.force_authenticate(user=self.vendor)
+        create_res = self.client.post(self.listing_url, self._payload(variants=[
+            {'title': 'Washing Only', 'payout_amount': '300'},
+        ]))
+        listing_id = create_res.data['id']
+
+        update_res = self.client.patch(f'{self.listing_url}{listing_id}/', {'description': 'updated description'}, format='multipart')
+        self.assertEqual(update_res.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(update_res.data['variants']), 1)
+
+    def test_listing_without_variants_returns_empty_list(self):
+        self.client.force_authenticate(user=self.vendor)
+        response = self.client.post(self.listing_url, self._payload())
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['variants'], [])
+
+
+class ListingAdminFeeCalculationTests(TestCase):
+    """
+    services/admin.py ListingAdmin — creating/editing a listing through Django's
+    built-in admin (not the vendor-facing API) must still compute `price` from
+    `payout_amount` via payments.pricing.calculate_final_price. Bug: the admin
+    form used to expose a raw, independent `price` field with no payout_amount
+    field at all, so an admin-created listing never got the fee applied.
+    """
+
+    def setUp(self):
+        self.client = Client()
+        self.admin_user = User.objects.create_user(
+            username='django_admin', email='django_admin@pau.edu.ng', password='pass12345',
+            is_staff=True, is_superuser=True,
+        )
+        self.client.force_login(self.admin_user)
+        self.vendor = User.objects.create_user(
+            username='admin_created_vendor', email='admin_created_vendor@pau.edu.ng', password='pass123',
+            user_type='vendor', is_verified_vendor=True,
+        )
+        self.category = Category.objects.create(title='Admin Fee Test Cat', slug='admin-fee-test-cat')
+        self.add_url = '/studex-portal-9f3a2/services/listing/add/'
+
+    def _payload(self, **overrides):
+        data = {
+            'title': 'Admin Created Listing', 'description': 'x',
+            'payout_amount': '1000.00', 'vendor': self.vendor.id, 'category': self.category.id,
+            'listing_type': 'service', 'discount_percent': '0',
+            'campus': 'pau', 'stock_quantity': '0',
+            # Required management form data for the ListingVariantInline
+            # formset (prefix "variants", from Listing.variants related_name) —
+            # without this Django rejects the whole admin form as invalid.
+            'variants-TOTAL_FORMS': '0', 'variants-INITIAL_FORMS': '0',
+            'variants-MIN_NUM_FORMS': '0', 'variants-MAX_NUM_FORMS': '1000',
+        }
+        data.update(overrides)
+        return data
+
+    def test_creating_listing_via_admin_computes_price_and_fee(self):
+        response = self.client.post(self.add_url, self._payload())
+        self.assertEqual(response.status_code, 302)  # redirect on success
+        listing = Listing.objects.get(title='Admin Created Listing')
+        # 8% of 1000 = 80, below the ₦100 floor -> fee is 100, price is 1100.
+        self.assertEqual(listing.price, Decimal('1100.00'))
+        self.assertEqual(listing.payout_amount, Decimal('1000.00'))
+
+    def test_creating_listing_via_admin_without_payout_amount_is_rejected(self):
+        response = self.client.post(self.add_url, self._payload(payout_amount=''))
+        self.assertEqual(response.status_code, 200)  # re-renders form with error, not a 500
+        self.assertFalse(Listing.objects.filter(title='Admin Created Listing').exists())
+
+    def test_editing_payout_amount_via_admin_recomputes_price(self):
+        listing = Listing.objects.create(
+            title='Existing Admin Listing', description='x', payout_amount=Decimal('1000.00'),
+            price=Decimal('1100.00'), vendor=self.vendor, category=self.category, is_available=True,
+        )
+        change_url = f'/studex-portal-9f3a2/services/listing/{listing.id}/change/'
+        response = self.client.post(change_url, self._payload(
+            title='Existing Admin Listing', payout_amount='2000.00',
+        ))
+        self.assertEqual(response.status_code, 302)
+        listing.refresh_from_db()
+        # 8% of 2000 = 160 (above floor) -> price = 2160.
+        self.assertEqual(listing.price, Decimal('2160.00'))
 
 
 class PayoutAmountMigrationTests(TestCase):

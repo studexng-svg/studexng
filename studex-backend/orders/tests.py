@@ -10,7 +10,7 @@ from rest_framework import status
 from decimal import Decimal
 
 from accounts.models import User
-from services.models import Category, Listing
+from services.models import Category, Listing, ListingVariant
 from orders.models import Order, Dispute, Booking, BookingReferenceImage
 
 
@@ -845,4 +845,81 @@ class BookingQuantityTests(APITestCase):
     def test_quantity_of_one_accepted_regardless_of_listing_type(self):
         self.client.force_authenticate(user=self.buyer)
         response = self.client.post(self.booking_url, self._payload(self.flat_listing.id, quantity=1))
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+
+class BookingVariantTests(APITestCase):
+    """
+    BookingSerializer.variant — a listing offering named options (e.g. "Washing
+    Only" vs "Washing & Ironing") requires the buyer to pick one.
+    """
+
+    def setUp(self):
+        self.client = APIClient()
+        self.buyer = User.objects.create_user(
+            username='variant_booking_buyer', email='variant_booking_buyer@pau.edu.ng', password='pass123'
+        )
+        self.seller = User.objects.create_user(
+            username='variant_booking_seller', email='variant_booking_seller@pau.edu.ng', password='pass123',
+            user_type='vendor', is_verified_vendor=True
+        )
+        self.category = Category.objects.create(title='Variant Booking Cat', slug='variant-booking-cat')
+        self.listing_with_variants = Listing.objects.create(
+            title='Laundry Service', description='x', payout_amount=Decimal('500.00'),
+            price=Decimal('600.00'), is_per_unit=True, unit_label='cloth',
+            vendor=self.seller, category=self.category, is_available=True,
+        )
+        self.variant_a = ListingVariant.objects.create(
+            listing=self.listing_with_variants, title='Washing Only',
+            payout_amount=Decimal('300.00'), price=Decimal('400.00'),
+        )
+        self.other_listing = Listing.objects.create(
+            title='Other Listing', description='x', payout_amount=Decimal('1000.00'),
+            price=Decimal('1100.00'), vendor=self.seller, category=self.category, is_available=True,
+        )
+        self.other_variant = ListingVariant.objects.create(
+            listing=self.other_listing, title='Other Option',
+            payout_amount=Decimal('200.00'), price=Decimal('300.00'),
+        )
+        self.no_variant_listing = Listing.objects.create(
+            title='Plain Listing', description='x', payout_amount=Decimal('1000.00'),
+            price=Decimal('1100.00'), vendor=self.seller, category=self.category, is_available=True,
+        )
+        self.booking_url = '/api/orders/bookings/'
+
+    def _payload(self, listing_id, variant_id=None, quantity=None):
+        from datetime import date, timedelta
+        data = {
+            'listing': listing_id,
+            'scheduled_date': str(date.today() + timedelta(days=1)),
+            'scheduled_time': '2:30 PM',
+        }
+        if variant_id is not None:
+            data['variant'] = variant_id
+        if quantity is not None:
+            data['quantity'] = quantity
+        return data
+
+    def test_variant_required_when_listing_has_variants(self):
+        self.client.force_authenticate(user=self.buyer)
+        response = self.client.post(self.booking_url, self._payload(self.listing_with_variants.id))
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('variant', response.data)
+
+    def test_variant_accepted_when_it_belongs_to_the_listing(self):
+        self.client.force_authenticate(user=self.buyer)
+        response = self.client.post(self.booking_url, self._payload(self.listing_with_variants.id, variant_id=self.variant_a.id, quantity=4))
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        booking = Booking.objects.get(id=response.data['id'])
+        self.assertEqual(booking.variant_id, self.variant_a.id)
+
+    def test_variant_rejected_when_it_belongs_to_a_different_listing(self):
+        self.client.force_authenticate(user=self.buyer)
+        response = self.client.post(self.booking_url, self._payload(self.listing_with_variants.id, variant_id=self.other_variant.id))
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('variant', response.data)
+
+    def test_no_variant_required_for_listing_without_variants(self):
+        self.client.force_authenticate(user=self.buyer)
+        response = self.client.post(self.booking_url, self._payload(self.no_variant_listing.id))
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)

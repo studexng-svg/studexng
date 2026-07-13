@@ -188,6 +188,28 @@ class Listing(models.Model):
         ]
 
 
+class ListingVariant(models.Model):
+    """
+    A named, differently-priced option under one listing (e.g. "Washing Only" /
+    "Washing & Ironing" under a single Laundry listing) — so a buyer picks a
+    variant instead of the vendor having to create 3 separate listings.
+    unit_label/is_per_unit stay on the parent Listing (shared across variants);
+    only payout_amount (and its computed price) varies per variant.
+    """
+    listing = models.ForeignKey(Listing, on_delete=models.CASCADE, related_name='variants')
+    title = models.CharField(max_length=100)
+    payout_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    # Computed the same way as Listing.price (payments/pricing.calculate_final_price).
+    price = models.DecimalField(max_digits=10, decimal_places=2)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['id']
+
+    def __str__(self):
+        return f"{self.listing.title} — {self.title}"
+
+
 class Transaction(models.Model):
     STATUS_CHOICES = (
         ('in_escrow', 'In Escrow'),

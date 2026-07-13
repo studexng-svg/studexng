@@ -1,6 +1,7 @@
 # services/serializers.py
+import json
 from rest_framework import serializers
-from .models import Category, Listing, Transaction, Deal
+from .models import Category, Listing, ListingVariant, Transaction, Deal
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
@@ -11,6 +12,13 @@ class CategorySerializer(serializers.ModelSerializer):
         model = Category
         fields = ['id', 'title', 'slug', 'image']
         read_only_fields = ['id']
+
+
+class ListingVariantSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ListingVariant
+        fields = ['id', 'title', 'payout_amount', 'price']
+        read_only_fields = ['id', 'price']
 
 
 class VendorSerializer(serializers.Serializer):
@@ -111,12 +119,18 @@ class ListingSerializer(serializers.ModelSerializer):
     weekly_order_count = serializers.SerializerMethodField(read_only=True)
     last_ordered_at = serializers.SerializerMethodField(read_only=True)
     platform_fee = serializers.SerializerMethodField(read_only=True)
+    # Named variants (e.g. "Washing Only" vs "Washing & Ironing") under this
+    # listing. Read-only here — writes come in as a raw JSON string under the
+    # same `variants` key (see create()/update()/_sync_variants below), not a
+    # nested DRF field, so the vendor form can submit it in the same
+    # multipart request as everything else without nested-serializer plumbing.
+    variants = ListingVariantSerializer(many=True, read_only=True)
 
     class Meta:
         model = Listing
         fields = [
             'id', 'title', 'description', 'payout_amount', 'price', 'platform_fee',
-            'is_per_unit', 'unit_label',
+            'is_per_unit', 'unit_label', 'variants',
             'discount_percent', 'sale_price',
             'image', 'image2', 'image3', 'image4', 'image5', 'image_upload',
             'is_available', 'listing_type', 'track_inventory', 'stock_quantity',
@@ -144,13 +158,76 @@ class ListingSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         from payments.pricing import calculate_final_price
         validated_data['price'] = calculate_final_price(validated_data['payout_amount'])
-        return super().create(validated_data)
+        instance = super().create(validated_data)
+        self._variant_warnings = self._sync_variants(instance, self.initial_data.get('variants'))
+        return instance
 
     def update(self, instance, validated_data):
         if 'payout_amount' in validated_data and validated_data['payout_amount'] is not None:
             from payments.pricing import calculate_final_price
             validated_data['price'] = calculate_final_price(validated_data['payout_amount'])
-        return super().update(instance, validated_data)
+        instance = super().update(instance, validated_data)
+        self._variant_warnings = self._sync_variants(instance, self.initial_data.get('variants'))
+        return instance
+
+    def _sync_variants(self, listing, raw_variants):
+        """
+        Syncs ListingVariant rows from a raw JSON string like:
+        '[{"id": 3, "title": "Washing Only", "payout_amount": "300"}, {"title": "New Variant", "payout_amount": "500"}]'
+        Rows with an `id` are updated in place; rows without one are created;
+        any existing variant not present in the submitted list is deleted —
+        unless it has real bookings (PROTECT), in which case it's left alone
+        and a warning is collected instead of raising a 500.
+        """
+        if raw_variants is None:
+            return []
+        try:
+            rows = json.loads(raw_variants)
+        except (TypeError, ValueError):
+            return []
+        if not isinstance(rows, list):
+            return []
+
+        from decimal import Decimal, InvalidOperation
+        from django.db.models import ProtectedError
+        from payments.pricing import calculate_final_price
+
+        submitted_ids = set()
+        warnings = []
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            title = (row.get('title') or '').strip()
+            raw_amount = row.get('payout_amount')
+            if not title or raw_amount in (None, ''):
+                continue
+            try:
+                payout_amount = Decimal(str(raw_amount))
+            except InvalidOperation:
+                continue
+            if payout_amount <= 0:
+                continue
+            price = calculate_final_price(payout_amount)
+
+            variant_id = row.get('id')
+            if variant_id:
+                updated = ListingVariant.objects.filter(id=variant_id, listing=listing).update(
+                    title=title, payout_amount=payout_amount, price=price,
+                )
+                if updated:
+                    submitted_ids.add(int(variant_id))
+            else:
+                variant = ListingVariant.objects.create(
+                    listing=listing, title=title, payout_amount=payout_amount, price=price,
+                )
+                submitted_ids.add(variant.id)
+
+        for existing in listing.variants.exclude(id__in=submitted_ids):
+            try:
+                existing.delete()
+            except ProtectedError:
+                warnings.append(f'Cannot remove "{existing.title}" — it has existing bookings.')
+        return warnings
 
     def get_sale_price(self, obj):
         if obj.discount_percent and obj.discount_percent > 0:
@@ -207,6 +284,8 @@ class ListingSerializer(serializers.ModelSerializer):
                 data['deal'] = None
         except Exception:
             data['deal'] = None
+        if getattr(self, '_variant_warnings', None):
+            data['variant_warnings'] = self._variant_warnings
         return data
 
     def get_is_reserved(self, obj):

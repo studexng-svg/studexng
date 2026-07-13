@@ -786,9 +786,12 @@ class BookingViewSet(viewsets.ModelViewSet):
         # fee baked in at listing-creation time) — no fee gets added at checkout.
         # Per-unit listings (e.g. laundry priced per cloth) instead compute the fee
         # once against the true quantity-scaled payout, not the flat listing price.
-        if booking.listing.is_per_unit:
+        # Uses the variant's payout_amount when the booking picked one.
+        if booking.listing.is_per_unit or booking.variant_id:
             from payments.pricing import calculate_final_price
-            checkout_amount = calculate_final_price(Decimal(str(booking.listing.payout_amount)) * booking.quantity)
+            unit_payout = booking.variant.payout_amount if booking.variant_id else booking.listing.payout_amount
+            qty = booking.quantity if booking.listing.is_per_unit else 1
+            checkout_amount = calculate_final_price(Decimal(str(unit_payout)) * qty)
         else:
             checkout_amount = Decimal(str(booking.listing.price))
 
@@ -796,6 +799,7 @@ class BookingViewSet(viewsets.ModelViewSet):
             'booking_id': booking.id,
             'listing_id': booking.listing.id,
             'listing_title': booking.listing.title,
+            'variant_title': booking.variant.title if booking.variant_id else None,
             'quantity': booking.quantity,
             'listing_price': float(checkout_amount),
             'checkout_amount': float(checkout_amount),

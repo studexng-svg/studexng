@@ -23,6 +23,13 @@ const TIME_SLOTS = [
 const NOTE_MAX_LENGTH = 250;
 const STEPS = ["Date & Time", "Photos", "Notes", "Review", "Payment"] as const;
 
+interface ListingVariant {
+  id: number;
+  title: string;
+  payout_amount: number | string;
+  price: number | string;
+}
+
 interface BookingListing {
   id: number;
   title: string;
@@ -30,6 +37,7 @@ interface BookingListing {
   payout_amount?: number | string | null;
   is_per_unit?: boolean;
   unit_label?: string;
+  variants?: ListingVariant[];
   deal?: { discounted_price: number } | null;
   sale_price?: number | null;
   vendor: { username: string; business_name?: string };
@@ -54,6 +62,9 @@ export default function BookingWizard({ listing, onClose, onSuccess }: BookingWi
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
   const [quantity, setQuantity] = useState(1);
+  const hasVariants = !!listing.variants?.length;
+  const [selectedVariantId, setSelectedVariantId] = useState<number | null>(null);
+  const selectedVariant = listing.variants?.find(v => v.id === selectedVariantId) ?? null;
   const [unitPreview, setUnitPreview] = useState<{ price: number } | null>(null);
   const previewDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [images, setImages] = useState<File[]>([]);
@@ -67,7 +78,7 @@ export default function BookingWizard({ listing, onClose, onSuccess }: BookingWi
   // listing.price is already all-inclusive (vendor payout + platform fee baked in
   // at listing-creation time) — no separate fee gets added at checkout.
   const effectivePrice = listing.deal?.discounted_price ?? listing.sale_price ?? listing.price;
-  const price = Number(effectivePrice);
+  const price = hasVariants ? Number(selectedVariant?.price ?? 0) : Number(effectivePrice);
   // Per-unit listings (e.g. laundry priced per cloth): the fee must apply once to
   // the true quantity-scaled payout, not be multiplied along with a flat price —
   // so the live total comes from the server preview, not price * quantity.
@@ -76,7 +87,7 @@ export default function BookingWizard({ listing, onClose, onSuccess }: BookingWi
   useEffect(() => {
     if (!listing.is_per_unit) return;
     if (previewDebounce.current) clearTimeout(previewDebounce.current);
-    const unitPayout = Number(listing.payout_amount);
+    const unitPayout = Number(hasVariants ? selectedVariant?.payout_amount : listing.payout_amount);
     if (!unitPayout || unitPayout <= 0) { setUnitPreview(null); return; }
     previewDebounce.current = setTimeout(async () => {
       try {
@@ -86,7 +97,7 @@ export default function BookingWizard({ listing, onClose, onSuccess }: BookingWi
     }, 300);
     return () => { if (previewDebounce.current) clearTimeout(previewDebounce.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [quantity, listing.is_per_unit, listing.payout_amount]);
+  }, [quantity, listing.is_per_unit, listing.payout_amount, selectedVariantId]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -102,14 +113,14 @@ export default function BookingWizard({ listing, onClose, onSuccess }: BookingWi
   }, []);
 
   const canProceedFromStep = (s: number) => {
-    if (s === 0) return !!date && !!time;
+    if (s === 0) return !!date && !!time && (!hasVariants || !!selectedVariantId);
     return true;
   };
 
   const goNext = () => {
     setError("");
     if (!canProceedFromStep(step)) {
-      setError(step === 0 ? "Please pick a date and time." : "");
+      setError(step === 0 ? (hasVariants && !selectedVariantId ? "Please choose an option." : "Please pick a date and time.") : "");
       return;
     }
     setStep((s) => Math.min(s + 1, STEPS.length - 1));
@@ -131,6 +142,7 @@ export default function BookingWizard({ listing, onClose, onSuccess }: BookingWi
       formData.append("scheduled_date", date);
       formData.append("scheduled_time", time);
       if (listing.is_per_unit) formData.append("quantity", String(quantity));
+      if (selectedVariantId) formData.append("variant", String(selectedVariantId));
       formData.append("note", note);
       images.forEach((file) => formData.append("reference_images", file));
 
@@ -222,6 +234,25 @@ export default function BookingWizard({ listing, onClose, onSuccess }: BookingWi
         {/* Step 0: date & time */}
         {step === 0 && (
           <div className="space-y-4">
+            {hasVariants && (
+              <div>
+                <label className="text-xs text-stone-500 font-bold uppercase tracking-wide mb-2 block">
+                  Choose an option
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {listing.variants!.map(v => (
+                    <button key={v.id} type="button" onClick={() => setSelectedVariantId(v.id)}
+                      className={`px-3.5 py-2 rounded-xl text-xs font-semibold border transition text-left ${
+                        selectedVariantId === v.id ? "text-white border-transparent" : "bg-stone-50 text-stone-600 border-stone-200 hover:border-teal-300"
+                      }`}
+                      style={selectedVariantId === v.id ? { background: TEAL } : {}}>
+                      {v.title}<br />
+                      <span className="font-normal opacity-80">₦{Number(v.price).toLocaleString()}{listing.is_per_unit ? ` / ${listing.unit_label || "unit"}` : ""}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             <div>
               <label className="text-xs text-stone-500 font-bold uppercase tracking-wide mb-2 flex items-center gap-1.5">
                 <Calendar className="w-3.5 h-3.5 text-teal-500" />Pick a Date
@@ -298,6 +329,9 @@ export default function BookingWizard({ listing, onClose, onSuccess }: BookingWi
         {step === 3 && (
           <div className="bg-stone-50 rounded-2xl p-4 space-y-2 border border-stone-100">
             <div className="flex justify-between text-sm"><span className="text-stone-500">Service</span><span className="font-semibold text-stone-900">{listing.title}</span></div>
+            {selectedVariant && (
+              <div className="flex justify-between text-sm"><span className="text-stone-500">Option</span><span className="font-semibold text-stone-900">{selectedVariant.title}</span></div>
+            )}
             <div className="flex justify-between text-sm"><span className="text-stone-500">Vendor</span><span className="font-semibold text-stone-900">{vendorName}</span></div>
             <div className="flex justify-between text-sm"><span className="text-stone-500">Date</span><span className="font-semibold text-stone-900">{date}</span></div>
             <div className="flex justify-between text-sm"><span className="text-stone-500">Time</span><span className="font-semibold text-stone-900">{time}</span></div>

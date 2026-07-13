@@ -16,6 +16,7 @@ export default function ListingsPage() {
   const [form, setForm] = useState({
     title: "", description: "", payoutAmount: "", category: "",
     is_per_unit: false, unit_label: "",
+    variants: [] as { id?: number; title: string; payout_amount: string }[],
     listing_type: "service", track_inventory: false,
     stock_quantity: 0, discount_percent: 0, images: Array(5).fill(null) as (File | null)[],
     brand: "", condition: "", delivery_time: "", tags: "",
@@ -72,6 +73,7 @@ export default function ListingsPage() {
       title: listing.title, description: listing.description,
       payoutAmount: (listing.payout_amount ?? listing.price).toString(), category: listing.category,
       is_per_unit: listing.is_per_unit || false, unit_label: listing.unit_label || "",
+      variants: (listing.variants || []).map((v: any) => ({ id: v.id, title: v.title, payout_amount: String(v.payout_amount) })),
       listing_type: listing.listing_type || "service",
       track_inventory: listing.track_inventory || false,
       stock_quantity: listing.stock_quantity || 0,
@@ -86,7 +88,7 @@ export default function ListingsPage() {
   };
 
   const resetForm = () => {
-    setForm({ title: "", description: "", payoutAmount: "", category: "", is_per_unit: false, unit_label: "", listing_type: "service", track_inventory: false, stock_quantity: 0, discount_percent: 0, images: Array(5).fill(null), brand: "", condition: "", delivery_time: "", tags: "" });
+    setForm({ title: "", description: "", payoutAmount: "", category: "", is_per_unit: false, unit_label: "", variants: [], listing_type: "service", track_inventory: false, stock_quantity: 0, discount_percent: 0, images: Array(5).fill(null), brand: "", condition: "", delivery_time: "", tags: "" });
     setEditing(null);
     setShowForm(false);
     setPricePreview(null);
@@ -106,6 +108,10 @@ export default function ListingsPage() {
       fd.append("category", form.category);
       fd.append("is_per_unit", form.is_per_unit ? "true" : "false");
       fd.append("unit_label", form.is_per_unit ? form.unit_label.trim() : "");
+      if (isLaundryCategory && form.is_per_unit) {
+        const validVariants = form.variants.filter(v => v.title.trim() && v.payout_amount);
+        fd.append("variants", JSON.stringify(validVariants));
+      }
       fd.append("listing_type", form.listing_type);
       const isInventoryType = form.listing_type === "food" || form.listing_type === "product";
       fd.append("track_inventory", isInventoryType ? "true" : "false");
@@ -121,7 +127,13 @@ export default function ListingsPage() {
       const res = editing
         ? await api.services.updateListing(editing.id, fd)
         : await api.services.createListing(fd);
-      if (res.ok) { showToast(editing ? "Updated!" : "Created!"); resetForm(); queryClient.invalidateQueries({ queryKey: ["vendor-listings"] }); }
+      if (res.ok) {
+        const data = await res.json().catch(() => null);
+        if (data?.variant_warnings?.length) showToast(data.variant_warnings[0]);
+        else showToast(editing ? "Updated!" : "Created!");
+        resetForm();
+        queryClient.invalidateQueries({ queryKey: ["vendor-listings"] });
+      }
       else showToast("Failed to save.");
     } catch { showToast("Error."); } finally { setSaving(false); }
   };
@@ -232,6 +244,36 @@ export default function ListingsPage() {
                   {form.is_per_unit
                     ? <ToggleRight className="w-8 h-8 text-teal-600" />
                     : <ToggleLeft className="w-8 h-8 text-stone-300" />}
+                </button>
+              </div>
+            )}
+            {isLaundryCategory && form.is_per_unit && (
+              <div className="bg-stone-50 border border-stone-100 rounded-xl px-4 py-3 space-y-2">
+                <p className="text-stone-800 text-sm font-semibold">Service options <span className="font-normal text-stone-400">(optional)</span></p>
+                <p className="text-stone-400 text-xs">
+                  Add options like "Washing Only" / "Ironing Only" / "Washing & Ironing" — each at its own price per {form.unit_label.trim() || "unit"}.
+                  Leave empty to just sell "{form.title || "this listing"}" as one option.
+                </p>
+                {form.variants.map((v, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <input value={v.title}
+                      onChange={e => setForm(f => ({ ...f, variants: f.variants.map((row, idx) => idx === i ? { ...row, title: e.target.value } : row) }))}
+                      placeholder="Option name (e.g. Washing Only)"
+                      className="flex-1 bg-white border border-stone-200 rounded-lg px-3 py-2 text-stone-900 text-sm focus:outline-none focus:border-teal-500 transition placeholder:text-stone-400" />
+                    <input type="number" value={v.payout_amount}
+                      onChange={e => setForm(f => ({ ...f, variants: f.variants.map((row, idx) => idx === i ? { ...row, payout_amount: e.target.value } : row) }))}
+                      placeholder={`₦ per ${form.unit_label.trim() || "unit"}`}
+                      className="w-32 bg-white border border-stone-200 rounded-lg px-3 py-2 text-stone-900 text-sm focus:outline-none focus:border-teal-500 transition" />
+                    <button type="button" onClick={() => setForm(f => ({ ...f, variants: f.variants.filter((_, idx) => idx !== i) }))}
+                      className="p-2 bg-red-50 hover:bg-red-100 border border-red-100 rounded-lg transition flex-shrink-0">
+                      <X className="w-3.5 h-3.5 text-red-500" />
+                    </button>
+                  </div>
+                ))}
+                <button type="button"
+                  onClick={() => setForm(f => ({ ...f, variants: [...f.variants, { title: "", payout_amount: "" }] }))}
+                  className="flex items-center gap-1 text-teal-600 text-xs font-semibold">
+                  <Plus className="w-3.5 h-3.5" /> Add option
                 </button>
               </div>
             )}

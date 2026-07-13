@@ -278,6 +278,9 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
   const discountPct   = listing.deal?.discount_percent ?? listing.discount_percent ?? 0;
   const displayPrice  = effectivePrice !== null && effectivePrice < listing.price ? Number(effectivePrice) : Number(listing.price);
   const hasDiscount   = effectivePrice !== null && Number(effectivePrice) < listing.price;
+  const variants      = (listing as any).variants as { id: number; price: number | string }[] | undefined;
+  const hasVariants   = !!variants?.length;
+  const minVariantPrice = hasVariants ? Math.min(...variants!.map(v => Number(v.price))) : null;
 
   const allImages = [listing.image,(listing as any).image2,(listing as any).image3,(listing as any).image4,(listing as any).image5]
     .filter((img): img is string => !!img && img.startsWith("http"));
@@ -454,11 +457,17 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
 
               {/* Price */}
               <div className="flex items-baseline gap-3">
-                <span className="text-3xl font-black text-stone-900">₦{displayPrice.toLocaleString()}</span>
-                {hasDiscount && (
+                {hasVariants ? (
+                  <span className="text-3xl font-black text-stone-900">From ₦{minVariantPrice!.toLocaleString()}</span>
+                ) : (
                   <>
-                    <span className="text-lg text-stone-400 line-through">₦{Number(listing.price).toLocaleString()}</span>
-                    <span className="text-sm font-bold text-red-500 bg-red-50 px-2 py-0.5 rounded-lg">{discountPct}% off</span>
+                    <span className="text-3xl font-black text-stone-900">₦{displayPrice.toLocaleString()}</span>
+                    {hasDiscount && (
+                      <>
+                        <span className="text-lg text-stone-400 line-through">₦{Number(listing.price).toLocaleString()}</span>
+                        <span className="text-sm font-bold text-red-500 bg-red-50 px-2 py-0.5 rounded-lg">{discountPct}% off</span>
+                      </>
+                    )}
                   </>
                 )}
               </div>

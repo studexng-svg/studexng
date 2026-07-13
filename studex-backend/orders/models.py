@@ -171,6 +171,15 @@ class Booking(models.Model):
         on_delete=models.CASCADE,
         related_name='bookings'
     )
+    # Set when the listing offers named variants (e.g. "Washing Only" vs
+    # "Washing & Ironing") — PROTECT so a variant with real bookings can't be
+    # silently deleted out from under order history.
+    variant = models.ForeignKey(
+        'services.ListingVariant',
+        on_delete=models.PROTECT,
+        null=True, blank=True,
+        related_name='bookings',
+    )
     scheduled_date = models.DateField()
     scheduled_time = models.CharField(max_length=20)
     # Only meaningful when listing.is_per_unit is True (e.g. "4 clothes").

@@ -6,7 +6,7 @@ from django.http import HttpResponse
 from django.db.models import Count, Sum
 from django import forms
 import csv
-from .models import Category, Listing, Transaction, VendorOfTheMonth
+from .models import Category, Listing, ListingVariant, Transaction, VendorOfTheMonth
 
 
 class CategoryImageForm(forms.ModelForm):
@@ -48,6 +48,32 @@ class ListingAdminForm(forms.ModelForm):
             self.fields['image_file'].help_text = (
                 f'Current: <a href="{self.instance.image}" target="_blank">View image</a>'
             )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        payout_amount = cleaned_data.get('payout_amount')
+        if payout_amount is None:
+            raise forms.ValidationError(
+                "Amount the vendor should receive (payout_amount) is required — "
+                "the buyer-facing price and platform fee are computed from it."
+            )
+        if payout_amount <= 0:
+            raise forms.ValidationError("payout_amount must be greater than zero.")
+        if cleaned_data.get('is_per_unit') and not (cleaned_data.get('unit_label') or '').strip():
+            raise forms.ValidationError("unit_label is required when is_per_unit is checked.")
+        return cleaned_data
+
+
+class ListingVariantInline(admin.TabularInline):
+    """
+    Named, differently-priced options under one listing (e.g. "Washing Only" vs
+    "Washing & Ironing"). `price` is read-only here too — always derived from
+    `payout_amount`, computed in ListingAdmin.save_formset below.
+    """
+    model = ListingVariant
+    extra = 0
+    fields = ('title', 'payout_amount', 'price')
+    readonly_fields = ('price',)
 
 
 class ListingChangelistForm(forms.ModelForm):
@@ -138,6 +164,7 @@ class CategoryAdmin(admin.ModelAdmin):
 @admin.register(Listing)
 class ListingAdmin(admin.ModelAdmin):
     form = ListingAdminForm
+    inlines = [ListingVariantInline]
 
     list_display = (
         'title', 'vendor', 'campus', 'vendor_status', 'category',
@@ -146,14 +173,18 @@ class ListingAdmin(admin.ModelAdmin):
     list_editable = ('listing_type',)
     list_filter = ('listing_type', 'campus', 'is_available', 'category', 'vendor__is_verified_vendor', 'vendor__user_type', 'created_at')
     search_fields = ('title', 'description', 'vendor__username', 'vendor__business_name', 'listing_type')
-    readonly_fields = ('campus', 'created_at', 'updated_at', 'get_total_orders', 'get_total_revenue')
+    # `price` is read-only here too — same rule as the vendor-facing API
+    # (services/serializers.py:ListingSerializer): it's always derived from
+    # payout_amount via payments.pricing.calculate_final_price, never typed
+    # in directly. Otherwise a listing created here never gets a fee applied.
+    readonly_fields = ('campus', 'created_at', 'updated_at', 'get_total_orders', 'get_total_revenue', 'price')
     raw_id_fields = ('vendor',)
     date_hierarchy = 'created_at'
     list_per_page = 50
 
     fieldsets = (
         ('Listing Info', {
-            'fields': ('title', 'description', 'price', 'image', 'category', 'listing_type')
+            'fields': ('title', 'description', 'payout_amount', 'price', 'is_per_unit', 'unit_label', 'image', 'category', 'listing_type')
         }),
         ('Vendor & Availability', {
             'fields': ('vendor', 'campus', 'is_available')
@@ -250,6 +281,15 @@ class ListingAdmin(admin.ModelAdmin):
             except Exception as e:
                 import logging
                 logging.getLogger(__name__).warning(f"Cloudinary listing upload failed: {e}")
+
+        # `price` is read-only in this form — always derive it from
+        # payout_amount here, the same way ListingSerializer.create()/update()
+        # does for the vendor-facing API. Without this, a listing created or
+        # edited via Django admin never gets the platform fee applied.
+        if obj.payout_amount is not None:
+            from payments.pricing import calculate_final_price
+            obj.price = calculate_final_price(obj.payout_amount)
+
         """
         Override save_model so that when admin saves a listing,
         we detect is_available changes and notify the vendor.
@@ -273,6 +313,31 @@ class ListingAdmin(admin.ModelAdmin):
                 import logging
                 logging.getLogger(__name__).warning(f"Notification failed in save_model: {e}")
         super().save_model(request, obj, form, change)
+
+    def save_formset(self, request, form, formset, change):
+        if formset.model is not ListingVariant:
+            formset.save()
+            return
+
+        from django.contrib import messages
+        from django.db.models import ProtectedError
+        from payments.pricing import calculate_final_price
+
+        instances = formset.save(commit=False)
+        for instance in instances:
+            instance.price = calculate_final_price(instance.payout_amount)
+            instance.save()
+        formset.save_m2m()
+
+        for obj in formset.deleted_objects:
+            try:
+                obj.delete()
+            except ProtectedError:
+                self.message_user(
+                    request,
+                    f'Could not remove "{obj.title}" — it has existing bookings.',
+                    level=messages.WARNING,
+                )
 
     def mark_available(self, request, queryset):
         """Mark selected listings as available and notify each vendor."""
