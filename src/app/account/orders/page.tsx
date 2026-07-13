@@ -21,7 +21,58 @@ interface Order {
   };
   amount: number;
   created_at: string;
-  status: "pending" | "paid" | "processing" | "completed" | "disputed" | "cancelled";
+  status: "pending" | "paid" | "seller_completed" | "completed" | "disputed" | "cancelled" | "vendor_declined";
+}
+
+const ACTIVE_STATUSES = new Set(["pending", "paid", "seller_completed", "disputed"]);
+
+function OrderCard({
+  order, getStatusColor, getStatusIcon, getStatusLabel,
+}: {
+  order: Order;
+  getStatusColor: (s: string) => string;
+  getStatusIcon: (s: string) => React.ReactNode;
+  getStatusLabel: (s: string) => string;
+}) {
+  return (
+    <div className="bg-white rounded-2xl border border-stone-200 shadow-sm overflow-hidden hover:border-teal-300 hover:shadow-md transition-all animate-fadeUp">
+      <Link href={`/account/orders/${order.id}`}>
+        <div className="cursor-pointer">
+          {/* HEADER */}
+          <div className="bg-stone-50 p-4 border-b border-stone-100">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="font-semibold text-stone-800 text-sm">#{order.reference}</p>
+                <p className="text-xs text-stone-500 mt-0.5">
+                  {new Date(order.created_at).toLocaleDateString("en-NG", {
+                    day: "numeric", month: "short", year: "numeric"
+                  })}
+                </p>
+              </div>
+              <div className={`px-3 py-1.5 rounded-full font-semibold text-xs flex items-center gap-1.5 ${getStatusColor(order.status)}`}>
+                {getStatusIcon(order.status)}
+                <span>{getStatusLabel(order.status)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* ORDER INFO */}
+          <div className="p-4">
+            <p className="font-semibold text-stone-800">{order.listing?.title || "Order"}</p>
+            <p className="text-sm text-stone-500 mt-0.5">{order.listing?.vendor?.username}</p>
+          </div>
+
+          {/* AMOUNT */}
+          <div className="bg-stone-50 px-4 py-3 border-t border-stone-100 flex items-center justify-between">
+            <p className="font-bold text-xl text-teal-700">
+              ₦{parseFloat(String(order.amount)).toLocaleString("en-NG", { minimumFractionDigits: 2 })}
+            </p>
+            <ChevronLeft className="w-5 h-5 text-stone-400 rotate-180" />
+          </div>
+        </div>
+      </Link>
+    </div>
+  );
 }
 
 export default function OrdersPage() {
@@ -45,6 +96,8 @@ export default function OrdersPage() {
   });
 
   const orders = data ?? [];
+  const activeOrders = orders.filter((o) => ACTIVE_STATUSES.has(o.status));
+  const previousOrders = orders.filter((o) => !ACTIVE_STATUSES.has(o.status));
 
   useEffect(() => {
     if (isHydrated && !isLoggedIn) router.push("/auth");
@@ -62,11 +115,12 @@ export default function OrdersPage() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "paid":
-      case "processing": return "bg-amber-100 text-amber-600";
+      case "paid": return "bg-amber-100 text-amber-600";
+      case "seller_completed": return "bg-blue-100 text-blue-600";
       case "completed": return "bg-emerald-100 text-emerald-600";
       case "disputed": return "bg-red-100 text-red-600";
-      case "cancelled": return "bg-stone-100 text-stone-500";
+      case "cancelled":
+      case "vendor_declined": return "bg-stone-100 text-stone-500";
       default: return "bg-stone-100 text-stone-500";
     }
   };
@@ -75,7 +129,8 @@ export default function OrdersPage() {
     switch (status) {
       case "completed": return <CheckCircle className="w-4 h-4" />;
       case "disputed":
-      case "cancelled": return <AlertCircle className="w-4 h-4" />;
+      case "cancelled":
+      case "vendor_declined": return <AlertCircle className="w-4 h-4" />;
       default: return <Clock className="w-4 h-4" />;
     }
   };
@@ -83,11 +138,12 @@ export default function OrdersPage() {
   const getStatusLabel = (status: string) => {
     switch (status) {
       case "pending": return "Pending Payment";
-      case "paid":
-      case "processing": return "In Progress";
+      case "paid": return "In Progress";
+      case "seller_completed": return "Awaiting Your Confirmation";
       case "completed": return "Completed";
       case "disputed": return "Disputed";
       case "cancelled": return "Cancelled";
+      case "vendor_declined": return "Declined — Refunded";
       default: return status;
     }
   };
@@ -128,45 +184,29 @@ export default function OrdersPage() {
             </Link>
           </div>
         ) : (
-          orders.map((order) => (
-            <div key={order.id} className="bg-white rounded-2xl border border-stone-200 shadow-sm overflow-hidden hover:border-teal-300 hover:shadow-md transition-all animate-fadeUp">
-              <Link href={`/account/orders/${order.id}`}>
-                <div className="cursor-pointer">
-                  {/* HEADER */}
-                  <div className="bg-stone-50 p-4 border-b border-stone-100">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <p className="font-semibold text-stone-800 text-sm">#{order.reference}</p>
-                        <p className="text-xs text-stone-500 mt-0.5">
-                          {new Date(order.created_at).toLocaleDateString("en-NG", {
-                            day: "numeric", month: "short", year: "numeric"
-                          })}
-                        </p>
-                      </div>
-                      <div className={`px-3 py-1.5 rounded-full font-semibold text-xs flex items-center gap-1.5 ${getStatusColor(order.status)}`}>
-                        {getStatusIcon(order.status)}
-                        <span>{getStatusLabel(order.status)}</span>
-                      </div>
-                    </div>
-                  </div>
+          <>
+            {activeOrders.length > 0 && (
+              <div className="space-y-3">
+                <p className="text-xs font-bold uppercase tracking-wide text-stone-400 px-1">
+                  Active ({activeOrders.length})
+                </p>
+                {activeOrders.map((order) => (
+                  <OrderCard key={order.id} order={order} getStatusColor={getStatusColor} getStatusIcon={getStatusIcon} getStatusLabel={getStatusLabel} />
+                ))}
+              </div>
+            )}
 
-                  {/* ORDER INFO */}
-                  <div className="p-4">
-                    <p className="font-semibold text-stone-800">{order.listing?.title || "Order"}</p>
-                    <p className="text-sm text-stone-500 mt-0.5">{order.listing?.vendor?.username}</p>
-                  </div>
-
-                  {/* AMOUNT */}
-                  <div className="bg-stone-50 px-4 py-3 border-t border-stone-100 flex items-center justify-between">
-                    <p className="font-bold text-xl text-teal-700">
-                      ₦{parseFloat(String(order.amount)).toLocaleString("en-NG", { minimumFractionDigits: 2 })}
-                    </p>
-                    <ChevronLeft className="w-5 h-5 text-stone-400 rotate-180" />
-                  </div>
-                </div>
-              </Link>
-            </div>
-          ))
+            {previousOrders.length > 0 && (
+              <div className="space-y-3 mt-6">
+                <p className="text-xs font-bold uppercase tracking-wide text-stone-400 px-1">
+                  Previous ({previousOrders.length})
+                </p>
+                {previousOrders.map((order) => (
+                  <OrderCard key={order.id} order={order} getStatusColor={getStatusColor} getStatusIcon={getStatusIcon} getStatusLabel={getStatusLabel} />
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

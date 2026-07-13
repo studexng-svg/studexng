@@ -27,6 +27,13 @@ export default function BottomNav() {
     return null;
   }
 
+  // Longest-prefix match — resolves the ambiguity where a nested route like
+  // /account/orders matches both the "Orders" (/account/orders) and "Account"
+  // (/account) hrefs; only the more specific one should ever light up.
+  const activeHref = navItems
+    .filter((i) => pathname === i.href || pathname.startsWith(i.href + "/"))
+    .sort((a, b) => b.href.length - a.href.length)[0]?.href;
+
   return (
     <>
     {/* Floating checkout FAB — home page only, bottom-right, periodic shake */}
@@ -62,7 +69,7 @@ export default function BottomNav() {
       }}>
       <div className="flex justify-around items-center px-2 py-3 max-w-full">
         {navItems.map((item) => {
-          const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
+          const isActive = item.href === activeHref;
           const Icon = item.icon;
 
           return (
