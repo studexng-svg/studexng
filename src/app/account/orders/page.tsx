@@ -9,7 +9,7 @@ import { useAuth } from "@/lib/authStore";
 import { TEAL } from "@/lib/tokens";
 import TopNav from "@/components/layout/TopNav";
 import { useScrollRestoration } from "@/hooks/useScrollRestoration";
-import { api } from "@/lib/api";
+import { api, BASE_URL, fetchAllPages } from "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
 
 interface Order {
@@ -83,11 +83,14 @@ export default function OrdersPage() {
   const { data, isPending, isError, error } = useQuery<Order[], Error>({
     queryKey: ["orders-buyer"],
     queryFn: async () => {
-      const res = await api.orders.list("buyer");
-      if (res.status === 401) throw new Error("unauthorized");
-      if (!res.ok) throw new Error(`Failed to load orders: ${res.status}`);
-      const data = await res.json();
-      return Array.isArray(data) ? data : data.results || [];
+      // The list endpoint is paginated (PAGE_SIZE=20, newest first) — a single
+      // fetchWithAuth() call only returns page 1, which can silently hide older
+      // completed/cancelled orders once a buyer has more than 20 total. Check
+      // auth/error status on the first page, then pull every page.
+      const check = await api.orders.list("buyer");
+      if (check.status === 401) throw new Error("unauthorized");
+      if (!check.ok) throw new Error(`Failed to load orders: ${check.status}`);
+      return fetchAllPages(`${BASE_URL}/api/orders/orders/?role=buyer`);
     },
     enabled: isHydrated && isLoggedIn,
     refetchInterval: 15_000,
