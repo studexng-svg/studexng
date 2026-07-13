@@ -106,7 +106,7 @@ export default function BookingsPage() {
                 <div className="bg-teal-50 border border-teal-100 rounded-xl p-3 col-span-2">
                   <p className="text-teal-500 text-xs mb-0.5">Your payout</p>
                   <p className="font-bold text-teal-600 text-lg">₦{Number(booking.listing_price || 0).toLocaleString()}</p>
-                  <p className="text-stone-400 text-xs mt-0.5">Your full listing price (8% service fee charged to buyer)</p>
+                  <p className="text-stone-400 text-xs mt-0.5">Your full listing price — no fees deducted</p>
                 </div>
               </div>
 

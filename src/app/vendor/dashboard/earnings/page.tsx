@@ -46,13 +46,6 @@ export default function EarningsPage() {
       bg: "bg-purple-50 border-purple-100",
       note: "All time",
     },
-    {
-      label: "Service Fee",
-      value: "8%",
-      color: "text-stone-600",
-      bg: "bg-stone-50 border-stone-100",
-      note: "Min ₦50 · Max ₦3,500 per transaction",
-    },
   ];
 
   return (
@@ -62,7 +55,7 @@ export default function EarningsPage() {
         <h2 className="font-black text-stone-900 text-xl tracking-tight" style={HEADING_FONT}>Your Earnings</h2>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {stats.map(stat => (
           <div key={stat.label} className={`bg-white border rounded-2xl p-5 shadow-sm ${stat.bg}`}>
             <p className="text-stone-400 text-xs mb-1.5">{stat.label}</p>
@@ -79,9 +72,9 @@ export default function EarningsPage() {
         </div>
         <div className="space-y-2 text-sm text-stone-500 leading-relaxed">
           {[
-            "A customer pays the full listing price through Paystack checkout.",
-            "StudEx collects an 8% service fee (min ₦50, max ₦3,500) from the buyer — this covers the platform and Paystack's processing cost. Your full listing price is transferred to your bank.",
-            "Everything else goes directly to your bank account — Paystack now pays out in real time, usually within minutes of the order completing.",
+            "A customer pays through Paystack checkout.",
+            "You receive your full listing price — no fees are ever deducted from your payout.",
+            "Your payout goes directly to your bank account — Paystack now pays out in real time, usually within minutes of the order completing.",
           ].map((step, i) => (
             <div key={i} className="flex items-start gap-3 bg-stone-50 border border-stone-100 rounded-xl p-3">
               <span className="text-teal-600 font-bold text-base leading-none">{i + 1}</span>
