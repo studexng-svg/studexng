@@ -12,7 +12,7 @@ import { useBookingStore } from "@/lib/bookingStore";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/authStore";
 import Script from "next/script";
-import { GRAD, GRAD_TEXT, TEAL, PURPLE } from "@/lib/tokens";
+import { TEAL, PURPLE } from "@/lib/tokens";
 
 const JAKARTA = { fontFamily: "'Plus Jakarta Sans', sans-serif" };
 import TopNav from "@/components/layout/TopNav";
@@ -334,7 +334,7 @@ export default function CheckoutPage() {
                       ₦{(item.original_price * item.quantity).toLocaleString()}
                     </p>
                   )}
-                  <p className="font-semibold text-sm" style={GRAD_TEXT}>
+                  <p className="font-semibold text-sm" style={{ color: TEAL }}>
                     ₦{(item.price * item.quantity).toLocaleString()}
                   </p>
                 </div>
@@ -453,7 +453,7 @@ export default function CheckoutPage() {
             )}
             <div className="border-t border-stone-100 pt-3 flex justify-between items-center">
               <span className="font-bold text-stone-900" style={JAKARTA}>Total</span>
-              <span className="text-2xl font-bold" style={GRAD_TEXT}>
+              <span className="text-2xl font-bold" style={{ color: TEAL }}>
                 ₦{finalTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
