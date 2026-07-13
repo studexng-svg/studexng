@@ -80,7 +80,13 @@ class OrderSerializer(serializers.ModelSerializer):
         ]
 
     def create(self, validated_data):
-        from wallet.models import EscrowTransaction
+        # NOTE: this path is not used by the live payment flow — real orders are
+        # created by payments._create_order_from_paystack_data after a Paystack
+        # charge succeeds, using payments.pricing for the vendor/platform split.
+        # This serializer's create() only exists so OrderViewSet's default POST
+        # doesn't crash outright; it used to call a dead `wallet.EscrowTransaction`
+        # with its own hardcoded (and wrong) 5% fee — removed as part of centralizing
+        # all fee/split logic into payments.pricing.
         from decimal import Decimal
 
         listing_id = validated_data.pop('listing_id')
@@ -91,29 +97,13 @@ class OrderSerializer(serializers.ModelSerializer):
 
         reference = f"ORD-{uuid.uuid4().hex[:12].upper()}"
 
-        total_amount = Decimal(str(listing.price))
-        platform_fee_percentage = Decimal('0.05')
-        platform_fee = total_amount * platform_fee_percentage
-        seller_amount = total_amount - platform_fee
-
         order = Order.objects.create(
             reference=reference,
             listing=listing,
-            amount=total_amount,
+            amount=Decimal(str(listing.price)),
             status='pending',
             **validated_data
         )
-
-        EscrowTransaction.objects.create(
-            order=order,
-            buyer=self.context['request'].user,
-            seller=listing.vendor,
-            total_amount=total_amount,
-            seller_amount=seller_amount,
-            platform_fee=platform_fee,
-            status='held'
-        )
-
         return order
 
 

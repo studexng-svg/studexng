@@ -370,3 +370,55 @@ class WalletBalanceTests(TestCase):
 
         self.user.refresh_from_db()
         self.assertEqual(float(self.user.wallet_balance), 1234.56)
+
+
+class AdminPricingSettingsTests(APITestCase):
+    """PATCH /api/admin/pricing-settings/ — retroactively recomputes every listing's price."""
+
+    def setUp(self):
+        from decimal import Decimal
+        from services.models import Category, Listing
+        self.client = APIClient()
+        self.admin = User.objects.create_user(
+            username='pricing_admin', email='pricing_admin@pau.edu.ng', password='pass123', is_staff=True,
+        )
+        self.vendor = User.objects.create_user(
+            username='pricing_settings_vendor', email='pricing_settings_vendor@pau.edu.ng', password='pass123',
+            user_type='vendor', is_verified_vendor=True,
+        )
+        self.non_admin = User.objects.create_user(
+            username='pricing_regular', email='pricing_regular@pau.edu.ng', password='pass123',
+        )
+        category = Category.objects.create(title='Admin Pricing Cat', slug='admin-pricing-cat')
+        self.listing = Listing.objects.create(
+            vendor=self.vendor, category=category, title='Item', description='x',
+            payout_amount=Decimal('10000'), price=Decimal('10800'), is_available=True,
+        )
+        self.url = '/api/admin/pricing-settings/'
+
+    def test_non_admin_forbidden(self):
+        self.client.force_authenticate(user=self.non_admin)
+        response = self.client.patch(self.url, {'service_fee_percent': '10'})
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_admin_can_change_fee_percent_and_it_recomputes_existing_listings(self):
+        from decimal import Decimal
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.patch(self.url, {'service_fee_percent': '10'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(Decimal(response.data['service_fee_percent']), Decimal('10'))
+        self.assertEqual(response.data['listings_recomputed'], 1)
+
+        self.listing.refresh_from_db()
+        self.assertEqual(self.listing.price, Decimal('11000.00'))  # 10000 + 10%
+
+    def test_get_returns_current_percent(self):
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('service_fee_percent', response.data)
+
+    def test_rejects_out_of_range_percent(self):
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.patch(self.url, {'service_fee_percent': '150'})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)

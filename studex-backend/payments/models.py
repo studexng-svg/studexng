@@ -1,6 +1,29 @@
 # payments/models.py
+from decimal import Decimal
 from django.db import models
 from django.conf import settings
+
+
+class PricingSettings(models.Model):
+    """
+    Singleton (always pk=1, same pattern as notifications.PlatformSettings) holding
+    the admin-configurable platform fee percentage. See payments/pricing.py for the
+    one shared pricing service that reads this — nothing else should hardcode the rate.
+    """
+    service_fee_percent = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("8.00"))
+    updated_at = models.DateTimeField(auto_now=True)
+
+    @classmethod
+    def get(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"Pricing Settings (fee: {self.service_fee_percent}%)"
 
 
 class SellerBankAccount(models.Model):

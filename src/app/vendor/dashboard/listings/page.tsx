@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/authStore";
 import { TEAL, toArray } from "@/lib/tokens";
@@ -14,11 +14,27 @@ export default function ListingsPage() {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<any>(null);
   const [form, setForm] = useState({
-    title: "", description: "", price: "", category: "",
+    title: "", description: "", payoutAmount: "", category: "", subcategory: "",
     listing_type: "service", track_inventory: false,
     stock_quantity: 0, discount_percent: 0, images: Array(5).fill(null) as (File | null)[],
     brand: "", condition: "", delivery_time: "", tags: "",
   });
+  const [pricePreview, setPricePreview] = useState<{ price: number; platform_fee: number } | null>(null);
+  const previewDebounce = useRef<NodeJS.Timeout | null>(null);
+
+  // Live "buyer pays ₦X" preview — server computes it, no fee math duplicated here.
+  useEffect(() => {
+    if (previewDebounce.current) clearTimeout(previewDebounce.current);
+    const amount = Number(form.payoutAmount);
+    if (!amount || amount <= 0) { setPricePreview(null); return; }
+    previewDebounce.current = setTimeout(async () => {
+      try {
+        const res = await api.services.previewPrice(amount);
+        if (res.ok) setPricePreview(await res.json());
+      } catch { /* preview is best-effort */ }
+    }, 400);
+    return () => { if (previewDebounce.current) clearTimeout(previewDebounce.current); };
+  }, [form.payoutAmount]);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState("");
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
@@ -46,12 +62,15 @@ export default function ListingsPage() {
 
   const listings: any[] = listingsData ?? [];
   const categories: any[] = categoriesData ?? [];
+  const selectedCategory = categories.find((c: any) => c.slug === form.category);
+  const availableSubcategories: any[] = selectedCategory?.subcategories ?? [];
 
   const openEdit = (listing: any) => {
     setEditing(listing);
     setForm({
       title: listing.title, description: listing.description,
-      price: listing.price.toString(), category: listing.category,
+      payoutAmount: (listing.payout_amount ?? listing.price).toString(), category: listing.category,
+      subcategory: listing.subcategory ? listing.subcategory.toString() : "",
       listing_type: listing.listing_type || "service",
       track_inventory: listing.track_inventory || false,
       stock_quantity: listing.stock_quantity || 0,
@@ -66,22 +85,24 @@ export default function ListingsPage() {
   };
 
   const resetForm = () => {
-    setForm({ title: "", description: "", price: "", category: "", listing_type: "service", track_inventory: false, stock_quantity: 0, discount_percent: 0, images: Array(5).fill(null), brand: "", condition: "", delivery_time: "", tags: "" });
+    setForm({ title: "", description: "", payoutAmount: "", category: "", subcategory: "", listing_type: "service", track_inventory: false, stock_quantity: 0, discount_percent: 0, images: Array(5).fill(null), brand: "", condition: "", delivery_time: "", tags: "" });
     setEditing(null);
     setShowForm(false);
+    setPricePreview(null);
   };
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 2500); };
 
   const handleSave = async () => {
-    if (!form.title || !form.price || !form.category) return;
+    if (!form.title || !form.payoutAmount || !form.category || !form.subcategory) return;
     setSaving(true);
     try {
       const fd = new FormData();
       fd.append("title", form.title);
       fd.append("description", form.description);
-      fd.append("price", form.price);
+      fd.append("payout_amount", form.payoutAmount);
       fd.append("category", form.category);
+      fd.append("subcategory", form.subcategory);
       fd.append("listing_type", form.listing_type);
       const isInventoryType = form.listing_type === "food" || form.listing_type === "product";
       fd.append("track_inventory", isInventoryType ? "true" : "false");
@@ -173,10 +194,18 @@ export default function ListingsPage() {
               rows={3} placeholder="Describe your service..."
               className="w-full bg-white border border-stone-200 rounded-xl px-4 py-3 text-stone-900 text-base focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 transition resize-none placeholder:text-stone-400" />
             <div className="grid grid-cols-2 gap-3">
-              <input type="number" value={form.price} onChange={e => setForm(f => ({ ...f, price: e.target.value }))}
-                placeholder="Price (₦)"
-                className="bg-white border border-stone-200 rounded-xl px-4 py-3 text-stone-900 text-base focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 transition" />
-              <select value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
+              <div>
+                <input type="number" value={form.payoutAmount} onChange={e => setForm(f => ({ ...f, payoutAmount: e.target.value }))}
+                  placeholder="Amount you want to receive (₦)"
+                  className="w-full bg-white border border-stone-200 rounded-xl px-4 py-3 text-stone-900 text-base focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 transition" />
+                {pricePreview && (
+                  <p className="text-xs text-stone-400 mt-1.5 px-1">
+                    Buyer pays <span className="font-semibold text-stone-600">₦{pricePreview.price.toLocaleString()}</span>
+                    {" "}· platform fee ₦{pricePreview.platform_fee.toLocaleString()}
+                  </p>
+                )}
+              </div>
+              <select value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value, subcategory: "" }))}
                 className="bg-white border border-stone-200 rounded-xl px-4 py-3 text-stone-900 text-base focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 transition">
                 <option value="">Select category</option>
                 {categories.map((cat: any) => (
@@ -184,13 +213,21 @@ export default function ListingsPage() {
                 ))}
               </select>
             </div>
+            <select value={form.subcategory} disabled={!form.category}
+              onChange={e => setForm(f => ({ ...f, subcategory: e.target.value }))}
+              className="w-full bg-white border border-stone-200 rounded-xl px-4 py-3 text-stone-900 text-base focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 transition disabled:opacity-50 disabled:cursor-not-allowed">
+              <option value="">{form.category ? "Select subcategory" : "Select category first"}</option>
+              {availableSubcategories.map((sub: any) => (
+                <option key={sub.id} value={sub.id}>{sub.title}</option>
+              ))}
+            </select>
             {/* Discount */}
             <div className="bg-stone-50 border border-stone-100 rounded-xl px-4 py-3 flex items-center gap-4">
               <div className="flex-1">
                 <p className="text-stone-800 text-sm font-semibold">Discount % <span className="font-normal text-stone-400">(optional)</span></p>
                 <p className="text-stone-400 text-xs">
-                  {form.discount_percent > 0 && form.price
-                    ? `Sale price: ₦${(Number(form.price) * (1 - form.discount_percent / 100)).toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+                  {form.discount_percent > 0 && pricePreview
+                    ? `Sale price: ₦${(pricePreview.price * (1 - form.discount_percent / 100)).toLocaleString(undefined, { maximumFractionDigits: 0 })}`
                     : "Set a % to run a sale — shows in Hot Deals on the home page"}
                 </p>
               </div>
@@ -292,7 +329,7 @@ export default function ListingsPage() {
             </div>
 
             <div className="flex gap-3">
-              <button onClick={handleSave} disabled={saving || !form.title || !form.price || !form.category}
+              <button onClick={handleSave} disabled={saving || !form.title || !form.payoutAmount || !form.category || !form.subcategory}
                 className="flex-1 py-3 text-white disabled:opacity-40 rounded-full font-semibold text-sm transition active:scale-[0.98]"
                 style={{ background: TEAL }}>
                 {saving ? "Saving..." : editing ? "Update" : "Create Listing"}

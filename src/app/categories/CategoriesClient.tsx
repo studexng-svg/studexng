@@ -6,12 +6,20 @@ import { ChevronLeft, ChevronRight, Sparkles, Search, X } from "lucide-react";
 import TopNav from "@/components/layout/TopNav";
 import { useScrollRestoration } from "@/hooks/useScrollRestoration";
 import { api } from "@/lib/api";
+import { SubcategoryPills } from "@/components/SubcategoryPills";
+
+interface Subcategory {
+  id: number;
+  title: string;
+  slug: string;
+}
 
 interface Category {
   id: number;
   title: string;
   slug: string;
   image: string;
+  subcategories: Subcategory[];
 }
 
 function getCampus(): string {
@@ -33,6 +41,7 @@ export default function CategoriesClient({ categories }: { categories: Category[
   useScrollRestoration("categories", ["/category/"]);
 
   const [selectedSlug, setSelectedSlug] = useState<string>(categories[0]?.slug ?? "");
+  const [selectedSubSlug, setSelectedSubSlug] = useState<string>("");
   const [listings, setListings]         = useState<any[]>([]);
   const [loading, setLoading]           = useState(false);
   const [countsBySlug, setCountsBySlug] = useState<Record<string, number>>({});
@@ -51,18 +60,23 @@ export default function CategoriesClient({ categories }: { categories: Category[
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const loadCategory = (slug: string) => {
+  const loadCategory = (slug: string, subSlug: string = "") => {
     setLoading(true);
     setListings([]);
+    const params: Record<string, string> = { campus: campusRef.current, category: slug, page_size: "24" };
+    if (subSlug) params.subcategory = subSlug;
     api.pub
-      .listings({ campus: campusRef.current, category: slug, page_size: "24" })
+      .listings(params)
       .then(r => (r.ok ? r.json() : { results: [], count: 0 }))
       .then(d => {
         setListings(d.results ?? d ?? []);
-        setCountsBySlug(prev => ({
-          ...prev,
-          [slug]: d.count ?? (d.results ?? d ?? []).length,
-        }));
+        // Only track the unfiltered count per category chip, not per-subcategory.
+        if (!subSlug) {
+          setCountsBySlug(prev => ({
+            ...prev,
+            [slug]: d.count ?? (d.results ?? d ?? []).length,
+          }));
+        }
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -71,7 +85,13 @@ export default function CategoriesClient({ categories }: { categories: Category[
   const handleSelect = (slug: string) => {
     if (slug === selectedSlug) return;
     setSelectedSlug(slug);
+    setSelectedSubSlug("");
     loadCategory(slug);
+  };
+
+  const handleSelectSubcategory = (subSlug: string) => {
+    setSelectedSubSlug(subSlug);
+    loadCategory(selectedSlug, subSlug);
   };
 
   const handleSearch = (q: string) => {
@@ -257,6 +277,17 @@ export default function CategoriesClient({ categories }: { categories: Category[
                 {searchResults.map(listing => <ListingCard key={listing.id} listing={listing} />)}
               </div>
             )}
+          </div>
+        )}
+
+        {/* ── SUBCATEGORY PILLS ── */}
+        {!isSearching && selectedCat && selectedCat.subcategories?.length > 0 && (
+          <div className="mt-4 px-5">
+            <SubcategoryPills
+              subcategories={selectedCat.subcategories}
+              value={selectedSubSlug}
+              onChange={handleSelectSubcategory}
+            />
           </div>
         )}
 

@@ -1,15 +1,26 @@
 # services/serializers.py
 from rest_framework import serializers
-from .models import Category, Listing, Transaction, Deal
+from .models import Category, Subcategory, Listing, Transaction, Deal
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
 
 
+class SubcategorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Subcategory
+        fields = ['id', 'title', 'slug', 'category']
+        read_only_fields = ['id']
+
+
 class CategorySerializer(serializers.ModelSerializer):
+    # Requires CategoryViewSet.get_queryset() to .prefetch_related('subcategories')
+    # so this stays a single query, not N+1.
+    subcategories = SubcategorySerializer(many=True, read_only=True)
+
     class Meta:
         model = Category
-        fields = ['id', 'title', 'slug', 'image']
+        fields = ['id', 'title', 'slug', 'image', 'subcategories']
         read_only_fields = ['id']
 
 
@@ -96,32 +107,64 @@ class ListingSerializer(serializers.ModelSerializer):
         queryset=Category.objects.all(),
         help_text="Category slug (e.g., 'food', 'nails')"
     )
+    # Subcategory slugs aren't globally unique (only unique per category), so this
+    # takes the numeric id rather than a SlugRelatedField like `category` does.
+    subcategory = serializers.PrimaryKeyRelatedField(queryset=Subcategory.objects.all(), required=True)
+    subcategory_title = serializers.CharField(source='subcategory.title', read_only=True, default=None)
     image = serializers.SerializerMethodField()
     image2 = serializers.SerializerMethodField()
     image3 = serializers.SerializerMethodField()
     image4 = serializers.SerializerMethodField()
     image5 = serializers.SerializerMethodField()
     image_upload = serializers.CharField(required=False, allow_null=True, allow_blank=True, write_only=True, source='image')
+    # Required on create; PATCH (partial=True) updates may omit it to leave price
+    # unchanged. Nullable at the model level only for pre-migration legacy rows.
+    payout_amount = serializers.DecimalField(max_digits=10, decimal_places=2, required=True)
     is_reserved = serializers.SerializerMethodField()
     campus = serializers.CharField(source='vendor.school', read_only=True, default='')
     sale_price = serializers.SerializerMethodField(read_only=True)
     weekly_order_count = serializers.SerializerMethodField(read_only=True)
     last_ordered_at = serializers.SerializerMethodField(read_only=True)
+    platform_fee = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = Listing
         fields = [
-            'id', 'title', 'description', 'price', 'discount_percent', 'sale_price',
+            'id', 'title', 'description', 'payout_amount', 'price', 'platform_fee',
+            'discount_percent', 'sale_price',
             'image', 'image2', 'image3', 'image4', 'image5', 'image_upload',
             'is_available', 'listing_type', 'track_inventory', 'stock_quantity',
             'is_reserved',
-            'category', 'vendor', 'vendor_is_verified',
+            'category', 'subcategory', 'subcategory_title', 'vendor', 'vendor_is_verified',
             'campus',
             'brand', 'condition', 'delivery_time', 'tags',
             'weekly_order_count', 'last_ordered_at',
             'created_at', 'updated_at'
         ]
-        read_only_fields = ['vendor', 'vendor_is_verified', 'created_at', 'updated_at']
+        # `price` is computed from `payout_amount` (see payments/pricing.py) — vendors
+        # no longer set it directly. Enforced here, not just by convention.
+        read_only_fields = ['vendor', 'vendor_is_verified', 'price', 'created_at', 'updated_at']
+
+    def validate_payout_amount(self, value):
+        if value is not None and value <= 0:
+            raise serializers.ValidationError("Amount you want to receive must be greater than zero.")
+        return value
+
+    def get_platform_fee(self, obj):
+        if obj.payout_amount is None:
+            return None
+        return float(obj.price - obj.payout_amount)
+
+    def create(self, validated_data):
+        from payments.pricing import calculate_final_price
+        validated_data['price'] = calculate_final_price(validated_data['payout_amount'])
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        if 'payout_amount' in validated_data and validated_data['payout_amount'] is not None:
+            from payments.pricing import calculate_final_price
+            validated_data['price'] = calculate_final_price(validated_data['payout_amount'])
+        return super().update(instance, validated_data)
 
     def get_sale_price(self, obj):
         if obj.discount_percent and obj.discount_percent > 0:
@@ -225,6 +268,13 @@ class ListingSerializer(serializers.ModelSerializer):
         user = request.user
         if not user.is_verified_vendor:
             raise serializers.ValidationError("You must be a verified vendor to post listings.")
+
+        category = data.get('category', getattr(self.instance, 'category', None))
+        subcategory = data.get('subcategory')
+        if subcategory is not None and category is not None and subcategory.category_id != category.id:
+            raise serializers.ValidationError(
+                {'subcategory': "This subcategory does not belong to the selected category."}
+            )
         return data
 
 

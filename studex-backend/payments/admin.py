@@ -4,8 +4,25 @@ from django.utils.html import format_html
 from django.http import HttpResponse
 from django.db.models import Sum
 import csv
-from .models import SellerBankAccount, PaymentTransaction
+from .models import SellerBankAccount, PaymentTransaction, PricingSettings
 from .views import _transfer_to_vendor
+
+
+@admin.register(PricingSettings)
+class PricingSettingsAdmin(admin.ModelAdmin):
+    """
+    Singleton — use the AdminPricingSettingsView API (/api/admin/pricing-settings/)
+    for the retroactive-recompute behavior; editing here directly does NOT recompute
+    existing listings' prices.
+    """
+    list_display = ['service_fee_percent', 'updated_at']
+    readonly_fields = ['updated_at']
+
+    def has_add_permission(self, request):
+        return not PricingSettings.objects.exists()
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(SellerBankAccount)

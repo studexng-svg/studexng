@@ -26,6 +26,7 @@ interface Category {
   title: string;
   slug: string;
   image: string;
+  subcategories: { id: number; title: string; slug: string }[];
 }
 
 export default async function CategoriesPage() {

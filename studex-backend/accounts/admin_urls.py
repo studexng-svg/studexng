@@ -30,6 +30,8 @@ from accounts.admin_views import (
     AdminFeedbackListView,
     AdminCategoryListView,
     AdminCategoryDetailView,
+    AdminSubcategoryListView,
+    AdminSubcategoryDetailView,
     AdminCartListView,
     AdminAbandonedCartsView,
     AdminAbandonedCartReminderView,
@@ -41,6 +43,7 @@ from accounts.admin_views import (
     AdminBroadcastCountsView,
     AdminGroqNotifyView,
     AdminPlatformSettingsView,
+    AdminPricingSettingsView,
     AdminAIChatView,
     AdminAIActionView,
     AdminAIChatHistoryView,
@@ -115,6 +118,8 @@ if AdminCategoryListView is not None:
     urlpatterns += [
         path('categories/', AdminCategoryListView.as_view(), name='category-list'),
         path('categories/<int:category_id>/', AdminCategoryDetailView.as_view(), name='category-detail'),
+        path('subcategories/', AdminSubcategoryListView.as_view(), name='subcategory-list'),
+        path('subcategories/<int:subcategory_id>/', AdminSubcategoryDetailView.as_view(), name='subcategory-detail'),
     ]
 
 # Broadcast messaging
@@ -124,6 +129,7 @@ urlpatterns += [
     path('broadcast-counts/', AdminBroadcastCountsView.as_view(), name='broadcast-counts'),
     path('groq-notify/', AdminGroqNotifyView.as_view(), name='groq-notify'),
     path('platform-settings/', AdminPlatformSettingsView.as_view(), name='platform-settings'),
+    path('pricing-settings/', AdminPricingSettingsView.as_view(), name='pricing-settings'),
     path('ai-chat/', AdminAIChatView.as_view(), name='ai-chat'),
     path('ai-action/', AdminAIActionView.as_view(), name='ai-action'),
     path('ai-history/', AdminAIChatHistoryView.as_view(), name='ai-history-list'),

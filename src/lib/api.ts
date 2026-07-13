@@ -249,6 +249,9 @@ export const api = {
     deleteListing: (id: number | string) =>
       fetchWithAuth(u(`/api/services/listings/${id}/`), { method: "DELETE" }),
 
+    previewPrice: (payoutAmount: string | number) =>
+      fetchWithAuth(u("/api/services/preview-price/"), { method: "POST", body: s({ payout_amount: payoutAmount }) }),
+
     adminToggle: (id: number | string, body: Record<string, unknown>) =>
       fetchWithAuth(u(`/api/admin/listings/${id}/`), { method: "PATCH", body: s(body) }),
 

@@ -781,18 +781,16 @@ class BookingViewSet(viewsets.ModelViewSet):
                 status=400,
             )
 
-        from payments.views import calc_service_fee
         from decimal import Decimal
-        amount = Decimal(str(booking.listing.price))
-        service_fee = calc_service_fee(amount)
-        checkout_amount = amount + service_fee
+        # booking.listing.price is already all-inclusive (vendor payout + platform
+        # fee baked in at listing-creation time) — no fee gets added at checkout.
+        checkout_amount = Decimal(str(booking.listing.price))
 
         return Response({
             'booking_id': booking.id,
             'listing_id': booking.listing.id,
             'listing_title': booking.listing.title,
-            'listing_price': float(amount),
-            'service_fee': float(service_fee),
+            'listing_price': float(checkout_amount),
             'checkout_amount': float(checkout_amount),
             'checkout_amount_kobo': int(checkout_amount * 100),
             'currency': 'NGN',

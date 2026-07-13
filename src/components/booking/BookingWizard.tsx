@@ -11,7 +11,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/lib/authStore";
 import { api } from "@/lib/api";
-import { TEAL, PURPLE, calcServiceFee } from "@/lib/tokens";
+import { TEAL, PURPLE } from "@/lib/tokens";
 import ReferenceImageUpload from "@/components/booking/ReferenceImageUpload";
 
 const TIME_SLOTS = [
@@ -58,10 +58,11 @@ export default function BookingWizard({ listing, onClose, onSuccess }: BookingWi
 
   const today = new Date().toISOString().split("T")[0];
   const vendorName = listing.vendor.business_name || listing.vendor.username;
+  // listing.price is already all-inclusive (vendor payout + platform fee baked in
+  // at listing-creation time) — no separate fee gets added at checkout.
   const effectivePrice = listing.deal?.discounted_price ?? listing.sale_price ?? listing.price;
   const price = Number(effectivePrice);
-  const serviceFee = calcServiceFee(price);
-  const total = price + serviceFee;
+  const total = price;
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -260,8 +261,7 @@ export default function BookingWizard({ listing, onClose, onSuccess }: BookingWi
             {note && (
               <div className="text-sm"><span className="text-stone-500">Note: </span><span className="text-stone-700">{note}</span></div>
             )}
-            <div className="flex justify-between text-sm pt-2 border-t border-stone-200"><span className="text-stone-500">Service Fee</span><span className="font-medium text-teal-600">₦{serviceFee.toLocaleString()}</span></div>
-            <div className="flex justify-between"><span className="font-semibold text-stone-900">Total</span><span className="font-bold text-teal-600 text-lg">₦{total.toLocaleString()}</span></div>
+            <div className="flex justify-between pt-2 border-t border-stone-200"><span className="font-semibold text-stone-900">Total</span><span className="font-bold text-teal-600 text-lg">₦{total.toLocaleString()}</span></div>
           </div>
         )}
 

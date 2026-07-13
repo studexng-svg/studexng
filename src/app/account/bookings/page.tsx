@@ -12,7 +12,7 @@ import {
 import TopNav from "@/components/layout/TopNav";
 import { useAuth } from "@/lib/authStore";
 import { api } from "@/lib/api";
-import { TEAL, PURPLE, toArray, calcServiceFee } from "@/lib/tokens";
+import { TEAL, PURPLE, toArray } from "@/lib/tokens";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 
@@ -190,13 +190,14 @@ export default function BuyerBookingsPage() {
   };
 
   const activeBooking = bookings.find(b => b.id === payingId);
+  // listing_price is already all-inclusive (vendor payout + platform fee baked in
+  // at listing-creation time) — no separate fee gets added at checkout anymore.
   const listingPrice = activeBooking ? parseFloat(activeBooking.listing_price) : 0;
-  const fullCheckoutAmount = listingPrice + calcServiceFee(listingPrice);
+  const fullCheckoutAmount = listingPrice;
   const creditsToApply = useCredits ? Math.min(loyaltyBalance, fullCheckoutAmount) : 0;
   const isFullyCoveredByCredits = useCredits && creditsToApply >= fullCheckoutAmount && fullCheckoutAmount > 0;
   const amountAfterCredits = isFullyCoveredByCredits ? 0 : Math.max(listingPrice - creditsToApply, 0);
-  const serviceFee = isFullyCoveredByCredits ? 0 : calcServiceFee(amountAfterCredits);
-  const totalWithFee = isFullyCoveredByCredits ? 0 : amountAfterCredits + serviceFee;
+  const totalWithFee = amountAfterCredits;
 
   const proceedToPaystack = async () => {
     if (!activeBooking) return;
@@ -371,10 +372,6 @@ export default function BuyerBookingsPage() {
                   <span className="text-stone-500">Time</span>
                   <span className="font-semibold text-stone-900">{activeBooking.scheduled_time}</span>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-stone-500">Service Fee</span>
-                  <span className="font-medium text-teal-600">₦{serviceFee.toLocaleString()}</span>
-                </div>
                 <div className="border-t border-stone-200 pt-2 flex justify-between">
                   <span className="font-semibold text-stone-900">Total</span>
                   <span className="font-bold text-teal-600 text-lg">₦{totalWithFee.toLocaleString()}</span>
@@ -534,7 +531,7 @@ export default function BuyerBookingsPage() {
                     <button onClick={() => handlePay(booking.id)}
                       className="flex-1 py-3 text-white rounded-xl font-semibold text-sm flex items-center justify-center gap-2 shadow-md active:scale-95 transition-transform"
                       style={{ background: TEAL }}>
-                      <CreditCard className="w-4 h-4" /> Pay ₦{(Number(booking.listing_price) + calcServiceFee(Number(booking.listing_price))).toLocaleString()}
+                      <CreditCard className="w-4 h-4" /> Pay ₦{Number(booking.listing_price).toLocaleString()}
                     </button>
                   )}
                   {isBookingPending && (

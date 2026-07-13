@@ -6,7 +6,7 @@ from django.http import HttpResponse
 from django.db.models import Count, Sum
 from django import forms
 import csv
-from .models import Category, Listing, Transaction, VendorOfTheMonth
+from .models import Category, Subcategory, Listing, Transaction, VendorOfTheMonth
 
 
 class CategoryImageForm(forms.ModelForm):
@@ -133,6 +133,18 @@ class CategoryAdmin(admin.ModelAdmin):
             ])
         return response
     export_to_csv.short_description = "Export selected to CSV"
+
+
+@admin.register(Subcategory)
+class SubcategoryAdmin(admin.ModelAdmin):
+    list_display = ('title', 'category', 'slug', 'listing_count')
+    list_filter = ('category',)
+    search_fields = ('title', 'category__title')
+    prepopulated_fields = {"slug": ("title",)}
+    ordering = ('category__title', 'title')
+
+    def listing_count(self, obj):
+        return obj.listings.count()
 
 
 @admin.register(Listing)

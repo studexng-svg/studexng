@@ -16,6 +16,7 @@ from rest_framework.response import Response
 from django.utils import timezone
 from orders.models import Order
 from .models import SellerBankAccount, PaymentTransaction
+from .pricing import split_settlement
 
 logger = logging.getLogger(__name__)
 
@@ -321,17 +322,17 @@ def get_checkout_config(request):
     except Exception:
         pass
 
-    final_amount = amount - discount_amount
-    service_fee = calc_service_fee(final_amount)
-    checkout_amount = final_amount + service_fee
+    # listing.price is already all-inclusive (vendor payout + platform fee) —
+    # checkout charges exactly that, minus any profile-bonus discount. No fee gets
+    # added on top anymore.
+    checkout_amount = amount - discount_amount
 
     return Response({
         "listing_id": listing.id,
         "listing_title": listing.title,
         "listing_price": float(amount),
         "discount_amount": float(discount_amount),
-        "vendor_receives": float(final_amount),
-        "service_fee": float(service_fee),
+        "vendor_receives": float(listing.payout_amount) if listing.payout_amount is not None else None,
         "checkout_amount": float(checkout_amount),
         "checkout_amount_kobo": int(checkout_amount * 100),
         "currency": "NGN",
@@ -457,8 +458,10 @@ def initialize_payment(request):
         except Exception as e:
             logger.warning(f"initialize_payment: loyalty balance check failed: {e}")
 
-    final_amount = max(amount - discount_amount - credits_applied, Decimal("0"))
-    checkout_amount = final_amount + calc_service_fee(final_amount)
+    # listing.price is already all-inclusive (vendor payout + platform fee baked in
+    # at listing-creation time by payments.pricing) — no fee gets added at checkout
+    # anymore. final_amount is exactly what the buyer pays.
+    checkout_amount = max(amount - discount_amount - credits_applied, Decimal("0"))
     total_amount_kobo = int(checkout_amount * 100)
 
     if total_amount_kobo < 10000:  # Paystack minimum is ₦100 (10000 kobo)
@@ -748,17 +751,21 @@ def pay_with_credits(request):
     buyer = request.user
     listing_price = Decimal(str(listing.price))
     deal_discount_amount = Decimal("0")
+    vendor_discount_currency = Decimal("0")
+    deal_absorbed = False
     try:
         deal = listing.deal
         if deal.is_active:
             effective = Decimal(str(deal.discounted_price))
             deal_discount_amount = listing_price - effective
             listing_price = effective
+            deal_absorbed = True
     except Exception:
         vd = getattr(listing, 'discount_percent', 0) or 0
         if vd > 0:
             effective = listing_price - listing_price * Decimal(vd) / 100
             deal_discount_amount = listing_price - effective
+            vendor_discount_currency = deal_discount_amount
             listing_price = effective
 
     try:
@@ -812,20 +819,26 @@ def pay_with_credits(request):
     except Exception as e:
         logger.warning(f"pay_with_credits: conversation unlock failed: {e}")
 
-    service_fee = calc_service_fee(listing_price)
-    total_charge = listing_price + service_fee
-    credits_to_deduct = min(loyalty_account.credit_balance, total_charge)
+    # listing_price is already all-inclusive (fee baked in) and already net of any
+    # Deal/vendor discount above — no separate fee gets added on top anymore.
+    payout_amount = listing.payout_amount if listing.payout_amount is not None else Decimal(str(listing.price))
+    vendor_amount, platform_amount = split_settlement(
+        listing_price, payout_amount,
+        vendor_discount_currency=vendor_discount_currency,
+        deal_absorbed_by_platform=deal_absorbed,
+    )
+    credits_to_deduct = min(loyalty_account.credit_balance, listing_price)
 
     txn = PaymentTransaction.objects.create(
         buyer=buyer,
         seller=seller,
         reference=reference,
         amount=Decimal("0"),
-        seller_amount=listing_price,
-        platform_amount=service_fee,
-        service_charge=service_fee,
+        seller_amount=vendor_amount,
+        platform_amount=platform_amount,
+        service_charge=platform_amount,
         paystack_charge_fee=Decimal("0"),  # buyer paid ₦0, no Paystack inbound charge
-        transfer_fee=calc_transfer_fee(listing_price),
+        transfer_fee=calc_transfer_fee(vendor_amount),
         deal_discount_amount=deal_discount_amount,
         status="success",
         order_type="service",
@@ -929,10 +942,12 @@ def seller_earnings(request):
     total_orders = Order.objects.filter(listing__vendor=user).count()
     txns = PaymentTransaction.objects.filter(seller=user, status="success")
     total_earned = txns.aggregate(Sum("seller_amount"))["seller_amount__sum"] or 0
+    from payments.pricing import get_service_fee_percent, MIN_FEE, MAX_FEE
+    fee_percent = get_service_fee_percent()
     return Response({
         "total_earned": float(total_earned),
         "total_orders": total_orders,
-        "service_fee_description": "8% (min ₦100, max ₦3,500)",
+        "service_fee_description": f"{fee_percent:g}% (min ₦{MIN_FEE:g}, max ₦{MAX_FEE:g})",
     })
 
 
@@ -1243,9 +1258,15 @@ def _create_order_from_paystack_data(paystack_data, buyer, listing_id, order_typ
         listing_deal_discount = Decimal(str(meta.get("listing_deal_discount", "0") or "0"))
         listing_vendor_discount = Decimal(str(meta.get("listing_vendor_discount", listing_deal_discount) or "0"))
         deal_discount_amount = Decimal(str(meta.get("deal_discount_amount", "0") or "0"))
-        # Vendor bears only their own discount; admin deal discount is absorbed by platform
-        vendor_amount = max(Decimal(str(listing.price)) - listing_vendor_discount, Decimal("0"))
-        platform_amount = max(amount_paid - vendor_amount, Decimal("0"))
+        # Vendor bears only their own discount; admin deal discount is absorbed by
+        # platform. payout_amount falls back to price for any listing that somehow
+        # missed the payout_amount backfill migration.
+        payout_amount = listing.payout_amount if listing.payout_amount is not None else Decimal(str(listing.price))
+        vendor_amount, platform_amount = split_settlement(
+            amount_paid, payout_amount,
+            vendor_discount_currency=listing_vendor_discount,
+            deal_absorbed_by_platform=bool(deal_discount_amount),
+        )
     else:
         vendor_amount, platform_amount = _split_amounts(amount_paid)
         deal_discount_amount = Decimal("0")

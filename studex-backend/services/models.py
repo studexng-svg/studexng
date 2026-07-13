@@ -26,6 +26,21 @@ class Category(models.Model):
         ordering = ['title']
 
 
+class Subcategory(models.Model):
+    category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name='subcategories')
+    title = models.CharField(max_length=100)
+    slug = models.SlugField(max_length=100)
+
+    class Meta:
+        unique_together = ('category', 'slug')
+        ordering = ['title']
+        indexes = [models.Index(fields=['category', 'slug'])]
+        verbose_name_plural = "Subcategories"
+
+    def __str__(self):
+        return f"{self.category.title} → {self.title}"
+
+
 class Listing(models.Model):
     """Product or service posted by a verified vendor"""
 
@@ -37,8 +52,18 @@ class Listing(models.Model):
 
     vendor = models.ForeignKey(User, on_delete=models.CASCADE, related_name='listings')
     category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name='listings')
+    # Nullable only for pre-migration legacy rows (backfilled by a data migration);
+    # required at the serializer level for every new/edited listing going forward.
+    # PROTECT so a subcategory can never be deleted out from under live listings.
+    subcategory = models.ForeignKey(Subcategory, on_delete=models.PROTECT, null=True, blank=True, related_name='listings')
     title = models.CharField(max_length=200)
     description = models.TextField()
+    # The amount the vendor asked to receive — the only price field vendors edit
+    # directly. Nullable only because existing rows get backfilled by a migration;
+    # required for every new/edited listing at the serializer level.
+    payout_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    # Buyer-facing all-inclusive price = payout_amount + platform fee (see
+    # payments/pricing.py). Computed automatically — no longer vendor-writable.
     price = models.DecimalField(max_digits=10, decimal_places=2)
     listing_type = models.CharField(
         max_length=10,

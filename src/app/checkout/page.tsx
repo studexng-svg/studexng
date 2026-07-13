@@ -12,7 +12,7 @@ import { useBookingStore } from "@/lib/bookingStore";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/authStore";
 import Script from "next/script";
-import { GRAD, GRAD_TEXT, TEAL, PURPLE, calcServiceFee } from "@/lib/tokens";
+import { GRAD, GRAD_TEXT, TEAL, PURPLE } from "@/lib/tokens";
 
 const JAKARTA = { fontFamily: "'Plus Jakarta Sans', sans-serif" };
 import TopNav from "@/components/layout/TopNav";
@@ -55,13 +55,14 @@ export default function CheckoutPage() {
   const [loyaltyBalance, setLoyaltyBalance] = useState(0);
   const [useCredits, setUseCredits] = useState(false);
 
+  // discountedBase is already all-inclusive (vendor payout + platform fee baked in
+  // at listing-creation time) — no separate fee gets added at checkout anymore.
   const discountedBase = discount ? discount.finalBase : baseTotal;
-  const fullCheckoutAmount = discountedBase + calcServiceFee(discountedBase);
+  const fullCheckoutAmount = discountedBase;
   const creditsToApply = useCredits ? Math.min(loyaltyBalance, fullCheckoutAmount) : 0;
   const isFullyCoveredByCredits = useCredits && creditsToApply >= fullCheckoutAmount && fullCheckoutAmount > 0;
   const baseAfterCredits = isFullyCoveredByCredits ? 0 : Math.max(discountedBase - creditsToApply, 0);
-  const serviceFee = isFullyCoveredByCredits ? 0 : calcServiceFee(baseAfterCredits);
-  const finalTotal = isFullyCoveredByCredits ? 0 : baseAfterCredits + serviceFee;
+  const finalTotal = baseAfterCredits;
 
   useEffect(() => {
     if (!isLoggedIn || !isHydrated || baseTotal <= 0) return;
@@ -450,17 +451,6 @@ export default function CheckoutPage() {
                 </span>
               </div>
             )}
-            {isFullyCoveredByCredits && (
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-emerald-600 font-medium">Service fee</span>
-                <span className="text-emerald-600 font-semibold">₦0.00 (covered)</span>
-              </div>
-            )}
-
-            <div className="flex justify-between items-center text-sm">
-              <span className="text-stone-500">Service fee (8%)</span>
-              <span className="text-stone-700 font-medium">₦{serviceFee.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-            </div>
             <div className="border-t border-stone-100 pt-3 flex justify-between items-center">
               <span className="font-bold text-stone-900" style={JAKARTA}>Total</span>
               <span className="text-2xl font-bold" style={GRAD_TEXT}>
