@@ -25,7 +25,6 @@ class CategoryImageForm(forms.ModelForm):
 _ORDER_TYPE_CHOICES = [
     ('service', 'Service (Booking)'),
     ('product', 'Product (Order)'),
-    ('food',    'Food (Order)'),
 ]
 
 
@@ -35,7 +34,7 @@ class ListingAdminForm(forms.ModelForm):
     listing_type = forms.ChoiceField(
         choices=_ORDER_TYPE_CHOICES,
         label='Order Type',
-        help_text='Controls whether a purchase creates a Booking (Service) or a direct Order (Product / Food).',
+        help_text='Controls whether a purchase creates a Booking (Service) or a direct Order (Product).',
     )
 
     class Meta:
@@ -214,7 +213,6 @@ class ListingAdmin(admin.ModelAdmin):
             {'label': 'Unavailable','value': l.filter(is_available=False).count(),           'color': '#f87171'},
             {'label': 'Services',   'value': l.filter(listing_type='service').count(),       'color': '#60a5fa'},
             {'label': 'Products',   'value': l.filter(listing_type='product').count(),       'color': '#c084fc'},
-            {'label': 'Food',       'value': l.filter(listing_type='food').count(),          'color': '#fb923c'},
             {'label': 'Revenue',    'value': f'₦{float(rev):,.0f}',                          'color': '#fbbf24',
              'sub': 'paid orders'},
         ]

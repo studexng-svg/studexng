@@ -96,7 +96,7 @@ export default function ListingsPage() {
         fd.append("variants", JSON.stringify(validVariants));
       }
       fd.append("listing_type", form.listing_type);
-      const isInventoryType = form.listing_type === "food" || form.listing_type === "product";
+      const isInventoryType = form.listing_type === "product";
       fd.append("track_inventory", isInventoryType ? "true" : "false");
       fd.append("stock_quantity", isInventoryType ? form.stock_quantity.toString() : "0");
       fd.append("discount_percent", form.discount_percent.toString());
@@ -322,10 +322,9 @@ export default function ListingsPage() {
             <select value={form.listing_type} onChange={e => setForm(f => ({ ...f, listing_type: e.target.value }))}
               className="w-full bg-white border border-stone-200 rounded-xl px-4 py-3 text-stone-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 transition">
               <option value="service">Service (e.g. nails, lashes)</option>
-              <option value="food">Food (stock tracked)</option>
-              <option value="product">Physical Product (stock tracked)</option>
+              <option value="product">Physical Product (stock tracked, e.g. food, items)</option>
             </select>
-            {(form.listing_type === "food" || form.listing_type === "product") && (
+            {form.listing_type === "product" && (
               <div className="flex items-center gap-4 bg-stone-50 border border-stone-100 rounded-xl px-4 py-3">
                 <div className="flex-1">
                   <p className="text-stone-800 text-sm font-semibold">Stock Quantity</p>

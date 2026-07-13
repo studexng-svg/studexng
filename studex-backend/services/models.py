@@ -47,7 +47,6 @@ class Listing(models.Model):
     LISTING_TYPE_CHOICES = (
         ('service', 'Service'),
         ('product', 'Product'),
-        ('food', 'Food'),
     )
 
     vendor = models.ForeignKey(User, on_delete=models.CASCADE, related_name='listings')

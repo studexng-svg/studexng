@@ -12,7 +12,6 @@ import { toast } from "sonner";
 const TYPE_COLOR: Record<string, string> = {
   service: "bg-blue-100 text-blue-700",
   product: "bg-purple-100 text-purple-700",
-  food:    "bg-orange-100 text-orange-700",
 };
 
 const TABS = [

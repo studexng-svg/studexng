@@ -141,7 +141,7 @@ def _normalize_order_type(raw_type: str) -> str:
     if "booking" in t or "service" in t:
         return "service"
     if "food" in t or "product" in t:
-        return t
+        return "product"
     return "service"
 
 

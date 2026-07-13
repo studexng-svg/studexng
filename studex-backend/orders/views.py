@@ -177,13 +177,13 @@ class OrderViewSet(viewsets.ModelViewSet):
                 status=400,
             )
 
-        # Delivery proof required for physical/food orders only.
+        # Delivery proof required for physical product orders only.
         listing_type = order.listing.listing_type
-        if listing_type in ['product', 'food']:
+        if listing_type == 'product':
             proof_1 = request.FILES.get('proof_1')
             if not proof_1:
                 return Response(
-                    {"detail": "At least one delivery proof photo is required for product/food orders."},
+                    {"detail": "At least one delivery proof photo is required for product orders."},
                     status=400,
                 )
             from services.views import upload_to_cloudinary
