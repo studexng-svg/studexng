@@ -279,12 +279,17 @@ export default function CheckoutPage() {
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
             className="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: PURPLE }}>
-                <Calendar className="w-5 h-5 text-white" />
+              <div className="w-14 h-14 rounded-xl overflow-hidden bg-stone-50 flex-shrink-0 flex items-center justify-center">
+                {booking.providerImg
+                  ? <img src={booking.providerImg} alt={booking.providerName} className="w-full h-full object-cover" loading="lazy" />
+                  : <div className="w-full h-full flex items-center justify-center" style={{ background: PURPLE }}>
+                      <Calendar className="w-5 h-5 text-white" />
+                    </div>
+                }
               </div>
-              <div>
-                <p className="font-semibold text-stone-900 text-sm">{booking.providerName}</p>
-                <p className="text-xs text-teal-600 font-medium">Service Booking</p>
+              <div className="min-w-0">
+                <p className="font-semibold text-stone-900 text-sm truncate">{booking.providerName}</p>
+                <p className="text-xs text-teal-600 font-medium">{booking.service || "Service Booking"}</p>
               </div>
             </div>
             <div className="space-y-2.5 bg-stone-50 rounded-xl p-4">
@@ -316,27 +321,35 @@ export default function CheckoutPage() {
               <motion.div key={item.id}
                 initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: i * 0.07 }}
-                className="flex justify-between items-center py-2.5 border-b border-stone-100 last:border-0">
-                <div>
-                  <p className="font-medium text-stone-900 text-sm">{item.title}</p>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <p className="text-xs text-stone-400">× {item.quantity}</p>
-                    {item.original_price && item.original_price > item.price && (
-                      <span className="text-xs bg-rose-100 text-rose-600 font-semibold px-1.5 py-0.5 rounded-full">
-                        -{item.deal_discount_percent}%
-                      </span>
-                    )}
-                  </div>
+                className="flex items-center gap-3 py-2.5 border-b border-stone-100 last:border-0">
+                <div className="w-14 h-14 rounded-xl overflow-hidden bg-stone-50 flex-shrink-0 flex items-center justify-center">
+                  {item.img
+                    ? <img src={item.img} alt={item.title} className="w-full h-full object-cover" loading="lazy" />
+                    : <Sparkles className="w-5 h-5 text-stone-300" />
+                  }
                 </div>
-                <div className="text-right">
-                  {item.original_price && item.original_price > item.price && (
-                    <p className="text-xs text-stone-400 line-through">
-                      ₦{(item.original_price * item.quantity).toLocaleString()}
+                <div className="flex-1 min-w-0 flex justify-between items-center gap-2">
+                  <div className="min-w-0">
+                    <p className="font-medium text-stone-900 text-sm truncate">{item.title}</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <p className="text-xs text-stone-400">× {item.quantity}</p>
+                      {item.original_price && item.original_price > item.price && (
+                        <span className="text-xs bg-rose-100 text-rose-600 font-semibold px-1.5 py-0.5 rounded-full">
+                          -{item.deal_discount_percent}%
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    {item.original_price && item.original_price > item.price && (
+                      <p className="text-xs text-stone-400 line-through">
+                        ₦{(item.original_price * item.quantity).toLocaleString()}
+                      </p>
+                    )}
+                    <p className="font-semibold text-sm" style={{ color: TEAL }}>
+                      ₦{(item.price * item.quantity).toLocaleString()}
                     </p>
-                  )}
-                  <p className="font-semibold text-sm" style={{ color: TEAL }}>
-                    ₦{(item.price * item.quantity).toLocaleString()}
-                  </p>
+                  </div>
                 </div>
               </motion.div>
             ))}
