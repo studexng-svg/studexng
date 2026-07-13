@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/authStore";
 import { TEAL, toArray } from "@/lib/tokens";
@@ -21,22 +21,6 @@ export default function ListingsPage() {
     stock_quantity: 0, discount_percent: 0, images: Array(5).fill(null) as (File | null)[],
     brand: "", condition: "", delivery_time: "", tags: "",
   });
-  const [pricePreview, setPricePreview] = useState<{ price: number; platform_fee: number } | null>(null);
-  const previewDebounce = useRef<NodeJS.Timeout | null>(null);
-
-  // Live "buyer pays ₦X" preview — server computes it, no fee math duplicated here.
-  useEffect(() => {
-    if (previewDebounce.current) clearTimeout(previewDebounce.current);
-    const amount = Number(form.payoutAmount);
-    if (!amount || amount <= 0) { setPricePreview(null); return; }
-    previewDebounce.current = setTimeout(async () => {
-      try {
-        const res = await api.services.previewPrice(amount);
-        if (res.ok) setPricePreview(await res.json());
-      } catch { /* preview is best-effort */ }
-    }, 400);
-    return () => { if (previewDebounce.current) clearTimeout(previewDebounce.current); };
-  }, [form.payoutAmount]);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState("");
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
@@ -91,7 +75,6 @@ export default function ListingsPage() {
     setForm({ title: "", description: "", payoutAmount: "", category: "", is_per_unit: false, unit_label: "", variants: [], listing_type: "service", track_inventory: false, stock_quantity: 0, discount_percent: 0, images: Array(5).fill(null), brand: "", condition: "", delivery_time: "", tags: "" });
     setEditing(null);
     setShowForm(false);
-    setPricePreview(null);
   };
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 2500); };
@@ -213,14 +196,6 @@ export default function ListingsPage() {
                 <input type="number" value={form.payoutAmount} onChange={e => setForm(f => ({ ...f, payoutAmount: e.target.value }))}
                   placeholder={form.is_per_unit ? `Amount per ${form.unit_label.trim() || "unit"} (₦)` : "Amount you want to receive (₦)"}
                   className="w-full bg-white border border-stone-200 rounded-xl px-4 py-3 text-stone-900 text-base focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 transition" />
-                {pricePreview && (
-                  <p className="text-xs text-stone-400 mt-1.5 px-1">
-                    You get <span className="font-semibold text-stone-600">₦{Number(form.payoutAmount).toLocaleString()}</span>
-                    {" "}+ ₦{pricePreview.platform_fee.toLocaleString()} fee{" "}
-                    = Buyer pays <span className="font-semibold text-teal-600">₦{pricePreview.price.toLocaleString()}</span>
-                    {form.is_per_unit ? ` per ${form.unit_label.trim() || "unit"}` : ""}
-                  </p>
-                )}
               </div>
               <select value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
                 className="bg-white border border-stone-200 rounded-xl px-4 py-3 text-stone-900 text-base focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 transition">
@@ -283,8 +258,8 @@ export default function ListingsPage() {
               <div className="flex-1">
                 <p className="text-stone-800 text-sm font-semibold">Discount % <span className="font-normal text-stone-400">(optional)</span></p>
                 <p className="text-stone-400 text-xs">
-                  {form.discount_percent > 0 && pricePreview
-                    ? `Sale price: ₦${(pricePreview.price * (1 - form.discount_percent / 100)).toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+                  {form.discount_percent > 0
+                    ? `${form.discount_percent}% off will show in Hot Deals on the home page`
                     : "Set a % to run a sale — shows in Hot Deals on the home page"}
                 </p>
               </div>
@@ -440,55 +415,26 @@ export default function ListingsPage() {
                 </div>
                 <p className="text-stone-400 text-xs mb-2 line-clamp-2">{listing.description}</p>
 
-                {/* Payout / fee / buyer-price breakdown */}
+                {/* Vendor sees only their own payout — never the fee or buyer price */}
                 {listing.variants?.length > 0 ? (
-                  <div className="bg-stone-50 border border-stone-100 rounded-lg p-2 mb-2 space-y-2">
-                    {listing.variants.map((v: any) => {
-                      const fee = Number(v.price) - Number(v.payout_amount);
-                      const unitSuffix = listing.is_per_unit ? `/${listing.unit_label || "unit"}` : "";
-                      return (
-                        <div key={v.id} className="text-xs">
-                          <p className="font-semibold text-stone-700 mb-0.5">{v.title}</p>
-                          <div className="flex items-center justify-between text-stone-400">
-                            <span>You get ₦{Number(v.payout_amount).toLocaleString()}{unitSuffix}</span>
-                            <span>+₦{fee.toLocaleString()} fee</span>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-stone-400">Buyer pays</span>
-                            <span className="font-bold text-teal-600">₦{Number(v.price).toLocaleString()}{unitSuffix}</span>
-                          </div>
-                        </div>
-                      );
-                    })}
+                  <div className="bg-stone-50 border border-stone-100 rounded-lg p-2 mb-2 space-y-1">
+                    {listing.variants.map((v: any) => (
+                      <div key={v.id} className="flex items-center justify-between text-xs">
+                        <span className="text-stone-500">{v.title}</span>
+                        <span className="font-semibold text-teal-600">
+                          You get ₦{Number(v.payout_amount).toLocaleString()}
+                          {listing.is_per_unit ? `/${listing.unit_label || "unit"}` : ""}
+                        </span>
+                      </div>
+                    ))}
                   </div>
                 ) : (
-                  <div className="bg-stone-50 border border-stone-100 rounded-lg px-2.5 py-2 mb-2 text-xs space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span className="text-stone-400">You get</span>
-                      <span className="font-semibold text-stone-700">
-                        ₦{Number(listing.payout_amount ?? listing.price).toLocaleString()}
-                        {listing.is_per_unit ? `/${listing.unit_label || "unit"}` : ""}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-stone-400">Platform fee</span>
-                      <span className="font-semibold text-stone-700">+₦{Number(listing.platform_fee ?? 0).toLocaleString()}</span>
-                    </div>
-                    <div className="flex items-center justify-between pt-1 mt-1 border-t border-stone-200">
-                      <span className="text-stone-400">Buyer pays</span>
-                      {listing.discount_percent > 0 ? (
-                        <span className="flex items-center gap-1.5">
-                          <span className="text-stone-400 line-through">₦{Number(listing.price).toLocaleString()}</span>
-                          <span className="font-bold text-red-600">
-                            ₦{Math.round(Number(listing.price) * (1 - listing.discount_percent / 100)).toLocaleString()}
-                          </span>
-                        </span>
-                      ) : (
-                        <span className="font-bold text-teal-600">
-                          ₦{Number(listing.price).toLocaleString()}{listing.is_per_unit ? `/${listing.unit_label || "unit"}` : ""}
-                        </span>
-                      )}
-                    </div>
+                  <div className="bg-stone-50 border border-stone-100 rounded-lg px-2.5 py-2 mb-2 flex items-center justify-between text-xs">
+                    <span className="text-stone-500">You get</span>
+                    <span className="font-bold text-teal-600">
+                      ₦{Number(listing.payout_amount ?? listing.price).toLocaleString()}
+                      {listing.is_per_unit ? `/${listing.unit_label || "unit"}` : ""}
+                    </span>
                   </div>
                 )}
 
