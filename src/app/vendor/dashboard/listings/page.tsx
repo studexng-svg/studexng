@@ -7,6 +7,7 @@ import { TEAL, toArray } from "@/lib/tokens";
 import { Plus, Edit2, Trash2, Loader, ToggleLeft, ToggleRight, X, Share2 } from "lucide-react";
 import { EmptyState, LoadingSpinner, HEADING_FONT } from "../_shared";
 import { api } from "@/lib/api";
+import { compressImage } from "@/lib/utils";
 
 export default function ListingsPage() {
   const { user } = useAuth();
@@ -19,6 +20,7 @@ export default function ListingsPage() {
     variants: [] as { id?: number; title: string; payout_amount: string }[],
     listing_type: "service", track_inventory: false,
     stock_quantity: 0, discount_percent: 0, images: Array(5).fill(null) as (File | null)[],
+    imagePreviews: Array(5).fill(null) as (string | null)[],
     brand: "", condition: "", delivery_time: "", tags: "",
   });
   const [saving, setSaving] = useState(false);
@@ -63,6 +65,7 @@ export default function ListingsPage() {
       stock_quantity: listing.stock_quantity || 0,
       discount_percent: listing.discount_percent || 0,
       images: Array(5).fill(null),
+      imagePreviews: Array(5).fill(null),
       brand: listing.brand || "",
       condition: listing.condition || "",
       delivery_time: listing.delivery_time || "",
@@ -72,7 +75,7 @@ export default function ListingsPage() {
   };
 
   const resetForm = () => {
-    setForm({ title: "", description: "", payoutAmount: "", category: "", is_per_unit: false, unit_label: "", variants: [], listing_type: "service", track_inventory: false, stock_quantity: 0, discount_percent: 0, images: Array(5).fill(null), brand: "", condition: "", delivery_time: "", tags: "" });
+    setForm({ title: "", description: "", payoutAmount: "", category: "", is_per_unit: false, unit_label: "", variants: [], listing_type: "service", track_inventory: false, stock_quantity: 0, discount_percent: 0, images: Array(5).fill(null), imagePreviews: Array(5).fill(null), brand: "", condition: "", delivery_time: "", tags: "" });
     setEditing(null);
     setShowForm(false);
   };
@@ -278,14 +281,38 @@ export default function ListingsPage() {
                   const imgSlots = ['image','image2','image3','image4','image5'];
                   const existingUrl: string | null = editing ? editing[imgSlots[i]] || null : null;
                   const newFile = form.images[i];
+                  const previewUrl = form.imagePreviews[i];
+
+                  const pickImage = async (f: File | undefined) => {
+                    if (!f) return;
+                    // Modern phone cameras (esp. high-megapixel Android sensors) can produce
+                    // 15-40MB photos that fail to decode/preview reliably on lower-end
+                    // devices — shrink client-side before it ever hits state/upload.
+                    const compressed = await compressImage(f);
+                    const imgs = [...form.images]; imgs[i] = compressed;
+                    const previews = [...form.imagePreviews]; previews[i] = URL.createObjectURL(compressed);
+                    setForm(prev => ({ ...prev, images: imgs, imagePreviews: previews }));
+                  };
+
                   return (
                     <div key={i} className="relative aspect-square">
                       {newFile ? (
                         <>
-                          <img src={URL.createObjectURL(newFile)} alt="" className="w-full h-full object-cover rounded-xl border-2 border-teal-400" />
+                          {previewUrl ? (
+                            <img src={previewUrl} alt="" className="w-full h-full object-cover rounded-xl border-2 border-teal-400"
+                              onError={() => {
+                                const imgs = [...form.images]; imgs[i] = null;
+                                const previews = [...form.imagePreviews]; previews[i] = null;
+                                setForm(f => ({ ...f, images: imgs, imagePreviews: previews }));
+                                showToast("Couldn't load that photo — try a different one.");
+                              }} />
+                          ) : (
+                            <div className="w-full h-full rounded-xl border-2 border-teal-400 bg-stone-50 animate-pulse" />
+                          )}
                           <button type="button" onClick={() => {
                             const imgs = [...form.images]; imgs[i] = null;
-                            setForm(f => ({ ...f, images: imgs }));
+                            const previews = [...form.imagePreviews]; previews[i] = null;
+                            setForm(f => ({ ...f, images: imgs, imagePreviews: previews }));
                           }} className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center shadow">
                             <X className="w-2.5 h-2.5 text-white" />
                           </button>
@@ -295,11 +322,7 @@ export default function ListingsPage() {
                           <img src={existingUrl} alt="" className="w-full h-full object-cover rounded-xl border border-stone-200" />
                           <label className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 rounded-xl cursor-pointer transition">
                             <span className="text-white text-xs font-semibold">Replace</span>
-                            <input type="file" accept="image/*" className="hidden" onChange={e => {
-                              const f = e.target.files?.[0]; if (!f) return;
-                              const imgs = [...form.images]; imgs[i] = f;
-                              setForm(prev => ({ ...prev, images: imgs }));
-                            }} />
+                            <input type="file" accept="image/*" className="hidden" onChange={e => pickImage(e.target.files?.[0])} />
                           </label>
                           {i === 0 && <span className="absolute bottom-1 left-1 text-xs bg-teal-600 text-white px-1.5 py-0.5 rounded-full font-semibold">Main</span>}
                         </div>
@@ -307,11 +330,7 @@ export default function ListingsPage() {
                         <label className="w-full h-full border-2 border-dashed border-stone-200 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-teal-400 hover:bg-teal-50/30 transition">
                           <Plus className="w-4 h-4 text-stone-300" />
                           <span className="text-xs text-stone-300 mt-0.5">{i === 0 ? 'Main' : `Photo ${i+1}`}</span>
-                          <input type="file" accept="image/*" className="hidden" onChange={e => {
-                            const f = e.target.files?.[0]; if (!f) return;
-                            const imgs = [...form.images]; imgs[i] = f;
-                            setForm(prev => ({ ...prev, images: imgs }));
-                          }} />
+                          <input type="file" accept="image/*" className="hidden" onChange={e => pickImage(e.target.files?.[0])} />
                         </label>
                       )}
                     </div>
