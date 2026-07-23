@@ -105,7 +105,7 @@ class FullLifecycleSmokeTest(TestCase):
         self.assertEqual(order.status, 'seller_completed')
 
         step("11. Buyer confirms — this triggers the Paystack payout in real life")
-        with patch('payments.views._transfer_to_vendor') as mock_transfer:
+        with patch('payments.views.trigger_vendor_payout') as mock_transfer:
             res = client.post(f'/api/orders/orders/{order.id}/confirm/')
             print(res.status_code, res.data.get('message'))
             print("payout triggered:", mock_transfer.called)

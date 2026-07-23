@@ -1,11 +1,16 @@
 # payments/admin.py
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.utils.html import format_html
+from django.utils import timezone
 from django.http import HttpResponse
 from django.db.models import Sum
 import csv
-from .models import SellerBankAccount, PaymentTransaction, PricingSettings
-from .views import _transfer_to_vendor
+from .models import (
+    SellerBankAccount, PaymentTransaction, PricingSettings,
+    EscrowReconciliationLog, VendorDebt, PayoutAuditRecord, CampusPricingSettings,
+)
+from .views import trigger_vendor_payout
+from .reconciliation import run_reconciliation
 
 
 @admin.register(PricingSettings)
@@ -23,6 +28,30 @@ class PricingSettingsAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+@admin.register(CampusPricingSettings)
+class CampusPricingSettingsAdmin(admin.ModelAdmin):
+    """
+    Editing here directly (rather than via AdminPricingSettingsView) does NOT
+    retroactively recompute the affected listing prices — use the API for
+    any change that should actually take effect on existing listings.
+    """
+    list_display = ['get_campus_display', 'scope_display', 'service_fee_percent_display', 'updated_at']
+    list_filter = ['campus', 'vendor_type']
+    readonly_fields = ['updated_at']
+
+    def scope_display(self, obj):
+        if obj.vendor_type_id:
+            return obj.vendor_type.display_name
+        return format_html('<em>campus default</em>')
+    scope_display.short_description = 'Scope'
+
+    def service_fee_percent_display(self, obj):
+        if obj.service_fee_percent is None:
+            return format_html('<span style="color:gray;">inherits next level</span>')
+        return f'{obj.service_fee_percent}%'
+    service_fee_percent_display.short_description = 'Fee'
 
 
 @admin.register(SellerBankAccount)
@@ -78,7 +107,7 @@ class PaymentTransactionAdmin(admin.ModelAdmin):
     net_platform_display.short_description = 'Net Profit'
 
     def colored_status(self, obj):
-        colors = {'success': 'green', 'pending': 'orange', 'failed': 'red', 'refunded': 'blue'}
+        colors = {'success': 'green', 'pending': 'orange', 'failed': 'red', 'refunded': 'blue', 'refund_pending': 'darkorange'}
         color = colors.get(obj.status, 'black')
         return format_html(
             '<span style="color:{};font-weight:bold;">{}</span>',
@@ -130,7 +159,7 @@ class PaymentTransactionAdmin(admin.ModelAdmin):
                 listing_title = order.listing.title
             except Exception:
                 pass
-            _transfer_to_vendor(txn, listing_title)
+            trigger_vendor_payout(txn, listing_title)
             txn.refresh_from_db(fields=['transfer_reference'])
             if txn.transfer_reference:
                 sent += 1
@@ -164,3 +193,151 @@ class PaymentTransactionAdmin(admin.ModelAdmin):
             ])
         return response
     export_to_csv.short_description = "Export to CSV"
+
+
+@admin.register(EscrowReconciliationLog)
+class EscrowReconciliationLogAdmin(admin.ModelAdmin):
+    list_display = [
+        'checked_at', 'paystack_balance_display', 'expected_balance_display',
+        'discrepancy_display', 'flagged_badge',
+    ]
+    list_filter = ['is_flagged', 'resolved']
+    readonly_fields = [
+        'checked_at', 'paystack_balance', 'expected_held_for_vendors',
+        'expected_platform_revenue', 'expected_balance', 'discrepancy', 'is_flagged',
+    ]
+    fields = [
+        'checked_at', 'paystack_balance', 'expected_held_for_vendors',
+        'expected_platform_revenue', 'expected_balance', 'discrepancy', 'is_flagged',
+        'resolved', 'resolved_by', 'resolved_at', 'notes',
+    ]
+    ordering = ['-checked_at']
+    actions = ['run_reconciliation_now', 'mark_resolved']
+
+    def has_add_permission(self, request):
+        # Only ever created by the reconciliation job/action, never by hand —
+        # a manually-created row would misrepresent an actual balance check.
+        return False
+
+    def paystack_balance_display(self, obj):
+        return format_html('₦{}', f'{obj.paystack_balance:,.2f}')
+    paystack_balance_display.short_description = 'Actual Balance'
+
+    def expected_balance_display(self, obj):
+        return format_html('₦{}', f'{obj.expected_balance:,.2f}')
+    expected_balance_display.short_description = 'Expected Balance'
+
+    def discrepancy_display(self, obj):
+        color = 'red' if (obj.is_flagged and not obj.resolved) else 'green'
+        return format_html('<span style="color:{};font-weight:bold;">₦{}</span>', color, f'{obj.discrepancy:,.2f}')
+    discrepancy_display.short_description = 'Discrepancy'
+
+    def flagged_badge(self, obj):
+        if obj.resolved:
+            return format_html('<span style="color:gray;">Resolved</span>')
+        if obj.is_flagged:
+            return format_html('<span style="color:red;font-weight:bold;">⚠ FLAGGED</span>')
+        return format_html('<span style="color:green;">OK</span>')
+    flagged_badge.short_description = 'Status'
+
+    def run_reconciliation_now(self, request, queryset):
+        try:
+            log = run_reconciliation()
+            if log.is_flagged:
+                self.message_user(
+                    request,
+                    f"Reconciliation run complete — DISCREPANCY of ₦{log.discrepancy:,.2f} flagged.",
+                    level=messages.ERROR,
+                )
+            else:
+                self.message_user(
+                    request,
+                    f"Reconciliation run complete — balanced (₦{log.discrepancy:,.2f}, within tolerance).",
+                )
+        except Exception as e:
+            self.message_user(request, f"Reconciliation run failed: {e}", level=messages.ERROR)
+    run_reconciliation_now.short_description = "Run a new reconciliation check now"
+
+    def mark_resolved(self, request, queryset):
+        updated = queryset.update(resolved=True, resolved_by=request.user, resolved_at=timezone.now())
+        self.message_user(request, f"{updated} log(s) marked resolved.")
+    mark_resolved.short_description = "Mark selected as resolved"
+
+
+@admin.register(VendorDebt)
+class VendorDebtAdmin(admin.ModelAdmin):
+    list_display = [
+        'vendor', 'original_amount_display', 'outstanding_amount_display',
+        'status_badge', 'source_transaction', 'created_at', 'settled_at',
+    ]
+    list_filter = ['status', 'created_at']
+    search_fields = ['vendor__username', 'source_transaction__reference', 'reason']
+    readonly_fields = ['vendor', 'source_transaction', 'original_amount', 'created_at']
+    ordering = ['-created_at']
+    actions = ['write_off']
+
+    def has_add_permission(self, request):
+        # Only ever created automatically by refund_payment() when a refund
+        # is issued after payout — a manually-added row wouldn't correspond
+        # to a real refund that actually happened.
+        return False
+
+    def original_amount_display(self, obj):
+        return format_html('₦{}', f'{obj.original_amount:,.2f}')
+    original_amount_display.short_description = 'Original'
+
+    def outstanding_amount_display(self, obj):
+        color = 'red' if obj.status == 'outstanding' else 'gray'
+        return format_html('<span style="color:{};font-weight:bold;">₦{}</span>', color, f'{obj.outstanding_amount:,.2f}')
+    outstanding_amount_display.short_description = 'Outstanding'
+
+    def status_badge(self, obj):
+        colors = {'outstanding': 'red', 'settled': 'green', 'written_off': 'gray'}
+        return format_html(
+            '<span style="color:{};font-weight:bold;">{}</span>',
+            colors.get(obj.status, 'black'), obj.get_status_display(),
+        )
+    status_badge.short_description = 'Status'
+
+    def write_off(self, request, queryset):
+        updated = queryset.filter(status='outstanding').update(
+            status='written_off', outstanding_amount=0, settled_at=timezone.now(),
+        )
+        self.message_user(request, f"{updated} debt(s) written off.")
+    write_off.short_description = "Write off selected debts (vendor will not be charged)"
+
+
+@admin.register(PayoutAuditRecord)
+class PayoutAuditRecordAdmin(admin.ModelAdmin):
+    """
+    Permanent payout audit trail — one row per transaction, written by
+    record_payout_audit() from every place a payout resolves. Never
+    hand-editable: the whole point is that this reflects what actually
+    happened, not what an admin wishes had happened.
+    """
+    list_display = [
+        'transaction', 'vendor', 'rider', 'amount_released_display',
+        'transfer_status', 'pickup_verified_at', 'created_at',
+    ]
+    list_filter = ['transfer_status', 'created_at']
+    search_fields = ['transaction__reference', 'vendor__username', 'rider__username', 'transfer_reference']
+    readonly_fields = [
+        'transaction', 'order_id', 'vendor', 'rider', 'delivery_assignment',
+        'pickup_verified_at', 'pickup_evidence_image',
+        'transfer_reference', 'transfer_status', 'amount_released',
+        'created_at', 'updated_at',
+    ]
+    ordering = ['-created_at']
+
+    def amount_released_display(self, obj):
+        return format_html('₦{}', f'{obj.amount_released:,.2f}')
+    amount_released_display.short_description = 'Amount Released'
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False

@@ -394,7 +394,7 @@ def me(request):
         }
     except Profile.DoesNotExist:
         pass
-    from studex.permissions import _is_platform_admin
+    from studex.permissions import is_platform_admin
     return Response({
         'id': user.id,
         'username': user.username,
@@ -403,7 +403,7 @@ def me(request):
         'bio': user.bio or '',
         'user_type': user.user_type,
         'is_verified_vendor': user.is_verified_vendor,
-        'is_admin': _is_platform_admin(user),
+        'is_admin': is_platform_admin(user),
         'business_name': user.business_name or '',
         'hostel': user.hostel or '',
         'matric_number': user.matric_number or '',

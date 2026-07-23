@@ -465,7 +465,10 @@ try:
                     if payout_amount <= 0:
                         return Response({'error': 'payout_amount must be greater than zero.'}, status=status.HTTP_400_BAD_REQUEST)
                     listing.payout_amount = payout_amount
-                    listing.price = calculate_final_price(payout_amount)
+                    from payments.settlement import get_vendor_type
+                    listing.price = calculate_final_price(
+                        payout_amount, campus=listing.campus, vendor_type=get_vendor_type(listing.vendor),
+                    )
 
                 listing.save()
 
@@ -618,12 +621,12 @@ try:
                         # Trigger vendor payout via Transfer API
                         try:
                             from payments.models import PaymentTransaction
-                            from payments.views import _transfer_to_vendor
+                            from payments.views import trigger_vendor_payout
                             txn = PaymentTransaction.objects.filter(
                                 reference=order.reference, status='success'
                             ).first()
                             if txn and not txn.transfer_reference:
-                                _transfer_to_vendor(txn, order.listing.title)
+                                trigger_vendor_payout(txn, order.listing.title)
                         except Exception as pe:
                             import logging as _log
                             _log.getLogger(__name__).warning(
@@ -865,12 +868,12 @@ try:
                     if resolution == 'release_to_provider':
                         try:
                             from payments.models import PaymentTransaction
-                            from payments.views import _transfer_to_vendor
+                            from payments.views import trigger_vendor_payout
                             txn = PaymentTransaction.objects.filter(
                                 reference=order.reference, status='success'
                             ).first()
                             if txn and not txn.transfer_reference:
-                                _transfer_to_vendor(txn, order.listing.title)
+                                trigger_vendor_payout(txn, order.listing.title)
                         except Exception as pe:
                             import logging as _log
                             _log.getLogger(__name__).warning(
@@ -888,7 +891,7 @@ try:
 
                     elif resolution == 'refund_customer':
                         try:
-                            from payments.views import _refund_paystack_transaction
+                            from payments.views import refund_paystack_transaction
                             from payments.models import PaymentTransaction
                             import logging as _log
                             txn = PaymentTransaction.objects.filter(
@@ -927,7 +930,7 @@ try:
                             credits_only = txn.amount == 0
                             if not credits_only:
                                 amount_kobo = int(txn.amount * 100)
-                                ok = _refund_paystack_transaction(order.reference, amount_kobo)
+                                ok = refund_paystack_transaction(order.reference, amount_kobo)
                                 if not ok:
                                     _log.getLogger(__name__).warning(
                                         f"Dispute refund: Paystack rejected refund for order {order.id}")
@@ -2161,7 +2164,7 @@ class AdminGroqNotifyView(APIView):
         } for log in logs])
 
     def post(self, request):
-        from groq_notifications import _call_groq, _build_recipients, send_groq_notifications
+        from groq_notifications import call_groq, build_recipients, send_groq_notifications
 
         audience = (request.data.get('audience') or 'all').strip()
         school = (request.data.get('school') or '').strip().lower()
@@ -2171,13 +2174,13 @@ class AdminGroqNotifyView(APIView):
             return Response({'error': 'audience must be students, vendors, or all'}, status=400)
 
         if preview_only:
-            payload = _call_groq(audience, school)
+            payload = call_groq(audience, school)
             if not payload:
                 return Response(
                     {'error': 'Groq API unavailable — check GROQ_API_KEY on Render'},
                     status=503,
                 )
-            recipient_count = _build_recipients(audience, school).count()
+            recipient_count = build_recipients(audience, school).count()
             return Response({
                 'title': payload['title'],
                 'message': payload['message'],
@@ -2624,7 +2627,7 @@ class AdminAIActionView(APIView):
             return Response({'error': f'Unknown action type: {action_type}'}, status=400)
 
     def _send_notification(self, params):
-        from groq_notifications import _build_recipients
+        from groq_notifications import build_recipients
         from accounts.utils import send_notification as _notify
 
         audience = params.get('audience', 'all')
@@ -2644,7 +2647,7 @@ class AdminAIActionView(APIView):
             except User.DoesNotExist:
                 return Response({'error': 'User not found'}, status=404)
 
-        recipients = _build_recipients(audience, school)
+        recipients = build_recipients(audience, school)
         sent = 0
         for user in recipients.iterator():
             try:
@@ -2967,38 +2970,166 @@ class AdminPricingSettingsView(APIView):
     PATCH /api/admin/pricing-settings/ — body: { service_fee_percent: number }
     PATCH retroactively recomputes every existing listing's price from its stored
     payout_amount using the new percentage (confirmed product decision — not just
-    new/edited listings).
+    new/edited listings). Omitting `campus`/`vendor_type` from either verb is the
+    exact behavior this endpoint had before Blocker 6 (Campus Pricing) — byte-for-
+    byte unchanged.
+
+    Three-level resolution (see payments.pricing.get_service_fee_percent):
+      Level 1: campus + vendor_type   Level 2: campus only   Level 3: global
+
+      GET  ?campus=pau                       -> Level 2 (campus default)
+      GET  ?campus=pau&vendor_type=food       -> Level 1 (campus+type override)
+      PATCH {campus, service_fee_percent}                  -> sets Level 2
+      PATCH {campus, vendor_type, service_fee_percent}     -> sets Level 1
+      PATCH {campus, [vendor_type,] clear_override: true}  -> reverts that row
+                                                               to inheriting the
+                                                               next level up
+
+    `vendor_type` is always the VendorType's friendly `name` (e.g. "food") at
+    this API boundary — resolved to the actual VendorType instance once, here,
+    before anything touches CampusPricingSettings. The resolver and the model
+    itself never compare on the name string (see payments/pricing.py and
+    payments/settlement.py get_vendor_type).
+
+    Every PATCH form recomputes only the listings it affects — global changes
+    still recompute every listing (unchanged); a campus or campus+type override
+    recomputes only that scope.
     """
     permission_classes = [IsAdminUser]
 
+    def _resolve_vendor_type(self, name):
+        """Returns (VendorType_or_None, error_response_or_None)."""
+        if not name:
+            return None, None
+        from accounts.models import VendorType
+        vendor_type = VendorType.objects.filter(name=name).first()
+        if vendor_type is None:
+            return None, Response({'error': f'Unknown vendor type "{name}".'}, status=400)
+        return vendor_type, None
+
     def get(self, request):
         from payments.models import PricingSettings
-        settings_obj = PricingSettings.get()
-        return Response({'service_fee_percent': str(settings_obj.service_fee_percent)})
+
+        campus = (request.query_params.get('campus') or '').lower()
+        vendor_type_name = (request.query_params.get('vendor_type') or '').lower()
+
+        if not campus:
+            if vendor_type_name:
+                return Response({'error': 'vendor_type requires campus.'}, status=400)
+            settings_obj = PricingSettings.get()
+            return Response({'service_fee_percent': str(settings_obj.service_fee_percent)})
+
+        vendor_type, error = self._resolve_vendor_type(vendor_type_name)
+        if error:
+            return error
+
+        from payments.models import CampusPricingSettings
+        global_percent = PricingSettings.get().service_fee_percent
+
+        campus_default = CampusPricingSettings.objects.filter(campus=campus, vendor_type__isnull=True).first()
+        campus_default_percent = (
+            campus_default.service_fee_percent if campus_default and campus_default.service_fee_percent is not None
+            else None
+        )
+
+        if vendor_type is not None:
+            override = CampusPricingSettings.objects.filter(campus=campus, vendor_type=vendor_type).first()
+            is_override = override is not None and override.service_fee_percent is not None
+            if is_override:
+                effective = override.service_fee_percent
+            elif campus_default_percent is not None:
+                effective = campus_default_percent
+            else:
+                effective = global_percent
+            return Response({
+                'campus': campus,
+                'vendor_type': vendor_type.name,
+                'service_fee_percent': str(effective),
+                'is_override': is_override,
+                'campus_default_service_fee_percent': (
+                    str(campus_default_percent) if campus_default_percent is not None else None
+                ),
+                'global_service_fee_percent': str(global_percent),
+            })
+
+        is_override = campus_default_percent is not None
+        effective = campus_default_percent if is_override else global_percent
+        return Response({
+            'campus': campus,
+            'service_fee_percent': str(effective),
+            'is_override': is_override,
+            'global_service_fee_percent': str(global_percent),
+        })
 
     def patch(self, request):
         from decimal import Decimal, InvalidOperation
         from payments.models import PricingSettings
         from payments.pricing import recompute_all_listing_prices
 
-        raw = request.data.get('service_fee_percent')
-        try:
-            new_percent = Decimal(str(raw))
-        except (InvalidOperation, TypeError):
-            return Response({'error': 'service_fee_percent must be a number'}, status=400)
-        if not (Decimal('0') <= new_percent <= Decimal('100')):
-            return Response({'error': 'service_fee_percent must be between 0 and 100'}, status=400)
+        campus = (request.data.get('campus') or '').lower()
+        vendor_type_name = (request.data.get('vendor_type') or '').lower()
 
-        settings_obj = PricingSettings.get()
-        settings_obj.service_fee_percent = new_percent
-        settings_obj.save(update_fields=['service_fee_percent'])
+        if not campus:
+            if vendor_type_name:
+                return Response({'error': 'vendor_type requires campus.'}, status=400)
+            raw = request.data.get('service_fee_percent')
+            try:
+                new_percent = Decimal(str(raw))
+            except (InvalidOperation, TypeError):
+                return Response({'error': 'service_fee_percent must be a number'}, status=400)
+            if not (Decimal('0') <= new_percent <= Decimal('100')):
+                return Response({'error': 'service_fee_percent must be between 0 and 100'}, status=400)
 
-        recomputed_count = recompute_all_listing_prices(new_percent)
+            settings_obj = PricingSettings.get()
+            settings_obj.service_fee_percent = new_percent
+            settings_obj.save(update_fields=['service_fee_percent'])
 
-        return Response({
-            'service_fee_percent': str(settings_obj.service_fee_percent),
+            recomputed_count = recompute_all_listing_prices(new_percent)
+
+            return Response({
+                'service_fee_percent': str(settings_obj.service_fee_percent),
+                'listings_recomputed': recomputed_count,
+            })
+
+        from payments.models import CampusPricingSettings
+
+        valid_campuses = {c for c, _ in CampusPricingSettings.CAMPUS_CHOICES}
+        if campus not in valid_campuses:
+            return Response({'error': f'Unknown campus "{campus}".'}, status=400)
+
+        vendor_type, error = self._resolve_vendor_type(vendor_type_name)
+        if error:
+            return error
+
+        override, _ = CampusPricingSettings.objects.get_or_create(campus=campus, vendor_type=vendor_type)
+
+        if request.data.get('clear_override'):
+            override.service_fee_percent = None
+            override.save(update_fields=['service_fee_percent'])
+            from payments.pricing import get_service_fee_percent
+            new_percent = get_service_fee_percent(campus=campus, vendor_type=vendor_type)
+        else:
+            raw = request.data.get('service_fee_percent')
+            try:
+                new_percent = Decimal(str(raw))
+            except (InvalidOperation, TypeError):
+                return Response({'error': 'service_fee_percent must be a number'}, status=400)
+            if not (Decimal('0') <= new_percent <= Decimal('100')):
+                return Response({'error': 'service_fee_percent must be between 0 and 100'}, status=400)
+            override.service_fee_percent = new_percent
+            override.save(update_fields=['service_fee_percent'])
+
+        recomputed_count = recompute_all_listing_prices(new_percent, campus=campus, vendor_type=vendor_type)
+
+        response_data = {
+            'campus': campus,
+            'service_fee_percent': str(new_percent),
+            'is_override': not bool(request.data.get('clear_override')),
             'listings_recomputed': recomputed_count,
-        })
+        }
+        if vendor_type is not None:
+            response_data['vendor_type'] = vendor_type.name
+        return Response(response_data)
 
 
 def _broadcast_base_qs(school: str):
@@ -3186,7 +3317,7 @@ class AdminTestEmailView(APIView):
     permission_classes = [IsAdminUser]
 
     def post(self, request):
-        from studex.email import _try_resend, _try_brevo, _html_wrapper
+        from studex.email import try_resend, try_brevo, html_wrapper
         from django.conf import settings as s
 
         to = (request.data.get('to') or '').strip() or request.user.email
@@ -3194,7 +3325,7 @@ class AdminTestEmailView(APIView):
             return Response({'error': 'No recipient email — provide "to" or log in with an email account.'}, status=400)
 
         subject = 'StudEx — Email Delivery Test'
-        html = _html_wrapper(
+        html = html_wrapper(
             'Email delivery test',
             '<p style="font-size:15px;color:#44403C;line-height:1.7;margin:0;">This is a test email sent from the StudEx admin panel to verify that your email provider is configured correctly.</p>',
         )

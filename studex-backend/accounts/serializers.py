@@ -223,8 +223,8 @@ class UserProfileSerializer(serializers.ModelSerializer):
         read_only_fields = ['wallet_balance', 'is_verified_vendor', 'created_at', 'is_staff', 'is_superuser', 'is_admin']
 
     def get_is_admin(self, obj):
-        from studex.permissions import _is_platform_admin
-        return _is_platform_admin(obj)
+        from studex.permissions import is_platform_admin
+        return is_platform_admin(obj)
 
     def get_disclaimer_accepted_at(self, obj):
         try:

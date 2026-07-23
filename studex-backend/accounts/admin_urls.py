@@ -50,8 +50,6 @@ from accounts.admin_views import (
     AdminDealDetailView,
 )
 
-app_name = 'admin_api'
-
 urlpatterns = [
     # Dashboard
     path('dashboard/', AdminDashboardView.as_view(), name='dashboard'),

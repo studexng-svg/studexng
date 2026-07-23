@@ -9,7 +9,7 @@ from django.utils.html import format_html
 from django.http import HttpResponse
 from django.db.models import Count, Avg, Sum, Q
 import csv
-from .models import User, Profile, SellerApplication, Vendor
+from .models import User, Profile, SellerApplication, Vendor, VendorType
 from .utils import send_notification
 
 SCHOOL_CHOICES = [
@@ -382,16 +382,25 @@ class SellerApplicationAdmin(admin.ModelAdmin):
         return False
 
 
+@admin.register(VendorType)
+class VendorTypeAdmin(admin.ModelAdmin):
+    list_display = ['display_name', 'name', 'settlement_trigger', 'is_active', 'updated_at']
+    list_filter = ['settlement_trigger', 'is_active']
+    search_fields = ['name', 'display_name']
+    readonly_fields = ['created_at', 'updated_at']
+    ordering = ['display_name']
+
+
 @admin.register(Vendor)
 class VendorAdmin(admin.ModelAdmin):
-    list_display = ['user', 'is_verified', 'verified_at', 'verified_by', 'unverified_at', 'unverified_by']
-    list_filter = ['is_verified']
+    list_display = ['user', 'vendor_type', 'is_verified', 'verified_at', 'verified_by', 'unverified_at', 'unverified_by']
+    list_filter = ['is_verified', 'vendor_type']
     search_fields = ['user__username', 'user__email', 'user__business_name']
     readonly_fields = ['created_at', 'verified_at', 'unverified_at']
     ordering = ['-created_at']
 
     fieldsets = (
-        ('Vendor', {'fields': ('user', 'is_verified', 'created_at')}),
+        ('Vendor', {'fields': ('user', 'vendor_type', 'is_verified', 'created_at')}),
         ('Verification', {'fields': ('verified_at', 'verified_by')}),
         ('Unverification', {'fields': ('unverified_at', 'unverified_by', 'unverification_reason')}),
     )

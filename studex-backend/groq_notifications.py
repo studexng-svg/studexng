@@ -63,7 +63,7 @@ _SCHOOL_NAMES = {
 }
 
 
-def _call_groq(audience: str, school: str = '') -> dict | None:
+def call_groq(audience: str, school: str = '') -> dict | None:
     """
     Call Groq API for the given audience and optional campus.
     Returns {'title': str, 'message': str} or None on any failure.
@@ -122,7 +122,7 @@ def _call_groq(audience: str, school: str = '') -> dict | None:
         return None
 
 
-def _build_recipients(audience: str, school: str):
+def build_recipients(audience: str, school: str):
     """Active user queryset for the given audience and campus filter."""
     from accounts.models import User
     from django.db.models import Q
@@ -154,13 +154,13 @@ def send_groq_notifications(
     from accounts.utils import send_notification
     from notifications.models import GrokNotificationLog
 
-    payload = _call_groq(audience, school)
+    payload = call_groq(audience, school)
     if not payload:
         return {'error': 'Groq API unavailable or GROQ_API_KEY not configured'}
 
     title   = payload['title']
     message = payload['message']
-    recipients = _build_recipients(audience, school)
+    recipients = build_recipients(audience, school)
     action_url = '/categories' if audience == 'students' else '/vendor/dashboard'
 
     sent = 0

@@ -7,7 +7,7 @@ from rest_framework import permissions
 from django.conf import settings
 
 
-def _is_platform_admin(user):
+def is_platform_admin(user):
     """
     Returns True if the user is a platform admin.
     Checks is_staff OR matches the configured ADMIN_EMAILS list.
@@ -26,7 +26,7 @@ class IsAdminUser(permissions.BasePermission):
     """
 
     def has_permission(self, request, view):
-        return _is_platform_admin(request.user)
+        return is_platform_admin(request.user)
 
     message = "You must be an admin to access this resource."
 

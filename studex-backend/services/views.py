@@ -43,7 +43,9 @@ class PreviewPriceView(APIView):
         if payout_amount <= 0:
             return Response({"error": "payout_amount must be greater than zero."}, status=400)
 
-        price = calculate_final_price(payout_amount)
+        from payments.settlement import get_vendor_type
+        campus = (getattr(request.user, 'school', '') or '').lower()
+        price = calculate_final_price(payout_amount, campus=campus, vendor_type=get_vendor_type(request.user))
         return Response({
             "payout_amount": float(payout_amount),
             "platform_fee": float(price - payout_amount),

@@ -231,11 +231,52 @@ class SellerApplication(models.Model):
         return None
 
 
+class VendorType(models.Model):
+    """
+    Configuration point for a category of vendor (Food, Beauty, Laundry,
+    Retail, ...). Deliberately its own table rather than a plain CharField
+    choice on Vendor — future operational config that varies by vendor
+    category (batch delivery support, weather-suspension eligibility, etc.)
+    has a natural home here without another schema migration. See
+    payments/settlement.py for how settlement_trigger is consumed; nothing
+    else on this model is read by application code yet.
+
+    Vendor.vendor_type is nullable, and every consumer of settlement_trigger
+    treats "no vendor type assigned" as SETTLEMENT_TRIGGER_BUYER_CONFIRMATION
+    (today's global behavior) — assigning a vendor type is a strict opt-in,
+    never a change to any vendor's existing payout behavior.
+    """
+    SETTLEMENT_TRIGGER_CHOICES = (
+        ('buyer_confirmation', 'Buyer Confirmation / Auto-Release'),
+        ('pickup_verification', 'Rider Pickup Verification'),
+    )
+
+    name = models.SlugField(max_length=50, unique=True)
+    display_name = models.CharField(max_length=100)
+    settlement_trigger = models.CharField(
+        max_length=30, choices=SETTLEMENT_TRIGGER_CHOICES, default='buyer_confirmation',
+    )
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['display_name']
+        verbose_name = "Vendor Type"
+        verbose_name_plural = "Vendor Types"
+
+    def __str__(self):
+        return self.display_name
+
+
 class Vendor(models.Model):
     """Dedicated vendor record — single source of truth for verification status."""
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='vendor')
     is_verified = models.BooleanField(default=True)
+    vendor_type = models.ForeignKey(
+        VendorType, on_delete=models.SET_NULL, null=True, blank=True, related_name='vendors',
+    )
 
     verified_at = models.DateTimeField(null=True, blank=True)
     verified_by = models.ForeignKey(

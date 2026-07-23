@@ -288,15 +288,23 @@ class BookingSerializer(serializers.ModelSerializer):
 
     def get_listing_price(self, obj):
         from decimal import Decimal
+        from payments.settlement import get_vendor_type
+        vendor_type = get_vendor_type(obj.listing.vendor)
         if obj.variant_id:
             payout_amount = obj.variant.payout_amount
             if obj.listing.is_per_unit and obj.quantity > 1:
                 from payments.pricing import calculate_final_price
-                return str(calculate_final_price(Decimal(str(payout_amount)) * obj.quantity))
+                return str(calculate_final_price(
+                    Decimal(str(payout_amount)) * obj.quantity, campus=obj.listing.campus,
+                    vendor_type=vendor_type,
+                ))
             return str(obj.variant.price)
         if obj.listing.is_per_unit and obj.quantity > 1:
             from payments.pricing import calculate_final_price
-            return str(calculate_final_price(Decimal(str(obj.listing.payout_amount)) * obj.quantity))
+            return str(calculate_final_price(
+                Decimal(str(obj.listing.payout_amount)) * obj.quantity, campus=obj.listing.campus,
+                vendor_type=vendor_type,
+            ))
         price = Decimal(str(obj.listing.price))
         try:
             deal = obj.listing.deal

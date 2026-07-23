@@ -95,6 +95,7 @@ MIDDLEWARE = [
     'studex.middleware.RateLimitMiddleware',
     'studex.middleware.LastSeenMiddleware',
     'studex.middleware.SecurityHeadersMiddleware',
+    'studex.middleware.ApiVersionHeaderMiddleware',
 ]
 
 ROOT_URLCONF = 'studex.urls'

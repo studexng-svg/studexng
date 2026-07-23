@@ -20,7 +20,7 @@ FROM_ADDR  = f"{FROM_NAME} <{FROM_EMAIL}>"
 _IS_TEST_RUN = 'test' in sys.argv or 'pytest' in sys.modules
 
 
-def _html_wrapper(title: str, body_html: str) -> str:
+def html_wrapper(title: str, body_html: str) -> str:
     """Branded email shell used for all notification emails."""
     return f"""
     <div style="font-family:'DM Sans',Arial,sans-serif;max-width:520px;margin:0 auto;
@@ -40,7 +40,7 @@ def _html_wrapper(title: str, body_html: str) -> str:
     """
 
 
-def _try_resend(to: str, subject: str, html: str) -> bool:
+def try_resend(to: str, subject: str, html: str) -> bool:
     if _IS_TEST_RUN:
         logger.info(f"[email] Test run — skipped Resend send to {to}: {subject}")
         return True
@@ -60,7 +60,7 @@ def _try_resend(to: str, subject: str, html: str) -> bool:
         return False
 
 
-def _try_brevo(to: str, subject: str, html: str) -> bool:
+def try_brevo(to: str, subject: str, html: str) -> bool:
     if _IS_TEST_RUN:
         logger.info(f"[email] Test run — skipped Brevo send to {to}: {subject}")
         return True
@@ -94,8 +94,8 @@ def send_email(to: str, subject: str, html: str, _async: bool = True) -> None:
     Runs in a background thread by default so it never blocks a request.
     """
     def _send():
-        if not _try_resend(to, subject, html):
-            _try_brevo(to, subject, html)
+        if not try_resend(to, subject, html):
+            try_brevo(to, subject, html)
 
     if _async:
         threading.Thread(target=_send, daemon=True).start()
@@ -147,7 +147,7 @@ def send_notification_email(recipient, title: str, message: str, action_url: str
         send_email(
             to=email,
             subject=title,
-            html=_html_wrapper(title, body),
+            html=html_wrapper(title, body),
         )
     except Exception as e:
         logger.warning(f"[email] send_notification_email failed: {e}")

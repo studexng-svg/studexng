@@ -286,7 +286,10 @@ class ListingAdmin(admin.ModelAdmin):
         # edited via Django admin never gets the platform fee applied.
         if obj.payout_amount is not None:
             from payments.pricing import calculate_final_price
-            obj.price = calculate_final_price(obj.payout_amount)
+            from payments.settlement import get_vendor_type
+            obj.price = calculate_final_price(
+                obj.payout_amount, campus=obj.campus, vendor_type=get_vendor_type(obj.vendor),
+            )
 
         """
         Override save_model so that when admin saves a listing,
@@ -320,10 +323,14 @@ class ListingAdmin(admin.ModelAdmin):
         from django.contrib import messages
         from django.db.models import ProtectedError
         from payments.pricing import calculate_final_price
+        from payments.settlement import get_vendor_type
 
         instances = formset.save(commit=False)
         for instance in instances:
-            instance.price = calculate_final_price(instance.payout_amount)
+            instance.price = calculate_final_price(
+                instance.payout_amount, campus=instance.listing.campus,
+                vendor_type=get_vendor_type(instance.listing.vendor),
+            )
             instance.save()
         formset.save_m2m()
 

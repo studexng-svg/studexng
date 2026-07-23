@@ -149,3 +149,23 @@ class SecurityHeadersMiddleware(MiddlewareMixin):
             response['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains; preload'
 
         return response
+
+
+class ApiVersionHeaderMiddleware(MiddlewareMixin):
+    """
+    Stamps every /api/ response with which API version served it (Blocker 7
+    — API Versioning). Purely observational — it does not change routing or
+    behavior. `/api/` (legacy unversioned) and `/api/v1/` both currently
+    serve identical behavior, so both report "v1" today; this only starts
+    reporting something else once a request is actually served by a future
+    `/api/v2/` block, at which point that block's views should set this
+    header explicitly to override the default.
+    """
+
+    def process_response(self, request, response):
+        # Both /api/ (legacy alias) and /api/v1/ serve identical behavior today,
+        # so both report "v1" — see the class docstring for how a future /api/v2/
+        # block should override this.
+        if request.path.startswith('/api/') and 'API-Version' not in response:
+            response['API-Version'] = 'v1'
+        return response

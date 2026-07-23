@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 PAYSTACK_BASE = "https://api.paystack.co"
 
 
-def _refund_paystack_transaction(reference: str, amount_kobo: int | None = None) -> bool:
+def refund_paystack_transaction(reference: str, amount_kobo: int | None = None) -> bool:
     """Issue a full or partial refund via Paystack Refund API.
     Returns True if Paystack accepted the refund request, False otherwise.
     Paystack refunds to the original payment channel automatically.
@@ -434,7 +434,10 @@ def initialize_payment(request):
                 unit_payout = booking.variant.payout_amount if booking.variant_id else listing.payout_amount
                 qty = booking.quantity if booking.listing.is_per_unit else 1
                 total_payout = Decimal(str(unit_payout)) * qty
-                amount = calculate_final_price(total_payout)
+                from payments.settlement import get_vendor_type
+                amount = calculate_final_price(
+                    total_payout, campus=listing.campus, vendor_type=get_vendor_type(listing.vendor),
+                )
             else:
                 amount = Decimal(str(listing.price))
             try:
@@ -681,7 +684,11 @@ def verify_payment(request):
                 from payments.pricing import calculate_final_price as _cfp
                 _unit_payout = _booking.variant.payout_amount if _booking.variant_id else _listing.payout_amount
                 _qty = _booking.quantity if _listing.is_per_unit else 1
-                _base = _cfp(Decimal(str(_unit_payout)) * _qty)
+                from payments.settlement import get_vendor_type as _get_vendor_type
+                _base = _cfp(
+                    Decimal(str(_unit_payout)) * _qty, campus=_listing.campus,
+                    vendor_type=_get_vendor_type(_listing.vendor),
+                )
             else:
                 _base = Decimal(str(_listing.price))
             try:
@@ -709,7 +716,7 @@ def verify_payment(request):
             f"verify_payment: underpayment on {ref_key} — "
             f"paid {actual_kobo} kobo, min expected {min_kobo} kobo"
         )
-        _refund_paystack_transaction(ref_key, actual_kobo)
+        refund_paystack_transaction(ref_key, actual_kobo)
         return Response({
             "error": "Payment amount is less than the order amount. Your payment has been refunded automatically."
         }, status=400)
@@ -719,7 +726,7 @@ def verify_payment(request):
             f"verify_payment: overpayment on {ref_key} — "
             f"paid {actual_kobo} kobo, max expected {max_kobo} kobo"
         )
-        _refund_paystack_transaction(ref_key, actual_kobo)
+        refund_paystack_transaction(ref_key, actual_kobo)
         return Response({
             "error": "Payment amount does not match the checkout amount. Your payment has been refunded automatically."
         }, status=400)
@@ -800,7 +807,10 @@ def pay_with_credits(request):
     if booking is not None and (booking.listing.is_per_unit or booking.variant_id):
         from payments.pricing import calculate_final_price
         unit_payout = booking.variant.payout_amount if booking.variant_id else listing.payout_amount
-        listing_price = calculate_final_price(Decimal(str(unit_payout)) * quantity)
+        from payments.settlement import get_vendor_type
+        listing_price = calculate_final_price(
+            Decimal(str(unit_payout)) * quantity, campus=listing.campus, vendor_type=get_vendor_type(listing.vendor),
+        )
     else:
         listing_price = Decimal(str(listing.price))
     deal_discount_amount = Decimal("0")
@@ -922,7 +932,7 @@ def pay_with_credits(request):
     logger.info(f"pay_with_credits: ₦{credits_to_deduct} deducted for order {order_id} by {buyer.username}")
 
     # Vendor payout is deferred to buyer confirmation (same escrow flow as Paystack orders).
-    # _transfer_to_vendor is NOT called here — it runs in orders/views.py:confirm().
+    # trigger_vendor_payout is NOT called here — it runs in orders/views.py:confirm().
 
     try:
         from accounts.utils import send_notification
@@ -1006,7 +1016,10 @@ def seller_earnings(request):
     txns = PaymentTransaction.objects.filter(seller=user, status="success")
     total_earned = txns.aggregate(Sum("seller_amount"))["seller_amount__sum"] or 0
     from payments.pricing import get_service_fee_percent, MIN_FEE, MAX_FEE
-    fee_percent = get_service_fee_percent()
+    from payments.settlement import get_vendor_type
+    fee_percent = get_service_fee_percent(
+        campus=(getattr(user, 'school', '') or '').lower(), vendor_type=get_vendor_type(user),
+    )
     return Response({
         "total_earned": float(total_earned),
         "total_orders": total_orders,
@@ -1059,26 +1072,57 @@ def refund_payment(request):
     reason = request.data.get("reason", "Customer requested refund")
     if not reference:
         return Response({"error": "reference is required."}, status=400)
+
+    from django.db import transaction as db_transaction
+
+    # Claim the refund inside a row lock BEFORE making the (slow, external)
+    # Paystack call. Without this, two concurrent requests for the same
+    # reference — a double-click, a client retrying after a slow response —
+    # can both read status="success", both pass every check below, and both
+    # fire a real Paystack refund + (if already paid out) both create a
+    # VendorDebt for the same underlying transaction. select_for_update()
+    # serializes them: the second request blocks here until the first
+    # commits its claim, then sees status="refund_pending" and stops.
+    # The external call itself happens outside the lock (same pattern as
+    # auto_release_orders / trigger_vendor_payout) so we don't hold a DB
+    # connection open for up to 15s waiting on Paystack.
     try:
-        txn = PaymentTransaction.objects.get(reference=reference)
+        with db_transaction.atomic():
+            try:
+                txn = PaymentTransaction.objects.select_for_update().get(reference=reference)
+            except PaymentTransaction.DoesNotExist:
+                return Response({"error": "Transaction not found."}, status=404)
+
+            if txn.buyer != request.user and not request.user.is_staff:
+                return Response({"error": "Not authorized."}, status=403)
+            if txn.status == "refunded":
+                return Response({"error": "Already refunded."}, status=400)
+            if txn.status == "refund_pending":
+                return Response(
+                    {"error": "A refund for this transaction is already being processed."},
+                    status=409,
+                )
+            if txn.status != "success":
+                return Response({"error": "Only successful transactions can be refunded."}, status=400)
+
+            # Vendor has already been paid via Transfer API. Refunding the buyer here
+            # still returns their money immediately (Paystack reverses the original
+            # charge independently of any transfer already sent) — but clawing back
+            # what the vendor was paid is a bigger decision than a routine self-service
+            # refund, so only staff/admin can trigger it. A VendorDebt is created below
+            # and settled from that vendor's future payouts (see trigger_vendor_payout).
+            already_paid_out = bool(txn.transfer_reference)
+            if already_paid_out and not request.user.is_staff:
+                return Response({
+                    "error": "This order has already been paid out to the vendor. "
+                             "Please contact support to arrange a refund."
+                }, status=403)
+
+            txn.status = "refund_pending"
+            txn.save(update_fields=["status"])
     except PaymentTransaction.DoesNotExist:
         return Response({"error": "Transaction not found."}, status=404)
-    if txn.buyer != request.user and not request.user.is_staff:
-        return Response({"error": "Not authorized."}, status=403)
-    if txn.status == "refunded":
-        return Response({"error": "Already refunded."}, status=400)
-    # Vendor has already been paid via Transfer API — reversing without clawing
-    # back the transfer would leave StudEx covering both sides of the payment.
-    # Require admin intervention in this case.
-    if txn.transfer_reference:
-        logger.warning(
-            f"refund_payment: blocked self-service refund on {reference} — "
-            f"vendor transfer {txn.transfer_reference} already sent"
-        )
-        return Response({
-            "error": "The vendor has already been paid for this order. "
-                     "Please contact support to arrange a refund."
-        }, status=400)
+
     try:
         # Paystack refund: POST /refund with transaction reference
         # Amount in kobo (naira × 100)
@@ -1096,13 +1140,48 @@ def refund_payment(request):
         )
         if refund_res.status_code in [200, 201] and refund_res.json().get("status"):
             txn.status = "refunded"
-            txn.save()
-            return Response({
+            txn.save(update_fields=["status"])
+
+            debt = None
+            if already_paid_out and txn.seller:
+                from payments.models import VendorDebt
+                debt = VendorDebt.objects.create(
+                    vendor=txn.seller,
+                    source_transaction=txn,
+                    original_amount=txn.seller_amount,
+                    outstanding_amount=txn.seller_amount,
+                    reason=f"Refund issued on {txn.reference} after vendor payout ({reason})",
+                )
+                logger.warning(
+                    f"refund_payment: refunded {reference} after vendor payout — "
+                    f"created VendorDebt {debt.id} for ₦{debt.outstanding_amount} "
+                    f"against {txn.seller.username}"
+                )
+
+            response_data = {
                 "message": "Refund initiated. Returns within 3-5 business days.",
                 "amount": float(txn.amount),
-            })
-        return Response({"error": refund_res.json().get("message", "Refund failed.")}, status=400)
+            }
+            if debt:
+                response_data["vendor_debt_created"] = {
+                    "id": debt.id,
+                    "vendor": txn.seller.username,
+                    "amount": float(debt.outstanding_amount),
+                }
+            return Response(response_data)
+
+        error_message = refund_res.json().get("message", "Refund failed.")
+        txn.status = "success"
+        txn.save(update_fields=["status"])
+        return Response({"error": error_message}, status=400)
     except Exception:
+        # Network error, timeout, or malformed Paystack response — release the
+        # claim so the buyer/staff can retry. If Paystack actually processed
+        # the refund despite our request failing to confirm it, the
+        # refund.processed webhook will still land and finalize status
+        # independently (see paystack_webhook below).
+        txn.status = "success"
+        txn.save(update_fields=["status"])
         return Response({"error": "Refund request failed. Contact support."}, status=400)
 
 
@@ -1290,6 +1369,17 @@ def paystack_webhook(request):
     elif event == "refund.failed":
         ref = ((data.get("transaction") or {}).get("reference") or data.get("reference") or "")
         logger.error(f"Paystack webhook: refund FAILED for {ref} — manual action required")
+        try:
+            txn = PaymentTransaction.objects.filter(reference=ref, status="refund_pending").first()
+            if txn:
+                txn.status = "success"
+                txn.save(update_fields=["status"])
+                logger.warning(
+                    f"Paystack webhook: reverted {ref} from refund_pending back to "
+                    f"success after refund.failed — safe to retry"
+                )
+        except Exception as e:
+            logger.error(f"refund.failed handler error: {e}")
 
     return HttpResponse(status=200)
 
@@ -1543,22 +1633,112 @@ def _create_or_update_transfer_recipient(user, bank_code, account_number, accoun
         return None, str(e)
 
 
-def _transfer_to_vendor(txn, listing_title):
+def settle_vendor_debt(seller, available_amount):
     """
+    Deducts outstanding VendorDebt (oldest first) from an amount about to be
+    paid out to a vendor. Returns (remaining_amount_to_pay, total_debt_settled).
+
+    Locks the debt rows for the duration of the deduction so two concurrent
+    payout attempts for the same vendor (e.g. a retry job and a fresh
+    confirm() firing close together) can't both apply the same debt twice.
+    """
+    from django.db import transaction as db_transaction
+    from payments.models import VendorDebt
+
+    remaining = available_amount
+    total_settled = Decimal("0")
+
+    with db_transaction.atomic():
+        debts = VendorDebt.objects.select_for_update().filter(
+            vendor=seller, status="outstanding"
+        ).order_by("created_at")
+
+        for debt in debts:
+            if remaining <= 0:
+                break
+            deduction = min(debt.outstanding_amount, remaining)
+            debt.outstanding_amount -= deduction
+            remaining -= deduction
+            total_settled += deduction
+            if debt.outstanding_amount <= 0:
+                debt.status = "settled"
+                debt.settled_at = timezone.now()
+            debt.save(update_fields=["outstanding_amount", "status", "settled_at"])
+
+    return remaining, total_settled
+
+
+def record_payout_audit(txn, amount_released, transfer_status=None, transfer_reference=None):
+    """
+    Writes/updates the permanent PayoutAuditRecord for this transaction.
+    Called from every place a payout attempt resolves (success, debt-offset,
+    or failure) in both trigger_vendor_payout and scheduler.retry_failed_transfers,
+    so there's exactly one always-present, continuously-updated row per
+    transaction regardless of how many retries it took. Never raises — payout
+    resolution must never be blocked by an audit-logging failure.
+    """
+    try:
+        from payments.models import PayoutAuditRecord
+
+        delivery_assignment = None
+        rider = None
+        pickup_verified_at = None
+        pickup_evidence_image = None
+        try:
+            from delivery.models import DeliveryAssignment
+            delivery_assignment = DeliveryAssignment.objects.filter(order_id=txn.order_id).first()
+            if delivery_assignment:
+                rider = delivery_assignment.rider
+                pickup_verified_at = delivery_assignment.picked_up_at
+                pickup_evidence_image = delivery_assignment.pickup_proof_image
+        except Exception:
+            pass
+
+        PayoutAuditRecord.objects.update_or_create(
+            transaction=txn,
+            defaults={
+                "order_id": txn.order_id,
+                "vendor": txn.seller,
+                "rider": rider,
+                "delivery_assignment": delivery_assignment,
+                "pickup_verified_at": pickup_verified_at,
+                "pickup_evidence_image": pickup_evidence_image,
+                "transfer_reference": transfer_reference if transfer_reference is not None else (txn.transfer_reference or ""),
+                "transfer_status": transfer_status if transfer_status is not None else (txn.transfer_status or ""),
+                "amount_released": amount_released,
+            },
+        )
+    except Exception as e:
+        logger.error(f"record_payout_audit: failed for txn {txn.reference}: {e}", exc_info=True)
+
+
+def trigger_vendor_payout(txn, listing_title):
+    """
+    Public contract (Blocker 8 — Internal Service Contracts): this is the one
+    function any app should call to pay a vendor for a transaction — orders,
+    delivery, scheduler.py, and the admin dashboard all call this, never the
+    Paystack Transfer API directly. See payments/contracts.py.
+
     Initiates a Paystack transfer to the vendor's bank account.
     Updates txn.transfer_reference / txn.transfer_status on success.
     Never raises — webhook must always return 200.
+
+    Before paying out, deducts any outstanding VendorDebt this vendor owes
+    (see payments/models.py VendorDebt) — a refund issued after a previous
+    payout on a different transaction. If the debt fully absorbs this
+    payout, no Paystack transfer is sent; the transaction is marked so retry
+    jobs and reconciliation don't treat it as unpaid or failed.
     """
     seller = txn.seller
     if not seller:
-        logger.error(f"_transfer_to_vendor: no seller on txn {txn.reference}")
+        logger.error(f"trigger_vendor_payout: no seller on txn {txn.reference}")
         return
 
     try:
         bank_account = SellerBankAccount.objects.get(user=seller)
     except SellerBankAccount.DoesNotExist:
         logger.error(
-            f"_transfer_to_vendor: no bank account for {seller.username} "
+            f"trigger_vendor_payout: no bank account for {seller.username} "
             f"(order {txn.order_id}) — manual payout required"
         )
         return
@@ -1566,15 +1746,33 @@ def _transfer_to_vendor(txn, listing_title):
     recipient_code = bank_account.paystack_recipient_code
     if not recipient_code:
         logger.error(
-            f"_transfer_to_vendor: no recipient_code for {seller.username} "
+            f"trigger_vendor_payout: no recipient_code for {seller.username} "
             f"(order {txn.order_id}) — manual payout required"
         )
         return
 
-    vendor_amount_kobo = int(txn.seller_amount * 100)
+    remaining_amount, debt_settled = settle_vendor_debt(seller, txn.seller_amount)
+    if debt_settled > 0:
+        logger.info(
+            f"trigger_vendor_payout: settled ₦{debt_settled} of outstanding debt for "
+            f"{seller.username} from payout on txn {txn.reference}"
+        )
+
+    if remaining_amount <= 0:
+        txn.transfer_reference = f"DEBT-OFFSET-{txn.reference}"
+        txn.transfer_status = "offset_by_debt"
+        txn.save(update_fields=["transfer_reference", "transfer_status"])
+        logger.info(
+            f"trigger_vendor_payout: payout for txn {txn.reference} fully absorbed by "
+            f"outstanding debt for {seller.username} — no transfer sent"
+        )
+        record_payout_audit(txn, Decimal("0"))
+        return
+
+    vendor_amount_kobo = int(remaining_amount * 100)
     secret_key = (getattr(settings, "PAYSTACK_SECRET_KEY", "") or "").strip()
     if not secret_key:
-        logger.error("_transfer_to_vendor: PAYSTACK_SECRET_KEY not configured")
+        logger.error("trigger_vendor_payout: PAYSTACK_SECRET_KEY not configured")
         return
 
     headers = {"Authorization": f"Bearer {secret_key}", "Content-Type": "application/json"}
@@ -1600,13 +1798,16 @@ def _transfer_to_vendor(txn, listing_title):
                 f"Transfer initiated for order {txn.order_id}: "
                 f"ref={txn.transfer_reference}, status={txn.transfer_status}"
             )
+            record_payout_audit(txn, remaining_amount)
         else:
             logger.error(
                 f"Transfer failed for order {txn.order_id} (seller: {seller.username}): "
                 f"{res.status_code} — {res_json}"
             )
+            record_payout_audit(txn, Decimal("0"), transfer_status="failed", transfer_reference="")
     except Exception as e:
         logger.error(f"Transfer exception for order {txn.order_id}: {e}", exc_info=True)
+        record_payout_audit(txn, Decimal("0"), transfer_status="failed", transfer_reference="")
 
 
 

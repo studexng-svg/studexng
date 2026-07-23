@@ -6,7 +6,8 @@ from django.db.models import Sum
 from datetime import timedelta
 import csv
 from .models import Order, Dispute
-from delivery.admin import DeliveryAssignmentInline, _notify_assignment
+from delivery.admin import DeliveryAssignmentInline
+from delivery.contracts import notify_rider_assignment
 from delivery.models import DeliveryAssignment
 
 
@@ -34,7 +35,7 @@ class OrderAdmin(admin.ModelAdmin):
         }),
     )
 
-    actions = ['mark_as_completed', 'mark_as_cancelled', 'trigger_auto_complete', 'export_to_csv']
+    actions = ['export_to_csv']
 
     def save_formset(self, request, form, formset, change):
         # Capture pre-save rider state and inject assigned_by for DeliveryAssignment inlines
@@ -56,7 +57,7 @@ class OrderAdmin(admin.ModelAdmin):
         for frm, old_rider_id in to_check:
             obj = frm.instance
             if obj.pk and obj.rider and obj.pickup_point and obj.rider_id != old_rider_id:
-                _notify_assignment(obj.order, obj.rider, obj.pickup_point)
+                notify_rider_assignment(obj.order, obj.rider, obj.pickup_point)
 
     def changelist_view(self, request, extra_context=None):
         o = Order.objects
@@ -101,70 +102,16 @@ class OrderAdmin(admin.ModelAdmin):
         )
     colored_status.short_description = 'Status'
 
-    def mark_as_completed(self, request, queryset):
-        """Manually complete orders (releases escrow)"""
-        from wallet.models import EscrowTransaction
-        updated = 0
-        for order in queryset.filter(status='in_progress'):
-            order.status = 'completed'
-            order.buyer_confirmed_at = timezone.now()
-            order.save()
-
-            # Release escrow
-            try:
-                escrow = EscrowTransaction.objects.get(order=order, status='held')
-                escrow.release()
-            except EscrowTransaction.DoesNotExist:
-                pass
-
-            updated += 1
-
-        self.message_user(request, f"{updated} order(s) marked as completed and escrow released.")
-    mark_as_completed.short_description = "Complete selected orders (release escrow)"
-
-    def mark_as_cancelled(self, request, queryset):
-        """Cancel orders and refund escrow"""
-        from wallet.models import EscrowTransaction
-        updated = 0
-        for order in queryset.filter(status__in=['pending', 'paid', 'in_progress']):
-            order.status = 'cancelled'
-            order.save()
-
-            # Refund escrow if exists
-            try:
-                escrow = EscrowTransaction.objects.get(order=order, status='held')
-                escrow.refund()
-            except EscrowTransaction.DoesNotExist:
-                pass
-
-            updated += 1
-
-        self.message_user(request, f"{updated} order(s) cancelled and refunded.")
-    mark_as_cancelled.short_description = "Cancel selected orders (refund buyer)"
-
-    def trigger_auto_complete(self, request, queryset):
-        """Force auto-completion for orders older than 7 days"""
-        from datetime import timedelta
-        from wallet.models import EscrowTransaction
-
-        cutoff_date = timezone.now() - timedelta(days=7)
-        updated = 0
-
-        for order in queryset.filter(status='in_progress', paid_at__lte=cutoff_date):
-            order.status = 'completed'
-            order.buyer_confirmed_at = timezone.now()
-            order.save()
-
-            try:
-                escrow = EscrowTransaction.objects.get(order=order, status='held')
-                escrow.release()
-            except EscrowTransaction.DoesNotExist:
-                pass
-
-            updated += 1
-
-        self.message_user(request, f"{updated} order(s) auto-completed (older than 7 days).")
-    trigger_auto_complete.short_description = "Auto-complete orders older than 7 days"
+    # mark_as_completed / mark_as_cancelled / trigger_auto_complete removed
+    # (Blocker 8 — Internal Service Contracts cleanup): all three imported
+    # `wallet.models.EscrowTransaction`, but `wallet` was removed from
+    # INSTALLED_APPS when escrow/fee logic was centralized into
+    # payments.pricing (see orders/serializers.py's note on the same dead
+    # dependency) — every click would have raised ModuleNotFoundError, and
+    # `status='in_progress'` was never a valid Order.STATUS_CHOICES value
+    # even before that, so these actions could never have matched any row.
+    # The real auto-release/payout path is scheduler.auto_release_orders +
+    # payments.contracts.trigger_vendor_payout.
 
     def export_to_csv(self, request, queryset):
         """Export selected orders to CSV"""

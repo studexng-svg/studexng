@@ -26,4 +26,26 @@ class DeliveryAssignmentSerializer(serializers.ModelSerializer):
             'rider_username', 'pickup_point_name', 'pickup_point_campus',
             'buyer_username', 'listing_title', 'vendor_username',
             'status', 'assigned_at', 'picked_up_at', 'at_pickup_point_at', 'completed_at',
+            'pickup_proof_image', 'completion_proof_image',
+            'responsibility', 'responsibility_transferred_at', 'code_locked',
         ]
+        # delivery_code is intentionally excluded here — this serializer backs
+        # rider-facing and general admin views. It must never reach a rider,
+        # since the whole point is proof the rider got it from the buyer, not
+        # from the API. See BuyerDeliveryStatusSerializer below.
+
+
+class BuyerDeliveryStatusSerializer(DeliveryAssignmentSerializer):
+    """Only the buyer's own OrderDeliveryStatusView uses this — adds delivery_code."""
+    delivery_code = serializers.SerializerMethodField()
+
+    class Meta(DeliveryAssignmentSerializer.Meta):
+        fields = DeliveryAssignmentSerializer.Meta.fields + ['delivery_code']
+
+    def get_delivery_code(self, obj):
+        # Reveal only once there's actually something to hand off — showing it
+        # while the rider is still en route to the vendor serves no purpose
+        # and just widens the window for it to leak before it matters.
+        if obj.status in ('at_pickup_point', 'completed'):
+            return obj.delivery_code
+        return None

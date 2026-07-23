@@ -135,7 +135,7 @@ def auto_release_orders():
     from orders.models import Order
     from accounts.utils import send_notification
     from payments.models import PaymentTransaction
-    from payments.views import _transfer_to_vendor
+    from payments.views import trigger_vendor_payout
 
     cutoff = timezone.now() - timedelta(hours=24)
 
@@ -170,7 +170,7 @@ def auto_release_orders():
                     reference=order.reference, status="success"
                 ).first()
                 if txn and not txn.transfer_reference:
-                    _transfer_to_vendor(txn, order.listing.title)
+                    trigger_vendor_payout(txn, order.listing.title)
             except Exception as pe:
                 logger.warning(f"Auto-release payout trigger failed for order {order.id}: {pe}")
 
@@ -311,6 +311,28 @@ def retry_failed_transfers():
             )
             continue
 
+        # Deduct any outstanding VendorDebt before retrying — a retry must not
+        # bypass debt collection just because it takes a different code path
+        # from the normal confirm()-triggered payout. See payments/models.py
+        # VendorDebt and payments/views.py trigger_vendor_payout.
+        from payments.views import settle_vendor_debt, record_payout_audit
+        remaining_amount, debt_settled = settle_vendor_debt(txn.seller, txn.seller_amount)
+        if debt_settled > 0:
+            logger.info(
+                f"retry_failed_transfers: settled ₦{debt_settled} of outstanding debt for "
+                f"{txn.seller.username} from retry payout on txn {txn.reference}"
+            )
+        if remaining_amount <= 0:
+            txn.transfer_reference = f"DEBT-OFFSET-{txn.reference}"
+            txn.transfer_status = "offset_by_debt"
+            txn.save(update_fields=['transfer_reference', 'transfer_status'])
+            logger.info(
+                f"retry_failed_transfers: retry payout for txn {txn.reference} fully "
+                f"absorbed by outstanding debt for {txn.seller.username} — no transfer sent"
+            )
+            record_payout_audit(txn, 0)
+            continue
+
         retry_n = txn.transfer_retry_count + 1
         # Use a suffixed reference so Paystack treats this as a distinct transfer
         # from any previous failed attempt.
@@ -318,7 +340,7 @@ def retry_failed_transfers():
 
         payload = {
             'source': 'balance',
-            'amount': int(txn.seller_amount * 100),
+            'amount': int(remaining_amount * 100),
             'recipient': recipient_code,
             'reason': f"StudEx payout retry #{retry_n} — order #{txn.order_id}",
             'reference': retry_ref,
@@ -343,6 +365,7 @@ def retry_failed_transfers():
                     f"retry_failed_transfers: retry #{retry_n} succeeded for txn {txn.reference} "
                     f"— Paystack ref {txn.transfer_reference}, status {txn.transfer_status}"
                 )
+                record_payout_audit(txn, remaining_amount)
             else:
                 txn.transfer_retry_count = retry_n
                 txn.transfer_status = 'failed'
@@ -351,6 +374,7 @@ def retry_failed_transfers():
                     f"retry_failed_transfers: retry #{retry_n} failed for txn {txn.reference} "
                     f"— {res.status_code}: {res_json}"
                 )
+                record_payout_audit(txn, 0, transfer_status='failed', transfer_reference='')
 
                 if retry_n >= MAX_TRANSFER_RETRIES:
                     _alert_admin_transfer_failure(txn)
@@ -362,6 +386,7 @@ def retry_failed_transfers():
                 f"retry_failed_transfers: exception on retry #{retry_n} for txn {txn.reference}: {e}",
                 exc_info=True,
             )
+            record_payout_audit(txn, 0, transfer_status='failed', transfer_reference='')
             if txn.transfer_retry_count >= MAX_TRANSFER_RETRIES:
                 _alert_admin_transfer_failure(txn)
 
@@ -1014,6 +1039,66 @@ def send_buyer_reengagement_nudge():
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# JOB 14: Escrow reconciliation — every hour
+# ─────────────────────────────────────────────────────────────────────────────
+
+def run_escrow_reconciliation():
+    """
+    Verifies Paystack's actual account balance against what StudEx's own
+    records say should be held. See payments/reconciliation.py for the full
+    implementation — this is just the scheduled trigger. Any failure here
+    (e.g. Paystack API unreachable) is logged, not raised, so one bad tick
+    doesn't take down the scheduler process.
+    """
+    from payments.reconciliation import run_reconciliation
+    try:
+        run_reconciliation()
+    except Exception as e:
+        logger.error(f"run_escrow_reconciliation: reconciliation run failed: {e}", exc_info=True)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# JOB 15: Recover stuck refund claims — every 5 min
+# ─────────────────────────────────────────────────────────────────────────────
+
+STUCK_REFUND_MINUTES = 10
+
+
+def recover_stuck_refunds():
+    """
+    Safety net for refund_payment()'s row-lock claim (see payments/views.py).
+    A transaction only sits in status="refund_pending" for the duration of a
+    single Paystack API call (≤15s timeout) — refund_payment() itself reverts
+    it to "success" on any failure, and the refund.failed webhook reverts it
+    too. The only way a row stays stuck longer than that is a crashed/killed
+    worker process between the claim and the Paystack call finishing, in
+    which case no code path is left to release it. Anything still pending
+    past a generous grace window is reverted here so it isn't refund-locked
+    forever, with a warning so an admin can check whether Paystack actually
+    processed it (the refund.processed webhook would have already caught
+    that and moved it to "refunded" if so).
+    """
+    from payments.models import PaymentTransaction
+
+    cutoff = timezone.now() - timedelta(minutes=STUCK_REFUND_MINUTES)
+    stuck = PaymentTransaction.objects.filter(status="refund_pending", updated_at__lte=cutoff)
+
+    count = 0
+    for txn in stuck:
+        txn.status = "success"
+        txn.save(update_fields=["status"])
+        logger.warning(
+            f"recover_stuck_refunds: {txn.reference} was stuck in refund_pending "
+            f"for over {STUCK_REFUND_MINUTES} min — reverted to success. "
+            f"Verify with Paystack whether the refund actually went through."
+        )
+        count += 1
+
+    if count:
+        logger.info(f"recover_stuck_refunds: recovered {count} stuck refund claim(s).")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Scheduler bootstrap — called by StudexConfig.ready()
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -1060,6 +1145,17 @@ def start():
         trigger=IntervalTrigger(hours=1),
         id="retry_failed_transfers",
         name="Retry failed vendor Paystack transfers (max 3 attempts)",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+
+    # Every hour
+    scheduler.add_job(
+        run_escrow_reconciliation,
+        trigger=IntervalTrigger(hours=1),
+        id="escrow_reconciliation",
+        name="Reconcile Paystack balance against internal escrow records",
         replace_existing=True,
         max_instances=1,
         coalesce=True,
@@ -1164,16 +1260,28 @@ def start():
         coalesce=True,
     )
 
+    # Every 5 min — release any refund claim stuck past its grace window
+    scheduler.add_job(
+        recover_stuck_refunds,
+        trigger=IntervalTrigger(minutes=5),
+        id='recover_stuck_refunds',
+        name='Recover refund_pending transactions stuck beyond grace window (5 min)',
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+
     try:
         scheduler.start()
         logger.info(
             "Scheduler started: booking_reminders (60s), "
             "auto_release_orders (midnight), auto_cancel_pending_orders (midnight), "
-            "retry_failed_transfers (1h), "
+            "retry_failed_transfers (1h), escrow_reconciliation (1h), "
             "groq_notify_students (Mon/Wed/Fri 10:00 per campus), groq_notify_vendors (Tue/Thu/Sat 10:00 per campus), "
             "prompt_rating_reviews (30 min), send_lunch_notifications (Mon-Fri 12:30 WAT), "
             "send_vendor_daily_digest (08:00 WAT), nudge_pending_booking_vendors (30 min), "
-            "send_buyer_daily_nudge (Mon-Fri 09:00 WAT), send_buyer_reengagement_nudge (17:00 WAT)."
+            "send_buyer_daily_nudge (Mon-Fri 09:00 WAT), send_buyer_reengagement_nudge (17:00 WAT), "
+            "recover_stuck_refunds (5 min)."
         )
     except Exception as e:
         logger.error(f"Failed to start scheduler: {e}", exc_info=True)

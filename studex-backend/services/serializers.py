@@ -157,7 +157,11 @@ class ListingSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         from payments.pricing import calculate_final_price
-        validated_data['price'] = calculate_final_price(validated_data['payout_amount'])
+        from payments.settlement import get_vendor_type
+        validated_data['price'] = calculate_final_price(
+            validated_data['payout_amount'], campus=validated_data.get('campus'),
+            vendor_type=get_vendor_type(validated_data.get('vendor')),
+        )
         instance = super().create(validated_data)
         self._variant_warnings = self._sync_variants(instance, self.initial_data.get('variants'))
         return instance
@@ -165,7 +169,11 @@ class ListingSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         if 'payout_amount' in validated_data and validated_data['payout_amount'] is not None:
             from payments.pricing import calculate_final_price
-            validated_data['price'] = calculate_final_price(validated_data['payout_amount'])
+            from payments.settlement import get_vendor_type
+            validated_data['price'] = calculate_final_price(
+                validated_data['payout_amount'], campus=validated_data.get('campus', instance.campus),
+                vendor_type=get_vendor_type(validated_data.get('vendor', instance.vendor)),
+            )
         instance = super().update(instance, validated_data)
         self._variant_warnings = self._sync_variants(instance, self.initial_data.get('variants'))
         return instance
@@ -191,7 +199,9 @@ class ListingSerializer(serializers.ModelSerializer):
         from decimal import Decimal, InvalidOperation
         from django.db.models import ProtectedError
         from payments.pricing import calculate_final_price
+        from payments.settlement import get_vendor_type
 
+        variant_vendor_type = get_vendor_type(listing.vendor)
         submitted_ids = set()
         warnings = []
         for row in rows:
@@ -207,7 +217,7 @@ class ListingSerializer(serializers.ModelSerializer):
                 continue
             if payout_amount <= 0:
                 continue
-            price = calculate_final_price(payout_amount)
+            price = calculate_final_price(payout_amount, campus=listing.campus, vendor_type=variant_vendor_type)
 
             variant_id = row.get('id')
             if variant_id:

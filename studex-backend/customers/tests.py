@@ -125,7 +125,7 @@ class SignalTests(TestCase):
         client = APIClient()
         client.force_authenticate(user=self.buyer)
         from unittest.mock import patch
-        with patch('payments.views._transfer_to_vendor'):
+        with patch('payments.views.trigger_vendor_payout'):
             res = client.post(f'/api/orders/orders/{order.id}/confirm/')
         self.assertEqual(res.status_code, 200)
 

@@ -111,8 +111,8 @@ class OrderViewSet(viewsets.ModelViewSet):
         if order.vendor_accepted_at is not None:
             return Response({"detail": "Order was already accepted and can no longer be declined."}, status=400)
 
-        from payments.views import _refund_paystack_transaction
-        refunded = _refund_paystack_transaction(order.reference)
+        from payments.views import refund_paystack_transaction
+        refunded = refund_paystack_transaction(order.reference)
         if not refunded:
             return Response({"detail": "Refund could not be initiated. Please try again shortly."}, status=502)
 
@@ -304,8 +304,35 @@ class OrderViewSet(viewsets.ModelViewSet):
             "estimated_time": order.estimated_time,
             "history": history,
             "timeline": self._booking_timeline(order),
+            "delivery": self._delivery_evidence(order),
             "order": self.get_serializer(order).data,
         })
+
+    def _delivery_evidence(self, order):
+        """
+        Rider pickup/completion evidence for orders fulfilled through the
+        delivery app (see delivery.models.DeliveryAssignment) — additive to
+        the response, null for any order with no rider assignment (services,
+        vendor-self-fulfilled products), so this never changes the shape of
+        the response for existing order types.
+        """
+        try:
+            from delivery.models import DeliveryAssignment
+            assignment = DeliveryAssignment.objects.select_related('rider').filter(order=order).first()
+        except Exception:
+            assignment = None
+        if not assignment:
+            return None
+        return {
+            "status": assignment.status,
+            "responsibility": assignment.responsibility,
+            "rider_username": assignment.rider.username if assignment.rider else None,
+            "picked_up_at": assignment.picked_up_at.isoformat() if assignment.picked_up_at else None,
+            "pickup_proof_image": assignment.pickup_proof_image,
+            "at_pickup_point_at": assignment.at_pickup_point_at.isoformat() if assignment.at_pickup_point_at else None,
+            "completed_at": assignment.completed_at.isoformat() if assignment.completed_at else None,
+            "completion_proof_image": assignment.completion_proof_image,
+        }
 
     def _booking_timeline(self, order):
         """
@@ -359,12 +386,12 @@ class OrderViewSet(viewsets.ModelViewSet):
         # who take payment but never deliver.
         try:
             from payments.models import PaymentTransaction
-            from payments.views import _transfer_to_vendor
+            from payments.views import trigger_vendor_payout
             txn = PaymentTransaction.objects.filter(
                 reference=order.reference, status="success"
             ).first()
             if txn and not txn.transfer_reference:
-                _transfer_to_vendor(txn, order.listing.title)
+                trigger_vendor_payout(txn, order.listing.title)
         except Exception as pe:
             logger.warning(f"Payout trigger failed for order {order.id}: {pe}")
 
@@ -542,7 +569,7 @@ class DisputeViewSet(viewsets.ModelViewSet):
 
             # Email admin
             from django.conf import settings as _settings
-            from studex.email import send_email, _html_wrapper
+            from studex.email import send_email, html_wrapper
             admin_email = getattr(_settings, 'ADMIN_EMAIL', '')
             if not admin_email:
                 return
@@ -576,7 +603,7 @@ class DisputeViewSet(viewsets.ModelViewSet):
             send_email(
                 to=admin_email,
                 subject=f'[StudEx] Vendor responded to Dispute #{dispute.id} — ready for review',
-                html=_html_wrapper(f'Vendor Response Received — Dispute #{dispute.id}', body),
+                html=html_wrapper(f'Vendor Response Received — Dispute #{dispute.id}', body),
             )
         except Exception as e:
             import logging as _logging
@@ -607,7 +634,7 @@ class DisputeViewSet(viewsets.ModelViewSet):
 
             # ── Email the admin ──────────────────────────────────────────────
             from django.conf import settings as _settings
-            from studex.email import send_email, _html_wrapper
+            from studex.email import send_email, html_wrapper
             frontend_base = getattr(_settings, 'FRONTEND_BASE_URL', 'https://studex.com.ng')
             admin_email = getattr(_settings, 'ADMIN_EMAIL', '')
             if not admin_email:
@@ -649,7 +676,7 @@ class DisputeViewSet(viewsets.ModelViewSet):
             send_email(
                 to=admin_email,
                 subject=f'[StudEx] New Dispute #{dispute.id} — Order #{order.reference}',
-                html=_html_wrapper(f'New Dispute Filed — #{dispute.id}', body),
+                html=html_wrapper(f'New Dispute Filed — #{dispute.id}', body),
             )
         except Exception as e:
             import logging as _logging
@@ -791,7 +818,11 @@ class BookingViewSet(viewsets.ModelViewSet):
             from payments.pricing import calculate_final_price
             unit_payout = booking.variant.payout_amount if booking.variant_id else booking.listing.payout_amount
             qty = booking.quantity if booking.listing.is_per_unit else 1
-            checkout_amount = calculate_final_price(Decimal(str(unit_payout)) * qty)
+            from payments.settlement import get_vendor_type
+            checkout_amount = calculate_final_price(
+                Decimal(str(unit_payout)) * qty, campus=booking.listing.campus,
+                vendor_type=get_vendor_type(booking.listing.vendor),
+            )
         else:
             checkout_amount = Decimal(str(booking.listing.price))
 

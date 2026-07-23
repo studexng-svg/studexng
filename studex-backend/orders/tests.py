@@ -648,7 +648,7 @@ class VendorOrderActionTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     # ── vendor-decline ───────────────────────────────────────────────
-    @patch('payments.views._refund_paystack_transaction', return_value=True)
+    @patch('payments.views.refund_paystack_transaction', return_value=True)
     def test_vendor_decline_success_triggers_refund(self, mock_refund):
         self.client.force_authenticate(user=self.seller)
         response = self.client.post(self._url('vendor-decline'))
@@ -657,7 +657,7 @@ class VendorOrderActionTests(APITestCase):
         self.assertEqual(self.order.status, 'vendor_declined')
         mock_refund.assert_called_once_with(self.order.reference)
 
-    @patch('payments.views._refund_paystack_transaction', return_value=False)
+    @patch('payments.views.refund_paystack_transaction', return_value=False)
     def test_vendor_decline_returns_502_if_refund_fails(self, mock_refund):
         self.client.force_authenticate(user=self.seller)
         response = self.client.post(self._url('vendor-decline'))
@@ -670,7 +670,7 @@ class VendorOrderActionTests(APITestCase):
         response = self.client.post(self._url('vendor-decline'))
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
-    @patch('payments.views._refund_paystack_transaction', return_value=True)
+    @patch('payments.views.refund_paystack_transaction', return_value=True)
     def test_vendor_decline_rejects_after_accept(self, mock_refund):
         self.order.vendor_accepted_at = timezone.now()
         self.order.save()
@@ -932,7 +932,7 @@ class AutoReleaseOrdersPayoutTests(TestCase):
     OrderViewSet.confirm() — a buyer who goes silent for 24h+ shouldn't cost
     the vendor their payout. Regression test for the bug where auto-release
     only flipped Order.status/Transaction.status without ever calling
-    payments.views._transfer_to_vendor (the real Paystack Transfer API call).
+    payments.views.trigger_vendor_payout (the real Paystack Transfer API call).
     """
 
     def setUp(self):
@@ -968,7 +968,7 @@ class AutoReleaseOrdersPayoutTests(TestCase):
     def test_auto_release_triggers_vendor_payout(self):
         from scheduler import auto_release_orders
 
-        with patch('payments.views._transfer_to_vendor') as mock_transfer:
+        with patch('payments.views.trigger_vendor_payout') as mock_transfer:
             auto_release_orders()
 
         self.order.refresh_from_db()
@@ -982,7 +982,7 @@ class AutoReleaseOrdersPayoutTests(TestCase):
         self.txn.transfer_reference = 'ALREADY-PAID-REF'
         self.txn.save(update_fields=['transfer_reference'])
 
-        with patch('payments.views._transfer_to_vendor') as mock_transfer:
+        with patch('payments.views.trigger_vendor_payout') as mock_transfer:
             auto_release_orders()
 
         mock_transfer.assert_not_called()
@@ -994,7 +994,7 @@ class AutoReleaseOrdersPayoutTests(TestCase):
             seller_completed_at=timezone.now() - timedelta(hours=2)
         )
 
-        with patch('payments.views._transfer_to_vendor') as mock_transfer:
+        with patch('payments.views.trigger_vendor_payout') as mock_transfer:
             auto_release_orders()
 
         self.order.refresh_from_db()
