@@ -472,6 +472,16 @@ try:
 
                 listing.save()
 
+                # The home page's listings list is cached per campus for 60s
+                # (services.views.ListingViewSet.list) — vendor-triggered
+                # creates/updates already invalidate it (perform_create/
+                # perform_update) but this admin endpoint didn't, so toggling
+                # is_available here left a stale cached copy on the home page
+                # until the TTL happened to expire.
+                if 'is_available' in request.data:
+                    from services.contracts import invalidate_listing_cache
+                    invalidate_listing_cache(listing.campus)
+
                 # Notify vendor when listing goes live for the first time
                 if becoming_available:
                     try:
@@ -2727,6 +2737,8 @@ class AdminAIActionView(APIView):
         if action == 'approve':
             listing.is_available = True
             listing.save(update_fields=['is_available', 'updated_at'])
+            from services.contracts import invalidate_listing_cache
+            invalidate_listing_cache(listing.campus)
             try:
                 _notify(
                     recipient=listing.vendor,
@@ -2742,6 +2754,8 @@ class AdminAIActionView(APIView):
         if action == 'deactivate':
             listing.is_available = False
             listing.save(update_fields=['is_available', 'updated_at'])
+            from services.contracts import invalidate_listing_cache
+            invalidate_listing_cache(listing.campus)
             try:
                 _notify(
                     recipient=listing.vendor,

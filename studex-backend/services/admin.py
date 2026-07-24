@@ -294,6 +294,14 @@ class ListingAdmin(admin.ModelAdmin):
                 obj.payout_amount, campus=obj.campus, vendor_type=get_vendor_type(obj.vendor),
             )
 
+        # The home page's listings list is cached per campus for 60s
+        # (services.views.ListingViewSet.list). Every other write path
+        # (vendor API create/update) already invalidates it — this admin
+        # form save didn't, so toggling is_available (or anything else)
+        # here left stale entries on the home page.
+        from .views import invalidate_listing_cache
+        invalidate_listing_cache(obj.campus)
+
         """
         Override save_model so that when admin saves a listing,
         we detect is_available changes and notify the vendor.
@@ -349,33 +357,43 @@ class ListingAdmin(admin.ModelAdmin):
 
     def mark_available(self, request, queryset):
         """Mark selected listings as available and notify each vendor."""
+        from .views import invalidate_listing_cache
         count = 0
+        campuses = set()
         for listing in queryset:
             if not listing.is_available:
                 listing.is_available = True
                 listing.save()  # triggers signal + save_model notifications
+                campuses.add(listing.campus)
                 try:
                     from studex.notifications import notify_vendor_listing_approved
                     notify_vendor_listing_approved(listing)
                 except Exception:
                     pass
             count += 1
+        for campus in campuses:
+            invalidate_listing_cache(campus)
         self.message_user(request, f"{count} listing(s) marked as available.")
     mark_available.short_description = "Mark as available"
 
     def mark_unavailable(self, request, queryset):
         """Mark selected listings as unavailable and notify each vendor."""
+        from .views import invalidate_listing_cache
         count = 0
+        campuses = set()
         for listing in queryset:
             if listing.is_available:
                 listing.is_available = False
                 listing.save()
+                campuses.add(listing.campus)
                 try:
                     from studex.notifications import notify_vendor_listing_deactivated
                     notify_vendor_listing_deactivated(listing)
                 except Exception:
                     pass
             count += 1
+        for campus in campuses:
+            invalidate_listing_cache(campus)
         self.message_user(request, f"{count} listing(s) marked as unavailable.")
     mark_unavailable.short_description = "Mark as unavailable"
 

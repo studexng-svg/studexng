@@ -8,7 +8,7 @@ import { usePathname } from "next/navigation";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { useEffect, useState } from "react";
 import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
-import { useCart } from "@/lib/cartStore";
+import { useCart, mapCartRow, RawCartRow } from "@/lib/cartStore";
 import { useWishlistStore } from "@/lib/wishlistStore";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/authStore";
@@ -27,11 +27,7 @@ function CartWishlistSync() {
     queryFn: async () => {
       const res = await api.cart.get();
       if (!res.ok) throw new Error("cart fetch failed");
-      return res.json() as Promise<Array<{
-        listing_id: number; title: string; price: string | number;
-        effective_price?: string | number; deal_discount_percent?: number;
-        img: string; quantity: number;
-      }>>;
+      return res.json() as Promise<RawCartRow[]>;
     },
     enabled: isLoggedIn && !!accessToken,
     staleTime: 0,
@@ -52,24 +48,7 @@ function CartWishlistSync() {
 
   useEffect(() => {
     if (!cartData) return;
-    useCart.setState({
-      cart: cartData.map(item => {
-        const originalPrice = parseFloat(String(item.price));
-        const effectivePrice = item.effective_price != null
-          ? parseFloat(String(item.effective_price))
-          : originalPrice;
-        const hasDeal = effectivePrice < originalPrice;
-        return {
-          id: item.listing_id,
-          title: item.title,
-          price: effectivePrice,
-          ...(hasDeal ? { original_price: originalPrice } : {}),
-          deal_discount_percent: item.deal_discount_percent ?? 0,
-          img: item.img || "",
-          quantity: item.quantity,
-        };
-      }),
-    });
+    useCart.setState({ cart: cartData.map(mapCartRow) });
   }, [cartData]);
 
   useEffect(() => {

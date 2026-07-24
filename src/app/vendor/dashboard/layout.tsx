@@ -12,12 +12,17 @@ import {
   MessageSquare, AlertCircle, ChevronRight, LogOut, Menu, X, ChevronLeft, Users, ChefHat,
 } from "lucide-react";
 
-const TABS = [
+// Menu-ordering vendors get "Menu" instead of "Listings" + "Kitchen" (one
+// unified page instead of two), and don't see "Bookings" — food orders go
+// through Orders, not the service-booking wizard. Everything else (Messages,
+// Orders, Customers, Disputes, History, Earnings, Reviews, Feedback) applies
+// to any vendor type unchanged.
+const ALL_TABS = [
   { id: "overview",  label: "Overview",  icon: LayoutDashboard, href: "/vendor/dashboard"           },
   { id: "messages",  label: "Messages",  icon: MessageCircle,   href: "/vendor/dashboard/messages"  },
   { id: "bookings",  label: "Bookings",  icon: Calendar,        href: "/vendor/dashboard/bookings"  },
   { id: "listings",  label: "Listings",  icon: Package,         href: "/vendor/dashboard/listings"  },
-  { id: "kitchen",   label: "Kitchen",   icon: ChefHat,         href: "/vendor/dashboard/kitchen"   },
+  { id: "kitchen",   label: "Menu",      icon: ChefHat,         href: "/vendor/dashboard/kitchen"   },
   { id: "orders",    label: "Orders",    icon: ShoppingBag,     href: "/vendor/dashboard/orders"    },
   { id: "customers", label: "Customers", icon: Users,           href: "/vendor/dashboard/customers" },
   { id: "disputes",  label: "Disputes",  icon: AlertCircle,     href: "/vendor/dashboard/disputes"  },
@@ -37,12 +42,28 @@ export default function VendorDashboardLayout({ children }: { children: React.Re
   const [bookingBadge, setBookingBadge] = useState(0);
   const [disputeBadge, setDisputeBadge] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isMenuVendor, setIsMenuVendor] = useState<boolean | null>(null);
 
   useEffect(() => {
     if (!isHydrated) return;
     if (!isLoggedIn) { router.push("/auth"); return; }
     if (!user?.is_verified_vendor) { router.push("/vendor/apply"); return; }
   }, [isHydrated, isLoggedIn, user]);
+
+  useEffect(() => {
+    if (!user) return;
+    api.services.menuItems()
+      .then(r => setIsMenuVendor(r.status !== 403))
+      .catch(() => setIsMenuVendor(false));
+  }, [user]);
+
+  // Hide both "Listings"/"Kitchen" while this is still resolving to avoid a
+  // flash of the wrong one; swap to the right single tab once known.
+  const TABS = ALL_TABS.filter(tab => {
+    if (isMenuVendor === null) return tab.id !== "listings" && tab.id !== "kitchen";
+    if (isMenuVendor) return tab.id !== "listings" && tab.id !== "bookings";
+    return tab.id !== "kitchen";
+  });
 
   useEffect(() => {
     if (!user) return;

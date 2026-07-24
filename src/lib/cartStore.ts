@@ -77,6 +77,54 @@ function loadGuestCart(): CartItem[] {
   }
 }
 
+export type RawCartRow = {
+  id: number;
+  listing_id: number;
+  title: string;
+  price: string | number;
+  effective_price?: string | number;
+  deal_discount_percent?: number;
+  img: string;
+  quantity: number;
+  vendor_id?: number;
+  vendor_username?: string;
+  addon_signature?: string;
+  selected_addons?: Array<{ id: number; name: string; price_delta: string | number }>;
+  uses_menu_checkout?: boolean;
+};
+
+// Single source of truth for turning a GET /api/cart/ row into a CartItem —
+// used by both fetchCart() below and LayoutClient's CartWishlistSync so the
+// two never drift out of sync on which fields (cartItemId, selectedAddons,
+// vendorId, ...) they populate. A previous divergence here dropped those
+// fields on every background refetch, which collapsed distinct add-on cart
+// lines for the same listing into one (they share `id` but not `cartItemId`,
+// and the cart page keys rows by `cartItemId ?? id`).
+export function mapCartRow(item: RawCartRow): CartItem {
+  const originalPrice = parseFloat(String(item.price));
+  const effectivePrice = item.effective_price != null
+    ? parseFloat(String(item.effective_price))
+    : originalPrice;
+  const hasDeal = effectivePrice < originalPrice;
+  return {
+    id: item.listing_id,
+    title: item.title,
+    price: effectivePrice,
+    ...(hasDeal ? { original_price: originalPrice } : {}),
+    deal_discount_percent: item.deal_discount_percent ?? 0,
+    img: item.img || "",
+    quantity: item.quantity,
+    cartItemId: item.id,
+    vendorId: item.vendor_id,
+    vendorUsername: item.vendor_username,
+    addonSignature: item.addon_signature || "",
+    selectedAddons: (item.selected_addons || []).map(a => ({
+      id: a.id, name: a.name, price_delta: parseFloat(String(a.price_delta)),
+    })),
+    usesMenuCheckout: !!item.uses_menu_checkout,
+  };
+}
+
 export const useCart = create<CartStore>()((set, get) => ({
   cart: [],
 
@@ -138,47 +186,8 @@ export const useCart = create<CartStore>()((set, get) => ({
     try {
       const res = await cartApi().get();
       if (!res.ok) return;
-      const data: Array<{
-        id: number;
-        listing_id: number;
-        title: string;
-        price: string | number;
-        effective_price?: string | number;
-        deal_discount_percent?: number;
-        img: string;
-        quantity: number;
-        vendor_id?: number;
-        vendor_username?: string;
-        addon_signature?: string;
-        selected_addons?: Array<{ id: number; name: string; price_delta: string | number }>;
-        uses_menu_checkout?: boolean;
-      }> = await res.json();
-      set({
-        cart: data.map((item) => {
-          const originalPrice = parseFloat(String(item.price));
-          const effectivePrice = item.effective_price != null
-            ? parseFloat(String(item.effective_price))
-            : originalPrice;
-          const hasDeal = effectivePrice < originalPrice;
-          return {
-            id: item.listing_id,
-            title: item.title,
-            price: effectivePrice,
-            ...(hasDeal ? { original_price: originalPrice } : {}),
-            deal_discount_percent: item.deal_discount_percent ?? 0,
-            img: item.img || "",
-            quantity: item.quantity,
-            cartItemId: item.id,
-            vendorId: item.vendor_id,
-            vendorUsername: item.vendor_username,
-            addonSignature: item.addon_signature || "",
-            selectedAddons: (item.selected_addons || []).map(a => ({
-              id: a.id, name: a.name, price_delta: parseFloat(String(a.price_delta)),
-            })),
-            usesMenuCheckout: !!item.uses_menu_checkout,
-          };
-        }),
-      });
+      const data: RawCartRow[] = await res.json();
+      set({ cart: data.map(mapCartRow) });
     } catch {}
   },
 

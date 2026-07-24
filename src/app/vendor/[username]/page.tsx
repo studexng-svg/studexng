@@ -16,6 +16,7 @@ import { useAdminMode } from "@/hooks/useAdminMode";
 import { useCart } from "@/lib/cartStore";
 import { useAuth } from "@/lib/authStore";
 import AddonPickerModal, { AddonGroupData } from "@/components/cart/AddonPickerModal";
+import RestaurantMenuView, { MenuOrderingItem } from "./RestaurantMenuView";
 
 /* ── helpers ───────────────────────────────────────────────────────────── */
 
@@ -55,7 +56,7 @@ export default function VendorProfilePage() {
   const [loading,  setLoading]  = useState(true);
   const [tab,      setTab]      = useState<Tab>("listings");
 
-  const [addonPicker, setAddonPicker] = useState<{ listing: { id: number; title: string; price: number }; groups: AddonGroupData[] } | null>(null);
+  const [addonPicker, setAddonPicker] = useState<{ listing: { id: number; title: string; price: number; image?: string | null; description?: string }; groups: AddonGroupData[] } | null>(null);
   const [toast,        setToast]        = useState("");
   const [adminToast,   setAdminToast]   = useState("");
   const [adminLoading, setAdminLoading] = useState<string | null>(null);
@@ -182,8 +183,14 @@ export default function VendorProfilePage() {
     });
   };
 
+  // A menu-ordering vendor (food, etc.) gets the restaurant-style browsing
+  // experience instead of the marketplace grid — detected from the data
+  // itself (any listing with a non-null menu_item) rather than a new field,
+  // since ListingSerializer already exposes menu_item on every listing.
+  const isMenuVendor = listings.some((l: any) => l.menu_item);
+
   const TABS: { id: Tab; label: string; count?: number }[] = [
-    { id: "listings", label: "Listings", count: sorted.length },
+    { id: "listings", label: isMenuVendor ? "Menu" : "Listings", count: sorted.length },
     { id: "reviews",  label: "Reviews",  count: totalReviews  },
     { id: "about",    label: "About"                          },
   ];
@@ -363,7 +370,19 @@ export default function VendorProfilePage() {
       <div className="max-w-6xl mx-auto px-6 lg:px-8 pt-8 pb-28">
 
         {/* ── Listings tab ── */}
-        {tab === "listings" && (
+        {tab === "listings" && isMenuVendor && (
+          <RestaurantMenuView
+            listings={sorted as MenuOrderingItem[]}
+            isOwn={!!(user?.id && user.id === vendor.id)}
+            onSelectItem={(item) => setAddonPicker({
+              listing: { id: item.id, title: item.title, price: Number(item.price), image: item.image, description: item.description },
+              groups: item.menu_item?.addon_groups || [],
+            })}
+          />
+        )}
+
+        {/* ── Listings tab (marketplace grid — non menu-ordering vendors) ── */}
+        {tab === "listings" && !isMenuVendor && (
           <>
             {sorted.length === 0 ? (
               <div className="bg-stone-50 rounded-2xl p-16 text-center border border-stone-100">

@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { api } from "@/lib/api";
 import { TEAL, toArray } from "@/lib/tokens";
+import { compressImage } from "@/lib/utils";
 import { HEADING_FONT, LoadingSpinner, EmptyState, AvailabilityBadge, ListingThumb } from "../_shared";
-import { Plus, Pencil, Trash2, X, ChefHat, Tag, ArrowRight } from "lucide-react";
+import { Plus, Pencil, Trash2, X, ChefHat, Tag, ImagePlus } from "lucide-react";
 
 interface MenuCategory { id: number; name: string; display_order: number; is_active: boolean; }
 interface Addon { id: number; group: number; name: string; price_delta: string; is_available: boolean; display_order: number; }
@@ -19,6 +19,7 @@ interface MenuItem {
 }
 interface Listing { id: number; title: string; price: string; is_available: boolean; image?: string | null; }
 
+const emptyItemForm = { title: "", description: "", price: "", image: null as File | null, imagePreview: null as string | null };
 const emptyCategoryForm = { name: "", display_order: 0, is_active: true };
 const emptyItemDetailsForm = {
   menu_category: "" as number | "", prep_time_minutes: "", allergens: "", ingredients: "",
@@ -27,7 +28,7 @@ const emptyItemDetailsForm = {
 const emptyGroupForm = { name: "", is_required: false, min_selections: 0, max_selections: 1, display_order: 0 };
 const emptyAddonForm = { name: "", price_delta: "0", is_available: true, display_order: 0 };
 
-export default function VendorKitchenPage() {
+export default function VendorMenuPage() {
   const [loading, setLoading] = useState(true);
   const [notEnabled, setNotEnabled] = useState(false);
   const [error, setError] = useState("");
@@ -36,6 +37,10 @@ export default function VendorKitchenPage() {
   const [categories, setCategories] = useState<MenuCategory[]>([]);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [listings, setListings] = useState<Listing[]>([]);
+  const [foodCategorySlug, setFoodCategorySlug] = useState<string | null>(null);
+
+  const [showItemForm, setShowItemForm] = useState(false);
+  const [itemForm, setItemForm] = useState(emptyItemForm);
 
   const [showCatModal, setShowCatModal] = useState(false);
   const [catForm, setCatForm] = useState(emptyCategoryForm);
@@ -57,23 +62,67 @@ export default function VendorKitchenPage() {
 
   const loadAll = async () => {
     try {
-      const [catRes, itemRes, listRes] = await Promise.all([
+      const [catRes, itemRes, listRes, marketplaceCatRes] = await Promise.all([
         api.services.menuCategories(),
         api.services.menuItems(),
         api.services.listingsAuth({ page_size: "500" }),
+        api.services.categoriesAuth(), // authenticated — resolves the vendor's own campus, not a default
       ]);
       if (catRes.status === 403 || itemRes.status === 403) { setNotEnabled(true); return; }
       setCategories(toArray(await catRes.json()));
       setMenuItems(toArray(await itemRes.json()));
       setListings(toArray(await listRes.json()));
+      const marketplaceCats = toArray(await marketplaceCatRes.json());
+      const food = marketplaceCats.find((c: any) => (c.slug || "").toLowerCase() === "food" || (c.title || "").toLowerCase() === "food");
+      setFoodCategorySlug(food?.slug || marketplaceCats[0]?.slug || null);
     } catch {
-      setError("Could not load your kitchen. Please refresh.");
+      setError("Could not load your menu. Please refresh.");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => { loadAll(); }, []);
+
+  // ── Add Menu Item — creates the Listing and its MenuItem together in one step ──
+  const pickItemImage = async (file?: File) => {
+    if (!file) return;
+    const compressed = await compressImage(file);
+    setItemForm(f => ({ ...f, image: compressed, imagePreview: URL.createObjectURL(compressed) }));
+  };
+
+  const saveItem = async () => {
+    if (!itemForm.title.trim() || !itemForm.price) { setError("Name and price are required."); return; }
+    if (!foodCategorySlug) { setError("No category available — please contact support."); return; }
+    setSaving(true); setError("");
+    try {
+      const fd = new FormData();
+      fd.append("title", itemForm.title.trim());
+      fd.append("description", itemForm.description.trim() || itemForm.title.trim());
+      fd.append("payout_amount", itemForm.price);
+      fd.append("category", foodCategorySlug);
+      fd.append("listing_type", "product");
+      fd.append("track_inventory", "false");
+      fd.append("stock_quantity", "0");
+      fd.append("discount_percent", "0");
+      if (itemForm.image) fd.append("image", itemForm.image);
+
+      const listingRes = await api.services.createListing(fd);
+      if (!listingRes.ok) {
+        const d = await listingRes.json().catch(() => ({}));
+        setError(Object.values(d)[0]?.toString() || "Could not create menu item.");
+        return;
+      }
+      // The backend attaches the menu record automatically for a menu-ordering
+      // vendor the instant the listing is created — no separate call needed.
+
+      setShowItemForm(false);
+      setItemForm(emptyItemForm);
+      flash("Menu item added! Add its customizations below.");
+      await loadAll();
+    } catch { setError("Network error."); }
+    finally { setSaving(false); }
+  };
 
   // ── Item details (category, prep time, allergens, etc.) ──────────────────
   const openDetails = (item: MenuItem) => {
@@ -115,12 +164,12 @@ export default function VendorKitchenPage() {
   };
 
   const toggleArchived = async (item: MenuItem) => {
-    if (!item.is_archived && !confirm("Remove this dish from the active menu? It's kept for past order history.")) return;
+    if (!item.is_archived && !confirm("Remove this item from the active menu? It's kept for past order history.")) return;
     await api.services.updateMenuItem(item.id, { is_archived: !item.is_archived });
     await loadAll();
   };
 
-  // ── Menu categories (optional grouping, e.g. "Rice Dishes") ───────────────
+  // ── Menu categories (e.g. "Rice Dishes") ──────────────────────────────────
   const openCategoryCreate = () => { setCatForm(emptyCategoryForm); setEditingCat(null); setShowCatModal(true); };
   const openCategoryEdit = (c: MenuCategory) => { setCatForm({ name: c.name, display_order: c.display_order, is_active: c.is_active }); setEditingCat(c); setShowCatModal(true); };
 
@@ -139,12 +188,12 @@ export default function VendorKitchenPage() {
   };
 
   const deleteCategory = async (id: number) => {
-    if (!confirm("Delete this category? Dishes in it become uncategorized.")) return;
+    if (!confirm("Delete this category? Items in it become uncategorized.")) return;
     await api.services.deleteMenuCategory(id);
     await loadAll();
   };
 
-  // ── Add-on groups ───────────────────────────────────────────────────────
+  // ── Customization groups (add-on groups) ──────────────────────────────────
   const openGroupCreate = (menuItemId: number) => { setGroupForm(emptyGroupForm); setGroupModal({ menuItemId, editing: null }); };
   const openGroupEdit = (menuItemId: number, g: AddonGroup) => {
     setGroupForm({ name: g.name, is_required: g.is_required, min_selections: g.min_selections, max_selections: g.max_selections, display_order: g.display_order });
@@ -157,7 +206,7 @@ export default function VendorKitchenPage() {
       const res = groupModal?.editing
         ? await api.services.updateAddonGroup(groupModal.editing.id, groupForm)
         : await api.services.createAddonGroup({ ...groupForm, menu_item: groupModal!.menuItemId });
-      if (!res.ok) { const d = await res.json(); setError(Object.values(d)[0]?.toString() || "Could not save add-on group."); return; }
+      if (!res.ok) { const d = await res.json(); setError(Object.values(d)[0]?.toString() || "Could not save customization group."); return; }
       setGroupModal(null);
       await loadAll();
     } catch { setError("Network error."); }
@@ -165,12 +214,12 @@ export default function VendorKitchenPage() {
   };
 
   const deleteGroup = async (id: number) => {
-    if (!confirm("Delete this add-on group and all its options?")) return;
+    if (!confirm("Delete this customization group and all its options?")) return;
     await api.services.deleteAddonGroup(id);
     await loadAll();
   };
 
-  // ── Addons ──────────────────────────────────────────────────────────────
+  // ── Customization options (add-ons) ────────────────────────────────────────
   const openAddonCreate = (groupId: number) => { setAddonForm(emptyAddonForm); setAddonModal({ groupId, editing: null }); };
   const openAddonEdit = (groupId: number, a: Addon) => {
     setAddonForm({ name: a.name, price_delta: a.price_delta, is_available: a.is_available, display_order: a.display_order });
@@ -183,7 +232,7 @@ export default function VendorKitchenPage() {
       const res = addonModal?.editing
         ? await api.services.updateAddon(addonModal.editing.id, addonForm)
         : await api.services.createAddon({ ...addonForm, group: addonModal!.groupId });
-      if (!res.ok) { const d = await res.json(); setError(Object.values(d)[0]?.toString() || "Could not save add-on."); return; }
+      if (!res.ok) { const d = await res.json(); setError(Object.values(d)[0]?.toString() || "Could not save option."); return; }
       setAddonModal(null);
       await loadAll();
     } catch { setError("Network error."); }
@@ -191,7 +240,7 @@ export default function VendorKitchenPage() {
   };
 
   const deleteAddon = async (id: number) => {
-    if (!confirm("Delete this add-on option?")) return;
+    if (!confirm("Delete this option?")) return;
     await api.services.deleteAddon(id);
     await loadAll();
   };
@@ -202,7 +251,7 @@ export default function VendorKitchenPage() {
     return (
       <div className="bg-white border border-stone-200 rounded-2xl p-10 text-center">
         <ChefHat className="w-10 h-10 text-stone-200 mx-auto mb-3" />
-        <p className="font-bold text-stone-900">Kitchen isn't enabled for your account</p>
+        <p className="font-bold text-stone-900">Menu isn't enabled for your account</p>
         <p className="text-stone-400 text-sm mt-1">This feature is only available to vendor types that support menu-based ordering.</p>
       </div>
     );
@@ -221,26 +270,20 @@ export default function VendorKitchenPage() {
       <div className="flex items-center justify-between">
         <div>
           <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-bold mb-0.5">Manage</p>
-          <h2 className="font-black text-stone-900 text-xl tracking-tight" style={HEADING_FONT}>Kitchen</h2>
-          <p className="text-stone-400 text-xs mt-0.5">{menuItems.length} {menuItems.length === 1 ? "dish" : "dishes"}</p>
+          <h2 className="font-black text-stone-900 text-xl tracking-tight" style={HEADING_FONT}>Menu</h2>
+          <p className="text-stone-400 text-xs mt-0.5">{menuItems.length} {menuItems.length === 1 ? "item" : "items"}</p>
         </div>
-        <Link href="/vendor/dashboard/listings"
+        <button onClick={() => { setItemForm(emptyItemForm); setError(""); setShowItemForm(true); }}
           className="flex items-center gap-1.5 px-4 py-2 text-white rounded-full font-semibold text-sm transition active:scale-95" style={{ background: TEAL }}>
-          <Plus className="w-4 h-4" /> Add Dish
-        </Link>
+          <Plus className="w-4 h-4" /> Add Menu Item
+        </button>
       </div>
 
       {error && <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-600">{error}</div>}
 
-      {/* ── Dishes ── */}
+      {/* ── Menu items ── */}
       {menuItems.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 gap-4">
-          <EmptyState icon={ChefHat} message="No dishes yet" />
-          <Link href="/vendor/dashboard/listings"
-            className="flex items-center gap-1.5 px-4 py-2 rounded-full text-teal-700 bg-teal-50 border border-teal-100 font-semibold text-sm -mt-8">
-            Create one in My Listings <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
-        </div>
+        <EmptyState icon={ChefHat} message="No menu items yet — tap Add Menu Item to create your first one" />
       ) : (
         <div className="space-y-3">
           {menuItems.map(item => {
@@ -267,23 +310,23 @@ export default function VendorKitchenPage() {
                     <div className="flex gap-2">
                       <button onClick={() => toggleHidden(item)}
                         className={`flex-1 py-2 rounded-xl text-xs font-semibold transition ${item.is_hidden ? "bg-amber-100 text-amber-700" : "bg-stone-100 text-stone-600"}`}>
-                        {item.is_hidden ? "Unhide from buyers" : "Hide from buyers"}
+                        {item.is_hidden ? "Show to buyers" : "Hide from buyers"}
                       </button>
                       <button onClick={() => toggleArchived(item)}
                         className={`flex-1 py-2 rounded-xl text-xs font-semibold transition ${item.is_archived ? "bg-stone-200 text-stone-600" : "bg-red-50 text-red-600"}`}>
-                        {item.is_archived ? "Restore" : "Remove from menu"}
+                        {item.is_archived ? "Restore" : "Archive"}
                       </button>
                     </div>
 
                     <div className="flex items-center justify-between">
-                      <p className="text-xs font-bold text-stone-500 uppercase tracking-wide">Add-ons & Prices</p>
+                      <p className="text-xs font-bold text-stone-500 uppercase tracking-wide">Customizations</p>
                       <button onClick={() => openGroupCreate(item.id)} className="flex items-center gap-1 px-2.5 py-1 rounded-full text-white text-xs font-semibold" style={{ background: TEAL }}>
-                        <Plus className="w-3 h-3" /> Add-on group
+                        <Plus className="w-3 h-3" /> Add Group
                       </button>
                     </div>
 
                     {item.addon_groups.length === 0 ? (
-                      <p className="text-stone-400 text-xs">No add-ons yet — e.g. "Choose your protein" with Chicken/Beef options.</p>
+                      <p className="text-stone-400 text-xs">No customizations yet — e.g. "Protein" with Chicken/Beef options.</p>
                     ) : (
                       <div className="space-y-2">
                         {item.addon_groups.map(g => (
@@ -322,16 +365,16 @@ export default function VendorKitchenPage() {
         </div>
       )}
 
-      {/* ── Optional: menu categories (e.g. "Rice Dishes", "Drinks") ── */}
+      {/* ── Categories (e.g. "Rice Dishes", "Drinks") ── */}
       <section className="bg-white border border-stone-200 rounded-2xl p-4">
         <div className="flex items-center justify-between mb-3">
-          <p className="font-bold text-stone-900 text-sm flex items-center gap-2"><Tag className="w-4 h-4 text-teal-600" /> Categories <span className="text-stone-400 font-normal">(optional)</span></p>
+          <p className="font-bold text-stone-900 text-sm flex items-center gap-2"><Tag className="w-4 h-4 text-teal-600" /> Categories</p>
           <button onClick={openCategoryCreate} className="flex items-center gap-1 px-3 py-1.5 rounded-full text-white text-xs font-semibold" style={{ background: TEAL }}>
             <Plus className="w-3.5 h-3.5" /> Add
           </button>
         </div>
         {sortedCategories.length === 0 ? (
-          <p className="text-stone-400 text-sm py-2">Group your dishes into sections like "Rice Dishes" or "Drinks" — optional.</p>
+          <p className="text-stone-400 text-sm py-2">Group your menu into sections like "Rice Dishes" or "Drinks" — optional.</p>
         ) : (
           <div className="space-y-1.5">
             {sortedCategories.map(c => (
@@ -346,9 +389,36 @@ export default function VendorKitchenPage() {
         )}
       </section>
 
+      {/* ── Add Menu Item modal ── */}
+      {showItemForm && (
+        <Modal title="Add Menu Item" onClose={() => setShowItemForm(false)}>
+          <Field label="Photo (optional)">
+            <label className="w-24 h-24 rounded-xl border-2 border-dashed border-stone-200 flex items-center justify-center cursor-pointer hover:border-teal-400 transition overflow-hidden">
+              {itemForm.imagePreview ? (
+                <img src={itemForm.imagePreview} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <ImagePlus className="w-6 h-6 text-stone-300" />
+              )}
+              <input type="file" accept="image/*" className="hidden" onChange={e => pickItemImage(e.target.files?.[0])} />
+            </label>
+          </Field>
+          <Field label="Item name">
+            <input value={itemForm.title} onChange={e => setItemForm(f => ({ ...f, title: e.target.value }))} className={inputCls} placeholder="e.g. Jollof Rice" />
+          </Field>
+          <Field label="Price (₦)">
+            <input type="number" value={itemForm.price} onChange={e => setItemForm(f => ({ ...f, price: e.target.value }))} className={inputCls} placeholder="e.g. 2160" />
+          </Field>
+          <Field label="Description (optional)">
+            <textarea value={itemForm.description} onChange={e => setItemForm(f => ({ ...f, description: e.target.value }))} rows={2} className={inputCls} placeholder="e.g. Smoky party jollof with plantain" />
+          </Field>
+          <SaveButton saving={saving} onClick={saveItem} label="Add Menu Item" />
+          <p className="text-xs text-stone-400 text-center">Add customizations like "Protein" or "Extras" after creating the item.</p>
+        </Modal>
+      )}
+
       {/* ── Item details modal (category, prep time, allergens) ── */}
       {detailsModal && (
-        <Modal title="Dish Details" onClose={() => setDetailsModal(null)}>
+        <Modal title="Menu Item Details" onClose={() => setDetailsModal(null)}>
           <Field label="Category">
             <select value={detailsForm.menu_category} onChange={e => setDetailsForm(f => ({ ...f, menu_category: e.target.value ? Number(e.target.value) : "" }))} className={inputCls}>
               <option value="">Uncategorized</option>
@@ -395,11 +465,11 @@ export default function VendorKitchenPage() {
         </Modal>
       )}
 
-      {/* ── Add-on group modal ── */}
+      {/* ── Customization group modal ── */}
       {groupModal && (
-        <Modal title={groupModal.editing ? "Edit Add-on Group" : "New Add-on Group"} onClose={() => setGroupModal(null)}>
+        <Modal title={groupModal.editing ? "Edit Customization Group" : "New Customization Group"} onClose={() => setGroupModal(null)}>
           <Field label="Name">
-            <input value={groupForm.name} onChange={e => setGroupForm(f => ({ ...f, name: e.target.value }))} className={inputCls} placeholder="e.g. Choose your protein" />
+            <input value={groupForm.name} onChange={e => setGroupForm(f => ({ ...f, name: e.target.value }))} className={inputCls} placeholder="e.g. Protein" />
           </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Min selections">
@@ -416,11 +486,11 @@ export default function VendorKitchenPage() {
         </Modal>
       )}
 
-      {/* ── Addon modal ── */}
+      {/* ── Customization option modal ── */}
       {addonModal && (
-        <Modal title={addonModal.editing ? "Edit Add-on" : "New Add-on"} onClose={() => setAddonModal(null)}>
+        <Modal title={addonModal.editing ? "Edit Option" : "New Option"} onClose={() => setAddonModal(null)}>
           <Field label="Name">
-            <input value={addonForm.name} onChange={e => setAddonForm(f => ({ ...f, name: e.target.value }))} className={inputCls} placeholder="e.g. Extra Chicken" />
+            <input value={addonForm.name} onChange={e => setAddonForm(f => ({ ...f, name: e.target.value }))} className={inputCls} placeholder="e.g. Chicken" />
           </Field>
           <Field label="Price (₦ — can be negative to discount, e.g. removing an ingredient)">
             <input type="number" step="0.01" value={addonForm.price_delta} onChange={e => setAddonForm(f => ({ ...f, price_delta: e.target.value }))} className={inputCls} />

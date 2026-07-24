@@ -19,6 +19,7 @@ import { GRAD, TEAL, PURPLE } from "@/lib/tokens";
 import VendorBadge from "@/components/VendorBadge";
 import ChatWindow from "@/components/ChatWindow";
 import BookingWizard from "@/components/booking/BookingWizard";
+import AddonPickerModal, { AddonGroupData } from "@/components/cart/AddonPickerModal";
 import { useAdminMode } from "@/hooks/useAdminMode";
 
 interface Review {
@@ -46,6 +47,7 @@ interface Listing {
   stock_quantity?: number;
   category: { id: number; title: string; slug: string };
   campus?: string;
+  menu_item?: { addon_groups: AddonGroupData[] } | null;
   vendor: {
     id: number;
     username: string;
@@ -123,6 +125,7 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
   const [stockWarning,  setStockWarning]  = useState(() => getStockWarning(initialListing));
   const [showChat,      setShowChat]      = useState(false);
   const [showBookingWizard, setShowBookingWizard] = useState(false);
+  const [showAddonPicker, setShowAddonPicker] = useState(false);
   // Chat is payment-gated (see chat/views.py ConversationViewSet). A buyer can only
   // message the vendor once a paid order already exists for this listing — check for
   // an existing unlocked conversation rather than assuming every visit is pre-payment.
@@ -197,6 +200,7 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
   const handleAddToCart = async () => {
     if (!listing) return;
     if (!isLoggedIn) { router.push("/auth"); return; }
+    if (listing.menu_item?.addon_groups?.length) { setShowAddonPicker(true); return; }
     try {
       const res = await api.cart.add({ listing_id: listing.id, quantity: qty });
       if (!res.ok) {
@@ -653,6 +657,21 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
               )}
             </div>
           </div>
+
+          {/* ══════════ ADD-ON PICKER (menu items with add-on groups) ══════════ */}
+          {showAddonPicker && listing.menu_item?.addon_groups && (
+            <AddonPickerModal
+              listing={{ id: listing.id, title: listing.title, price: displayPrice }}
+              addonGroups={listing.menu_item.addon_groups}
+              quantity={qty}
+              onClose={() => setShowAddonPicker(false)}
+              onAdded={() => {
+                showToast("Added to cart!");
+                try { sessionStorage.setItem("cart-referrer", window.location.pathname); } catch {}
+                queryClient.invalidateQueries({ queryKey: ["cart"] });
+              }}
+            />
+          )}
 
           {/* ══════════ BOOKING WIZARD (services) ══════════ */}
           {isService && showBookingWizard && (

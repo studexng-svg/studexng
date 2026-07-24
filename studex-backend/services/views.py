@@ -12,7 +12,7 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 
 
-def _invalidate_listing_cache(campus):
+def invalidate_listing_cache(campus):
     for ps in ['20', '50', '100', '200', '500']:
         cache.delete(f'listings_{campus}_{ps}')
 
@@ -272,7 +272,7 @@ class ListingViewSet(viewsets.ModelViewSet):
                 if url:
                     extra[slot] = url
         instance = serializer.save(**extra)
-        _invalidate_listing_cache(instance.campus)
+        invalidate_listing_cache(instance.campus)
 
     def perform_create(self, serializer):
         extra = {}
@@ -289,7 +289,7 @@ class ListingViewSet(viewsets.ModelViewSet):
             campus=campus,
             **extra,
         )
-        _invalidate_listing_cache(campus)
+        invalidate_listing_cache(campus)
         # Notify admin that a new listing needs review and approval
         try:
             from studex.notifications import notify_admin_new_listing
@@ -300,7 +300,7 @@ class ListingViewSet(viewsets.ModelViewSet):
     def perform_destroy(self, instance):
         campus = instance.campus
         super().perform_destroy(instance)
-        _invalidate_listing_cache(campus)
+        invalidate_listing_cache(campus)
 
 
 class TransactionViewSet(viewsets.ReadOnlyModelViewSet):
