@@ -1,5 +1,7 @@
 import { create } from "zustand";
 
+export type CartAddon = { id: number; name: string; price_delta: number };
+
 export type CartItem = {
   id: number;       // listing_id
   title: string;
@@ -11,6 +13,19 @@ export type CartItem = {
   category?: string;
   size?: string;
   vendor?: string;
+  // Phase 2 — Food Commerce Engine integration. Populated by fetchCart for
+  // every row the backend returns; absent for a guest-cart row (guests
+  // can't add menu items with add-ons — that requires login, same as
+  // checkout already does). A listing can now have more than one cart line
+  // (different add-on selections) sharing the same `id` (listing_id) —
+  // `cartItemId` (the actual CartItem row id) is what disambiguates them
+  // for update/remove.
+  cartItemId?: number;
+  vendorId?: number;
+  vendorUsername?: string;
+  addonSignature?: string;
+  selectedAddons?: CartAddon[];
+  usesMenuCheckout?: boolean;
 };
 
 type CartStore = {
@@ -21,6 +36,14 @@ type CartStore = {
   clearCart: () => void;
   fetchCart: () => Promise<void>;
   loadCartForUser: (userId: number | null) => void;
+  // Menu items with add-on selections (Phase 2) — requires login; always
+  // round-trips through the backend (which computes addon_signature and
+  // re-validates group rules) rather than replicating that logic in JS.
+  addToCartWithAddons: (listingId: number, quantity: number, addonIds: number[]) => Promise<void>;
+  // Per-line (by CartItem id) actions — the only correct way to target one
+  // line once a listing can have several add-on-distinct lines.
+  updateCartLineQuantity: (cartItemId: number, quantity: number) => Promise<void>;
+  removeCartLine: (cartItemId: number) => Promise<void>;
 };
 
 // Dynamic require avoids circular-module issues (api → authStore ↔ cartStore)
@@ -116,6 +139,7 @@ export const useCart = create<CartStore>()((set, get) => ({
       const res = await cartApi().get();
       if (!res.ok) return;
       const data: Array<{
+        id: number;
         listing_id: number;
         title: string;
         price: string | number;
@@ -123,6 +147,11 @@ export const useCart = create<CartStore>()((set, get) => ({
         deal_discount_percent?: number;
         img: string;
         quantity: number;
+        vendor_id?: number;
+        vendor_username?: string;
+        addon_signature?: string;
+        selected_addons?: Array<{ id: number; name: string; price_delta: string | number }>;
+        uses_menu_checkout?: boolean;
       }> = await res.json();
       set({
         cart: data.map((item) => {
@@ -139,10 +168,42 @@ export const useCart = create<CartStore>()((set, get) => ({
             deal_discount_percent: item.deal_discount_percent ?? 0,
             img: item.img || "",
             quantity: item.quantity,
+            cartItemId: item.id,
+            vendorId: item.vendor_id,
+            vendorUsername: item.vendor_username,
+            addonSignature: item.addon_signature || "",
+            selectedAddons: (item.selected_addons || []).map(a => ({
+              id: a.id, name: a.name, price_delta: parseFloat(String(a.price_delta)),
+            })),
+            usesMenuCheckout: !!item.uses_menu_checkout,
           };
         }),
       });
     } catch {}
+  },
+
+  addToCartWithAddons: async (listingId, quantity, addonIds) => {
+    const res = await cartApi().add({ listing_id: listingId, quantity, addon_ids: addonIds });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || "Could not add to cart.");
+    }
+    await get().fetchCart();
+  },
+
+  updateCartLineQuantity: async (cartItemId, quantity) => {
+    const qty = Math.max(1, quantity);
+    set((state) => ({
+      cart: state.cart.map((i) => (i.cartItemId === cartItemId ? { ...i, quantity: qty } : i)),
+    }));
+    const res = await cartApi().updateItem(cartItemId, { quantity: qty });
+    if (!res.ok) await get().fetchCart(); // resync on failure — optimistic update may be wrong
+  },
+
+  removeCartLine: async (cartItemId) => {
+    set((state) => ({ cart: state.cart.filter((i) => i.cartItemId !== cartItemId) }));
+    const res = await cartApi().removeItem(cartItemId);
+    if (!res.ok) await get().fetchCart();
   },
 
   loadCartForUser: (userId) => {

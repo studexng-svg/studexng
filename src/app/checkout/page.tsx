@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { useCartStore } from "@/lib/cartStore";
 import { useBookingStore } from "@/lib/bookingStore";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/authStore";
 import Script from "next/script";
 import { TEAL, PURPLE } from "@/lib/tokens";
@@ -26,15 +26,25 @@ declare global {
 
 export default function CheckoutPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, isLoggedIn, isHydrated } = useAuth();
-  const { cart, clearCart } = useCartStore();
+  const { cart, clearCart, fetchCart } = useCartStore();
   const { booking, clearBooking } = useBookingStore();
 
-  const isServiceBooking = !!booking && cart.length === 0;
-  const isFoodOrder = cart.length > 0;
+  // Vendor-scoped checkout (Phase 1 Step 3/4 + Phase 2 integration): a cart
+  // can hold items from several vendors — /cart links here with ?vendor=<id>
+  // for exactly one of them. No param → every existing behavior (whole
+  // cart, single-listing checkout) is completely unchanged.
+  const vendorIdParam = searchParams.get("vendor");
+  const vendorId = vendorIdParam ? Number(vendorIdParam) : null;
+  const cartItemsForCheckout = vendorId != null ? cart.filter(i => i.vendorId === vendorId) : cart;
+  const usesMenuCheckout = vendorId != null && cartItemsForCheckout.some(i => i.usesMenuCheckout);
 
-  const foodTotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const dealSavings = cart.reduce((sum, item) => {
+  const isServiceBooking = !!booking && cartItemsForCheckout.length === 0;
+  const isFoodOrder = cartItemsForCheckout.length > 0;
+
+  const foodTotal = cartItemsForCheckout.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const dealSavings = cartItemsForCheckout.reduce((sum, item) => {
     const orig = item.original_price ?? item.price;
     return sum + Math.max(orig - item.price, 0) * item.quantity;
   }, 0);
@@ -57,7 +67,10 @@ export default function CheckoutPage() {
 
   // discountedBase is already all-inclusive (vendor payout + platform fee baked in
   // at listing-creation time) — no separate fee gets added at checkout anymore.
-  const discountedBase = discount ? discount.finalBase : baseTotal;
+  // The vendor-scoped menu checkout doesn't support the profile-completion
+  // discount (Step 3's scope decision) — ignore it here so the displayed
+  // total always matches what initializeCart actually charges.
+  const discountedBase = (!usesMenuCheckout && discount) ? discount.finalBase : baseTotal;
   const fullCheckoutAmount = discountedBase;
   const creditsToApply = useCredits ? Math.min(loyaltyBalance, fullCheckoutAmount) : 0;
   const isFullyCoveredByCredits = useCredits && creditsToApply >= fullCheckoutAmount && fullCheckoutAmount > 0;
@@ -132,10 +145,20 @@ export default function CheckoutPage() {
       if (!res.ok) throw new Error(data.error || "Order creation failed");
       return data.order_id;
     }
+    if (usesMenuCheckout && vendorId != null) {
+      const res = await api.payments.verifyCart({
+        reference: txRef,
+        vendor_id: vendorId,
+        delivery_location: deliveryLocation.trim(),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Order creation failed");
+      return data.order_id;
+    }
     const res = await api.payments.verify({
       reference: txRef,
       transaction_id: transactionId,
-      items: cart.map(item => ({ listing_id: item.id, quantity: item.quantity })),
+      items: cartItemsForCheckout.map(item => ({ listing_id: item.id, quantity: item.quantity })),
       order_type: "product",
       delivery_location: deliveryLocation.trim(),
       use_credits: appliedCredits > 0,
@@ -158,7 +181,7 @@ export default function CheckoutPage() {
     if (!isFullyCoveredByCredits && !window.PaystackPop) { setPaymentError("Payment system not ready. Please refresh the page."); return; }
     if (isFoodOrder && !deliveryLocation.trim()) { setPaymentError("Please enter your campus delivery location."); return; }
 
-    const listingId = isServiceBooking ? booking?.providerId : cart[0]?.id;
+    const listingId = isServiceBooking ? booking?.providerId : cartItemsForCheckout[0]?.id;
     if (!listingId) {
       setPaymentError("Could not determine listing. Please go back and try again.");
       return;
@@ -166,13 +189,21 @@ export default function CheckoutPage() {
 
     setIsProcessing(true);
 
-    // Full credits coverage — skip Paystack, StudEx pays vendor directly
+    // Vendor-scoped items/delivery/credits cleanup after a successful
+    // payment — only refetches (drops just this vendor's now-purchased
+    // lines) rather than wiping the whole multi-vendor cart.
+    const cleanupCart = () => { if (vendorId != null) fetchCart(); else clearCart(); };
+
+    // Full credits coverage — skip Paystack, StudEx pays vendor directly.
+    // Not supported by the vendor-scoped menu checkout (Step 3's explicit
+    // scope decision) — the loyalty toggle is hidden for that flow, so
+    // isFullyCoveredByCredits can only be true here for the pre-existing path.
     if (isFullyCoveredByCredits) {
       try {
         const res = await api.payments.payWithCredits({ listing_id: listingId });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Payment failed");
-        if (isFoodOrder) clearCart();
+        if (isFoodOrder) cleanupCart();
         if (isServiceBooking) clearBooking();
         router.push(`/order-confirmation/${data.order_id}`);
       } catch (err: any) {
@@ -183,12 +214,18 @@ export default function CheckoutPage() {
     }
 
     try {
-      const initRes = await api.payments.initialize({
-        listing_id: listingId,
-        ...(isFoodOrder ? { cart_amount: foodTotal } : {}),
-        ...(isFoodOrder && deliveryLocation.trim() ? { delivery_location: deliveryLocation.trim() } : {}),
-        ...(useCredits && creditsToApply > 0 ? { use_credits: true } : {}),
-      });
+      const initRes = usesMenuCheckout && vendorId != null
+        ? await api.payments.initializeCart({
+            vendor_id: vendorId,
+            cart_amount: foodTotal,
+            ...(deliveryLocation.trim() ? { delivery_location: deliveryLocation.trim() } : {}),
+          })
+        : await api.payments.initialize({
+            listing_id: listingId,
+            ...(isFoodOrder ? { cart_amount: foodTotal } : {}),
+            ...(isFoodOrder && deliveryLocation.trim() ? { delivery_location: deliveryLocation.trim() } : {}),
+            ...(useCredits && creditsToApply > 0 ? { use_credits: true } : {}),
+          });
       const initData = await initRes.json();
       if (!initRes.ok) throw new Error(initData.error || "Failed to initialize payment");
 
@@ -208,7 +245,7 @@ export default function CheckoutPage() {
           if (response.status === "success") {
             createOrder(response.reference, response.reference, appliedCredits)
               .then(orderId => {
-                if (isFoodOrder) clearCart();
+                if (isFoodOrder) cleanupCart();
                 if (isServiceBooking) clearBooking();
                 router.push(`/order-confirmation/${orderId}`);
               })
@@ -229,7 +266,7 @@ export default function CheckoutPage() {
       setPaymentError(err.message || "Payment failed. Please try again.");
       setIsProcessing(false);
     }
-  }, [finalTotal, foodTotal, user, isFoodOrder, isServiceBooking, booking, cart, paystackLoaded, deliveryLocation, useCredits, creditsToApply, isFullyCoveredByCredits]);
+  }, [finalTotal, foodTotal, user, isFoodOrder, isServiceBooking, booking, cartItemsForCheckout, vendorId, usesMenuCheckout, paystackLoaded, deliveryLocation, useCredits, creditsToApply, isFullyCoveredByCredits]);
 
   // ── EMPTY STATE ──────────────────────────────────────────────────────────
   if (!isFoodOrder && !isServiceBooking) {
@@ -317,8 +354,8 @@ export default function CheckoutPage() {
               <Package className="w-4 h-4 text-teal-600" />
               <p className="font-semibold text-stone-900 text-sm">Order Items</p>
             </div>
-            {cart.map((item, i) => (
-              <motion.div key={item.id}
+            {cartItemsForCheckout.map((item, i) => (
+              <motion.div key={item.cartItemId ?? item.id}
                 initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: i * 0.07 }}
                 className="flex items-center gap-3 py-2.5 border-b border-stone-100 last:border-0">
@@ -331,6 +368,9 @@ export default function CheckoutPage() {
                 <div className="flex-1 min-w-0 flex justify-between items-center gap-2">
                   <div className="min-w-0">
                     <p className="font-medium text-stone-900 text-sm truncate">{item.title}</p>
+                    {!!item.selectedAddons?.length && (
+                      <p className="text-xs text-stone-400 truncate">{item.selectedAddons.map(a => a.name).join(", ")}</p>
+                    )}
                     <div className="flex items-center gap-2 mt-0.5">
                       <p className="text-xs text-stone-400">× {item.quantity}</p>
                       {item.original_price && item.original_price > item.price && (
@@ -403,22 +443,40 @@ export default function CheckoutPage() {
           className="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm">
           <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold mb-4">Order Summary</p>
           <div className="space-y-3">
-            <div className="flex justify-between items-center text-sm">
-              <span className="text-stone-500">
-                {isServiceBooking ? "Service price" : "Items total"}
-              </span>
-              <div className="text-right">
-                {dealSavings > 0 && (
-                  <p className="text-xs text-stone-400 line-through">
-                    ₦{(baseTotal + dealSavings).toLocaleString()}
-                  </p>
-                )}
-                <span className={`font-medium ${discount?.hasDiscount ? "line-through text-stone-400" : "text-stone-700"}`}>
-                  ₦{baseTotal.toLocaleString()}
+            {isFoodOrder && vendorId != null ? (
+              <>
+                {/* Vendor-scoped cart checkout: backend price is already
+                    all-inclusive (platform fee baked into each item's
+                    price) — never shown as a separate line. No delivery
+                    fee is configured anywhere yet, so delivery is always
+                    "Free" here. */}
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-stone-500">Product Total</span>
+                  <span className="font-medium text-stone-700">₦{baseTotal.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-stone-500">Delivery</span>
+                  <span className="font-semibold text-emerald-600">Free</span>
+                </div>
+              </>
+            ) : (
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-stone-500">
+                  {isServiceBooking ? "Service price" : "Items total"}
                 </span>
+                <div className="text-right">
+                  {dealSavings > 0 && (
+                    <p className="text-xs text-stone-400 line-through">
+                      ₦{(baseTotal + dealSavings).toLocaleString()}
+                    </p>
+                  )}
+                  <span className={`font-medium ${discount?.hasDiscount ? "line-through text-stone-400" : "text-stone-700"}`}>
+                    ₦{baseTotal.toLocaleString()}
+                  </span>
+                </div>
               </div>
-            </div>
-            {dealSavings > 0 && (
+            )}
+            {!usesMenuCheckout && dealSavings > 0 && (
               <div className="flex justify-between items-center text-sm">
                 <span className="text-rose-600 font-medium flex items-center gap-1">
                   Deal savings
@@ -428,7 +486,7 @@ export default function CheckoutPage() {
                 </span>
               </div>
             )}
-            {discount?.hasDiscount && (
+            {!usesMenuCheckout && discount?.hasDiscount && (
               <div className="flex justify-between items-center text-sm">
                 <span className="text-emerald-600 font-medium flex items-center gap-1">
                   🎉 Profile bonus (5% off)
@@ -439,24 +497,26 @@ export default function CheckoutPage() {
               </div>
             )}
 
-            {/* Loyalty credits toggle */}
-            <div className={`flex items-center justify-between rounded-xl px-3 py-2.5 border transition ${loyaltyBalance > 0 ? (useCredits ? "bg-amber-50 border-amber-300" : "bg-stone-50 border-stone-200 cursor-pointer") : "bg-stone-50 border-stone-100 opacity-50"}`}
-              onClick={() => loyaltyBalance > 0 && setUseCredits(v => !v)}>
-              <div className="flex items-center gap-2">
-                <span className="text-lg">🎁</span>
-                <div>
-                  <p className="text-sm font-semibold text-stone-800 leading-tight">Loyalty Credits</p>
-                  <p className="text-xs text-stone-500">
-                    {loyaltyBalance > 0 ? `₦${loyaltyBalance.toLocaleString()} available` : "No credits yet"}
-                  </p>
+            {/* Loyalty credits toggle — not supported by the vendor-scoped menu checkout */}
+            {!usesMenuCheckout && (
+              <div className={`flex items-center justify-between rounded-xl px-3 py-2.5 border transition ${loyaltyBalance > 0 ? (useCredits ? "bg-amber-50 border-amber-300" : "bg-stone-50 border-stone-200 cursor-pointer") : "bg-stone-50 border-stone-100 opacity-50"}`}
+                onClick={() => loyaltyBalance > 0 && setUseCredits(v => !v)}>
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">🎁</span>
+                  <div>
+                    <p className="text-sm font-semibold text-stone-800 leading-tight">Loyalty Credits</p>
+                    <p className="text-xs text-stone-500">
+                      {loyaltyBalance > 0 ? `₦${loyaltyBalance.toLocaleString()} available` : "No credits yet"}
+                    </p>
+                  </div>
+                </div>
+                <div className={`w-11 h-6 rounded-full flex items-center px-1 transition-colors ${loyaltyBalance > 0 && useCredits ? "bg-amber-400" : "bg-stone-300"}`}>
+                  <div className={`w-4 h-4 bg-white rounded-full shadow transition-transform ${loyaltyBalance > 0 && useCredits ? "translate-x-5" : "translate-x-0"}`} />
                 </div>
               </div>
-              <div className={`w-11 h-6 rounded-full flex items-center px-1 transition-colors ${loyaltyBalance > 0 && useCredits ? "bg-amber-400" : "bg-stone-300"}`}>
-                <div className={`w-4 h-4 bg-white rounded-full shadow transition-transform ${loyaltyBalance > 0 && useCredits ? "translate-x-5" : "translate-x-0"}`} />
-              </div>
-            </div>
+            )}
 
-            {useCredits && creditsToApply > 0 && (
+            {!usesMenuCheckout && useCredits && creditsToApply > 0 && (
               <div className="flex justify-between items-center text-sm">
                 <span className="text-amber-600 font-medium">🎁 Credits applied</span>
                 <span className="text-amber-600 font-semibold">

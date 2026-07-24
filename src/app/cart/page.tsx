@@ -47,7 +47,7 @@ function CountdownTimer({ reservedAt }: { reservedAt: string }) {
 
 export default function CartPage() {
   const router = useRouter();
-  const { cart, removeFromCart, updateQuantity, clearCart } = useCartStore();
+  const { cart, removeFromCart, updateQuantity, clearCart, removeCartLine, updateCartLineQuantity } = useCartStore();
   const { isLoggedIn } = useAuth();
 
   const handleBack = () => {
@@ -107,6 +107,26 @@ export default function CartPage() {
   const availableItems = cart.filter(item => !unavailableIds.has(item.id));
   const total = availableItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const hasUnavailable = unavailableIds.size > 0;
+
+  // Group by vendor for checkout — a cart can hold items from several
+  // vendors at once, but checkout itself is scoped to one vendor at a time.
+  const vendorGroups = useMemo(() => {
+    const map = new Map<number, { vendorId: number; vendorUsername: string; items: typeof availableItems; subtotal: number }>();
+    for (const item of availableItems) {
+      if (item.vendorId == null) continue;
+      const existing = map.get(item.vendorId);
+      if (existing) {
+        existing.items.push(item);
+        existing.subtotal += item.price * item.quantity;
+      } else {
+        map.set(item.vendorId, {
+          vendorId: item.vendorId, vendorUsername: item.vendorUsername || "vendor",
+          items: [item], subtotal: item.price * item.quantity,
+        });
+      }
+    }
+    return Array.from(map.values());
+  }, [availableItems]);
 
   // ── EMPTY STATE ──────────────────────────────────────────────────────────
   if (cart.length === 0) {
@@ -170,11 +190,14 @@ export default function CartPage() {
         )}
 
         {/* ── CART ITEMS ── */}
-        {cart.map((item, i) => {
+        {cart.map((item) => {
           const isUnavailable = unavailableIds.has(item.id);
+          const rowKey = item.cartItemId ?? item.id;
+          const doRemove = () => item.cartItemId ? removeCartLine(item.cartItemId) : removeFromCart(item.id);
+          const doUpdate = (qty: number) => item.cartItemId ? updateCartLineQuantity(item.cartItemId, qty) : updateQuantity(item.id, qty);
           return (
             <div
-              key={item.id}
+              key={rowKey}
               className={`bg-white rounded-2xl p-4 shadow-sm border flex gap-4 relative overflow-hidden transition-all animate-fadeUp ${
                 isUnavailable ? "border-red-200 opacity-70" : "border-stone-200 hover:border-teal-300 hover:shadow-md"
               }`}>
@@ -202,6 +225,14 @@ export default function CartPage() {
               {/* Info */}
               <div className="flex-1 min-w-0">
                 <h3 className="font-semibold text-stone-900 text-sm leading-tight truncate">{item.title}</h3>
+                {item.vendorUsername && (
+                  <p className="text-[11px] text-stone-400 mt-0.5">@{item.vendorUsername}</p>
+                )}
+                {!!item.selectedAddons?.length && (
+                  <p className="text-xs text-stone-400 mt-0.5 truncate">
+                    {item.selectedAddons.map(a => a.name).join(", ")}
+                  </p>
+                )}
                 <p className="text-xs text-stone-400 mt-0.5">₦{item.price.toLocaleString()} each</p>
 
                 {isUnavailable ? (
@@ -226,7 +257,7 @@ export default function CartPage() {
               <div className="flex flex-col justify-between items-end gap-3 flex-shrink-0">
                 {!isUnavailable && (
                   <div className="flex items-center gap-2 bg-stone-100 rounded-full px-3 py-1.5">
-                    <button onClick={() => updateQuantity(item.id, Math.max(1, item.quantity - 1))}
+                    <button onClick={() => doUpdate(Math.max(1, item.quantity - 1))}
                       className="text-stone-500 hover:text-teal-600 transition">
                       <Minus className="w-4 h-4" />
                     </button>
@@ -234,13 +265,13 @@ export default function CartPage() {
                     <button onClick={() => {
                       const max = stockLimits[item.id];
                       if (max && item.quantity >= max) return;
-                      updateQuantity(item.id, item.quantity + 1);
+                      doUpdate(item.quantity + 1);
                     }} className="text-stone-500 hover:text-teal-600 transition">
                       <Plus className="w-4 h-4" />
                     </button>
                   </div>
                 )}
-                <button onClick={() => removeFromCart(item.id)}
+                <button onClick={doRemove}
                   className="text-stone-300 hover:text-red-400 transition">
                   <Trash2 className="w-5 h-5" />
                 </button>
@@ -249,48 +280,70 @@ export default function CartPage() {
           );
         })}
 
-        {/* ── ORDER SUMMARY + CHECKOUT ── */}
+        {/* ── ORDER SUMMARY + CHECKOUT (grouped by vendor once more than one is present) ── */}
         {availableItems.length > 0 && (
-          <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm space-y-4 animate-fadeUp">
-
-            {/* Summary */}
-            <div>
-              <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold mb-3">Order Summary</p>
-              <div className="space-y-2">
-                {availableItems.map(item => (
-                  <div key={item.id} className="flex justify-between items-center text-sm">
-                    <span className="text-stone-500 truncate max-w-[60%]">{item.title} × {item.quantity}</span>
-                    <span className="text-stone-700 font-medium">₦{(item.price * item.quantity).toLocaleString()}</span>
+          <>
+            {vendorGroups.length <= 1 ? (
+              <div className="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm space-y-4 animate-fadeUp">
+                <div>
+                  <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold mb-3">Order Summary</p>
+                  <div className="space-y-2">
+                    {availableItems.map(item => (
+                      <div key={item.cartItemId ?? item.id} className="flex justify-between items-center text-sm">
+                        <span className="text-stone-500 truncate max-w-[60%]">{item.title} × {item.quantity}</span>
+                        <span className="text-stone-700 font-medium">₦{(item.price * item.quantity).toLocaleString()}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="border-t border-stone-100 mt-3 pt-3 flex justify-between items-center">
+                    <span className="font-bold text-stone-900" style={JAKARTA}>Total</span>
+                    <span className="text-2xl font-bold" style={GRAD_TEXT}>₦{total.toLocaleString()}</span>
+                  </div>
+                  {hasUnavailable && (
+                    <p className="text-amber-500 text-xs mt-1">Unavailable items excluded from total</p>
+                  )}
+                </div>
+                <Link href={hasUnavailable ? "#" : (vendorGroups[0] ? `/checkout?vendor=${vendorGroups[0].vendorId}` : "/checkout")}
+                  onClick={e => { if (hasUnavailable) e.preventDefault(); }}>
+                  <button
+                    disabled={hasUnavailable}
+                    className={`w-full py-4 font-semibold text-sm rounded-full flex items-center justify-center gap-2 transition-all tap-scale ${
+                      hasUnavailable ? "bg-stone-100 text-stone-400 cursor-not-allowed" : "text-white shadow-lg shadow-teal-200/60"
+                    }`}
+                    style={hasUnavailable ? {} : { background: TEAL }}>
+                    {hasUnavailable ? "Remove unavailable items first" : <> Checkout Now <ArrowRight className="w-4 h-4" /></>}
+                  </button>
+                </Link>
+              </div>
+            ) : (
+              <div className="space-y-3 animate-fadeUp">
+                <p className="text-stone-400 text-xs px-1">Your cart has items from {vendorGroups.length} vendors — check out one vendor at a time.</p>
+                {vendorGroups.map(group => (
+                  <div key={group.vendorId} className="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm space-y-3">
+                    <p className="font-bold text-stone-900 text-sm">@{group.vendorUsername}</p>
+                    <div className="space-y-1.5">
+                      {group.items.map(item => (
+                        <div key={item.cartItemId ?? item.id} className="flex justify-between items-center text-sm">
+                          <span className="text-stone-500 truncate max-w-[60%]">{item.title} × {item.quantity}</span>
+                          <span className="text-stone-700 font-medium">₦{(item.price * item.quantity).toLocaleString()}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="border-t border-stone-100 pt-2 flex justify-between items-center">
+                      <span className="font-semibold text-stone-900 text-sm">Subtotal</span>
+                      <span className="text-lg font-bold" style={GRAD_TEXT}>₦{group.subtotal.toLocaleString()}</span>
+                    </div>
+                    <Link href={`/checkout?vendor=${group.vendorId}`}>
+                      <button className="w-full py-3 font-semibold text-sm rounded-full text-white flex items-center justify-center gap-2 transition-all tap-scale"
+                        style={{ background: TEAL }}>
+                        Checkout @{group.vendorUsername} <ArrowRight className="w-4 h-4" />
+                      </button>
+                    </Link>
                   </div>
                 ))}
               </div>
-              <div className="border-t border-stone-100 mt-3 pt-3 flex justify-between items-center">
-                <span className="font-bold text-stone-900" style={JAKARTA}>Total</span>
-                <span className="text-2xl font-bold" style={GRAD_TEXT}>₦{total.toLocaleString()}</span>
-              </div>
-              {hasUnavailable && (
-                <p className="text-amber-500 text-xs mt-1">Unavailable items excluded from total</p>
-              )}
-            </div>
-
-            {/* Checkout button */}
-            <Link href={hasUnavailable ? "#" : "/checkout"}
-              onClick={e => { if (hasUnavailable) e.preventDefault(); }}>
-              <button
-                disabled={hasUnavailable}
-                className={`w-full py-4 font-semibold text-sm rounded-full flex items-center justify-center gap-2 transition-all tap-scale ${
-                  hasUnavailable
-                    ? "bg-stone-100 text-stone-400 cursor-not-allowed"
-                    : "text-white shadow-lg shadow-teal-200/60"
-                }`}
-                style={hasUnavailable ? {} : { background: TEAL }}>
-                {hasUnavailable
-                  ? "Remove unavailable items first"
-                  : <> Checkout Now <ArrowRight className="w-4 h-4" /></>
-                }
-              </button>
-            </Link>
-          </div>
+            )}
+          </>
         )}
 
       </div>

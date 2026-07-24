@@ -23,6 +23,28 @@ class OrderSerializer(serializers.ModelSerializer):
     buyer_username = serializers.ReadOnlyField(source='buyer.username')
     buyer_profile_picture = serializers.SerializerMethodField()
     dispute = serializers.SerializerMethodField()
+    items = serializers.SerializerMethodField()
+
+    def get_items(self, obj):
+        # Phase 2 — Frontend Integration: itemized breakdown for a multi-item
+        # (menu/food) order — the id here is what
+        # orders/{id}/items/{item_id}/mark-unavailable/ (Step 6) expects.
+        # Empty list for every single-item order (nothing to break down).
+        return [
+            {
+                'id': item.id,
+                'listing_title': item.listing.title,
+                'quantity': item.quantity,
+                'unit_price': str(item.unit_price_at_order_time),
+                'line_total': str(item.line_total),
+                'status': item.status,
+                'addons': [
+                    {'name': a.name_snapshot, 'price_delta': str(a.price_delta_snapshot)}
+                    for a in item.selected_addons.all()
+                ],
+            }
+            for item in obj.items.select_related('listing').prefetch_related('selected_addons').all()
+        ]
 
     def get_buyer_profile_picture(self, obj):
         try:
@@ -70,7 +92,7 @@ class OrderSerializer(serializers.ModelSerializer):
             'amount', 'quantity', 'status', 'current_status', 'estimated_time',
             'delivery_location', 'created_at', 'paid_at',
             'vendor_accepted_at', 'service_started_at', 'seller_completed_at', 'buyer_confirmed_at',
-            'delivery_proof_1', 'delivery_proof_2', 'dispute',
+            'delivery_proof_1', 'delivery_proof_2', 'dispute', 'items',
         ]
         read_only_fields = [
             'reference', 'amount', 'quantity', 'status', 'current_status', 'estimated_time',

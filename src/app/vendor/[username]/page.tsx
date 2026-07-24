@@ -15,6 +15,7 @@ import { GRAD, TEAL, PURPLE } from "@/lib/tokens";
 import { useAdminMode } from "@/hooks/useAdminMode";
 import { useCart } from "@/lib/cartStore";
 import { useAuth } from "@/lib/authStore";
+import AddonPickerModal, { AddonGroupData } from "@/components/cart/AddonPickerModal";
 
 /* ── helpers ───────────────────────────────────────────────────────────── */
 
@@ -54,6 +55,7 @@ export default function VendorProfilePage() {
   const [loading,  setLoading]  = useState(true);
   const [tab,      setTab]      = useState<Tab>("listings");
 
+  const [addonPicker, setAddonPicker] = useState<{ listing: { id: number; title: string; price: number }; groups: AddonGroupData[] } | null>(null);
   const [toast,        setToast]        = useState("");
   const [adminToast,   setAdminToast]   = useState("");
   const [adminLoading, setAdminLoading] = useState<string | null>(null);
@@ -201,6 +203,16 @@ export default function VendorProfilePage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* ── Add-on picker modal (menu items with customization) ── */}
+      {addonPicker && (
+        <AddonPickerModal
+          listing={addonPicker.listing}
+          addonGroups={addonPicker.groups}
+          onClose={() => setAddonPicker(null)}
+          onAdded={() => flash("Added to cart")}
+        />
+      )}
 
       {/* ── Admin notify modal ── */}
       {notifyOpen && (
@@ -400,6 +412,11 @@ export default function VendorProfilePage() {
                               <button onClick={e => {
                                   e.preventDefault();
                                   if (isService) { router.push(`/listing/${listing.id}`); return; }
+                                  const groups: AddonGroupData[] = listing.menu_item?.addon_groups || [];
+                                  if (groups.length > 0) {
+                                    setAddonPicker({ listing: { id: listing.id, title: listing.title, price: effPrice }, groups });
+                                    return;
+                                  }
                                   addToCart({ id: listing.id, title: listing.title, price: effPrice, img: listing.image || "" });
                                   flash(inCart ? "Added again" : "Added to cart");
                                 }}
@@ -423,6 +440,11 @@ export default function VendorProfilePage() {
                         <div className="px-3 pb-3 sm:hidden">
                           <button onClick={() => {
                               if (isService) { router.push(`/listing/${listing.id}`); return; }
+                              const groups: AddonGroupData[] = listing.menu_item?.addon_groups || [];
+                              if (groups.length > 0) {
+                                setAddonPicker({ listing: { id: listing.id, title: listing.title, price: effPrice }, groups });
+                                return;
+                              }
                               addToCart({ id: listing.id, title: listing.title, price: effPrice, img: listing.image || "" });
                               flash(inCart ? "Added again" : "Added to cart");
                             }}

@@ -135,6 +135,25 @@ export default function OrdersPage() {
   const [tick, setTick] = useState(0);
   const [chatLoading, setChatLoading] = useState<number | null>(null);
   const [actionLoading, setActionLoading] = useState<number | null>(null);
+  const [markingItem, setMarkingItem] = useState<number | null>(null);
+
+  const handleMarkUnavailable = async (order: any, itemId: number) => {
+    if (!confirm("Mark this item unavailable? The buyer will be refunded for it automatically.")) return;
+    setMarkingItem(itemId);
+    setError("");
+    try {
+      const res = await api.orders.markItemUnavailable(order.id, itemId);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { setError(data.detail || "Could not mark item unavailable."); return; }
+      queryClient.setQueryData<any[]>(["vendor-orders"], prev =>
+        prev ? prev.map(o => o.id === order.id
+          ? { ...o, items: (o.items || []).map((it: any) => it.id === itemId ? { ...it, status: "unavailable" } : it) }
+          : o
+        ) : prev
+      );
+    } catch { setError("Network error. Please try again."); }
+    finally { setMarkingItem(null); }
+  };
 
   const runOrderAction = async (
     order: any,
@@ -253,6 +272,34 @@ export default function OrdersPage() {
                   {order.delivery_location || <span className="text-stone-400 italic">No delivery location set</span>}
                 </p>
               </div>
+
+              {!!order.items?.length && !["completed", "cancelled", "vendor_declined"].includes(order.status) && (
+                <div className="mb-3 space-y-1.5">
+                  {order.items.map((item: any) => (
+                    <div key={item.id} className="flex items-center justify-between gap-2 bg-stone-50 rounded-xl px-3 py-2">
+                      <div className="min-w-0">
+                        <p className={`text-xs font-medium ${item.status === "unavailable" ? "text-stone-400 line-through" : "text-stone-700"}`}>
+                          {item.listing_title} × {item.quantity}
+                        </p>
+                        {item.addons?.length > 0 && (
+                          <p className="text-[11px] text-stone-400 truncate">{item.addons.map((a: any) => a.name).join(", ")}</p>
+                        )}
+                      </div>
+                      {item.status === "fulfilled" ? (
+                        <button
+                          onClick={() => handleMarkUnavailable(order, item.id)}
+                          disabled={markingItem === item.id}
+                          className="text-[11px] font-semibold text-red-500 bg-red-50 px-2.5 py-1 rounded-full flex-shrink-0 disabled:opacity-50 hover:bg-red-100 transition"
+                        >
+                          {markingItem === item.id ? "…" : "Mark Unavailable"}
+                        </button>
+                      ) : (
+                        <span className="text-[11px] font-semibold text-red-500 flex-shrink-0">Refunded</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
               {order.status === "paid" && !order.vendor_accepted_at && (
                 <div className="flex gap-2">
                   <button

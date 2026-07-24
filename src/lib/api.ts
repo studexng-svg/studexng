@@ -257,6 +257,41 @@ export const api = {
 
     adminDelete: (id: number | string) =>
       fetchWithAuth(u(`/api/admin/listings/${id}/`), { method: "DELETE" }),
+
+    // ── Menu management (Phase 1 Step 2 / Phase 2 integration) ──────────────
+    menuCategories: () => fetchWithAuth(u("/api/services/menu-categories/")),
+    createMenuCategory: (body: Record<string, unknown>) =>
+      fetchWithAuth(u("/api/services/menu-categories/"), { method: "POST", body: s(body) }),
+    updateMenuCategory: (id: number | string, body: Record<string, unknown>) =>
+      fetchWithAuth(u(`/api/services/menu-categories/${id}/`), { method: "PATCH", body: s(body) }),
+    deleteMenuCategory: (id: number | string) =>
+      fetchWithAuth(u(`/api/services/menu-categories/${id}/`), { method: "DELETE" }),
+    reorderMenuCategories: (items: { id: number; display_order: number }[]) =>
+      fetchWithAuth(u("/api/services/menu-categories/reorder/"), { method: "POST", body: s({ items }) }),
+
+    menuItems: () => fetchWithAuth(u("/api/services/menu-items/")),
+    createMenuItem: (body: Record<string, unknown>) =>
+      fetchWithAuth(u("/api/services/menu-items/"), { method: "POST", body: s(body) }),
+    updateMenuItem: (id: number | string, body: Record<string, unknown>) =>
+      fetchWithAuth(u(`/api/services/menu-items/${id}/`), { method: "PATCH", body: s(body) }),
+    deleteMenuItem: (id: number | string) =>
+      fetchWithAuth(u(`/api/services/menu-items/${id}/`), { method: "DELETE" }),
+
+    addonGroups: () => fetchWithAuth(u("/api/services/addon-groups/")),
+    createAddonGroup: (body: Record<string, unknown>) =>
+      fetchWithAuth(u("/api/services/addon-groups/"), { method: "POST", body: s(body) }),
+    updateAddonGroup: (id: number | string, body: Record<string, unknown>) =>
+      fetchWithAuth(u(`/api/services/addon-groups/${id}/`), { method: "PATCH", body: s(body) }),
+    deleteAddonGroup: (id: number | string) =>
+      fetchWithAuth(u(`/api/services/addon-groups/${id}/`), { method: "DELETE" }),
+
+    addons: () => fetchWithAuth(u("/api/services/addons/")),
+    createAddon: (body: Record<string, unknown>) =>
+      fetchWithAuth(u("/api/services/addons/"), { method: "POST", body: s(body) }),
+    updateAddon: (id: number | string, body: Record<string, unknown>) =>
+      fetchWithAuth(u(`/api/services/addons/${id}/`), { method: "PATCH", body: s(body) }),
+    deleteAddon: (id: number | string) =>
+      fetchWithAuth(u(`/api/services/addons/${id}/`), { method: "DELETE" }),
   },
 
   // ─── Orders ───────────────────────────────────────────────────────────────
@@ -287,6 +322,9 @@ export const api = {
         method: "PATCH",
         body: body instanceof FormData ? body : body ? s(body) : undefined,
       }),
+
+    markItemUnavailable: (orderId: number | string, itemId: number | string) =>
+      fetchWithAuth(u(`/api/orders/orders/${orderId}/items/${itemId}/mark-unavailable/`), { method: "POST" }),
 
     bookings: () => fetchWithAuth(u("/api/orders/bookings/")),
 
@@ -350,6 +388,13 @@ export const api = {
     earnings: () => fetchWithAuth(u("/api/payments/seller/earnings/")),
 
     transactions: () => fetchWithAuth(u("/api/payments/seller/transactions/")),
+
+    // ── Vendor-scoped cart checkout (Phase 1 Step 3/4 / Phase 2 integration) ──
+    initializeCart: (body: Record<string, unknown>) =>
+      fetchWithAuth(u("/api/payments/initialize-cart/"), { method: "POST", body: s(body) }),
+
+    verifyCart: (body: Record<string, unknown>) =>
+      fetchWithAuth(u("/api/payments/verify-cart/"), { method: "POST", body: s(body) }),
   },
 
   // ─── Cart ─────────────────────────────────────────────────────────────────
@@ -367,6 +412,14 @@ export const api = {
       fetchWithAuth(u(`/api/cart/update/${id}/`), { method: "PATCH", body: s(body) }),
 
     clear: () => fetchWithAuth(u("/api/cart/clear/"), { method: "POST" }),
+
+    // ── Per-line (by CartItem id) actions — needed once a listing can have
+    // several add-on-distinct cart lines (Phase 1 Step 3 / Phase 2 integration) ──
+    updateItem: (cartItemId: number | string, body: Record<string, unknown>) =>
+      fetchWithAuth(u(`/api/cart/items/${cartItemId}/update/`), { method: "PATCH", body: s(body) }),
+
+    removeItem: (cartItemId: number | string) =>
+      fetchWithAuth(u(`/api/cart/items/${cartItemId}/remove/`), { method: "DELETE" }),
   },
 
   // ─── Wishlist ─────────────────────────────────────────────────────────────
@@ -710,6 +763,27 @@ export const api = {
         method: "POST",
         body: s({ user_ids: userIds }),
       }),
+
+    // ── Batch templates & delivery batches (Phase 1 Step 7 / Phase 2 integration) ──
+    batchTemplates: (vendorId?: number | string) =>
+      fetchWithAuth(u(`/api/admin/batch-templates/${vendorId ? "?vendor_id=" + vendorId : ""}`)),
+
+    createBatchTemplate: (body: Record<string, unknown>) =>
+      fetchWithAuth(u("/api/admin/batch-templates/"), { method: "POST", body: s(body) }),
+
+    updateBatchTemplate: (id: number | string, body: Record<string, unknown>) =>
+      fetchWithAuth(u(`/api/admin/batch-templates/${id}/`), { method: "PATCH", body: s(body) }),
+
+    deleteBatchTemplate: (id: number | string) =>
+      fetchWithAuth(u(`/api/admin/batch-templates/${id}/`), { method: "DELETE" }),
+
+    deliveryBatches: (params?: { vendor_id?: string; campus?: string; batch_date?: string }) => {
+      const qs = params ? "?" + new URLSearchParams(params as Record<string, string>) : "";
+      return fetchWithAuth(u(`/api/admin/delivery-batches/${qs}`));
+    },
+
+    updateDeliveryBatch: (id: number | string, body: Record<string, unknown>) =>
+      fetchWithAuth(u(`/api/admin/delivery-batches/${id}/`), { method: "PATCH", body: s(body) }),
   },
 
   delivery: {
@@ -717,6 +791,8 @@ export const api = {
       fetchWithAuth(u(`/api/delivery/pickup-points/${campus ? "?campus=" + campus : ""}`)),
 
     myAssignments: () => fetchWithAuth(u("/api/delivery/my-assignments/")),
+
+    myBatches: () => fetchWithAuth(u("/api/delivery/my-batches/")),
 
     updateStatus: (assignmentId: number | string, newStatus: string) =>
       fetchWithAuth(u(`/api/delivery/assignments/${assignmentId}/update-status/`), {

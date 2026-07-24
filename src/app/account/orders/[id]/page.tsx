@@ -55,11 +55,22 @@ function useElapsed(isoDate?: string | null) {
   return elapsed;
 }
 
+interface OrderLineItem {
+  id: number;
+  listing_title: string;
+  quantity: number;
+  unit_price: string;
+  line_total: string;
+  status: "fulfilled" | "unavailable";
+  addons: { name: string; price_delta: string }[];
+}
+
 interface Order {
   id: number;
   reference: string;
   listing: { id: number; title: string; vendor: { id: number; username: string } };
   amount: number;
+  items?: OrderLineItem[];
   created_at: string;
   paid_at?: string | null;
   vendor_accepted_at?: string | null;
@@ -425,10 +436,34 @@ export default function OrderDetailPage() {
             <Package className="w-5 h-5 text-teal-600" /> Order Info
           </h3>
           <div className="space-y-3">
-            <div className="flex justify-between py-2 border-b border-stone-50">
-              <span className="text-sm text-stone-400">Item</span>
-              <span className="font-semibold text-stone-800 text-sm">{order.listing?.title}</span>
-            </div>
+            {order.items && order.items.length > 0 ? (
+              <div className="py-2 border-b border-stone-50 space-y-2">
+                <span className="text-sm text-stone-400">Items</span>
+                {order.items.map(item => (
+                  <div key={item.id} className="flex justify-between items-start gap-2 pl-1">
+                    <div className="min-w-0">
+                      <p className={`text-sm font-medium ${item.status === "unavailable" ? "text-stone-400 line-through" : "text-stone-800"}`}>
+                        {item.listing_title} × {item.quantity}
+                      </p>
+                      {item.addons.length > 0 && (
+                        <p className="text-xs text-stone-400">{item.addons.map(a => a.name).join(", ")}</p>
+                      )}
+                      {item.status === "unavailable" && (
+                        <p className="text-xs text-red-500 font-medium">Unavailable — refunded</p>
+                      )}
+                    </div>
+                    <span className="font-semibold text-stone-700 text-sm flex-shrink-0">
+                      ₦{parseFloat(item.line_total).toLocaleString()}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex justify-between py-2 border-b border-stone-50">
+                <span className="text-sm text-stone-400">Item</span>
+                <span className="font-semibold text-stone-800 text-sm">{order.listing?.title}</span>
+              </div>
+            )}
             <div className="flex justify-between py-2 border-b border-stone-50">
               <span className="text-sm text-stone-400">Vendor</span>
               <span className="font-semibold text-stone-800 text-sm">{order.listing?.vendor?.username}</span>

@@ -296,6 +296,43 @@ class ListingSerializer(serializers.ModelSerializer):
             data['deal'] = None
         if getattr(self, '_variant_warnings', None):
             data['variant_warnings'] = self._variant_warnings
+        # Phase 2 — Frontend Integration: expose the MenuItem extension (if
+        # any) on the same public listing payload the buyer menu page and
+        # cart already fetch, so add-on groups/options are reachable without
+        # a separate endpoint. Null for every non-menu listing. Archived
+        # items are omitted entirely (retired from the active menu); hidden
+        # ones are still included (same convention as Listing.is_available
+        # already being shown, greyed out, rather than hidden from the list).
+        try:
+            menu_item = instance.menu_item
+            if menu_item.is_archived:
+                data['menu_item'] = None
+            else:
+                data['menu_item'] = {
+                    'is_hidden': menu_item.is_hidden,
+                    'prep_time_minutes': menu_item.prep_time_minutes,
+                    'allergens': menu_item.allergens,
+                    'menu_category': menu_item.menu_category.name if menu_item.menu_category_id else None,
+                    'addon_groups': [
+                        {
+                            'id': group.id,
+                            'name': group.name,
+                            'is_required': group.is_required,
+                            'min_selections': group.min_selections,
+                            'max_selections': group.max_selections,
+                            'addons': [
+                                {
+                                    'id': addon.id, 'name': addon.name,
+                                    'price_delta': str(addon.price_delta), 'is_available': addon.is_available,
+                                }
+                                for addon in group.addons.all()
+                            ],
+                        }
+                        for group in menu_item.addon_groups.all()
+                    ],
+                }
+        except Exception:
+            data['menu_item'] = None
         return data
 
     def get_is_reserved(self, obj):

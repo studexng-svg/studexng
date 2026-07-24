@@ -9,7 +9,7 @@ import { api } from "@/lib/api";
 import {
   MessageCircle, Calendar, DollarSign, Package, ShoppingBag,
   Star, LayoutDashboard, Link2, Share2, Check, History,
-  MessageSquare, AlertCircle, ChevronRight, LogOut, Menu, X, ChevronLeft, Users,
+  MessageSquare, AlertCircle, ChevronRight, LogOut, Menu, X, ChevronLeft, Users, ChefHat,
 } from "lucide-react";
 
 const TABS = [
@@ -17,6 +17,7 @@ const TABS = [
   { id: "messages",  label: "Messages",  icon: MessageCircle,   href: "/vendor/dashboard/messages"  },
   { id: "bookings",  label: "Bookings",  icon: Calendar,        href: "/vendor/dashboard/bookings"  },
   { id: "listings",  label: "Listings",  icon: Package,         href: "/vendor/dashboard/listings"  },
+  { id: "menu",      label: "Menu",      icon: ChefHat,         href: "/vendor/dashboard/menu"      },
   { id: "orders",    label: "Orders",    icon: ShoppingBag,     href: "/vendor/dashboard/orders"    },
   { id: "customers", label: "Customers", icon: Users,           href: "/vendor/dashboard/customers" },
   { id: "disputes",  label: "Disputes",  icon: AlertCircle,     href: "/vendor/dashboard/disputes"  },

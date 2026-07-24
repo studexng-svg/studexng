@@ -224,6 +224,29 @@ class AddToCartWithAddonsTests(TestCase):
         self.assertEqual(item.selected_addons.count(), 1)
         self.assertEqual(item.selected_addons.first().price_delta_at_add_time, Decimal('300.00'))
 
+    def test_cart_effective_price_matches_true_checkout_price_not_bare_listing_price(self):
+        """
+        Regression test (Phase 2 integration): found via a live end-to-end
+        smoke test that CartItemSerializer.effective_price was returning the
+        bare listing.price (ignoring selected add-ons entirely) — a real
+        display/charge mismatch, since payments.cart_checkout computes the
+        fee on the combined (base + add-on deltas) amount, not the bare
+        listing price. effective_price must equal what checkout will
+        actually charge for this line.
+        """
+        from payments.pricing import calculate_final_price
+
+        self.client.post(
+            '/api/cart/add/', {'listing_id': self.listing.id, 'quantity': 1, 'addon_ids': [self.chicken.id]},
+            format='json',
+        )
+        response = self.client.get('/api/cart/')
+        row = response.data[0]
+
+        expected = calculate_final_price(Decimal('1500.00') + Decimal('300.00'))  # payout_amount is None -> falls back to price
+        self.assertEqual(Decimal(str(row['effective_price'])), expected)
+        self.assertNotEqual(Decimal(str(row['effective_price'])), Decimal(str(row['price'])))  # bare listing price alone would be wrong
+
     def test_different_addon_selections_create_separate_lines(self):
         r1 = self.client.post(
             '/api/cart/add/', {'listing_id': self.listing.id, 'quantity': 1, 'addon_ids': [self.chicken.id]},
