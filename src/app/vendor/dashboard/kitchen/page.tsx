@@ -113,28 +113,12 @@ export default function VendorKitchenPage() {
         setError(Object.values(d)[0]?.toString() || "Could not create dish.");
         return;
       }
-      const listing = await listingRes.json();
-
-      const menuItemRes = await api.services.createMenuItem({ listing: listing.id });
-      if (!menuItemRes.ok) {
-        const d = await menuItemRes.json().catch(() => ({}));
-        setError(Object.values(d)[0]?.toString() || "Dish was created, but could not set it up as a menu item.");
-        return;
-      }
+      // The backend attaches the MenuItem automatically for a menu-ordering
+      // vendor the instant the listing is created — no separate call needed.
 
       setShowDishForm(false);
       setDishForm(emptyDishForm);
       flash("Dish added! Add its options below.");
-      await loadAll();
-    } catch { setError("Network error."); }
-    finally { setSaving(false); }
-  };
-
-  const attachExistingListing = async (listingId: number) => {
-    setSaving(true); setError("");
-    try {
-      const res = await api.services.createMenuItem({ listing: listingId });
-      if (!res.ok) { const d = await res.json(); setError(Object.values(d)[0]?.toString() || "Could not add to kitchen."); return; }
       await loadAll();
     } catch { setError("Network error."); }
     finally { setSaving(false); }
@@ -273,7 +257,6 @@ export default function VendorKitchenPage() {
     );
   }
 
-  const listingsWithoutDish = listings.filter(l => !menuItems.some(m => m.listing === l.id));
   const sortedCategories = [...categories].sort((a, b) => a.display_order - b.display_order);
 
   return (
@@ -406,25 +389,6 @@ export default function VendorKitchenPage() {
           </div>
         )}
       </section>
-
-      {/* ── Advanced: bring an existing listing into the kitchen ── */}
-      {listingsWithoutDish.length > 0 && (
-        <section className="bg-white border border-stone-200 rounded-2xl p-4">
-          <p className="font-bold text-stone-900 text-sm mb-1">Add an existing listing to your kitchen</p>
-          <p className="text-stone-400 text-xs mb-3">These were created before Kitchen existed — pull them in to add options and pricing here.</p>
-          <div className="space-y-1.5">
-            {listingsWithoutDish.map(l => (
-              <div key={l.id} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-stone-50">
-                <span className="flex-1 text-sm font-medium text-stone-800 truncate">{l.title}</span>
-                <span className="text-xs text-stone-400">₦{Number(l.price).toLocaleString()}</span>
-                <button onClick={() => attachExistingListing(l.id)} disabled={saving} className="px-3 py-1 rounded-full text-white text-xs font-semibold disabled:opacity-50" style={{ background: TEAL }}>
-                  Add to Kitchen
-                </button>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
 
       {/* ── Add Dish modal ── */}
       {showDishForm && (

@@ -158,12 +158,21 @@ class ListingSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         from payments.pricing import calculate_final_price
         from payments.settlement import get_vendor_type
+        vendor_type = get_vendor_type(validated_data.get('vendor'))
         validated_data['price'] = calculate_final_price(
             validated_data['payout_amount'], campus=validated_data.get('campus'),
-            vendor_type=get_vendor_type(validated_data.get('vendor')),
+            vendor_type=vendor_type,
         )
         instance = super().create(validated_data)
         self._variant_warnings = self._sync_variants(instance, self.initial_data.get('variants'))
+        # UX fix: a menu-ordering vendor's listings are always kitchen-
+        # manageable the instant they're created — no separate "attach this
+        # listing to your kitchen" step. MenuItem fields (category, prep
+        # time, allergens, add-ons) start empty; the vendor fills them in
+        # from Kitchen directly. No-op for every other vendor type.
+        if vendor_type and vendor_type.supports_menu_ordering:
+            from .models import MenuItem
+            MenuItem.objects.get_or_create(listing=instance)
         return instance
 
     def update(self, instance, validated_data):
