@@ -588,7 +588,7 @@ def initialize_payment(request):
 def initialize_cart_payment(request):
     """
     POST /api/payments/initialize-cart/
-    Body: { vendor_id, delivery_location?, batch_id? }
+    Body: { vendor_id, delivery_location?, batch_id?, cart_amount? }
 
     batch_id is the buyer's preferred DeliveryBatch (Phase 1 — Food Commerce
     Engine, Step 4), only meaningful for a vendor with
@@ -602,6 +602,13 @@ def initialize_cart_payment(request):
     scheduling/inventory) and pricing (item + selected add-ons, campus+
     vendor-type fee hierarchy) are re-derived entirely server-side — never
     trusted from the client.
+
+    cart_amount (optional) is the total the buyer last saw in their cart —
+    same FR-16/re-validation pattern initialize_payment already applies to
+    single-listing cart_amount: if it no longer matches the freshly-computed
+    total (an item or add-on price changed underneath the buyer), the
+    request is rejected with the same message rather than silently charging
+    a different amount.
     """
     vendor_id = request.data.get("vendor_id")
     if not vendor_id:
@@ -612,6 +619,18 @@ def initialize_cart_payment(request):
         priced_lines, total_amount, vendor_type = price_vendor_cart(request.user, vendor_id)
     except CartCheckoutError as e:
         return Response({"error": e.detail}, status=400)
+
+    cart_amount_raw = request.data.get("cart_amount")
+    if cart_amount_raw:
+        try:
+            client_amount = Decimal(str(cart_amount_raw))
+        except Exception:
+            client_amount = None
+        if client_amount is not None and abs(client_amount - total_amount) > Decimal("0.01"):
+            return Response(
+                {"error": "Cart total does not match. Please refresh your cart and try again."},
+                status=400,
+            )
 
     # Phase 1 — Food Commerce Engine, Step 4 (Delivery Batch Reservation):
     # fail fast, before charging the buyer, if this is a batching vendor with

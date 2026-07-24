@@ -100,6 +100,34 @@ class InitializeCartPaymentTests(CartPaymentViewsTestBase):
         response = self.client.post('/api/payments/initialize-cart/', {}, format='json')
         self.assertEqual(response.status_code, 400)
 
+    @patch('payments.views.requests.post')
+    def test_stale_cart_amount_rejected(self, mock_post):
+        """FR-16: a price change since the buyer last saw their cart total is rejected, not silently charged."""
+        CartItem.objects.create(user=self.buyer, listing=self.listing_a, quantity=1)
+        response = self.client.post(
+            '/api/payments/initialize-cart/',
+            {'vendor_id': self.vendor_a.id, 'cart_amount': '1.00'}, format='json',
+        )
+        self.assertEqual(response.status_code, 400)
+        mock_post.assert_not_called()
+
+    @patch('payments.views.requests.post')
+    def test_matching_cart_amount_accepted(self, mock_post):
+        mock_post.return_value = self._mock_init_response()
+        CartItem.objects.create(user=self.buyer, listing=self.listing_a, quantity=1)
+        response = self.client.post(
+            '/api/payments/initialize-cart/',
+            {'vendor_id': self.vendor_a.id, 'cart_amount': '3240.00'}, format='json',
+        )
+        self.assertEqual(response.status_code, 200)
+
+    @patch('payments.views.requests.post')
+    def test_cart_amount_omitted_still_works(self, mock_post):
+        mock_post.return_value = self._mock_init_response()
+        CartItem.objects.create(user=self.buyer, listing=self.listing_a, quantity=1)
+        response = self.client.post('/api/payments/initialize-cart/', {'vendor_id': self.vendor_a.id}, format='json')
+        self.assertEqual(response.status_code, 200)
+
 
 class VerifyCartPaymentTests(CartPaymentViewsTestBase):
     @patch('payments.views.requests.get')
