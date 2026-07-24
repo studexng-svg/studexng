@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { TEAL, toArray } from "@/lib/tokens";
+import { compressImage } from "@/lib/utils";
 import { HEADING_FONT, LoadingSpinner, EmptyState } from "../_shared";
-import { Plus, Pencil, Trash2, X, ChefHat, Layers, Tag } from "lucide-react";
+import { Plus, Pencil, Trash2, X, ChefHat, Tag, ImagePlus } from "lucide-react";
 
 interface MenuCategory { id: number; name: string; display_order: number; is_active: boolean; }
 interface Addon { id: number; group: number; name: string; price_delta: string; is_available: boolean; display_order: number; }
@@ -16,30 +17,37 @@ interface MenuItem {
   availability_window_start: string | null; availability_window_end: string | null;
   addon_groups: AddonGroup[];
 }
-interface Listing { id: number; title: string; price: string; is_available: boolean; }
+interface Listing { id: number; title: string; price: string; is_available: boolean; image?: string | null; }
 
+const emptyDishForm = { title: "", description: "", price: "", image: null as File | null, imagePreview: null as string | null };
 const emptyCategoryForm = { name: "", display_order: 0, is_active: true };
-const emptyMenuItemForm = {
-  listing: 0, menu_category: "" as number | "", prep_time_minutes: "", allergens: "", ingredients: "",
+const emptyItemDetailsForm = {
+  menu_category: "" as number | "", prep_time_minutes: "", allergens: "", ingredients: "",
   is_seasonal: false, availability_window_start: "", availability_window_end: "",
 };
 const emptyGroupForm = { name: "", is_required: false, min_selections: 0, max_selections: 1, display_order: 0 };
 const emptyAddonForm = { name: "", price_delta: "0", is_available: true, display_order: 0 };
 
-export default function VendorMenuPage() {
+export default function VendorKitchenPage() {
   const [loading, setLoading] = useState(true);
   const [notEnabled, setNotEnabled] = useState(false);
   const [error, setError] = useState("");
+  const [toast, setToast] = useState("");
 
   const [categories, setCategories] = useState<MenuCategory[]>([]);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [listings, setListings] = useState<Listing[]>([]);
+  const [foodCategorySlug, setFoodCategorySlug] = useState<string | null>(null);
 
-  const [catModal, setCatModal] = useState<{ editing: MenuCategory | null } | null>(null);
+  const [showDishForm, setShowDishForm] = useState(false);
+  const [dishForm, setDishForm] = useState(emptyDishForm);
+
+  const [showCatModal, setShowCatModal] = useState(false);
   const [catForm, setCatForm] = useState(emptyCategoryForm);
+  const [editingCat, setEditingCat] = useState<MenuCategory | null>(null);
 
-  const [itemModal, setItemModal] = useState<{ listingId: number; editing: MenuItem | null } | null>(null);
-  const [itemForm, setItemForm] = useState(emptyMenuItemForm);
+  const [detailsModal, setDetailsModal] = useState<MenuItem | null>(null);
+  const [detailsForm, setDetailsForm] = useState(emptyItemDetailsForm);
 
   const [groupModal, setGroupModal] = useState<{ menuItemId: number; editing: AddonGroup | null } | null>(null);
   const [groupForm, setGroupForm] = useState(emptyGroupForm);
@@ -50,20 +58,25 @@ export default function VendorMenuPage() {
   const [expanded, setExpanded] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
 
+  const flash = (msg: string) => { setToast(msg); setTimeout(() => setToast(""), 2200); };
+
   const loadAll = async () => {
     try {
-      const [catRes, itemRes, listRes] = await Promise.all([
+      const [catRes, itemRes, listRes, marketplaceCatRes] = await Promise.all([
         api.services.menuCategories(),
         api.services.menuItems(),
         api.services.listingsAuth({ page_size: "500" }),
+        api.services.categoriesAuth(), // authenticated — resolves the vendor's own campus, not a default
       ]);
       if (catRes.status === 403 || itemRes.status === 403) { setNotEnabled(true); return; }
       setCategories(toArray(await catRes.json()));
       setMenuItems(toArray(await itemRes.json()));
-      const allListings: Listing[] = toArray(await listRes.json());
-      setListings(allListings);
+      setListings(toArray(await listRes.json()));
+      const marketplaceCats = toArray(await marketplaceCatRes.json());
+      const food = marketplaceCats.find((c: any) => (c.slug || "").toLowerCase() === "food" || (c.title || "").toLowerCase() === "food");
+      setFoodCategorySlug(food?.slug || marketplaceCats[0]?.slug || null);
     } catch {
-      setError("Could not load your menu. Please refresh.");
+      setError("Could not load your kitchen. Please refresh.");
     } finally {
       setLoading(false);
     }
@@ -71,38 +84,65 @@ export default function VendorMenuPage() {
 
   useEffect(() => { loadAll(); }, []);
 
-  // ── Categories ──────────────────────────────────────────────────────────
-  const openCategoryCreate = () => { setCatForm(emptyCategoryForm); setCatModal({ editing: null }); };
-  const openCategoryEdit = (c: MenuCategory) => { setCatForm({ name: c.name, display_order: c.display_order, is_active: c.is_active }); setCatModal({ editing: c }); };
+  // ── Add Dish — creates the Listing and its MenuItem together in one step ──
+  const pickDishImage = async (file?: File) => {
+    if (!file) return;
+    const compressed = await compressImage(file);
+    setDishForm(f => ({ ...f, image: compressed, imagePreview: URL.createObjectURL(compressed) }));
+  };
 
-  const saveCategory = async () => {
-    if (!catForm.name.trim()) { setError("Category name is required."); return; }
+  const saveDish = async () => {
+    if (!dishForm.title.trim() || !dishForm.price) { setError("Name and price are required."); return; }
+    if (!foodCategorySlug) { setError("No category available — please contact support."); return; }
     setSaving(true); setError("");
     try {
-      const res = catModal?.editing
-        ? await api.services.updateMenuCategory(catModal.editing.id, catForm)
-        : await api.services.createMenuCategory(catForm);
-      if (!res.ok) { const d = await res.json(); setError(Object.values(d)[0]?.toString() || "Could not save category."); return; }
-      setCatModal(null);
+      const fd = new FormData();
+      fd.append("title", dishForm.title.trim());
+      fd.append("description", dishForm.description.trim() || dishForm.title.trim());
+      fd.append("payout_amount", dishForm.price);
+      fd.append("category", foodCategorySlug);
+      fd.append("listing_type", "product");
+      fd.append("track_inventory", "false");
+      fd.append("stock_quantity", "0");
+      fd.append("discount_percent", "0");
+      if (dishForm.image) fd.append("image", dishForm.image);
+
+      const listingRes = await api.services.createListing(fd);
+      if (!listingRes.ok) {
+        const d = await listingRes.json().catch(() => ({}));
+        setError(Object.values(d)[0]?.toString() || "Could not create dish.");
+        return;
+      }
+      const listing = await listingRes.json();
+
+      const menuItemRes = await api.services.createMenuItem({ listing: listing.id });
+      if (!menuItemRes.ok) {
+        const d = await menuItemRes.json().catch(() => ({}));
+        setError(Object.values(d)[0]?.toString() || "Dish was created, but could not set it up as a menu item.");
+        return;
+      }
+
+      setShowDishForm(false);
+      setDishForm(emptyDishForm);
+      flash("Dish added! Add its options below.");
       await loadAll();
     } catch { setError("Network error."); }
     finally { setSaving(false); }
   };
 
-  const deleteCategory = async (id: number) => {
-    if (!confirm("Delete this category? Items in it will become uncategorized.")) return;
-    await api.services.deleteMenuCategory(id);
-    await loadAll();
+  const attachExistingListing = async (listingId: number) => {
+    setSaving(true); setError("");
+    try {
+      const res = await api.services.createMenuItem({ listing: listingId });
+      if (!res.ok) { const d = await res.json(); setError(Object.values(d)[0]?.toString() || "Could not add to kitchen."); return; }
+      await loadAll();
+    } catch { setError("Network error."); }
+    finally { setSaving(false); }
   };
 
-  // ── Menu items ──────────────────────────────────────────────────────────
-  const openItemCreate = (listingId: number) => {
-    setItemForm(emptyMenuItemForm);
-    setItemModal({ listingId, editing: null });
-  };
-  const openItemEdit = (item: MenuItem) => {
-    setItemForm({
-      listing: item.listing,
+  // ── Item details (category, prep time, allergens, etc.) ──────────────────
+  const openDetails = (item: MenuItem) => {
+    setDetailsForm({
       menu_category: item.menu_category ?? "",
       prep_time_minutes: item.prep_time_minutes?.toString() ?? "",
       allergens: (item.allergens || []).join(", "),
@@ -111,26 +151,24 @@ export default function VendorMenuPage() {
       availability_window_start: item.availability_window_start || "",
       availability_window_end: item.availability_window_end || "",
     });
-    setItemModal({ listingId: item.listing, editing: item });
+    setDetailsModal(item);
   };
 
-  const saveMenuItem = async () => {
+  const saveDetails = async () => {
+    if (!detailsModal) return;
     setSaving(true); setError("");
-    const body: Record<string, unknown> = {
-      menu_category: itemForm.menu_category || null,
-      prep_time_minutes: itemForm.prep_time_minutes ? Number(itemForm.prep_time_minutes) : null,
-      allergens: itemForm.allergens.split(",").map(a => a.trim()).filter(Boolean),
-      ingredients: itemForm.ingredients,
-      is_seasonal: itemForm.is_seasonal,
-      availability_window_start: itemForm.availability_window_start || null,
-      availability_window_end: itemForm.availability_window_end || null,
-    };
     try {
-      const res = itemModal?.editing
-        ? await api.services.updateMenuItem(itemModal.editing.id, body)
-        : await api.services.createMenuItem({ ...body, listing: itemModal!.listingId });
-      if (!res.ok) { const d = await res.json(); setError(Object.values(d)[0]?.toString() || "Could not save menu item."); return; }
-      setItemModal(null);
+      const res = await api.services.updateMenuItem(detailsModal.id, {
+        menu_category: detailsForm.menu_category || null,
+        prep_time_minutes: detailsForm.prep_time_minutes ? Number(detailsForm.prep_time_minutes) : null,
+        allergens: detailsForm.allergens.split(",").map(a => a.trim()).filter(Boolean),
+        ingredients: detailsForm.ingredients,
+        is_seasonal: detailsForm.is_seasonal,
+        availability_window_start: detailsForm.availability_window_start || null,
+        availability_window_end: detailsForm.availability_window_end || null,
+      });
+      if (!res.ok) { const d = await res.json(); setError(Object.values(d)[0]?.toString() || "Could not save."); return; }
+      setDetailsModal(null);
       await loadAll();
     } catch { setError("Network error."); }
     finally { setSaving(false); }
@@ -142,8 +180,32 @@ export default function VendorMenuPage() {
   };
 
   const toggleArchived = async (item: MenuItem) => {
-    if (!item.is_archived && !confirm("Archive this menu item? It will be removed from the active menu but kept for order history.")) return;
+    if (!item.is_archived && !confirm("Remove this dish from the active menu? It's kept for past order history.")) return;
     await api.services.updateMenuItem(item.id, { is_archived: !item.is_archived });
+    await loadAll();
+  };
+
+  // ── Menu categories (optional grouping, e.g. "Rice Dishes") ───────────────
+  const openCategoryCreate = () => { setCatForm(emptyCategoryForm); setEditingCat(null); setShowCatModal(true); };
+  const openCategoryEdit = (c: MenuCategory) => { setCatForm({ name: c.name, display_order: c.display_order, is_active: c.is_active }); setEditingCat(c); setShowCatModal(true); };
+
+  const saveCategory = async () => {
+    if (!catForm.name.trim()) { setError("Category name is required."); return; }
+    setSaving(true); setError("");
+    try {
+      const res = editingCat
+        ? await api.services.updateMenuCategory(editingCat.id, catForm)
+        : await api.services.createMenuCategory(catForm);
+      if (!res.ok) { const d = await res.json(); setError(Object.values(d)[0]?.toString() || "Could not save category."); return; }
+      setShowCatModal(false);
+      await loadAll();
+    } catch { setError("Network error."); }
+    finally { setSaving(false); }
+  };
+
+  const deleteCategory = async (id: number) => {
+    if (!confirm("Delete this category? Dishes in it become uncategorized.")) return;
+    await api.services.deleteMenuCategory(id);
     await loadAll();
   };
 
@@ -183,10 +245,9 @@ export default function VendorMenuPage() {
   const saveAddon = async () => {
     setSaving(true); setError("");
     try {
-      const body = { ...addonForm, price_delta: addonForm.price_delta };
       const res = addonModal?.editing
-        ? await api.services.updateAddon(addonModal.editing.id, body)
-        : await api.services.createAddon({ ...body, group: addonModal!.groupId });
+        ? await api.services.updateAddon(addonModal.editing.id, addonForm)
+        : await api.services.createAddon({ ...addonForm, group: addonModal!.groupId });
       if (!res.ok) { const d = await res.json(); setError(Object.values(d)[0]?.toString() || "Could not save add-on."); return; }
       setAddonModal(null);
       await loadAll();
@@ -206,83 +267,51 @@ export default function VendorMenuPage() {
     return (
       <div className="bg-white border border-stone-200 rounded-2xl p-10 text-center">
         <ChefHat className="w-10 h-10 text-stone-200 mx-auto mb-3" />
-        <p className="font-bold text-stone-900">Menu management isn't enabled for your account</p>
+        <p className="font-bold text-stone-900">Kitchen isn't enabled for your account</p>
         <p className="text-stone-400 text-sm mt-1">This feature is only available to vendor types that support menu-based ordering.</p>
       </div>
     );
   }
 
-  const listingsWithoutMenu = listings.filter(l => !menuItems.some(m => m.listing === l.id));
+  const listingsWithoutDish = listings.filter(l => !menuItems.some(m => m.listing === l.id));
   const sortedCategories = [...categories].sort((a, b) => a.display_order - b.display_order);
 
   return (
     <div className="pb-4 space-y-6">
+      {toast && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full font-semibold text-white text-sm z-50 shadow-xl" style={{ background: TEAL }}>
+          {toast}
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-bold mb-0.5">Catalog</p>
-          <h2 className="font-black text-stone-900 text-xl tracking-tight" style={HEADING_FONT}>Menu Management</h2>
+          <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-bold mb-0.5">Manage</p>
+          <h2 className="font-black text-stone-900 text-xl tracking-tight" style={HEADING_FONT}>Kitchen</h2>
+          <p className="text-stone-400 text-xs mt-0.5">{menuItems.length} {menuItems.length === 1 ? "dish" : "dishes"}</p>
         </div>
+        <button onClick={() => { setDishForm(emptyDishForm); setError(""); setShowDishForm(true); }}
+          className="flex items-center gap-1.5 px-4 py-2 text-white rounded-full font-semibold text-sm transition active:scale-95" style={{ background: TEAL }}>
+          <Plus className="w-4 h-4" /> Add Dish
+        </button>
       </div>
 
       {error && <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-600">{error}</div>}
 
-      {/* ── Categories ── */}
-      <section className="bg-white border border-stone-200 rounded-2xl p-4">
-        <div className="flex items-center justify-between mb-3">
-          <p className="font-bold text-stone-900 text-sm flex items-center gap-2"><Tag className="w-4 h-4 text-teal-600" /> Categories</p>
-          <button onClick={openCategoryCreate} className="flex items-center gap-1 px-3 py-1.5 rounded-full text-white text-xs font-semibold" style={{ background: TEAL }}>
-            <Plus className="w-3.5 h-3.5" /> Add
-          </button>
-        </div>
-        {sortedCategories.length === 0 ? (
-          <p className="text-stone-400 text-sm py-4 text-center">No categories yet — items will show as uncategorized.</p>
-        ) : (
-          <div className="space-y-1.5">
-            {sortedCategories.map(c => (
-              <div key={c.id} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-stone-50">
-                <span className="flex-1 text-sm font-medium text-stone-800">{c.name}</span>
-                {!c.is_active && <span className="text-[10px] font-bold text-stone-400 bg-stone-200 px-2 py-0.5 rounded-full">Inactive</span>}
-                <span className="text-[10px] text-stone-400">order {c.display_order}</span>
-                <button onClick={() => openCategoryEdit(c)} className="p-1.5 text-stone-400 hover:text-stone-700"><Pencil className="w-3.5 h-3.5" /></button>
-                <button onClick={() => deleteCategory(c.id)} className="p-1.5 text-red-400 hover:text-red-600"><Trash2 className="w-3.5 h-3.5" /></button>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-
-      {/* ── Listings not yet on the menu ── */}
-      {listingsWithoutMenu.length > 0 && (
-        <section className="bg-white border border-stone-200 rounded-2xl p-4">
-          <p className="font-bold text-stone-900 text-sm mb-3">Add a listing to your menu</p>
-          <p className="text-stone-400 text-xs mb-3">
-            Create the listing itself under <span className="font-semibold">Listings</span> first — then attach menu details (category, allergens, add-ons) here.
-          </p>
-          <div className="space-y-1.5">
-            {listingsWithoutMenu.map(l => (
-              <div key={l.id} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-stone-50">
-                <span className="flex-1 text-sm font-medium text-stone-800 truncate">{l.title}</span>
-                <span className="text-xs text-stone-400">₦{Number(l.price).toLocaleString()}</span>
-                <button onClick={() => openItemCreate(l.id)} className="px-3 py-1 rounded-full text-white text-xs font-semibold" style={{ background: TEAL }}>
-                  Add to Menu
-                </button>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* ── Menu items ── */}
-      <section className="space-y-3">
-        <p className="font-bold text-stone-900 text-sm flex items-center gap-2 px-1"><Layers className="w-4 h-4 text-teal-600" /> Menu Items</p>
-        {menuItems.length === 0 ? (
-          <EmptyState icon={ChefHat} message="No menu items yet" />
-        ) : (
-          menuItems.map(item => {
+      {/* ── Dishes ── */}
+      {menuItems.length === 0 ? (
+        <EmptyState icon={ChefHat} message="No dishes yet — tap Add Dish to create your first one" />
+      ) : (
+        <div className="space-y-3">
+          {menuItems.map(item => {
             const isOpen = expanded === item.id;
+            const listing = listings.find(l => l.id === item.listing);
             return (
               <div key={item.id} className="bg-white border border-stone-200 rounded-2xl overflow-hidden">
                 <div className="p-4 flex items-center gap-3 cursor-pointer" onClick={() => setExpanded(isOpen ? null : item.id)}>
+                  <div className="w-12 h-12 rounded-xl overflow-hidden bg-stone-50 flex-shrink-0 flex items-center justify-center">
+                    {listing?.image ? <img src={listing.image} alt="" className="w-full h-full object-cover" /> : <ChefHat className="w-5 h-5 text-stone-300" />}
+                  </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-stone-900 text-sm truncate">{item.listing_title}</p>
                     <p className="text-xs text-stone-400">
@@ -291,7 +320,7 @@ export default function VendorMenuPage() {
                       {item.is_archived && <span className="ml-2 text-stone-500 font-semibold">Archived</span>}
                     </p>
                   </div>
-                  <button onClick={(e) => { e.stopPropagation(); openItemEdit(item); }} className="p-1.5 text-stone-400 hover:text-stone-700"><Pencil className="w-3.5 h-3.5" /></button>
+                  <button onClick={(e) => { e.stopPropagation(); openDetails(item); }} className="p-1.5 text-stone-400 hover:text-stone-700"><Pencil className="w-3.5 h-3.5" /></button>
                 </div>
 
                 {isOpen && (
@@ -303,19 +332,19 @@ export default function VendorMenuPage() {
                       </button>
                       <button onClick={() => toggleArchived(item)}
                         className={`flex-1 py-2 rounded-xl text-xs font-semibold transition ${item.is_archived ? "bg-stone-200 text-stone-600" : "bg-red-50 text-red-600"}`}>
-                        {item.is_archived ? "Restore" : "Archive"}
+                        {item.is_archived ? "Restore" : "Remove from menu"}
                       </button>
                     </div>
 
                     <div className="flex items-center justify-between">
-                      <p className="text-xs font-bold text-stone-500 uppercase tracking-wide">Add-on Groups</p>
+                      <p className="text-xs font-bold text-stone-500 uppercase tracking-wide">Add-ons & Prices</p>
                       <button onClick={() => openGroupCreate(item.id)} className="flex items-center gap-1 px-2.5 py-1 rounded-full text-white text-xs font-semibold" style={{ background: TEAL }}>
-                        <Plus className="w-3 h-3" /> Group
+                        <Plus className="w-3 h-3" /> Add-on group
                       </button>
                     </div>
 
                     {item.addon_groups.length === 0 ? (
-                      <p className="text-stone-400 text-xs">No add-on groups — this item has no customization options.</p>
+                      <p className="text-stone-400 text-xs">No add-ons yet — e.g. "Choose your protein" with Chicken/Beef options.</p>
                     ) : (
                       <div className="space-y-2">
                         {item.addon_groups.map(g => (
@@ -350,15 +379,118 @@ export default function VendorMenuPage() {
                 )}
               </div>
             );
-          })
+          })}
+        </div>
+      )}
+
+      {/* ── Optional: menu categories (e.g. "Rice Dishes", "Drinks") ── */}
+      <section className="bg-white border border-stone-200 rounded-2xl p-4">
+        <div className="flex items-center justify-between mb-3">
+          <p className="font-bold text-stone-900 text-sm flex items-center gap-2"><Tag className="w-4 h-4 text-teal-600" /> Categories <span className="text-stone-400 font-normal">(optional)</span></p>
+          <button onClick={openCategoryCreate} className="flex items-center gap-1 px-3 py-1.5 rounded-full text-white text-xs font-semibold" style={{ background: TEAL }}>
+            <Plus className="w-3.5 h-3.5" /> Add
+          </button>
+        </div>
+        {sortedCategories.length === 0 ? (
+          <p className="text-stone-400 text-sm py-2">Group your dishes into sections like "Rice Dishes" or "Drinks" — optional.</p>
+        ) : (
+          <div className="space-y-1.5">
+            {sortedCategories.map(c => (
+              <div key={c.id} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-stone-50">
+                <span className="flex-1 text-sm font-medium text-stone-800">{c.name}</span>
+                {!c.is_active && <span className="text-[10px] font-bold text-stone-400 bg-stone-200 px-2 py-0.5 rounded-full">Inactive</span>}
+                <button onClick={() => openCategoryEdit(c)} className="p-1.5 text-stone-400 hover:text-stone-700"><Pencil className="w-3.5 h-3.5" /></button>
+                <button onClick={() => deleteCategory(c.id)} className="p-1.5 text-red-400 hover:text-red-600"><Trash2 className="w-3.5 h-3.5" /></button>
+              </div>
+            ))}
+          </div>
         )}
       </section>
 
+      {/* ── Advanced: bring an existing listing into the kitchen ── */}
+      {listingsWithoutDish.length > 0 && (
+        <section className="bg-white border border-stone-200 rounded-2xl p-4">
+          <p className="font-bold text-stone-900 text-sm mb-1">Add an existing listing to your kitchen</p>
+          <p className="text-stone-400 text-xs mb-3">These were created before Kitchen existed — pull them in to add options and pricing here.</p>
+          <div className="space-y-1.5">
+            {listingsWithoutDish.map(l => (
+              <div key={l.id} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-stone-50">
+                <span className="flex-1 text-sm font-medium text-stone-800 truncate">{l.title}</span>
+                <span className="text-xs text-stone-400">₦{Number(l.price).toLocaleString()}</span>
+                <button onClick={() => attachExistingListing(l.id)} disabled={saving} className="px-3 py-1 rounded-full text-white text-xs font-semibold disabled:opacity-50" style={{ background: TEAL }}>
+                  Add to Kitchen
+                </button>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* ── Add Dish modal ── */}
+      {showDishForm && (
+        <Modal title="Add a Dish" onClose={() => setShowDishForm(false)}>
+          <Field label="Photo (optional)">
+            <label className="w-24 h-24 rounded-xl border-2 border-dashed border-stone-200 flex items-center justify-center cursor-pointer hover:border-teal-400 transition overflow-hidden">
+              {dishForm.imagePreview ? (
+                <img src={dishForm.imagePreview} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <ImagePlus className="w-6 h-6 text-stone-300" />
+              )}
+              <input type="file" accept="image/*" className="hidden" onChange={e => pickDishImage(e.target.files?.[0])} />
+            </label>
+          </Field>
+          <Field label="Dish name">
+            <input value={dishForm.title} onChange={e => setDishForm(f => ({ ...f, title: e.target.value }))} className={inputCls} placeholder="e.g. Fried Rice" />
+          </Field>
+          <Field label="Price (₦)">
+            <input type="number" value={dishForm.price} onChange={e => setDishForm(f => ({ ...f, price: e.target.value }))} className={inputCls} placeholder="e.g. 3000" />
+          </Field>
+          <Field label="Description (optional)">
+            <textarea value={dishForm.description} onChange={e => setDishForm(f => ({ ...f, description: e.target.value }))} rows={2} className={inputCls} placeholder="e.g. Smoky party jollof with plantain" />
+          </Field>
+          <SaveButton saving={saving} onClick={saveDish} label="Add Dish" />
+          <p className="text-xs text-stone-400 text-center">Add options like "Choose your protein" after creating the dish.</p>
+        </Modal>
+      )}
+
+      {/* ── Item details modal (category, prep time, allergens) ── */}
+      {detailsModal && (
+        <Modal title="Dish Details" onClose={() => setDetailsModal(null)}>
+          <Field label="Category">
+            <select value={detailsForm.menu_category} onChange={e => setDetailsForm(f => ({ ...f, menu_category: e.target.value ? Number(e.target.value) : "" }))} className={inputCls}>
+              <option value="">Uncategorized</option>
+              {sortedCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </Field>
+          <Field label="Prep time (minutes, optional)">
+            <input type="number" value={detailsForm.prep_time_minutes} onChange={e => setDetailsForm(f => ({ ...f, prep_time_minutes: e.target.value }))} className={inputCls} />
+          </Field>
+          <Field label="Allergens (comma-separated, optional)">
+            <input value={detailsForm.allergens} onChange={e => setDetailsForm(f => ({ ...f, allergens: e.target.value }))} className={inputCls} placeholder="peanuts, dairy" />
+          </Field>
+          <Field label="Ingredients (optional)">
+            <textarea value={detailsForm.ingredients} onChange={e => setDetailsForm(f => ({ ...f, ingredients: e.target.value }))} rows={2} className={inputCls} />
+          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Available from (optional)">
+              <input type="time" value={detailsForm.availability_window_start} onChange={e => setDetailsForm(f => ({ ...f, availability_window_start: e.target.value }))} className={inputCls} />
+            </Field>
+            <Field label="Available until (optional)">
+              <input type="time" value={detailsForm.availability_window_end} onChange={e => setDetailsForm(f => ({ ...f, availability_window_end: e.target.value }))} className={inputCls} />
+            </Field>
+          </div>
+          <label className="flex items-center gap-2 text-sm text-stone-600">
+            <input type="checkbox" checked={detailsForm.is_seasonal} onChange={e => setDetailsForm(f => ({ ...f, is_seasonal: e.target.checked }))} /> Seasonal item
+          </label>
+          <SaveButton saving={saving} onClick={saveDetails} />
+        </Modal>
+      )}
+
       {/* ── Category modal ── */}
-      {catModal && (
-        <Modal title={catModal.editing ? "Edit Category" : "New Category"} onClose={() => setCatModal(null)}>
+      {showCatModal && (
+        <Modal title={editingCat ? "Edit Category" : "New Category"} onClose={() => setShowCatModal(false)}>
           <Field label="Name">
-            <input value={catForm.name} onChange={e => setCatForm(f => ({ ...f, name: e.target.value }))} className={inputCls} placeholder="e.g. Appetizers" />
+            <input value={catForm.name} onChange={e => setCatForm(f => ({ ...f, name: e.target.value }))} className={inputCls} placeholder="e.g. Rice Dishes" />
           </Field>
           <Field label="Display order">
             <input type="number" value={catForm.display_order} onChange={e => setCatForm(f => ({ ...f, display_order: Number(e.target.value) }))} className={inputCls} />
@@ -367,39 +499,6 @@ export default function VendorMenuPage() {
             <input type="checkbox" checked={catForm.is_active} onChange={e => setCatForm(f => ({ ...f, is_active: e.target.checked }))} /> Active
           </label>
           <SaveButton saving={saving} onClick={saveCategory} />
-        </Modal>
-      )}
-
-      {/* ── Menu item modal ── */}
-      {itemModal && (
-        <Modal title={itemModal.editing ? "Edit Menu Item" : "Add to Menu"} onClose={() => setItemModal(null)}>
-          <Field label="Category">
-            <select value={itemForm.menu_category} onChange={e => setItemForm(f => ({ ...f, menu_category: e.target.value ? Number(e.target.value) : "" }))} className={inputCls}>
-              <option value="">Uncategorized</option>
-              {sortedCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          </Field>
-          <Field label="Prep time (minutes, optional)">
-            <input type="number" value={itemForm.prep_time_minutes} onChange={e => setItemForm(f => ({ ...f, prep_time_minutes: e.target.value }))} className={inputCls} />
-          </Field>
-          <Field label="Allergens (comma-separated, optional)">
-            <input value={itemForm.allergens} onChange={e => setItemForm(f => ({ ...f, allergens: e.target.value }))} className={inputCls} placeholder="peanuts, dairy" />
-          </Field>
-          <Field label="Ingredients (optional)">
-            <textarea value={itemForm.ingredients} onChange={e => setItemForm(f => ({ ...f, ingredients: e.target.value }))} rows={2} className={inputCls} />
-          </Field>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Available from (optional)">
-              <input type="time" value={itemForm.availability_window_start} onChange={e => setItemForm(f => ({ ...f, availability_window_start: e.target.value }))} className={inputCls} />
-            </Field>
-            <Field label="Available until (optional)">
-              <input type="time" value={itemForm.availability_window_end} onChange={e => setItemForm(f => ({ ...f, availability_window_end: e.target.value }))} className={inputCls} />
-            </Field>
-          </div>
-          <label className="flex items-center gap-2 text-sm text-stone-600">
-            <input type="checkbox" checked={itemForm.is_seasonal} onChange={e => setItemForm(f => ({ ...f, is_seasonal: e.target.checked }))} /> Seasonal item
-          </label>
-          <SaveButton saving={saving} onClick={saveMenuItem} />
         </Modal>
       )}
 
@@ -454,11 +553,11 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function SaveButton({ saving, onClick }: { saving: boolean; onClick: () => void }) {
+function SaveButton({ saving, onClick, label = "Save" }: { saving: boolean; onClick: () => void; label?: string }) {
   return (
     <button onClick={onClick} disabled={saving}
       className="w-full py-3 rounded-full font-bold text-white text-sm disabled:opacity-50 transition" style={{ background: TEAL }}>
-      {saving ? "Saving…" : "Save"}
+      {saving ? "Saving…" : label}
     </button>
   );
 }

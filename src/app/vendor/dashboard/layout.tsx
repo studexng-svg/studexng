@@ -17,7 +17,7 @@ const TABS = [
   { id: "messages",  label: "Messages",  icon: MessageCircle,   href: "/vendor/dashboard/messages"  },
   { id: "bookings",  label: "Bookings",  icon: Calendar,        href: "/vendor/dashboard/bookings"  },
   { id: "listings",  label: "Listings",  icon: Package,         href: "/vendor/dashboard/listings"  },
-  { id: "menu",      label: "Menu",      icon: ChefHat,         href: "/vendor/dashboard/menu"      },
+  { id: "kitchen",   label: "Kitchen",   icon: ChefHat,         href: "/vendor/dashboard/kitchen"   },
   { id: "orders",    label: "Orders",    icon: ShoppingBag,     href: "/vendor/dashboard/orders"    },
   { id: "customers", label: "Customers", icon: Users,           href: "/vendor/dashboard/customers" },
   { id: "disputes",  label: "Disputes",  icon: AlertCircle,     href: "/vendor/dashboard/disputes"  },
