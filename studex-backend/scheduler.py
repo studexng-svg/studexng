@@ -1099,6 +1099,58 @@ def recover_stuck_refunds():
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# JOB 16: Generate today's delivery batches from active templates — 00:10 WAT
+# Phase 1 — Food Commerce Engine, Step 4 (Delivery Batch Reservation).
+# ─────────────────────────────────────────────────────────────────────────────
+
+def generate_daily_delivery_batches():
+    """
+    Creates today's DeliveryBatch row for every active BatchTemplate whose
+    days_of_week includes today's weekday (Africa/Lagos calendar day).
+    Editing a template only changes what future days generate — never
+    retroactively touches an already-generated DeliveryBatch (see
+    delivery.models.BatchTemplate).
+
+    Idempotent: get_or_create keyed on (vendor, template, batch_date) — the
+    same tuple DeliveryBatch's own unique_together enforces — so a duplicate
+    run (a server restart, a manual re-trigger) never double-creates a batch
+    or resets one an admin has already same-day-overridden.
+    """
+    from datetime import datetime, timedelta as _timedelta
+    from delivery.models import BatchTemplate, DeliveryBatch
+
+    now_lagos = datetime.now(LAGOS_TZ)
+    today = now_lagos.date()
+    weekday = today.weekday()
+
+    created = 0
+    for template in BatchTemplate.objects.filter(is_active=True):
+        if weekday not in (template.days_of_week or []):
+            continue
+        try:
+            delivery_dt = datetime.combine(today, template.delivery_time, tzinfo=LAGOS_TZ)
+            cutoff_dt = delivery_dt - _timedelta(minutes=template.cutoff_offset_minutes)
+            _, was_created = DeliveryBatch.objects.get_or_create(
+                vendor=template.vendor, template=template, batch_date=today,
+                defaults={
+                    'campus': template.campus,
+                    'display_name': template.display_name,
+                    'delivery_time': delivery_dt,
+                    'cutoff_time': cutoff_dt,
+                    'max_orders': template.max_orders,
+                    'status': 'open',
+                },
+            )
+            if was_created:
+                created += 1
+        except Exception as e:
+            logger.error(f"generate_daily_delivery_batches: failed for template {template.id}: {e}", exc_info=True)
+
+    if created:
+        logger.info(f"generate_daily_delivery_batches: created {created} batch(es) for {today}.")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Scheduler bootstrap — called by StudexConfig.ready()
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -1271,6 +1323,17 @@ def start():
         coalesce=True,
     )
 
+    # 00:10 WAT daily — generate today's delivery batches from active templates
+    scheduler.add_job(
+        generate_daily_delivery_batches,
+        trigger=CronTrigger(hour=0, minute=10, timezone=LAGOS_TZ),
+        id='generate_daily_delivery_batches',
+        name="Generate today's DeliveryBatch rows from active BatchTemplates (00:10 WAT)",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+
     try:
         scheduler.start()
         logger.info(
@@ -1281,7 +1344,7 @@ def start():
             "prompt_rating_reviews (30 min), send_lunch_notifications (Mon-Fri 12:30 WAT), "
             "send_vendor_daily_digest (08:00 WAT), nudge_pending_booking_vendors (30 min), "
             "send_buyer_daily_nudge (Mon-Fri 09:00 WAT), send_buyer_reengagement_nudge (17:00 WAT), "
-            "recover_stuck_refunds (5 min)."
+            "recover_stuck_refunds (5 min), generate_daily_delivery_batches (00:10 WAT)."
         )
     except Exception as e:
         logger.error(f"Failed to start scheduler: {e}", exc_info=True)

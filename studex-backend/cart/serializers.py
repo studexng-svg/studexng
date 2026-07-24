@@ -2,6 +2,13 @@ from rest_framework import serializers
 from .models import CartItem
 
 
+class CartItemAddonSerializer(serializers.Serializer):
+    """Read-only nested view of a cart line's selected add-ons (Phase 1 — Food Commerce Engine, Step 3)."""
+    id = serializers.IntegerField(source='addon.id')
+    name = serializers.CharField(source='addon.name')
+    price_delta = serializers.DecimalField(source='price_delta_at_add_time', max_digits=10, decimal_places=2)
+
+
 class CartItemSerializer(serializers.ModelSerializer):
     listing_id = serializers.IntegerField(source='listing.id', read_only=True)
     title = serializers.CharField(source='listing.title', read_only=True)
@@ -13,6 +20,13 @@ class CartItemSerializer(serializers.ModelSerializer):
     is_single_stock = serializers.SerializerMethodField()
     deal_discount_percent = serializers.SerializerMethodField()
     effective_price = serializers.SerializerMethodField()
+    # Phase 1 — Food Commerce Engine, Step 3: a cart can hold lines from
+    # several vendors at once (checkout itself is what's vendor-scoped — see
+    # payments/cart_checkout.py) — these let the frontend group cart display
+    # by vendor and identify which vendor_id to pass to checkout.
+    vendor_id = serializers.IntegerField(source='listing.vendor_id', read_only=True)
+    vendor_username = serializers.CharField(source='listing.vendor.username', read_only=True)
+    selected_addons = CartItemAddonSerializer(many=True, read_only=True)
 
     class Meta:
         model = CartItem
@@ -20,6 +34,7 @@ class CartItemSerializer(serializers.ModelSerializer):
             'id', 'listing_id', 'title',
             'price', 'effective_price', 'deal_discount_percent',
             'img', 'quantity', 'reserved_at', 'stock_quantity', 'is_single_stock',
+            'vendor_id', 'vendor_username', 'addon_signature', 'selected_addons',
         ]
 
     def get_img(self, obj):

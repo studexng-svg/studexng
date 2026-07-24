@@ -5,15 +5,31 @@ from django.http import HttpResponse
 from django.db.models import Sum
 from datetime import timedelta
 import csv
-from .models import Order, Dispute
+from .models import Order, Dispute, OrderItem, OrderItemAddon
 from delivery.admin import DeliveryAssignmentInline
 from delivery.contracts import notify_rider_assignment
 from delivery.models import DeliveryAssignment
 
 
+class OrderItemInline(admin.TabularInline):
+    """
+    Read-only — an OrderItem is a frozen historical snapshot (Phase 1 —
+    Food Commerce Engine). Empty for every order that predates this phase,
+    or any single-item order after it.
+    """
+    model = OrderItem
+    extra = 0
+    fields = ('listing', 'quantity', 'unit_price_at_order_time', 'line_total', 'status')
+    readonly_fields = fields
+    can_delete = False
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
 @admin.register(Order)
 class OrderAdmin(admin.ModelAdmin):
-    inlines = [DeliveryAssignmentInline]
+    inlines = [DeliveryAssignmentInline, OrderItemInline]
     list_display = [
         'reference', 'buyer', 'get_seller', 'listing',
         'amount', 'colored_status', 'created_at'
@@ -305,3 +321,31 @@ class DisputeAdmin(admin.ModelAdmin):
 
         return response
     export_to_csv.short_description = "Export selected to CSV"
+
+
+# ── Phase 1: Food Commerce Engine — multi-item order breakdown ────────────────
+# Both read-only: OrderItem/OrderItemAddon are frozen historical snapshots,
+# never hand-edited — the standalone registrations exist for search/filtering
+# across orders, complementing the inline on OrderAdmin above.
+
+class OrderItemAddonInline(admin.TabularInline):
+    model = OrderItemAddon
+    extra = 0
+    fields = ('name_snapshot', 'price_delta_snapshot', 'addon')
+    readonly_fields = fields
+    can_delete = False
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(OrderItem)
+class OrderItemAdmin(admin.ModelAdmin):
+    list_display = ['order', 'listing', 'quantity', 'unit_price_at_order_time', 'line_total', 'status']
+    list_filter = ['status']
+    search_fields = ['order__reference', 'listing__title']
+    readonly_fields = ['order', 'listing', 'quantity', 'unit_price_at_order_time', 'line_total', 'created_at']
+    inlines = [OrderItemAddonInline]
+
+    def has_add_permission(self, request):
+        return False

@@ -577,6 +577,312 @@ def initialize_payment(request):
     })
 
 
+# ─────────────────────────────────────────
+# INITIALIZE CART PAYMENT (vendor-scoped)
+# Phase 1 — Food Commerce Engine, Step 3. A separate, additive checkout path
+# for multi-item cart orders — does not modify initialize_payment above.
+# ─────────────────────────────────────────
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def initialize_cart_payment(request):
+    """
+    POST /api/payments/initialize-cart/
+    Body: { vendor_id, delivery_location?, batch_id? }
+
+    batch_id is the buyer's preferred DeliveryBatch (Phase 1 — Food Commerce
+    Engine, Step 4), only meaningful for a vendor with
+    VendorType.supports_batched_delivery — optional; the reservation service
+    auto-selects the next eligible batch if omitted or unavailable. Ignored
+    entirely for a non-batching vendor.
+
+    Prices and validates only the buyer's cart lines belonging to one
+    vendor — every other vendor's cart items are left untouched (see
+    payments.cart_checkout). Availability (hidden/moderation/archived/
+    scheduling/inventory) and pricing (item + selected add-ons, campus+
+    vendor-type fee hierarchy) are re-derived entirely server-side — never
+    trusted from the client.
+    """
+    vendor_id = request.data.get("vendor_id")
+    if not vendor_id:
+        return Response({"error": "vendor_id is required."}, status=400)
+
+    from payments.cart_checkout import price_vendor_cart, CartCheckoutError
+    try:
+        priced_lines, total_amount, vendor_type = price_vendor_cart(request.user, vendor_id)
+    except CartCheckoutError as e:
+        return Response({"error": e.detail}, status=400)
+
+    # Phase 1 — Food Commerce Engine, Step 4 (Delivery Batch Reservation):
+    # fail fast, before charging the buyer, if this is a batching vendor with
+    # nothing open right now. Read-only — no capacity is reserved here; the
+    # real (race-safe) reservation happens at verify time, same as every
+    # other piece of this checkout's pricing/availability being re-checked
+    # fresh at verify rather than trusted from initialize.
+    anchor_listing = priced_lines[0]['listing']
+    from delivery.capacity import vendor_uses_batched_delivery, has_eligible_batch
+    if vendor_uses_batched_delivery(anchor_listing.vendor) and not has_eligible_batch(anchor_listing.vendor, anchor_listing.campus):
+        return Response({"error": "No delivery slots are currently available for this vendor. Please try again later."}, status=400)
+
+    total_amount_kobo = int(total_amount * 100)
+    if total_amount_kobo < 10000:  # Paystack minimum is ₦100 (10000 kobo)
+        return Response({"error": "Amount is below the minimum transaction value."}, status=400)
+
+    batch_id = request.data.get("batch_id")
+    reference = f"STX-CART-{uuid.uuid4().hex[:14].upper()}"
+
+    # Same "gross-up" bound as initialize_payment — the exact amount Paystack
+    # will charge the customer when "pass fees to customer" is enabled.
+    _rate = Decimal("0.015")
+    _flat = Decimal("100") if total_amount >= Decimal("2500") else Decimal("0")
+    _gross = ((total_amount + _flat) / (1 - _rate)).quantize(Decimal("0.01"))
+    _gross_kobo = int(_gross * 100)
+
+    cache.set(f'pay_init:{reference}', {
+        'min_kobo': total_amount_kobo,
+        'max_kobo': _gross_kobo + 50,
+    }, 3600)
+
+    delivery_location = request.data.get("delivery_location", "")
+    callback_url = (
+        request.data.get("callback_url")
+        or getattr(settings, "PAYSTACK_CALLBACK_URL", "")
+        or None
+    )
+
+    payload = {
+        "email": request.user.email,
+        "amount": total_amount_kobo,
+        "reference": reference,
+        "metadata": {
+            "vendor_id": str(vendor_id),
+            "buyer_id": request.user.id,
+            "type": "menu_cart",
+            "delivery_location": delivery_location,
+            "batch_id": str(batch_id) if batch_id else "",
+        },
+    }
+    if callback_url:
+        payload["callback_url"] = callback_url
+
+    secret_key = (getattr(settings, "PAYSTACK_SECRET_KEY", "") or "").strip()
+    if not secret_key:
+        return Response({"error": "Payment gateway not configured."}, status=503)
+
+    headers = {"Authorization": f"Bearer {secret_key}", "Content-Type": "application/json"}
+    try:
+        res = requests.post(f"{PAYSTACK_BASE}/transaction/initialize", headers=headers, json=payload, timeout=15)
+    except Exception as e:
+        logger.error(f"Paystack cart initialize request failed: {e}")
+        return Response({"error": "Payment initialization failed."}, status=500)
+
+    if res.status_code not in [200, 201]:
+        logger.error(f"Paystack cart init error {res.status_code}: {res.text[:300]}")
+        return Response({"error": "Payment initialization failed."}, status=500)
+
+    res_json = res.json()
+    if not res_json.get("status"):
+        paystack_msg = res_json.get("message", "Unknown Paystack error")
+        logger.error(f"Paystack cart init rejected: {paystack_msg}")
+        return Response({"error": f"Payment initialization failed: {paystack_msg}"}, status=500)
+
+    data = res_json.get("data", {})
+    if not data.get("access_code"):
+        logger.error(f"Paystack cart init: no access_code in response data: {data}")
+        return Response({"error": "Payment initialization failed: no access code returned."}, status=500)
+
+    return Response({
+        "authorization_url": data.get("authorization_url"),
+        "access_code": data.get("access_code"),
+        "reference": data.get("reference", reference),
+        "amount_kobo": total_amount_kobo,
+        "vendor_id": vendor_id,
+        "item_count": len(priced_lines),
+    })
+
+
+# ─────────────────────────────────────────
+# VERIFY CART PAYMENT (vendor-scoped)
+# Phase 1 — Food Commerce Engine, Step 3.
+# ─────────────────────────────────────────
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def verify_cart_payment(request):
+    """
+    POST /api/payments/verify-cart/
+    Body: { reference, vendor_id, delivery_location?, batch_id? }
+
+    Mirrors verify_payment's integrity checks (email ownership, amount
+    bounds) then creates one Order + OrderItem/OrderItemAddon rows per cart
+    line via payments.cart_checkout, and removes only that vendor's cart
+    lines — every other vendor's cart items are untouched. For a batching
+    vendor, also reserves delivery capacity (Step 4) inside the same atomic
+    order-creation block — see create_order_from_priced_lines.
+    """
+    reference = request.data.get("reference")
+    vendor_id = request.data.get("vendor_id")
+    if not reference or not vendor_id:
+        return Response({"error": "reference and vendor_id are required."}, status=400)
+
+    existing = PaymentTransaction.objects.filter(reference=reference, status="success").first()
+    if existing and existing.order_id:
+        return Response({"order_id": existing.order_id, "message": "Already processed."})
+
+    try:
+        secret_key = (getattr(settings, "PAYSTACK_SECRET_KEY", "") or "").strip()
+        headers = {"Authorization": f"Bearer {secret_key}", "Content-Type": "application/json"}
+        verify_res = requests.get(f"{PAYSTACK_BASE}/transaction/verify/{reference}", headers=headers, timeout=15)
+    except Exception as e:
+        logger.error(f"Paystack cart verify request failed: {e}")
+        return Response({"error": "Payment verification failed. Contact support."}, status=400)
+
+    if verify_res.status_code != 200:
+        return Response({"error": "Payment verification failed."}, status=400)
+
+    verify_data = verify_res.json()
+    if not verify_data.get("status") or verify_data.get("data", {}).get("status") != "success":
+        return Response({"error": "Payment was not completed successfully."}, status=400)
+
+    paystack_data = verify_data["data"]
+
+    # ── Ownership check ───────────────────────────────────────────────────
+    paystack_email = paystack_data.get("customer", {}).get("email", "")
+    if paystack_email.lower() != request.user.email.lower():
+        logger.warning(f"verify_cart_payment: email mismatch on {reference}")
+        return Response({"error": "Payment was not made by this account."}, status=403)
+
+    # ── Vendor integrity check ────────────────────────────────────────────
+    meta_vendor_id = str((paystack_data.get("metadata") or {}).get("vendor_id", "") or "")
+    if meta_vendor_id and str(vendor_id) != meta_vendor_id:
+        logger.warning(f"verify_cart_payment: vendor_id mismatch on {reference}")
+        return Response({"error": "Payment reference does not match this vendor."}, status=400)
+
+    # ── Re-price the cart fresh (never trust the amount that was initialized —
+    # the cart may have changed since) and re-check the amount-integrity bounds ──
+    from payments.cart_checkout import price_vendor_cart, CartCheckoutError, create_order_from_priced_lines
+    try:
+        priced_lines, total_amount, vendor_type = price_vendor_cart(request.user, vendor_id)
+    except CartCheckoutError as e:
+        return Response({"error": f"Payment received but order failed: {e.detail}", "reference": reference}, status=500)
+
+    actual_kobo = int(paystack_data.get("amount", 0))
+    pay_init = cache.get(f'pay_init:{reference}')
+    min_kobo = pay_init.get('min_kobo') if isinstance(pay_init, dict) else None
+    max_kobo = pay_init.get('max_kobo') if isinstance(pay_init, dict) else None
+
+    if min_kobo is None:
+        min_kobo = int(total_amount * 100)
+    if max_kobo is None:
+        _rate = Decimal("0.015")
+        _flat = Decimal("100") if total_amount >= Decimal("2500") else Decimal("0")
+        _gross = ((total_amount + _flat) / (1 - _rate)).quantize(Decimal("0.01"))
+        max_kobo = int(_gross * 100) + 50
+
+    if actual_kobo < min_kobo - 1:
+        logger.warning(f"verify_cart_payment: underpayment on {reference}")
+        refund_paystack_transaction(reference, actual_kobo)
+        return Response({
+            "error": "Payment amount is less than the order amount. Your payment has been refunded automatically."
+        }, status=400)
+
+    if actual_kobo > max_kobo:
+        logger.warning(f"verify_cart_payment: overpayment/mismatch on {reference}")
+        refund_paystack_transaction(reference, actual_kobo)
+        return Response({
+            "error": "Payment amount does not match the checkout amount. Your payment has been refunded automatically."
+        }, status=400)
+    # ───────────────────────────────────────────────────────────────────────
+
+    amount_paid = Decimal(str(paystack_data.get("amount", 0))) / 100
+    delivery_location = (
+        request.data.get("delivery_location", "")
+        or (paystack_data.get("metadata") or {}).get("delivery_location", "")
+    )
+    batch_id = (
+        request.data.get("batch_id")
+        or (paystack_data.get("metadata") or {}).get("batch_id")
+        or None
+    )
+
+    # Phase 1 — Food Commerce Engine, Step 4: capacity is reserved inside
+    # create_order_from_priced_lines' own atomic block, race-safe against
+    # every other concurrent checkout for this vendor. If nothing is
+    # eligible (exhausted between initialize's pre-flight check and now, or
+    # the vendor never had any slots), the whole order creation has already
+    # rolled back — refund the buyer exactly like the underpayment/overpayment
+    # paths above, since money was collected but no order was created.
+    from delivery.capacity import NoBatchCapacityError
+    try:
+        order, total_payout_amount = create_order_from_priced_lines(
+            buyer=request.user, priced_lines=priced_lines, reference=reference,
+            amount_paid=amount_paid, delivery_location=delivery_location, batch_id=batch_id,
+        )
+    except NoBatchCapacityError as e:
+        logger.warning(f"verify_cart_payment: no batch capacity for {reference}: {e.detail}")
+        refund_paystack_transaction(reference, actual_kobo)
+        return Response({
+            "error": f"{e.detail} Your payment has been refunded automatically."
+        }, status=400)
+
+    seller = priced_lines[0]['listing'].vendor
+    vendor_amount, platform_amount = split_settlement(amount_paid, total_payout_amount)
+    paystack_fee = calc_paystack_charge_fee(amount_paid)
+    t_fee = calc_transfer_fee(vendor_amount)
+    item_count = order.items.count()
+
+    PaymentTransaction.objects.create(
+        buyer=request.user,
+        seller=seller,
+        paystack_transaction_id=paystack_data.get("id"),
+        reference=reference,
+        amount=amount_paid,
+        seller_amount=vendor_amount,
+        platform_amount=platform_amount,
+        service_charge=platform_amount,
+        paystack_charge_fee=paystack_fee,
+        transfer_fee=t_fee,
+        status="success",
+        order_type="product",
+        buyer_email=request.user.email,
+        buyer_name=request.user.get_full_name() or request.user.username,
+        paystack_response=paystack_data,
+        order_id=order.id,
+    )
+
+    try:
+        from chat.models import Conversation
+        conversation, _ = Conversation.objects.get_or_create(
+            buyer=request.user, seller=seller, listing=order.listing,
+            defaults={'order': order},
+        )
+        if conversation.order_id != order.id:
+            conversation.order = order
+            conversation.save(update_fields=['order'])
+    except Exception as e:
+        logger.warning(f"verify_cart_payment: conversation unlock failed: {e}")
+
+    try:
+        from accounts.utils import send_notification
+        send_notification(
+            recipient=seller, notification_type='new_order',
+            title=f'New Order — {item_count} item(s)',
+            message=(
+                f'{request.user.username} just paid for {item_count} item(s). '
+                f'Your payout of ₦{vendor_amount:,.0f} will be released once the buyer confirms delivery.'
+            ),
+            action_url='/vendor/dashboard', send_email=False,
+        )
+        send_notification(
+            recipient=request.user, notification_type='order_placed',
+            title='Order Confirmed',
+            message=f'Your payment of ₦{amount_paid:,.0f} was successful. The vendor has been notified.',
+            action_url='/account/orders',
+        )
+    except Exception as ne:
+        logger.warning(f"verify_cart_payment: notification failed: {ne}")
+
+    return Response({"order_id": order.id, "message": "Payment verified. Order created."})
 
 
 # ─────────────────────────────────────────

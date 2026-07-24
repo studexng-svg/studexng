@@ -473,4 +473,113 @@ class DealsListView(APIView):
                 'source': 'vendor',
             })
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Phase 1 — Food Commerce Engine: menu management (Step 2)
+#
+# Every ViewSet below is gated by CanManageMenu (services/permissions.py —
+# accounts.VendorType.supports_menu_ordering) and scoped by get_queryset to
+# rows the requesting vendor actually owns. There is no code path here that
+# checks `vendor_type.name == 'food'` — a future Bakery/Grocery/Pharmacy
+# VendorType gets this exact same management layer for free the moment an
+# admin flips its supports_menu_ordering flag (Step 1).
+# ─────────────────────────────────────────────────────────────────────────────
+
+from .models import MenuCategory, MenuItem, AddonGroup, Addon
+from .serializers import (
+    MenuCategorySerializer, MenuItemSerializer, AddonGroupSerializer, AddonSerializer, ReorderSerializer,
+)
+from .permissions import CanManageMenu
+
+
+class ReorderMixin:
+    """
+    Shared bulk drag-and-drop reordering for any ViewSet whose model has a
+    `display_order` field. Only ever touches rows already returned by
+    get_queryset — i.e. only the requesting vendor's own rows — so passing
+    another vendor's id in the payload silently has no effect rather than
+    leaking whether that id exists.
+    """
+    @action(detail=False, methods=['post'])
+    def reorder(self, request):
+        serializer = ReorderSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        items = serializer.validated_data['items']
+
+        owned_ids = set(self.get_queryset().values_list('id', flat=True))
+        model = self.get_queryset().model
+        to_update = []
+        for entry in items:
+            if entry['id'] not in owned_ids:
+                continue
+            obj = model(pk=entry['id'], display_order=entry['display_order'])
+            to_update.append(obj)
+        model.objects.bulk_update(to_update, ['display_order'])
+
+        return Response(self.get_serializer(self.get_queryset(), many=True).data)
+
+
+class MenuCategoryViewSet(ReorderMixin, viewsets.ModelViewSet):
+    """
+    /api/v1/services/menu-categories/ — a vendor's own menu sections.
+    Requires VendorType.supports_menu_ordering=True.
+    """
+    serializer_class = MenuCategorySerializer
+    permission_classes = [IsAuthenticated, CanManageMenu]
+
+    def get_queryset(self):
+        return MenuCategory.objects.filter(vendor=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(vendor=self.request.user)
+
+
+class MenuItemViewSet(viewsets.ModelViewSet):
+    """
+    /api/v1/services/menu-items/ — the catalog-detail extension for one of
+    the vendor's own Listings (services.models.MenuItem). `Listing` itself
+    is managed via the existing ListingViewSet, completely unchanged — this
+    only manages the Phase 1 extension row (allergens, prep time, category,
+    seasonality, hidden/archived, availability window).
+
+    Deliberately does NOT use ReorderMixin: MenuItem has no display_order
+    field of its own — ordering within a category is a MenuCategory-level
+    concern (and, within a category, an AddonGroup/Addon-level concern for
+    their own children). Adding the mixin here would register a `reorder`
+    action that crashes the instant it's called.
+    """
+    serializer_class = MenuItemSerializer
+    permission_classes = [IsAuthenticated, CanManageMenu]
+
+    def get_queryset(self):
+        return (
+            MenuItem.objects.filter(listing__vendor=self.request.user)
+            .select_related('listing', 'menu_category')
+            .prefetch_related('addon_groups__addons')
+        )
+
+
+class AddonGroupViewSet(ReorderMixin, viewsets.ModelViewSet):
+    """/api/v1/services/addon-groups/ — customization prompts on the vendor's own menu items."""
+    serializer_class = AddonGroupSerializer
+    permission_classes = [IsAuthenticated, CanManageMenu]
+
+    def get_queryset(self):
+        return (
+            AddonGroup.objects.filter(menu_item__listing__vendor=self.request.user)
+            .select_related('menu_item__listing')
+            .prefetch_related('addons')
+        )
+
+
+class AddonViewSet(ReorderMixin, viewsets.ModelViewSet):
+    """/api/v1/services/addons/ — individual selectable options within an add-on group."""
+    serializer_class = AddonSerializer
+    permission_classes = [IsAuthenticated, CanManageMenu]
+
+    def get_queryset(self):
+        return Addon.objects.filter(group__menu_item__listing__vendor=self.request.user).select_related(
+            'group__menu_item__listing',
+        )
+
         return Response(list(admin_data) + vendor_data)

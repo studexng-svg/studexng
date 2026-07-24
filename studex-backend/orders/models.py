@@ -40,6 +40,20 @@ class Order(models.Model):
     delivery_location = models.CharField(max_length=200, blank=True, default="")
     delivery_proof_1 = models.URLField(max_length=500, null=True, blank=True)
     delivery_proof_2 = models.URLField(max_length=500, null=True, blank=True)
+    # Phase 1 — Food Commerce Engine, Step 4 (Delivery Batch Reservation).
+    # Null for every order from a vendor that doesn't use batching (i.e.
+    # every order type that existed before this phase, and every non-
+    # batching vendor type after it) — identical to today's behavior in
+    # that case. Set exactly once, at checkout (see
+    # payments.cart_checkout.create_order_from_priced_lines), by the one
+    # reservation service (delivery.capacity) — never written to directly
+    # anywhere else. String FK to avoid a circular import with delivery,
+    # the same convention delivery.models.DeliveryAssignment.order already
+    # uses in reverse.
+    delivery_batch = models.ForeignKey(
+        'delivery.DeliveryBatch', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='reserved_orders',
+    )
 
     def __str__(self):
         return f"Order {self.reference} - {self.buyer.username}"
@@ -48,6 +62,75 @@ class Order(models.Model):
         ordering = ['-created_at']
         verbose_name = "Order"
         verbose_name_plural = "Orders"
+
+
+class OrderItem(models.Model):
+    """
+    The multi-item breakdown for an Order (Phase 1 — Food Commerce Engine).
+    Generic, not Food-specific — any future vendor type whose orders can
+    contain more than one distinct item uses this same table.
+
+    `Order` itself is never modified to support this: `Order.listing` stays
+    required and is set to the *anchor* listing — the first item the buyer
+    added to their cart — which is always the correct vendor/campus for the
+    whole order, since a cart is already constrained to one vendor. Every
+    existing code path that reads `order.listing.vendor`/`.campus` keeps
+    working unchanged. Only code that needs the full itemized breakdown
+    reads `order.items.all()` instead.
+
+    A single-item order (every order type that existed before this phase)
+    has zero OrderItem rows — nothing is backfilled, and `order.items.exists()`
+    is the signal for "does this order have a multi-item breakdown."
+    """
+    STATUS_CHOICES = (
+        ('fulfilled', 'Fulfilled'),
+        ('unavailable', 'Unavailable — Refunded'),
+    )
+
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='items')
+    # PROTECT: a menu item can never be deleted out from under a historical
+    # order — archive it (MenuItem.is_archived) instead.
+    listing = models.ForeignKey(Listing, on_delete=models.PROTECT, related_name='order_items')
+    quantity = models.PositiveIntegerField(default=1)
+    # Frozen at order-creation time — never re-derived from a live Listing
+    # afterward, the same discipline payments.PaymentTransaction already
+    # applies to service_charge/platform_amount.
+    unit_price_at_order_time = models.DecimalField(max_digits=10, decimal_places=2)
+    line_total = models.DecimalField(max_digits=10, decimal_places=2)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='fulfilled')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['order_id', 'id']
+        verbose_name = "Order Item"
+        verbose_name_plural = "Order Items"
+
+    def __str__(self):
+        return f"{self.order.reference} — {self.listing.title} ×{self.quantity}"
+
+
+class OrderItemAddon(models.Model):
+    """
+    A frozen, normalized record of one add-on selected on an OrderItem.
+    Normalized (FK to Addon) rather than a JSON blob so analytics can
+    aggregate "which add-ons sell best" directly; frozen (name_snapshot/
+    price_delta_snapshot) so that record survives even if the live Addon's
+    price changes or the Addon is deleted later (`on_delete=SET_NULL` —
+    the FK goes null, the snapshot fields never change).
+    """
+    order_item = models.ForeignKey(OrderItem, on_delete=models.CASCADE, related_name='selected_addons')
+    addon = models.ForeignKey(
+        'services.Addon', on_delete=models.SET_NULL, null=True, blank=True, related_name='order_selections',
+    )
+    name_snapshot = models.CharField(max_length=100)
+    price_delta_snapshot = models.DecimalField(max_digits=10, decimal_places=2)
+
+    class Meta:
+        verbose_name = "Order Item Add-on"
+        verbose_name_plural = "Order Item Add-ons"
+
+    def __str__(self):
+        return f"{self.order_item} — {self.name_snapshot}"
 
 
 class OrderStatus(models.Model):

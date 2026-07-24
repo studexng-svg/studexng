@@ -6,7 +6,10 @@ from django.http import HttpResponse
 from django.db.models import Count, Sum
 from django import forms
 import csv
-from .models import Category, Listing, ListingVariant, Transaction, VendorOfTheMonth
+from .models import (
+    Category, Listing, ListingVariant, Transaction, VendorOfTheMonth,
+    MenuCategory, MenuItem, AddonGroup, Addon,
+)
 
 
 class CategoryImageForm(forms.ModelForm):
@@ -602,3 +605,35 @@ class VendorOfTheMonthAdmin(admin.ModelAdmin):
     def completion_rate_display(self, obj):
         return f'{obj.completion_rate:.0f}%'
     completion_rate_display.short_description = 'Completion'
+
+
+# ── Phase 1: Food Commerce Engine — menu/add-on management ────────────────────
+
+@admin.register(MenuCategory)
+class MenuCategoryAdmin(admin.ModelAdmin):
+    list_display = ['name', 'vendor', 'display_order', 'is_active']
+    list_filter = ['is_active']
+    search_fields = ['name', 'vendor__username']
+    ordering = ['vendor_id', 'display_order']
+
+
+class AddonInline(admin.TabularInline):
+    model = Addon
+    extra = 0
+    fields = ('name', 'price_delta', 'is_available', 'display_order')
+
+
+@admin.register(AddonGroup)
+class AddonGroupAdmin(admin.ModelAdmin):
+    list_display = ['name', 'menu_item', 'is_required', 'min_selections', 'max_selections', 'display_order']
+    list_filter = ['is_required']
+    search_fields = ['name', 'menu_item__listing__title']
+    inlines = [AddonInline]
+
+
+@admin.register(MenuItem)
+class MenuItemAdmin(admin.ModelAdmin):
+    list_display = ['listing', 'menu_category', 'is_seasonal', 'is_hidden', 'is_archived', 'prep_time_minutes']
+    list_filter = ['is_seasonal', 'is_hidden', 'is_archived']
+    search_fields = ['listing__title']
+    raw_id_fields = ['listing']

@@ -4,11 +4,17 @@ from rest_framework.routers import DefaultRouter
 from .views import CategoryViewSet, ListingViewSet, TransactionViewSet
 from .views import ChangePasswordView, VendorOfMonthView, VendorOfMonthHistoryView, DealsListView
 from .views import PreviewPriceView
+from .views import MenuCategoryViewSet, MenuItemViewSet, AddonGroupViewSet, AddonViewSet
 
 router = DefaultRouter()
 router.register(r'categories', CategoryViewSet, basename='category')
 router.register(r'listings', ListingViewSet, basename='listing')
 router.register(r'transactions', TransactionViewSet, basename='transaction')
+# Phase 1 — Food Commerce Engine: menu management (Step 2)
+router.register(r'menu-categories', MenuCategoryViewSet, basename='menu-category')
+router.register(r'menu-items', MenuItemViewSet, basename='menu-item')
+router.register(r'addon-groups', AddonGroupViewSet, basename='addon-group')
+router.register(r'addons', AddonViewSet, basename='addon')
 
 
 urlpatterns = [

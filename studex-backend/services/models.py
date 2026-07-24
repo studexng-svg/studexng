@@ -209,6 +209,113 @@ class ListingVariant(models.Model):
         return f"{self.listing.title} — {self.title}"
 
 
+class MenuCategory(models.Model):
+    """
+    A vendor's own menu section ("Appetizers," "Mains," "Drinks") — distinct
+    from the global, marketplace-wide `Category`/`Subcategory` browse
+    taxonomy above, which stays untouched and keeps meaning "Food & Drinks"
+    at the marketplace level. Only meaningful for a vendor whose VendorType
+    has `supports_menu_ordering=True` (accounts.VendorType) — nothing
+    enforces that at the database layer, the same way `Listing.campus`
+    isn't validated against the vendor's actual school; it's an application-
+    level convention, checked at the view layer where menu categories are
+    created/edited.
+    """
+    vendor = models.ForeignKey(User, on_delete=models.CASCADE, related_name='menu_categories')
+    name = models.CharField(max_length=100)
+    display_order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['vendor_id', 'display_order', 'id']
+        verbose_name = "Menu Category"
+        verbose_name_plural = "Menu Categories"
+
+    def __str__(self):
+        return f"{self.vendor.username} — {self.name}"
+
+
+class MenuItem(models.Model):
+    """
+    The catalog-detail extension for a Listing that opts into menu-based
+    ordering — kitchen/catalog concerns that don't belong on the shared
+    `Listing` table every vendor type uses (allergens, prep time, combo
+    composition, seasonality). `Listing` itself is never modified by this
+    model: it keeps owning price, payout_amount, campus, vendor, images,
+    search, wishlist, and cart exactly as before. A Listing with no
+    `MenuItem` row is just a plain listing, identical to today.
+
+    Basic availability/inventory (`Listing.is_available`,
+    `Listing.track_inventory`, `Listing.stock_quantity`) is deliberately
+    NOT duplicated here — those already exist on Listing and are reused
+    unchanged. This model only adds fields no other vendor type needs.
+    """
+    listing = models.OneToOneField(Listing, on_delete=models.CASCADE, related_name='menu_item')
+    menu_category = models.ForeignKey(
+        MenuCategory, on_delete=models.SET_NULL, null=True, blank=True, related_name='items',
+    )
+    prep_time_minutes = models.PositiveIntegerField(null=True, blank=True)
+    allergens = models.JSONField(default=list, blank=True, help_text="List of allergen names, e.g. [\"peanuts\", \"dairy\"].")
+    ingredients = models.TextField(blank=True, default='')
+    is_seasonal = models.BooleanField(default=False)
+    is_hidden = models.BooleanField(
+        default=False,
+        help_text="Hidden from buyer browsing without deactivating the underlying listing (e.g. a combo only orderable via a promo link).",
+    )
+    is_archived = models.BooleanField(
+        default=False,
+        help_text="Retired from the active menu but kept for historical order references (OrderItem.listing is PROTECTed).",
+    )
+    availability_window_start = models.TimeField(null=True, blank=True)
+    availability_window_end = models.TimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Menu Item"
+        verbose_name_plural = "Menu Items"
+
+    def __str__(self):
+        return f"Menu item: {self.listing.title}"
+
+
+class AddonGroup(models.Model):
+    """A customization prompt on a menu item ("Choose your protein")."""
+    menu_item = models.ForeignKey(MenuItem, on_delete=models.CASCADE, related_name='addon_groups')
+    name = models.CharField(max_length=100)
+    is_required = models.BooleanField(default=False)
+    min_selections = models.PositiveIntegerField(default=0)
+    max_selections = models.PositiveIntegerField(default=1)
+    display_order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ['menu_item_id', 'display_order', 'id']
+        verbose_name = "Add-on Group"
+        verbose_name_plural = "Add-on Groups"
+
+    def __str__(self):
+        return f"{self.menu_item.listing.title} — {self.name}"
+
+
+class Addon(models.Model):
+    """A single selectable option within an AddonGroup ("Extra cheese +₦200")."""
+    group = models.ForeignKey(AddonGroup, on_delete=models.CASCADE, related_name='addons')
+    name = models.CharField(max_length=100)
+    # Can be zero, or negative for a "remove this ingredient" style option.
+    price_delta = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    is_available = models.BooleanField(default=True)
+    display_order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ['group_id', 'display_order', 'id']
+        verbose_name = "Add-on"
+        verbose_name_plural = "Add-ons"
+
+    def __str__(self):
+        return f"{self.group.name} — {self.name} ({self.price_delta:+})"
+
+
 class Transaction(models.Model):
     STATUS_CHOICES = (
         ('in_escrow', 'In Escrow'),

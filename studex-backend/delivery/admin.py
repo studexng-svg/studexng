@@ -2,7 +2,10 @@ from django.contrib import admin
 from django.utils.html import format_html
 from django.contrib.auth import get_user_model
 from django import forms
-from .models import CampusPickupPoint, DeliveryAssignment, DeliveryVerificationEvent, generate_delivery_code
+from .models import (
+    CampusPickupPoint, DeliveryAssignment, DeliveryVerificationEvent, generate_delivery_code,
+    BatchTemplate, DeliveryBatch,
+)
 
 User = get_user_model()
 
@@ -88,7 +91,7 @@ class DeliveryAssignmentInline(admin.StackedInline):
         'responsibility', 'responsibility_transferred_at',
     ]
     fields = [
-        'rider', 'pickup_point', 'status', 'delivery_code',
+        'rider', 'pickup_point', 'batch', 'status', 'delivery_code',
         'responsibility', 'responsibility_transferred_at',
         'pickup_proof_image', 'completion_proof_image',
         'assigned_at', 'picked_up_at', 'at_pickup_point_at',
@@ -123,7 +126,7 @@ class DeliveryAssignmentAdmin(admin.ModelAdmin):
     ]
     fieldsets = (
         ('Assignment', {
-            'fields': ('order', 'rider', 'pickup_point', 'status'),
+            'fields': ('order', 'rider', 'pickup_point', 'batch', 'status'),
         }),
         ('Responsibility Transfer', {
             'fields': ('responsibility', 'responsibility_transferred_at'),
@@ -211,3 +214,37 @@ class DeliveryVerificationEventAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+# ── Phase 1: Food Commerce Engine — batches ────────────────────────────────────
+
+@admin.register(BatchTemplate)
+class BatchTemplateAdmin(admin.ModelAdmin):
+    list_display = ['display_name', 'vendor', 'campus', 'delivery_time', 'max_orders', 'is_active']
+    list_filter = ['campus', 'is_active']
+    search_fields = ['display_name', 'vendor__username']
+    list_editable = ['is_active']
+
+
+@admin.register(DeliveryBatch)
+class DeliveryBatchAdmin(admin.ModelAdmin):
+    list_display = [
+        'display_name', 'vendor', 'campus', 'batch_date', 'delivery_time',
+        'capacity_display', 'colored_batch_status',
+    ]
+    list_filter = ['campus', 'status', 'batch_date']
+    search_fields = ['display_name', 'vendor__username']
+    readonly_fields = ['current_orders', 'created_at', 'updated_at']
+    ordering = ['-batch_date', 'delivery_time']
+
+    def capacity_display(self, obj):
+        return f'{obj.current_orders} / {obj.max_orders}'
+    capacity_display.short_description = 'Capacity'
+
+    def colored_batch_status(self, obj):
+        colors = {'open': '#10b981', 'full': '#f59e0b', 'closed': '#6b7280', 'suspended': '#ef4444'}
+        return format_html(
+            '<span style="color:{}; font-weight:bold;">{}</span>',
+            colors.get(obj.status, '#6b7280'), obj.get_status_display(),
+        )
+    colored_batch_status.short_description = 'Status'

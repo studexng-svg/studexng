@@ -256,6 +256,21 @@ class VendorType(models.Model):
     settlement_trigger = models.CharField(
         max_length=30, choices=SETTLEMENT_TRIGGER_CHOICES, default='buyer_confirmation',
     )
+    # Capability flags (Phase 1 — Food Commerce Engine). Each gates an
+    # entire optional subsystem behind a checkbox, not a hardcoded
+    # `vendor_type.name == 'food'` check anywhere in application code — the
+    # same "config lives on VendorType, not in code" principle
+    # settlement_trigger already established. A future VendorType (Bakery,
+    # Grocery, Pharmacy, ...) adopts either capability by flipping one field
+    # here; no migration, no deploy.
+    supports_menu_ordering = models.BooleanField(
+        default=False,
+        help_text="Vendors of this type can build a menu (categories, items, add-ons) instead of plain listings.",
+    )
+    supports_batched_delivery = models.BooleanField(
+        default=False,
+        help_text="Vendors of this type can use scheduled Delivery Batches with capacity limits.",
+    )
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

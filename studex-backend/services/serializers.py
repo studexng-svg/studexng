@@ -394,3 +394,122 @@ class DealDetailSerializer(serializers.ModelSerializer):
         return float(obj.discounted_price)
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Phase 1 — Food Commerce Engine: menu management (Step 2)
+#
+# Every serializer below is vendor-scoped by its owning ViewSet's
+# get_queryset (services/views.py) — a vendor literally cannot see another
+# vendor's rows, so cross-vendor ownership never needs re-checking here.
+# What IS validated here is internal consistency: a MenuItem's listing must
+# belong to the requesting vendor, an AddonGroup's menu_item must belong to
+# one of the requesting vendor's listings, and so on — because those are
+# foreign keys the client chooses at write time, not implied by the URL.
+# ─────────────────────────────────────────────────────────────────────────────
+
+from .models import MenuCategory, MenuItem, AddonGroup, Addon
+
+
+class MenuCategorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MenuCategory
+        fields = ['id', 'name', 'display_order', 'is_active']
+        read_only_fields = ['id']
+
+
+class AddonSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Addon
+        fields = ['id', 'group', 'name', 'price_delta', 'is_available', 'display_order']
+        read_only_fields = ['id']
+
+    def validate_group(self, group):
+        request = self.context['request']
+        if group.menu_item.listing.vendor_id != request.user.id:
+            raise serializers.ValidationError("You can only add add-ons to your own menu items.")
+        return group
+
+
+class AddonGroupSerializer(serializers.ModelSerializer):
+    addons = AddonSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = AddonGroup
+        fields = ['id', 'menu_item', 'name', 'is_required', 'min_selections', 'max_selections', 'display_order', 'addons']
+        read_only_fields = ['id']
+
+    def validate_menu_item(self, menu_item):
+        request = self.context['request']
+        if menu_item.listing.vendor_id != request.user.id:
+            raise serializers.ValidationError("You can only add add-on groups to your own menu items.")
+        return menu_item
+
+    def validate(self, data):
+        min_selections = data.get('min_selections', getattr(self.instance, 'min_selections', 0))
+        max_selections = data.get('max_selections', getattr(self.instance, 'max_selections', 1))
+        is_required = data.get('is_required', getattr(self.instance, 'is_required', False))
+
+        if max_selections < 1:
+            raise serializers.ValidationError({'max_selections': 'Must be at least 1.'})
+        if min_selections > max_selections:
+            raise serializers.ValidationError({'min_selections': 'Cannot be greater than max_selections.'})
+        if is_required and min_selections < 1:
+            raise serializers.ValidationError(
+                {'min_selections': 'A required add-on group must have min_selections of at least 1.'}
+            )
+        return data
+
+
+class MenuItemSerializer(serializers.ModelSerializer):
+    addon_groups = AddonGroupSerializer(many=True, read_only=True)
+    listing_title = serializers.CharField(source='listing.title', read_only=True)
+    listing_price = serializers.DecimalField(source='listing.price', max_digits=10, decimal_places=2, read_only=True)
+    listing_is_available = serializers.BooleanField(source='listing.is_available', read_only=True)
+
+    class Meta:
+        model = MenuItem
+        fields = [
+            'id', 'listing', 'listing_title', 'listing_price', 'listing_is_available',
+            'menu_category', 'prep_time_minutes', 'allergens', 'ingredients',
+            'is_seasonal', 'is_hidden', 'is_archived',
+            'availability_window_start', 'availability_window_end',
+            'addon_groups', 'created_at', 'updated_at',
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+    def validate_listing(self, listing):
+        request = self.context['request']
+        if listing.vendor_id != request.user.id:
+            raise serializers.ValidationError("You can only create a menu item for your own listing.")
+        # OneToOneField already enforces this at the DB layer (IntegrityError);
+        # checking here first gives a clean 400 instead of a 500.
+        if self.instance is None and MenuItem.objects.filter(listing=listing).exists():
+            raise serializers.ValidationError("This listing already has a menu item.")
+        return listing
+
+    def validate_menu_category(self, menu_category):
+        if menu_category is None:
+            return menu_category
+        request = self.context['request']
+        if menu_category.vendor_id != request.user.id:
+            raise serializers.ValidationError("You can only use one of your own menu categories.")
+        return menu_category
+
+
+class ReorderItemSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    display_order = serializers.IntegerField()
+
+
+class ReorderSerializer(serializers.Serializer):
+    """Shared bulk-reorder payload for MenuCategory/AddonGroup/Addon (drag-and-drop)."""
+    items = ReorderItemSerializer(many=True)
+
+    def validate_items(self, items):
+        if not items:
+            raise serializers.ValidationError("items must not be empty.")
+        ids = [item['id'] for item in items]
+        if len(ids) != len(set(ids)):
+            raise serializers.ValidationError("Duplicate id in items.")
+        return items
+
+

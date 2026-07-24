@@ -4,9 +4,10 @@ from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
 from django.core.cache import cache
 from django.utils import timezone
-from .models import CartItem
+from .models import CartItem, CartItemAddon, compute_addon_signature
 from .serializers import CartItemSerializer
 from services.models import Listing
+from services.menu_selection import validate_addon_selection, AddonSelectionError
 
 RESERVATION_TTL = 600  # 10 minutes in seconds
 
@@ -18,7 +19,9 @@ def _reservation_key(listing_id):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_cart(request):
-    items = CartItem.objects.filter(user=request.user).select_related('listing__deal')
+    items = CartItem.objects.filter(user=request.user).select_related(
+        'listing__deal', 'listing__vendor',
+    ).prefetch_related('selected_addons__addon')
     return Response(CartItemSerializer(items, many=True).data)
 
 
@@ -27,6 +30,7 @@ def get_cart(request):
 def add_to_cart(request):
     listing_id = request.data.get('listing_id')
     quantity = max(1, int(request.data.get('quantity', 1)))
+    addon_ids = request.data.get('addon_ids', [])
 
     if not listing_id:
         return Response({'error': 'listing_id is required.'}, status=400)
@@ -35,6 +39,18 @@ def add_to_cart(request):
         listing = Listing.objects.get(id=listing_id)
     except Listing.DoesNotExist:
         return Response({'error': 'Listing not found.'}, status=404)
+
+    # Phase 1 — Food Commerce Engine, Step 3: a menu item can be added with a
+    # chosen set of add-ons — validated against the item's AddonGroup rules
+    # (required/min/max) here, at cart-construction time. A plain listing
+    # (no addon_ids, no MenuItem) behaves exactly as before: addon_signature
+    # stays '', matching the original (user, listing) uniqueness exactly.
+    try:
+        selected_addons = validate_addon_selection(listing, addon_ids)
+    except AddonSelectionError as e:
+        return Response({'error': e.detail}, status=400)
+
+    addon_signature = compute_addon_signature([a.id for a in selected_addons])
 
     # Single-stock reservation gate
     is_single_stock = listing.track_inventory and listing.stock_quantity == 1
@@ -51,9 +67,15 @@ def add_to_cart(request):
     item, created = CartItem.objects.get_or_create(
         user=request.user,
         listing=listing,
+        addon_signature=addon_signature,
         defaults={'quantity': quantity, 'reserved_at': now},
     )
-    if not created:
+    if created:
+        for addon in selected_addons:
+            CartItemAddon.objects.create(
+                cart_item=item, addon=addon, price_delta_at_add_time=addon.price_delta,
+            )
+    else:
         update_fields = ['quantity', 'updated_at']
         item.quantity += quantity
         if is_single_stock and item.reserved_at is None:
@@ -71,7 +93,11 @@ def update_cart_item(request, listing_id):
     if quantity is None:
         return Response({'error': 'quantity is required.'}, status=400)
 
-    item = get_object_or_404(CartItem, user=request.user, listing_id=listing_id)
+    # Only safe for a listing with a single (addon_signature='') cart line.
+    # A menu item added with several different add-on selections now has
+    # more than one CartItem per (user, listing) — use update_cart_item_by_id
+    # below to target a specific line unambiguously in that case.
+    item = get_object_or_404(CartItem, user=request.user, listing_id=listing_id, addon_signature='')
     item.quantity = max(1, int(quantity))
     item.save(update_fields=['quantity', 'updated_at'])
     return Response(CartItemSerializer(item).data)
@@ -80,10 +106,44 @@ def update_cart_item(request, listing_id):
 @api_view(['DELETE'])
 @permission_classes([IsAuthenticated])
 def remove_from_cart(request, listing_id):
-    item = get_object_or_404(CartItem, user=request.user, listing_id=listing_id)
+    # Same addon_signature='' scoping caveat as update_cart_item above.
+    item = get_object_or_404(CartItem, user=request.user, listing_id=listing_id, addon_signature='')
 
     # Release reservation if this user owns it
     rkey = _reservation_key(listing_id)
+    if cache.get(rkey) == request.user.id:
+        cache.delete(rkey)
+
+    item.delete()
+    return Response(status=204)
+
+
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated])
+def update_cart_item_by_id(request, pk):
+    """
+    Phase 1 — Food Commerce Engine, Step 3: identifies a cart line by its own
+    id rather than by listing_id, so a listing with several add-on-distinct
+    lines (see CartItem.addon_signature) can have exactly one of them
+    updated. Additive — update_cart_item above is untouched for callers that
+    only ever have one line per listing.
+    """
+    quantity = request.data.get('quantity')
+    if quantity is None:
+        return Response({'error': 'quantity is required.'}, status=400)
+    item = get_object_or_404(CartItem, id=pk, user=request.user)
+    item.quantity = max(1, int(quantity))
+    item.save(update_fields=['quantity', 'updated_at'])
+    return Response(CartItemSerializer(item).data)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def remove_cart_item_by_id(request, pk):
+    """Additive id-scoped counterpart to remove_from_cart — see update_cart_item_by_id."""
+    item = get_object_or_404(CartItem, id=pk, user=request.user)
+
+    rkey = _reservation_key(item.listing_id)
     if cache.get(rkey) == request.user.id:
         cache.delete(rkey)
 

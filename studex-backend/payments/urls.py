@@ -4,6 +4,9 @@ from . import views
 
 urlpatterns = [
     path("initialize/", views.initialize_payment, name="initialize-payment"),
+    # Phase 1 — Food Commerce Engine, Step 3: vendor-scoped multi-item cart checkout.
+    path("initialize-cart/", views.initialize_cart_payment, name="initialize-cart-payment"),
+    path("verify-cart/", views.verify_cart_payment, name="verify-cart-payment"),
     path("seller/transactions/", views.seller_transactions, name="seller-transactions"),
     path("seller/bank-account/", views.seller_bank_account, name="seller-bank-account"),
     path("verify-bank-account/", views.verify_bank_account, name="verify-bank-account"),

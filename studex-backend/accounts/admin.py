@@ -384,8 +384,12 @@ class SellerApplicationAdmin(admin.ModelAdmin):
 
 @admin.register(VendorType)
 class VendorTypeAdmin(admin.ModelAdmin):
-    list_display = ['display_name', 'name', 'settlement_trigger', 'is_active', 'updated_at']
-    list_filter = ['settlement_trigger', 'is_active']
+    list_display = [
+        'display_name', 'name', 'settlement_trigger',
+        'supports_menu_ordering', 'supports_batched_delivery', 'is_active', 'updated_at',
+    ]
+    list_filter = ['settlement_trigger', 'supports_menu_ordering', 'supports_batched_delivery', 'is_active']
+    list_editable = ['supports_menu_ordering', 'supports_batched_delivery']
     search_fields = ['name', 'display_name']
     readonly_fields = ['created_at', 'updated_at']
     ordering = ['display_name']
