@@ -1,5 +1,28 @@
 "use client";
-import { Loader } from "lucide-react";
+import { Loader, ToggleRight, ToggleLeft } from "lucide-react";
+
+// Shared between the Listings tab (where dishes/listings are created and
+// approval status is authoritative) and the Kitchen tab (where add-ons are
+// managed for the same underlying listing) — keeps the two tabs visually
+// interconnected instead of each inventing its own status pill.
+export function AvailabilityBadge({ isAvailable }: { isAvailable: boolean }) {
+  return (
+    <span className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg ${
+      isAvailable ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-600"
+    }`}>
+      {isAvailable ? <ToggleRight className="w-3.5 h-3.5" /> : <ToggleLeft className="w-3.5 h-3.5" />}
+      {isAvailable ? "Active" : "Pending Approval"}
+    </span>
+  );
+}
+
+export function ListingThumb({ src, alt, fallbackIcon: Icon }: { src?: string | null; alt: string; fallbackIcon: any }) {
+  return (
+    <div className="w-12 h-12 rounded-xl overflow-hidden bg-stone-50 flex-shrink-0 flex items-center justify-center">
+      {src ? <img src={src} alt={alt} className="w-full h-full object-cover" /> : <Icon className="w-5 h-5 text-stone-300" />}
+    </div>
+  );
+}
 
 export function StatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {

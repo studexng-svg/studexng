@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { api } from "@/lib/api";
 import { TEAL, toArray } from "@/lib/tokens";
-import { compressImage } from "@/lib/utils";
-import { HEADING_FONT, LoadingSpinner, EmptyState } from "../_shared";
-import { Plus, Pencil, Trash2, X, ChefHat, Tag, ImagePlus } from "lucide-react";
+import { HEADING_FONT, LoadingSpinner, EmptyState, AvailabilityBadge, ListingThumb } from "../_shared";
+import { Plus, Pencil, Trash2, X, ChefHat, Tag, ArrowRight } from "lucide-react";
 
 interface MenuCategory { id: number; name: string; display_order: number; is_active: boolean; }
 interface Addon { id: number; group: number; name: string; price_delta: string; is_available: boolean; display_order: number; }
@@ -19,7 +19,6 @@ interface MenuItem {
 }
 interface Listing { id: number; title: string; price: string; is_available: boolean; image?: string | null; }
 
-const emptyDishForm = { title: "", description: "", price: "", image: null as File | null, imagePreview: null as string | null };
 const emptyCategoryForm = { name: "", display_order: 0, is_active: true };
 const emptyItemDetailsForm = {
   menu_category: "" as number | "", prep_time_minutes: "", allergens: "", ingredients: "",
@@ -37,10 +36,6 @@ export default function VendorKitchenPage() {
   const [categories, setCategories] = useState<MenuCategory[]>([]);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [listings, setListings] = useState<Listing[]>([]);
-  const [foodCategorySlug, setFoodCategorySlug] = useState<string | null>(null);
-
-  const [showDishForm, setShowDishForm] = useState(false);
-  const [dishForm, setDishForm] = useState(emptyDishForm);
 
   const [showCatModal, setShowCatModal] = useState(false);
   const [catForm, setCatForm] = useState(emptyCategoryForm);
@@ -62,19 +57,15 @@ export default function VendorKitchenPage() {
 
   const loadAll = async () => {
     try {
-      const [catRes, itemRes, listRes, marketplaceCatRes] = await Promise.all([
+      const [catRes, itemRes, listRes] = await Promise.all([
         api.services.menuCategories(),
         api.services.menuItems(),
         api.services.listingsAuth({ page_size: "500" }),
-        api.services.categoriesAuth(), // authenticated — resolves the vendor's own campus, not a default
       ]);
       if (catRes.status === 403 || itemRes.status === 403) { setNotEnabled(true); return; }
       setCategories(toArray(await catRes.json()));
       setMenuItems(toArray(await itemRes.json()));
       setListings(toArray(await listRes.json()));
-      const marketplaceCats = toArray(await marketplaceCatRes.json());
-      const food = marketplaceCats.find((c: any) => (c.slug || "").toLowerCase() === "food" || (c.title || "").toLowerCase() === "food");
-      setFoodCategorySlug(food?.slug || marketplaceCats[0]?.slug || null);
     } catch {
       setError("Could not load your kitchen. Please refresh.");
     } finally {
@@ -83,46 +74,6 @@ export default function VendorKitchenPage() {
   };
 
   useEffect(() => { loadAll(); }, []);
-
-  // ── Add Dish — creates the Listing and its MenuItem together in one step ──
-  const pickDishImage = async (file?: File) => {
-    if (!file) return;
-    const compressed = await compressImage(file);
-    setDishForm(f => ({ ...f, image: compressed, imagePreview: URL.createObjectURL(compressed) }));
-  };
-
-  const saveDish = async () => {
-    if (!dishForm.title.trim() || !dishForm.price) { setError("Name and price are required."); return; }
-    if (!foodCategorySlug) { setError("No category available — please contact support."); return; }
-    setSaving(true); setError("");
-    try {
-      const fd = new FormData();
-      fd.append("title", dishForm.title.trim());
-      fd.append("description", dishForm.description.trim() || dishForm.title.trim());
-      fd.append("payout_amount", dishForm.price);
-      fd.append("category", foodCategorySlug);
-      fd.append("listing_type", "product");
-      fd.append("track_inventory", "false");
-      fd.append("stock_quantity", "0");
-      fd.append("discount_percent", "0");
-      if (dishForm.image) fd.append("image", dishForm.image);
-
-      const listingRes = await api.services.createListing(fd);
-      if (!listingRes.ok) {
-        const d = await listingRes.json().catch(() => ({}));
-        setError(Object.values(d)[0]?.toString() || "Could not create dish.");
-        return;
-      }
-      // The backend attaches the MenuItem automatically for a menu-ordering
-      // vendor the instant the listing is created — no separate call needed.
-
-      setShowDishForm(false);
-      setDishForm(emptyDishForm);
-      flash("Dish added! Add its options below.");
-      await loadAll();
-    } catch { setError("Network error."); }
-    finally { setSaving(false); }
-  };
 
   // ── Item details (category, prep time, allergens, etc.) ──────────────────
   const openDetails = (item: MenuItem) => {
@@ -273,17 +224,23 @@ export default function VendorKitchenPage() {
           <h2 className="font-black text-stone-900 text-xl tracking-tight" style={HEADING_FONT}>Kitchen</h2>
           <p className="text-stone-400 text-xs mt-0.5">{menuItems.length} {menuItems.length === 1 ? "dish" : "dishes"}</p>
         </div>
-        <button onClick={() => { setDishForm(emptyDishForm); setError(""); setShowDishForm(true); }}
+        <Link href="/vendor/dashboard/listings"
           className="flex items-center gap-1.5 px-4 py-2 text-white rounded-full font-semibold text-sm transition active:scale-95" style={{ background: TEAL }}>
           <Plus className="w-4 h-4" /> Add Dish
-        </button>
+        </Link>
       </div>
 
       {error && <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-600">{error}</div>}
 
       {/* ── Dishes ── */}
       {menuItems.length === 0 ? (
-        <EmptyState icon={ChefHat} message="No dishes yet — tap Add Dish to create your first one" />
+        <div className="flex flex-col items-center justify-center py-16 gap-4">
+          <EmptyState icon={ChefHat} message="No dishes yet" />
+          <Link href="/vendor/dashboard/listings"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-full text-teal-700 bg-teal-50 border border-teal-100 font-semibold text-sm -mt-8">
+            Create one in My Listings <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
       ) : (
         <div className="space-y-3">
           {menuItems.map(item => {
@@ -292,9 +249,7 @@ export default function VendorKitchenPage() {
             return (
               <div key={item.id} className="bg-white border border-stone-200 rounded-2xl overflow-hidden">
                 <div className="p-4 flex items-center gap-3 cursor-pointer" onClick={() => setExpanded(isOpen ? null : item.id)}>
-                  <div className="w-12 h-12 rounded-xl overflow-hidden bg-stone-50 flex-shrink-0 flex items-center justify-center">
-                    {listing?.image ? <img src={listing.image} alt="" className="w-full h-full object-cover" /> : <ChefHat className="w-5 h-5 text-stone-300" />}
-                  </div>
+                  <ListingThumb src={listing?.image} alt={item.listing_title} fallbackIcon={ChefHat} />
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-stone-900 text-sm truncate">{item.listing_title}</p>
                     <p className="text-xs text-stone-400">
@@ -303,6 +258,7 @@ export default function VendorKitchenPage() {
                       {item.is_archived && <span className="ml-2 text-stone-500 font-semibold">Archived</span>}
                     </p>
                   </div>
+                  <AvailabilityBadge isAvailable={listing?.is_available ?? item.listing_is_available} />
                   <button onClick={(e) => { e.stopPropagation(); openDetails(item); }} className="p-1.5 text-stone-400 hover:text-stone-700"><Pencil className="w-3.5 h-3.5" /></button>
                 </div>
 
@@ -389,33 +345,6 @@ export default function VendorKitchenPage() {
           </div>
         )}
       </section>
-
-      {/* ── Add Dish modal ── */}
-      {showDishForm && (
-        <Modal title="Add a Dish" onClose={() => setShowDishForm(false)}>
-          <Field label="Photo (optional)">
-            <label className="w-24 h-24 rounded-xl border-2 border-dashed border-stone-200 flex items-center justify-center cursor-pointer hover:border-teal-400 transition overflow-hidden">
-              {dishForm.imagePreview ? (
-                <img src={dishForm.imagePreview} alt="" className="w-full h-full object-cover" />
-              ) : (
-                <ImagePlus className="w-6 h-6 text-stone-300" />
-              )}
-              <input type="file" accept="image/*" className="hidden" onChange={e => pickDishImage(e.target.files?.[0])} />
-            </label>
-          </Field>
-          <Field label="Dish name">
-            <input value={dishForm.title} onChange={e => setDishForm(f => ({ ...f, title: e.target.value }))} className={inputCls} placeholder="e.g. Fried Rice" />
-          </Field>
-          <Field label="Price (₦)">
-            <input type="number" value={dishForm.price} onChange={e => setDishForm(f => ({ ...f, price: e.target.value }))} className={inputCls} placeholder="e.g. 3000" />
-          </Field>
-          <Field label="Description (optional)">
-            <textarea value={dishForm.description} onChange={e => setDishForm(f => ({ ...f, description: e.target.value }))} rows={2} className={inputCls} placeholder="e.g. Smoky party jollof with plantain" />
-          </Field>
-          <SaveButton saving={saving} onClick={saveDish} label="Add Dish" />
-          <p className="text-xs text-stone-400 text-center">Add options like "Choose your protein" after creating the dish.</p>
-        </Modal>
-      )}
 
       {/* ── Item details modal (category, prep time, allergens) ── */}
       {detailsModal && (

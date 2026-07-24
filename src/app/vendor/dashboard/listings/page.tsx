@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/authStore";
 import { TEAL, toArray } from "@/lib/tokens";
-import { Plus, Edit2, Trash2, Loader, ToggleLeft, ToggleRight, X, Share2 } from "lucide-react";
-import { EmptyState, LoadingSpinner, HEADING_FONT } from "../_shared";
+import { Plus, Edit2, Trash2, Loader, ToggleLeft, ToggleRight, X, Share2, ChefHat, ArrowRight } from "lucide-react";
+import { EmptyState, LoadingSpinner, HEADING_FONT, AvailabilityBadge } from "../_shared";
 import { api } from "@/lib/api";
 import { compressImage } from "@/lib/utils";
 
@@ -45,6 +46,16 @@ export default function ListingsPage() {
       const res = await api.services.categoriesAuth();
       return toArray(await res.json());
     },
+    staleTime: 300_000,
+  });
+
+  // Menu-ordering (Kitchen) is only enabled for certain vendor types — reuse
+  // the same enabled/disabled signal Kitchen itself uses (403 vs 200) so this
+  // page can surface a bridge to Kitchen without duplicating that logic.
+  const { data: kitchenEnabled } = useQuery({
+    queryKey: ["vendor-kitchen-enabled"],
+    queryFn: async () => (await api.services.menuItems()).status !== 403,
+    enabled: !!user?.username,
     staleTime: 300_000,
   });
 
@@ -142,6 +153,21 @@ export default function ListingsPage() {
         <div className="fixed top-6 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full font-semibold text-white text-sm z-50 shadow-xl" style={{ background: TEAL }}>
           {toast}
         </div>
+      )}
+
+      {/* Bridge to Kitchen — add-ons & prices for food listings are managed there */}
+      {kitchenEnabled && (
+        <Link href="/vendor/dashboard/kitchen"
+          className="mb-5 bg-gradient-to-r from-teal-50 to-teal-100/40 border border-teal-100 rounded-2xl p-4 flex items-center gap-3 hover:border-teal-300 transition">
+          <div className="w-9 h-9 rounded-xl bg-white flex items-center justify-center flex-shrink-0 shadow-sm">
+            <ChefHat className="w-4 h-4 text-teal-600" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-bold text-stone-900 text-sm">Add-ons & prices live in Kitchen</p>
+            <p className="text-stone-400 text-xs mt-0.5">Create a dish here, then set its options in Kitchen</p>
+          </div>
+          <ArrowRight className="w-4 h-4 text-teal-600 flex-shrink-0" />
+        </Link>
       )}
 
       {/* Share store banner */}
@@ -462,12 +488,7 @@ export default function ListingsPage() {
                   </p>
                 )}
                 <div className="flex items-center justify-between">
-                  <span className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg ${
-                    listing.is_available ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-600"
-                  }`}>
-                    {listing.is_available ? <ToggleRight className="w-3.5 h-3.5" /> : <ToggleLeft className="w-3.5 h-3.5" />}
-                    {listing.is_available ? "Active" : "Pending Approval"}
-                  </span>
+                  <AvailabilityBadge isAvailable={listing.is_available} />
                   <div className="flex gap-2">
                     <button onClick={() => openEdit(listing)} className="p-2 bg-stone-50 hover:bg-stone-100 border border-stone-200 rounded-lg transition">
                       <Edit2 className="w-3.5 h-3.5 text-stone-500" />
