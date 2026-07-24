@@ -7,7 +7,7 @@ from django.db import models
 from django.utils import timezone
 from django.contrib.auth import get_user_model
 from decimal import Decimal
-from .models import Order, OrderStatus, Booking, BookingReferenceImage, Dispute
+from .models import Order, OrderStatus, Booking, BookingReferenceImage, Dispute, OrderItem
 from .serializers import OrderSerializer, OrderStatusSerializer, DisputeSerializer, BookingSerializer
 import logging
 
@@ -95,6 +95,72 @@ class OrderViewSet(viewsets.ModelViewSet):
             action_url=f'/account/orders/{order.id}',
         )
         return Response({"message": "Order accepted.", "order": self.get_serializer(order).data})
+
+    @action(detail=True, methods=['post'], url_path=r'items/(?P<item_id>[^/.]+)/mark-unavailable')
+    def mark_item_unavailable(self, request, pk=None, item_id=None):
+        """
+        Phase 1 — Food Commerce Engine, Step 6 (Partial Refund). Vendor or
+        assigned rider flags one OrderItem unavailable pre-pickup; the buyer
+        is refunded exactly that item's line_total (payments.item_refund)
+        and notified. Fetches the Order directly rather than via
+        self.get_object() — get_queryset() only scopes to buyer/vendor, and
+        an assigned rider (who has no listing/buyer relationship to this
+        order) is also allowed here per the TDS permission model (§10).
+        """
+        try:
+            order = Order.objects.select_related('listing__vendor', 'buyer').get(pk=pk)
+        except Order.DoesNotExist:
+            return Response({"detail": "Order not found."}, status=404)
+
+        is_vendor = order.listing.vendor_id == request.user.id
+        is_assigned_rider = False
+        try:
+            is_assigned_rider = order.delivery.rider_id == request.user.id
+        except Exception:
+            pass
+        if not (is_vendor or is_assigned_rider):
+            return Response({"detail": "Only the vendor or the assigned rider can do this."}, status=403)
+
+        # Item unavailability is only ever accepted before pickup
+        # verification completes (TDS §17's decision) — once responsibility
+        # has transferred to StudEx Delivery, a missing item is a delivery
+        # incident, a separate, future-phase workflow, not this one.
+        try:
+            if order.delivery.responsibility_transferred_at is not None:
+                return Response(
+                    {"detail": "This order has already been picked up by a rider — contact support."}, status=400,
+                )
+        except Exception:
+            pass  # no DeliveryAssignment yet — pickup can't have happened
+
+        try:
+            order_item = order.items.select_related('listing').get(id=item_id)
+        except OrderItem.DoesNotExist:
+            return Response({"detail": "Item not found on this order."}, status=404)
+
+        from payments.item_refund import mark_order_item_unavailable, ItemRefundError
+        try:
+            refund_amount, vendor_debt = mark_order_item_unavailable(order_item.id)
+        except ItemRefundError as e:
+            return Response({"detail": e.detail}, status=400)
+
+        _notify(
+            recipient=order.buyer,
+            notification_type='order_update',
+            title='An item in your order is unavailable',
+            message=(
+                f'"{order_item.listing.title}" from your order for "{order.listing.title}" is unavailable. '
+                f'₦{refund_amount:,.2f} has been refunded to you.'
+            ),
+            action_url=f'/account/orders/{order.id}',
+        )
+
+        return Response({
+            "message": "Item marked unavailable and refunded.",
+            "refund_amount": float(refund_amount),
+            "vendor_debt_created": vendor_debt is not None,
+            "order": self.get_serializer(order).data,
+        })
 
     @action(detail=True, methods=['post'], url_path='vendor-decline')
     def vendor_decline(self, request, pk=None):

@@ -7,9 +7,13 @@ from rest_framework import permissions, status
 from django.utils import timezone
 
 from studex.permissions import IsAdminUser
-from .models import CampusPickupPoint, DeliveryAssignment, generate_delivery_code, MAX_CODE_ATTEMPTS
+from .models import (
+    CampusPickupPoint, DeliveryAssignment, generate_delivery_code, MAX_CODE_ATTEMPTS,
+    BatchTemplate, DeliveryBatch,
+)
 from .serializers import (
     CampusPickupPointSerializer, DeliveryAssignmentSerializer, BuyerDeliveryStatusSerializer,
+    BatchTemplateSerializer, DeliveryBatchSerializer,
 )
 
 logger = logging.getLogger(__name__)
@@ -243,6 +247,55 @@ class RiderAssignmentListView(APIView):
         return Response(DeliveryAssignmentSerializer(qs, many=True).data)
 
 
+class RiderBatchListView(APIView):
+    """
+    GET /api/delivery/my-batches/ (Phase 1 — Food Commerce Engine, Step 5).
+    Groups a rider's incomplete assignments by DeliveryBatch — additive UI
+    layer over the same data RiderAssignmentListView already returns. Pickup
+    and completion actions are untouched — this is a read-only grouping view,
+    not a new verification mechanic (see RiderUpdateStatusView, unmodified).
+    Assignments with no batch (every non-batching vendor's order, and every
+    order that predates this phase) are returned separately under 'unbatched'.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        if request.user.user_type != 'rider':
+            return Response({'error': 'Not a rider'}, status=status.HTTP_403_FORBIDDEN)
+
+        assignments = DeliveryAssignment.objects.filter(
+            rider=request.user,
+        ).exclude(status='completed').select_related(
+            'order__buyer', 'order__listing__vendor', 'pickup_point', 'batch__vendor',
+        ).prefetch_related('order__items__selected_addons').order_by(
+            'batch__cutoff_time', '-assigned_at',
+        )
+
+        batches = {}
+        unbatched = []
+        for assignment in assignments:
+            data = DeliveryAssignmentSerializer(assignment).data
+            if assignment.batch_id:
+                batch = assignment.batch
+                group = batches.setdefault(batch.id, {
+                    'batch_id': batch.id,
+                    'display_name': batch.display_name,
+                    'vendor_username': batch.vendor.username,
+                    'delivery_time': batch.delivery_time.isoformat(),
+                    'cutoff_time': batch.cutoff_time.isoformat(),
+                    'status': batch.status,
+                    'assignments': [],
+                })
+                group['assignments'].append(data)
+            else:
+                unbatched.append(data)
+
+        return Response({
+            'batches': list(batches.values()),
+            'unbatched': unbatched,
+        })
+
+
 def _client_ip(request):
     x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR', '')
     return (x_forwarded_for.split(',')[0].strip() if x_forwarded_for
@@ -460,3 +513,101 @@ class OrderDeliveryStatusView(APIView):
             return Response({'error': 'No delivery for this order'}, status=status.HTTP_404_NOT_FOUND)
 
         return Response(BuyerDeliveryStatusSerializer(assignment).data)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Admin: Batch Templates & Delivery Batches
+# Phase 1 — Food Commerce Engine, Step 7 (FR-12, FR-13). Registered under
+# /api/admin/ via accounts/admin_urls.py, same convention as every other
+# Admin*View in this file.
+# ─────────────────────────────────────────────────────────────────────────────
+
+class AdminBatchTemplateListView(APIView):
+    """GET/POST /api/admin/batch-templates/"""
+    permission_classes = [IsAdminUser]
+
+    def get(self, request):
+        qs = BatchTemplate.objects.select_related('vendor').all()
+        vendor_id = request.query_params.get('vendor_id')
+        if vendor_id:
+            qs = qs.filter(vendor_id=vendor_id)
+        return Response(BatchTemplateSerializer(qs, many=True).data)
+
+    def post(self, request):
+        ser = BatchTemplateSerializer(data=request.data)
+        if ser.is_valid():
+            ser.save()
+            return Response(ser.data, status=status.HTTP_201_CREATED)
+        return Response(ser.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class AdminBatchTemplateDetailView(APIView):
+    """PATCH/DELETE /api/admin/batch-templates/<id>/"""
+    permission_classes = [IsAdminUser]
+
+    def _get(self, pk):
+        try:
+            return BatchTemplate.objects.get(pk=pk)
+        except BatchTemplate.DoesNotExist:
+            return None
+
+    def patch(self, request, pk):
+        obj = self._get(pk)
+        if not obj:
+            return Response({'error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
+        ser = BatchTemplateSerializer(obj, data=request.data, partial=True)
+        if ser.is_valid():
+            ser.save()
+            return Response(ser.data)
+        return Response(ser.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, pk):
+        obj = self._get(pk)
+        if not obj:
+            return Response({'error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
+        obj.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class AdminDeliveryBatchListView(APIView):
+    """
+    GET /api/admin/delivery-batches/ — capacity across all vendors/campuses
+    (FR-12): current_orders vs max_orders per batch. Supports ?vendor_id=,
+    ?campus=, ?batch_date= filters.
+    """
+    permission_classes = [IsAdminUser]
+
+    def get(self, request):
+        qs = DeliveryBatch.objects.select_related('vendor', 'template').all()
+        vendor_id = request.query_params.get('vendor_id')
+        campus = request.query_params.get('campus')
+        batch_date = request.query_params.get('batch_date')
+        if vendor_id:
+            qs = qs.filter(vendor_id=vendor_id)
+        if campus:
+            qs = qs.filter(campus__iexact=campus)
+        if batch_date:
+            qs = qs.filter(batch_date=batch_date)
+        return Response(DeliveryBatchSerializer(qs, many=True).data)
+
+
+class AdminDeliveryBatchDetailView(APIView):
+    """
+    PATCH /api/admin/delivery-batches/<id>/ — override one generated day's
+    delivery_time/cutoff_time/max_orders/display_name/status independently
+    of its BatchTemplate (FR-13) — never touches the template or any other
+    day. vendor/campus/batch_date/template/current_orders are read-only
+    (see DeliveryBatchSerializer).
+    """
+    permission_classes = [IsAdminUser]
+
+    def patch(self, request, pk):
+        try:
+            obj = DeliveryBatch.objects.get(pk=pk)
+        except DeliveryBatch.DoesNotExist:
+            return Response({'error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
+        ser = DeliveryBatchSerializer(obj, data=request.data, partial=True)
+        if ser.is_valid():
+            ser.save()
+            return Response(ser.data)
+        return Response(ser.errors, status=status.HTTP_400_BAD_REQUEST)

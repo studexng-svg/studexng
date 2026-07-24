@@ -144,6 +144,10 @@ from delivery.views import (
     AdminAssignRiderView,
     AdminDeliveryListView,
     AdminRiderListView,
+    AdminBatchTemplateListView,
+    AdminBatchTemplateDetailView,
+    AdminDeliveryBatchListView,
+    AdminDeliveryBatchDetailView,
 )
 urlpatterns += [
     path('pickup-points/', AdminPickupPointListView.as_view(), name='pickup-point-list'),
@@ -151,6 +155,11 @@ urlpatterns += [
     path('orders/<int:order_id>/assign-rider/', AdminAssignRiderView.as_view(), name='assign-rider'),
     path('deliveries/', AdminDeliveryListView.as_view(), name='delivery-list'),
     path('riders/', AdminRiderListView.as_view(), name='rider-list'),
+    # Phase 1 — Food Commerce Engine, Step 7: admin batch controls (FR-12, FR-13).
+    path('batch-templates/', AdminBatchTemplateListView.as_view(), name='batch-template-list'),
+    path('batch-templates/<int:pk>/', AdminBatchTemplateDetailView.as_view(), name='batch-template-detail'),
+    path('delivery-batches/', AdminDeliveryBatchListView.as_view(), name='delivery-batch-list'),
+    path('delivery-batches/<int:pk>/', AdminDeliveryBatchDetailView.as_view(), name='delivery-batch-detail'),
 ]
 
 if AdminCartListView is not None:

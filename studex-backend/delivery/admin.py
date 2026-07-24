@@ -236,6 +236,15 @@ class DeliveryBatchAdmin(admin.ModelAdmin):
     search_fields = ['display_name', 'vendor__username']
     readonly_fields = ['current_orders', 'created_at', 'updated_at']
     ordering = ['-batch_date', 'delivery_time']
+    actions = ['force_close']
+
+    def force_close(self, request, queryset):
+        # Phase 1 — Food Commerce Engine, Step 7 (§14): "Force-close a batch
+        # past cutoff" — same shape as VendorDebtAdmin.write_off. Excludes
+        # already-closed rows so the message count reflects real changes.
+        updated = queryset.exclude(status='closed').update(status='closed')
+        self.message_user(request, f"{updated} batch(es) force-closed — no further reservations will be accepted.")
+    force_close.short_description = "Force-close selected batches (stops new reservations)"
 
     def capacity_display(self, obj):
         return f'{obj.current_orders} / {obj.max_orders}'
