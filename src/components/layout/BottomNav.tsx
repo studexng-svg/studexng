@@ -22,8 +22,11 @@ export default function BottomNav() {
   const { cart } = useCart();
   const showCheckout = cart.length > 0 && pathname === "/home";
 
-  // Hide on auth/admin/rider pages and individual chat rooms
-  if (pathname === "/" || pathname === "/auth" || pathname.startsWith("/admin") || pathname.startsWith("/chat") || pathname.startsWith("/rider")) {
+  // Hide on auth/admin/rider pages, individual chat rooms, and the vendor
+  // dashboard (which has its own dedicated nav — /vendor/[username], the
+  // public storefront, is intentionally NOT excluded here since buyers
+  // still need Home/Shop/Cart there).
+  if (pathname === "/" || pathname === "/auth" || pathname.startsWith("/admin") || pathname.startsWith("/chat") || pathname.startsWith("/rider") || pathname.startsWith("/vendor/dashboard")) {
     return null;
   }
 

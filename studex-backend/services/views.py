@@ -197,7 +197,13 @@ class ListingViewSet(viewsets.ModelViewSet):
         # Public vendor profile filter — bypass all other logic
         vendor_username = self.request.query_params.get('vendor_username')
         if vendor_username:
-            qs = Listing.objects.filter(vendor__username__iexact=vendor_username, is_available=True)
+            qs = Listing.objects.filter(vendor__username__iexact=vendor_username)
+            is_owner = user.is_authenticated and user.username.lower() == vendor_username.lower()
+            if not (is_owner or (user.is_authenticated and user.is_staff)):
+                # Public storefront visitors (and other vendors) only ever see
+                # approved listings; the vendor viewing their own dashboard
+                # needs to see pending ones too so they can track approval status.
+                qs = qs.filter(is_available=True)
             return qs.select_related('vendor', 'category').prefetch_related('vendor__profile', 'variants')
 
         # For retrieve/update/delete — no campus filter so any listing is accessible

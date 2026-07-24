@@ -553,6 +553,102 @@ class ListingAPITests(APITestCase):
         self.assertEqual(len(response.data['results']), 2)
 
 
+class VendorOwnListingsVisibilityTests(APITestCase):
+    """
+    Regression test for a bug where the vendor dashboard's own "Listings" tab
+    (which queries ?vendor_username=<self>) hid the vendor's own pending
+    (is_available=False) listings behind the same is_available=True filter
+    meant for public storefront visitors — so a vendor could never see a
+    listing they just created until after an admin approved it.
+    """
+
+    def setUp(self):
+        self.client = APIClient()
+
+        self.vendor = User.objects.create_user(
+            username='foodvendor',
+            email='foodvendor@pau.edu.ng',
+            password='pass123',
+            user_type='vendor',
+            is_verified_vendor=True,
+            business_name='Food Vendor Biz'
+        )
+        self.other_buyer = User.objects.create_user(
+            username='otherbuyer',
+            email='otherbuyer@pau.edu.ng',
+            password='pass123',
+            user_type='student'
+        )
+        self.staff = User.objects.create_user(
+            username='staffuser',
+            email='staff@pau.edu.ng',
+            password='pass123',
+            user_type='student',
+            is_staff=True
+        )
+
+        self.category = Category.objects.create(title='Food', slug='food')
+
+        self.approved = Listing.objects.create(
+            vendor=self.vendor,
+            category=self.category,
+            title='Jollof Rice',
+            description='Approved dish',
+            price=Decimal('1000.00'),
+            is_available=True
+        )
+        self.pending = Listing.objects.create(
+            vendor=self.vendor,
+            category=self.category,
+            title='Fried Rice',
+            description='Freshly created, awaiting admin approval',
+            price=Decimal('1200.00'),
+            is_available=False
+        )
+
+        self.url = f'/api/services/listings/?vendor_username={self.vendor.username}&page_size=500'
+
+    def _ids(self, response):
+        return {item['id'] for item in response.data['results']}
+
+    def test_vendor_sees_own_pending_listing(self):
+        self.client.force_authenticate(user=self.vendor)
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        ids = self._ids(response)
+        self.assertIn(self.approved.id, ids)
+        self.assertIn(self.pending.id, ids)
+
+    def test_staff_sees_vendors_pending_listing(self):
+        self.client.force_authenticate(user=self.staff)
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        ids = self._ids(response)
+        self.assertIn(self.approved.id, ids)
+        self.assertIn(self.pending.id, ids)
+
+    def test_anonymous_visitor_does_not_see_pending_listing(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        ids = self._ids(response)
+        self.assertIn(self.approved.id, ids)
+        self.assertNotIn(self.pending.id, ids)
+
+    def test_other_authenticated_user_does_not_see_pending_listing(self):
+        self.client.force_authenticate(user=self.other_buyer)
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        ids = self._ids(response)
+        self.assertIn(self.approved.id, ids)
+        self.assertNotIn(self.pending.id, ids)
+
+    def test_pending_listing_becomes_publicly_visible_after_approval(self):
+        self.pending.is_available = True
+        self.pending.save(update_fields=['is_available'])
+        response = self.client.get(self.url)
+        self.assertIn(self.pending.id, self._ids(response))
+
+
 class TransactionAPITests(APITestCase):
     """Test Transaction API endpoints"""
 
