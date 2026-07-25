@@ -691,15 +691,63 @@ export default function HomePageClient({ initialVendors, initialListings, initia
     const src = vendor.username === (user as any)?.username && (user as any)?.profile_image ? (user as any).profile_image : vendor.profile_picture;
     const displaySrc = src?.startsWith("http") ? src : null;
     const initials = (vendor.business_name || vendor.username || "??").slice(0, 2).toUpperCase();
-    const isRestaurant = variant === "restaurant";
+
+    // Restaurant variant is a genuinely different card shape (landscape photo,
+    // cuisine-style subtitle, dish count) — not a recolored product/profile card.
+    if (variant === "restaurant") {
+      return (
+        <div key={vendor.id} className="animate-fadeUp" style={{ animationDelay: `${Math.min(i * 0.05, 0.3)}s` }}>
+          <Link href={`/vendor/${vendor.username}`}>
+            <div className="bg-white rounded-2xl border border-amber-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow group cursor-pointer">
+              <div className="relative w-full h-28 sm:h-32 overflow-hidden bg-stone-50">
+                {displaySrc
+                  ? <img src={displaySrc} alt={vendor.business_name || vendor.username} className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                  : <div className="absolute inset-0 flex items-center justify-center" style={{ background: "linear-gradient(135deg,#F59E0B 0%,#EA580C 100%)" }}><UtensilsCrossed className="w-8 h-8 text-white/80" /></div>
+                }
+                <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
+                {vendor.is_online && (
+                  <div className="absolute top-2 right-2 flex items-center gap-1 bg-white/90 px-2 py-0.5 rounded-full shadow-sm">
+                    <div className="w-1.5 h-1.5 rounded-full bg-green-400" />
+                    <span className="text-[10px] font-semibold text-stone-700">Online</span>
+                  </div>
+                )}
+                {vendor.vendor_badge && vendor.vendor_badge !== "none" && (
+                  <span className={`absolute top-2 left-2 text-[10px] font-bold px-2 py-0.5 rounded-full ${BADGE_STYLES[vendor.vendor_badge]}`}>
+                    {BADGE_LABELS[vendor.vendor_badge]}
+                  </span>
+                )}
+              </div>
+              <div className="p-3">
+                <p className="font-bold text-stone-900 text-sm truncate">{vendor.business_name || vendor.username}</p>
+                <p className="text-stone-400 text-xs mt-0.5 truncate flex items-center gap-1">
+                  <UtensilsCrossed className="w-3 h-3 text-amber-500 flex-shrink-0" />
+                  Restaurant{vendor.hostel ? ` · ${vendor.hostel}` : ""}
+                </p>
+                <div className="flex items-center justify-between mt-2">
+                  {vendor.total_reviews > 0 ? (
+                    <div className="flex items-center gap-0.5">
+                      <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                      <span className="text-xs text-stone-600 font-medium">{vendor.rating}</span>
+                      <span className="text-xs text-stone-400">({vendor.total_reviews})</span>
+                    </div>
+                  ) : <span />}
+                  <span className="text-xs text-stone-400">{vendor.total_listings} dishes</span>
+                </div>
+              </div>
+            </div>
+          </Link>
+        </div>
+      );
+    }
+
     return (
       <div key={vendor.id} className="animate-fadeUp" style={{ animationDelay: `${Math.min(i * 0.05, 0.3)}s` }}>
         <Link href={`/vendor/${vendor.username}`}>
-          <div className={`bg-white rounded-xl border shadow-sm overflow-hidden hover:shadow-md transition-shadow group cursor-pointer ${isRestaurant ? "border-amber-100" : "border-stone-100"}`}>
+          <div className="bg-white rounded-xl border border-stone-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow group cursor-pointer">
             <div className="relative w-full aspect-square overflow-hidden bg-stone-50">
               {displaySrc
                 ? <img src={displaySrc} alt={vendor.business_name || vendor.username} className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                : <div className="absolute inset-0 flex items-center justify-center text-white text-3xl font-black" style={{ background: isRestaurant ? "#F59E0B" : TEAL }}>{initials}</div>
+                : <div className="absolute inset-0 flex items-center justify-center text-white text-3xl font-black" style={{ background: TEAL }}>{initials}</div>
               }
               {vendor.is_online && (
                 <div className="absolute top-2.5 right-2.5 flex items-center gap-1 bg-white/90 px-2 py-0.5 rounded-full shadow-sm">
@@ -725,11 +773,6 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                   </span>
                 )}
               </div>
-              {isRestaurant && (
-                <span className="inline-flex items-center gap-1 mt-1.5 text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">
-                  <UtensilsCrossed className="w-2.5 h-2.5" /> Food
-                </span>
-              )}
               <div className="flex items-center justify-between mt-2">
                 {vendor.total_reviews > 0 && (
                   <div className="flex items-center gap-0.5"><Star className="w-3 h-3 fill-amber-400 text-amber-400" /><span className="text-xs text-stone-600 font-medium">{vendor.rating}</span><span className="text-xs text-stone-400">({vendor.total_reviews})</span></div>
@@ -938,12 +981,15 @@ export default function HomePageClient({ initialVendors, initialListings, initia
             <div className="absolute bottom-0 left-[20%] w-56 h-56 rounded-full pointer-events-none"
               style={{ background: "radial-gradient(circle,rgba(13,148,136,0.25) 0%,transparent 70%)" }} />
 
-            <div className="relative z-10 px-4 py-10 sm:px-8 sm:py-10 lg:px-10 lg:py-12">
+            <div className="relative z-10 px-4 py-8 sm:px-8 sm:py-9 lg:px-10 lg:py-10">
               {/* Always side-by-side — scaled down on mobile */}
               <div className="flex items-center gap-3 sm:gap-6">
 
                 {/* Text */}
                 <div className="flex-1 min-w-0">
+                  <p className="text-teal-200 text-[10px] sm:text-xs font-bold tracking-[0.18em] uppercase mb-1.5 sm:mb-2">
+                    Campus Shopping
+                  </p>
                   <h1 className="text-xl sm:text-3xl lg:text-5xl font-black text-white leading-[1.1] mb-1.5 sm:mb-3"
                     style={{ fontFamily: "var(--font-jakarta),'Plus Jakarta Sans',sans-serif" }}>
                     Shop Smart.<br className="sm:hidden" /> Live Campus.
@@ -965,8 +1011,8 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                   </div>
                 </div>
 
-                {/* Image — real food photo anchor (layered over the existing dark carousel, not replacing it) */}
-                <div className="relative w-28 h-36 sm:w-44 sm:h-56 lg:w-56 lg:h-72 rounded-xl sm:rounded-2xl overflow-hidden shadow-2xl border-2 border-white/20 flex-shrink-0">
+                {/* Image — real food photo anchor, the hero's dominant visual element */}
+                <div className="relative w-32 h-40 sm:w-56 sm:h-64 lg:w-72 lg:h-80 rounded-xl sm:rounded-2xl overflow-hidden shadow-2xl border-2 border-white/20 flex-shrink-0">
                   <img
                     src="/images/food-1.jpg"
                     alt="Fresh food from a campus vendor on StudEx"
@@ -974,18 +1020,33 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                   />
                   {/* Floating trust card — real top-rated menu (food) vendor only; hidden entirely if none qualify */}
                   {topFoodVendor && (
-                    <div className="absolute bottom-1.5 left-1.5 right-1.5 sm:bottom-2 sm:left-2 sm:right-2 bg-white/95 backdrop-blur-sm rounded-lg sm:rounded-xl px-2 py-1.5 sm:px-3 sm:py-2 shadow-lg">
-                      <p className="text-[10px] sm:text-xs font-black text-stone-900 truncate">
+                    <div className="absolute bottom-1.5 left-1.5 right-1.5 sm:bottom-2.5 sm:left-2.5 sm:right-2.5 bg-white/95 backdrop-blur-sm rounded-lg sm:rounded-xl px-2 py-1.5 sm:px-3 sm:py-2.5 shadow-lg">
+                      <p className="text-[10px] sm:text-sm font-black text-stone-900 truncate">
                         🍽️ {topFoodVendor.business_name || topFoodVendor.username}
                       </p>
                       {topFoodVendor.rating > 0 && (
-                        <p className="text-[9px] sm:text-[11px] text-stone-500 mt-0.5">
+                        <p className="text-[9px] sm:text-xs text-stone-500 mt-0.5">
                           ⭐ {topFoodVendor.rating.toFixed(1)}{topFoodVendor.total_reviews > 0 && ` (${topFoodVendor.total_reviews})`}
                         </p>
                       )}
                     </div>
                   )}
                 </div>
+              </div>
+
+              {/* Trust row — folded in from the standalone bar below the hero, matching the reference's in-hero icon strip */}
+              <div className="grid grid-cols-2 gap-2 sm:gap-3 mt-5 sm:mt-7">
+                {TRUST_ITEMS.map(({ icon: Icon, title, desc }) => (
+                  <div key={title} className="flex items-center gap-2 sm:gap-3 bg-white/10 border border-white/15 rounded-xl px-2.5 py-2 sm:px-4 sm:py-3">
+                    <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-full bg-white/15 flex items-center justify-center flex-shrink-0">
+                      <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-white font-bold text-[11px] sm:text-sm leading-tight truncate">{title}</p>
+                      <p className="text-white/60 text-[9px] sm:text-xs leading-tight truncate hidden sm:block">{desc}</p>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           </motion.div>
@@ -1052,23 +1113,6 @@ export default function HomePageClient({ initialVendors, initialListings, initia
               )}
             </div>
           )}
-
-          {/* ── TRUST BAR ── */}
-          <div className="mt-4 bg-white border border-stone-200 rounded-2xl overflow-hidden shadow-sm">
-            <div className="grid grid-cols-2 divide-x divide-stone-100">
-              {TRUST_ITEMS.map(({ icon: Icon, title, desc }) => (
-                <div key={title} className="flex items-center gap-3 px-5 py-4">
-                  <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 bg-teal-50 border border-teal-100">
-                    <Icon className="w-5 h-5 text-teal-600" />
-                  </div>
-                  <div>
-                    <p className="font-bold text-stone-900 text-sm">{title}</p>
-                    <p className="text-stone-400 text-xs mt-0.5 leading-snug">{desc}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
 
           {/* ── RESTAURANTS (menu-ordering food vendors — hard-separated from Marketplace) ── */}
           {menuVendors.length > 0 && (
