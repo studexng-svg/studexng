@@ -746,7 +746,7 @@ class VendorListView(ListAPIView):
 
         return (
             qs
-            .select_related('profile')
+            .select_related('profile', 'vendor__vendor_type')
             .annotate(
                 online_order=online_order,
                 badge_order=badge_order,
@@ -786,7 +786,7 @@ class VendorDetailView(generics.RetrieveAPIView):
         from django.db.models import Count, Q
         return (
             User.objects.filter(is_verified_vendor=True)
-            .select_related('profile')
+            .select_related('profile', 'vendor__vendor_type')
             .annotate(
                 completed_order_count=Count(
                     'listings__order',

@@ -559,6 +559,7 @@ class VendorListSerializer(serializers.ModelSerializer):
     available_days = serializers.SerializerMethodField()
     opening_time = serializers.SerializerMethodField()
     closing_time = serializers.SerializerMethodField()
+    is_menu_vendor = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -567,8 +568,13 @@ class VendorListSerializer(serializers.ModelSerializer):
             'bio', 'vendor_badge', 'rating', 'total_reviews',
             'completion_rate', 'total_listings', 'hostel', 'is_online', 'school',
             'completed_order_count', 'available_days', 'opening_time', 'closing_time',
-            'avg_response_minutes',
+            'avg_response_minutes', 'is_menu_vendor',
         ]
+
+    def get_is_menu_vendor(self, obj):
+        from payments.settlement import get_vendor_type
+        vt = get_vendor_type(obj)
+        return bool(vt and vt.supports_menu_ordering)
 
     def get_is_online(self, obj):
         from django.utils import timezone

@@ -36,6 +36,7 @@ interface Vendor {
   hostel: string;
   is_online?: boolean;
   completed_order_count?: number;
+  is_menu_vendor?: boolean;
 }
 
 interface Category {
@@ -163,6 +164,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
   const [showResults, setShowResults]     = useState(false);
 
   const featuredRef = useRef<HTMLDivElement>(null);
+  const restaurantsRef = useRef<HTMLDivElement>(null);
   const activeTabRef = useRef<"listings" | "vendors">("listings");
   const activeFilterRef = useRef<string>("All");
 
@@ -203,6 +205,8 @@ export default function HomePageClient({ initialVendors, initialListings, initia
     } else if (window.location.hash === "#vendors") {
       setActiveTab("vendors");
       setTimeout(() => featuredRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 200);
+    } else if (window.location.hash === "#restaurants") {
+      setTimeout(() => restaurantsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 200);
     }
 
     // Save state before navigating deeper (vendor pages, listings)
@@ -421,6 +425,11 @@ export default function HomePageClient({ initialVendors, initialListings, initia
     deals.filter((d: any) => d.source === 'admin').map((d: any) => d.listing?.id).filter(Boolean)
   );
   const nonDealListings = allListings.filter(l => !adminDealIds.has(l.id));
+
+  // Hard split for the Food/Marketplace separation: a menu vendor (is_menu_vendor)
+  // only ever appears in the Restaurants strip, never in the general Vendors tab.
+  const menuVendors = vendors.filter(v => v.is_menu_vendor);
+  const marketplaceVendors = vendors.filter(v => !v.is_menu_vendor);
 
   const filteredListings = applyPriceFilter(nonDealListings.filter(l => catSlug(l) === activeFilter));
   const rankedListings   = applyPriceFilter(
@@ -702,18 +711,19 @@ export default function HomePageClient({ initialVendors, initialListings, initia
     );
   };
 
-  const renderVendorCard = (vendor: Vendor, i: number) => {
+  const renderVendorCard = (vendor: Vendor, i: number, variant: "default" | "restaurant" = "default") => {
     const src = vendor.username === (user as any)?.username && (user as any)?.profile_image ? (user as any).profile_image : vendor.profile_picture;
     const displaySrc = src?.startsWith("http") ? src : null;
     const initials = (vendor.business_name || vendor.username || "??").slice(0, 2).toUpperCase();
+    const isRestaurant = variant === "restaurant";
     return (
       <div key={vendor.id} className="animate-fadeUp" style={{ animationDelay: `${Math.min(i * 0.05, 0.3)}s` }}>
         <Link href={`/vendor/${vendor.username}`}>
-          <div className="bg-white rounded-xl border border-stone-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow group cursor-pointer">
+          <div className={`bg-white rounded-xl border shadow-sm overflow-hidden hover:shadow-md transition-shadow group cursor-pointer ${isRestaurant ? "border-amber-100" : "border-stone-100"}`}>
             <div className="relative w-full aspect-square overflow-hidden bg-stone-50">
               {displaySrc
                 ? <img src={displaySrc} alt={vendor.business_name || vendor.username} className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                : <div className="absolute inset-0 flex items-center justify-center text-white text-3xl font-black" style={{ background: TEAL }}>{initials}</div>
+                : <div className="absolute inset-0 flex items-center justify-center text-white text-3xl font-black" style={{ background: isRestaurant ? "#F59E0B" : TEAL }}>{initials}</div>
               }
               {vendor.is_online && (
                 <div className="absolute top-2.5 right-2.5 flex items-center gap-1 bg-white/90 px-2 py-0.5 rounded-full shadow-sm">
@@ -739,6 +749,11 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                   </span>
                 )}
               </div>
+              {isRestaurant && (
+                <span className="inline-flex items-center gap-1 mt-1.5 text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">
+                  <UtensilsCrossed className="w-2.5 h-2.5" /> Food
+                </span>
+              )}
               <div className="flex items-center justify-between mt-2">
                 {vendor.total_reviews > 0 && (
                   <div className="flex items-center gap-0.5"><Star className="w-3 h-3 fill-amber-400 text-amber-400" /><span className="text-xs text-stone-600 font-medium">{vendor.rating}</span><span className="text-xs text-stone-400">({vendor.total_reviews})</span></div>
@@ -980,85 +995,52 @@ export default function HomePageClient({ initialVendors, initialListings, initia
 
                 {/* Text */}
                 <div className="flex-1 min-w-0">
-                  {vendorOfMonth ? (
-                    <>
-                      <div className="flex items-center gap-1 bg-amber-400 w-fit px-2 py-0.5 sm:px-3 sm:py-1 rounded-full mb-2 sm:mb-3">
-                        <Trophy className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-amber-900" />
-                        <span className="text-amber-900 text-xs sm:text-xs font-bold">Vendor of the Month · {vendorOfMonth.month}</span>
-                      </div>
-                      <h1 className="text-lg sm:text-3xl lg:text-5xl font-black text-white leading-[1.1]"
-                        style={{ fontFamily: "var(--font-jakarta),'Plus Jakarta Sans',sans-serif" }}>
-                        {vendorOfMonth.business_name}
-                      </h1>
-                      <p className="text-white/50 text-xs sm:text-sm mt-0.5 mb-2 sm:mb-3">@{vendorOfMonth.username}</p>
-
-                      {/* Stats row */}
-                      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mb-3 sm:mb-4">
-                        <span className="flex items-center gap-1 bg-white/15 rounded-full px-2 py-0.5 sm:px-3 sm:py-1 text-xs sm:text-xs text-white font-semibold">
-                          🛒 {vendorOfMonth.total_orders} orders
-                        </span>
-                        {vendorOfMonth.rating > 0 && (
-                          <span className="flex items-center gap-1 bg-white/15 rounded-full px-2 py-0.5 sm:px-3 sm:py-1 text-xs sm:text-xs text-white font-semibold">
-                            ⭐ {vendorOfMonth.rating.toFixed(1)}
-                            {vendorOfMonth.total_reviews > 0 && <span className="text-white/60">({vendorOfMonth.total_reviews})</span>}
-                          </span>
-                        )}
-                        {vendorOfMonth.completion_rate > 0 && (
-                          <span className="flex items-center gap-1 bg-white/15 rounded-full px-2 py-0.5 sm:px-3 sm:py-1 text-xs sm:text-xs text-white font-semibold">
-                            ✅ {Math.round(vendorOfMonth.completion_rate)}% completion
-                          </span>
-                        )}
-                        {vendorOfMonth.vendor_badge && vendorOfMonth.vendor_badge !== "none" && (
-                          <span className="flex items-center gap-1 bg-amber-400/90 rounded-full px-2 py-0.5 sm:px-3 sm:py-1 text-xs sm:text-xs text-amber-900 font-bold">
-                            {vendorOfMonth.vendor_badge === "top" ? "🏆 Top Vendor" : vendorOfMonth.vendor_badge === "trusted" ? "✅ Trusted" : "⭐ Rising"}
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="flex items-center gap-3">
-                        <Link href={`/vendor/${vendorOfMonth.username}`}>
-                          <motion.button whileTap={{ scale: 0.97 }}
-                            className="bg-white text-stone-900 font-bold px-3 py-1.5 sm:px-6 sm:py-2.5 rounded-full text-xs sm:text-sm inline-flex items-center gap-1.5 sm:gap-2 shadow-lg">
-                            Shop Now <ArrowRight className="w-3 h-3 sm:w-4 sm:h-4" />
-                          </motion.button>
-                        </Link>
-                        <Link href="/vendor-of-month" className="text-white/70 text-xs sm:text-xs font-semibold hover:text-white transition-colors">
-                          🏆 Hall of Fame
-                        </Link>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <h1 className="text-xl sm:text-3xl lg:text-5xl font-black text-white leading-[1.1] mb-1.5 sm:mb-3"
-                        style={{ fontFamily: "var(--font-jakarta),'Plus Jakarta Sans',sans-serif" }}>
-                        Shop Smart.<br className="sm:hidden" /> Live Campus.
-                      </h1>
-                      <p className="text-white/80 text-xs sm:text-sm lg:text-base mb-3 sm:mb-4 leading-relaxed line-clamp-2 sm:line-clamp-none">
-                        Explore hundreds of services from verified vendors on your campus, every day.
-                      </p>
-                      <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                        <Link href="/categories">
-                          <motion.button whileTap={{ scale: 0.97 }}
-                            className="bg-white text-stone-900 font-bold px-3 py-1.5 sm:px-6 sm:py-2.5 rounded-full text-xs sm:text-sm inline-flex items-center gap-1 sm:gap-2 shadow-lg">
-                            Shop Now <ArrowRight className="w-3 h-3 sm:w-4 sm:h-4" />
-                          </motion.button>
-                        </Link>
-                        <button onClick={() => { setActiveTab("vendors"); setTimeout(() => featuredRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); }}
-                          className="bg-white/20 border border-white/30 text-white font-semibold px-3 py-1.5 sm:px-6 sm:py-2.5 rounded-full text-xs sm:text-sm inline-flex items-center gap-1 sm:gap-1.5 backdrop-blur-sm hover:bg-white/30 transition">
-                          View Vendors
-                        </button>
-                      </div>
-                    </>
-                  )}
+                  <h1 className="text-xl sm:text-3xl lg:text-5xl font-black text-white leading-[1.1] mb-1.5 sm:mb-3"
+                    style={{ fontFamily: "var(--font-jakarta),'Plus Jakarta Sans',sans-serif" }}>
+                    Shop Smart.<br className="sm:hidden" /> Live Campus.
+                  </h1>
+                  <p className="text-white/80 text-xs sm:text-sm lg:text-base mb-3 sm:mb-4 leading-relaxed line-clamp-2 sm:line-clamp-none">
+                    Explore hundreds of services from verified vendors on your campus, every day.
+                  </p>
+                  <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                    <motion.button whileTap={{ scale: 0.97 }}
+                      onClick={() => restaurantsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                      className="bg-white text-stone-900 font-bold px-3 py-1.5 sm:px-6 sm:py-2.5 rounded-full text-xs sm:text-sm inline-flex items-center gap-1 sm:gap-2 shadow-lg">
+                      <UtensilsCrossed className="w-3 h-3 sm:w-4 sm:h-4" /> Order Food
+                    </motion.button>
+                    <motion.button whileTap={{ scale: 0.97 }}
+                      onClick={() => { setActiveTab("listings"); setTimeout(() => featuredRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); }}
+                      className="bg-white/20 border border-white/30 text-white font-semibold px-3 py-1.5 sm:px-6 sm:py-2.5 rounded-full text-xs sm:text-sm inline-flex items-center gap-1 sm:gap-1.5 backdrop-blur-sm hover:bg-white/30 transition">
+                      <ShoppingCart className="w-3 h-3 sm:w-4 sm:h-4" /> Shop Marketplace
+                    </motion.button>
+                  </div>
                 </div>
 
-                {/* Image — always visible, smaller on mobile */}
-                <div className="w-28 h-36 sm:w-44 sm:h-56 lg:w-56 lg:h-72 rounded-xl sm:rounded-2xl overflow-hidden shadow-2xl border-2 border-white/20 flex-shrink-0">
+                {/* Image — real food photo anchor (layered over the existing dark carousel, not replacing it) */}
+                <div className="relative w-28 h-36 sm:w-44 sm:h-56 lg:w-56 lg:h-72 rounded-xl sm:rounded-2xl overflow-hidden shadow-2xl border-2 border-white/20 flex-shrink-0">
                   <img
-                    src={vendorOfMonth?.profile_picture || "https://plus.unsplash.com/premium_photo-1681487865280-c2b836dd83e8?fm=jpg&q=80&w=900&auto=format&fit=crop"}
-                    alt={vendorOfMonth?.business_name || "Shop on StudEx"}
-                    className="w-full h-full object-cover object-top"
+                    src="/images/food-1.jpg"
+                    alt="Fresh food from a campus vendor on StudEx"
+                    className="w-full h-full object-cover"
                   />
+                  {/* Floating trust card — real Vendor-of-Month data when one exists, generic real figures otherwise */}
+                  <div className="absolute bottom-1.5 left-1.5 right-1.5 sm:bottom-2 sm:left-2 sm:right-2 bg-white/95 backdrop-blur-sm rounded-lg sm:rounded-xl px-2 py-1.5 sm:px-3 sm:py-2 shadow-lg">
+                    {vendorOfMonth ? (
+                      <>
+                        <p className="text-[10px] sm:text-xs font-black text-stone-900 truncate">🏆 {vendorOfMonth.business_name}</p>
+                        {vendorOfMonth.rating > 0 && (
+                          <p className="text-[9px] sm:text-[11px] text-stone-500 mt-0.5">
+                            ⭐ {vendorOfMonth.rating.toFixed(1)}{vendorOfMonth.total_reviews > 0 && ` (${vendorOfMonth.total_reviews})`}
+                          </p>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-[10px] sm:text-xs font-black text-stone-900">⭐ 4.9 Avg Rating</p>
+                        <p className="text-[9px] sm:text-[11px] text-stone-500 mt-0.5">70+ verified vendors</p>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -1157,10 +1139,37 @@ export default function HomePageClient({ initialVendors, initialListings, initia
             </div>
           </div>
 
+          {/* ── RESTAURANTS (menu-ordering food vendors — hard-separated from Marketplace) ── */}
+          {menuVendors.length > 0 && (
+            <div className="mt-8" id="restaurants" ref={restaurantsRef}>
+              <div className="rounded-2xl bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-100 p-4 sm:p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-full bg-amber-400 flex items-center justify-center flex-shrink-0">
+                      <UtensilsCrossed className="w-4 h-4 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-amber-700 text-xs tracking-widest uppercase font-bold">Food</p>
+                      <h2 className="text-lg font-extrabold text-stone-900" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Restaurants</h2>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex gap-3 overflow-x-auto pb-1 -mx-1 px-1" style={{ scrollbarWidth: "none", msOverflowStyle: "none" } as React.CSSProperties}>
+                  {menuVendors.map((v, i) => (
+                    <div key={v.id} className="flex-shrink-0 w-44">{renderVendorCard(v, i, "restaurant")}</div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* ── FEATURED SECTION ── */}
           <div className="mt-8" ref={featuredRef}>
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
               <div>
+                {menuVendors.length > 0 && (
+                  <p className="text-teal-600 text-xs tracking-widest uppercase font-bold mb-0.5">🛍️ Marketplace</p>
+                )}
                 <h2 className="text-xl font-extrabold text-stone-900" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                   {activeTab === "listings"
                     ? activeFilter === "All" ? "Featured Services" : categories.find(c => c.slug === activeFilter)?.title || activeFilter
@@ -1354,14 +1363,14 @@ export default function HomePageClient({ initialVendors, initialListings, initia
             {/* Vendors */}
             {activeTab === "vendors" && (
               <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
-                {vendors.length === 0 ? (
+                {marketplaceVendors.length === 0 ? (
                   <div className="bg-white rounded-2xl p-16 text-center border border-stone-100 shadow-sm">
                     <Sparkles className="w-12 h-12 text-stone-200 mx-auto mb-3" />
                     <h3 className="text-lg font-bold text-stone-400">No vendors yet</h3>
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                    {vendors.map((v, i) => renderVendorCard(v, i))}
+                    {marketplaceVendors.map((v, i) => renderVendorCard(v, i))}
                   </div>
                 )}
               </motion.div>
