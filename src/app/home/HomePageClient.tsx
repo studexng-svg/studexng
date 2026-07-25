@@ -94,30 +94,6 @@ const TRUST_ITEMS = [
 
 const HERO_GRAD = "linear-gradient(135deg,#0D9488 0%,#7C3AED 100%)";
 
-const heroBackgrounds = [
-  { type: "gradient", value: "linear-gradient(135deg,#0D9488 0%,#7C3AED 100%)" },
-  // Nails / nail art
-  { type: "image", value: "https://images.unsplash.com/photo-1604654894610-df63bc536371?w=1200&q=80" },
-  // Lashes / eye makeup close-up
-  { type: "image", value: "https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=1200&q=80" },
-  // Hair styling / braiding
-  { type: "image", value: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=1200&q=80" },
-  // Food — jollof rice / Nigerian cuisine
-  { type: "image", value: "https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=1200&q=80" },
-  // Drinks / beverages
-  { type: "image", value: "https://images.unsplash.com/photo-1546171753-97d7676e4602?w=1200&q=80" },
-  // Laundry / clothing
-  { type: "image", value: "https://images.unsplash.com/photo-1582735689369-4fe89db7114c?w=1200&q=80" },
-  // Fashion / outfit
-  { type: "image", value: "https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=1200&q=80" },
-  // Photography / camera
-  { type: "image", value: "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=1200&q=80" },
-  // Makeup / beauty
-  { type: "image", value: "https://images.unsplash.com/photo-1487412947147-5cebf100ffc2?w=1200&q=80" },
-  // Fitness / gym
-  { type: "image", value: "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=1200&q=80" },
-];
-
 interface Props {
   initialVendors: Vendor[];
   initialListings: any[];
@@ -140,7 +116,6 @@ export default function HomePageClient({ initialVendors, initialListings, initia
   const [activeTab, setActiveTab]       = useState<"listings" | "vendors">("listings");
   const [minPrice, setMinPrice]         = useState<string>("");
   const [maxPrice, setMaxPrice]         = useState<string>("");
-  const [heroIndex, setHeroIndex]       = useState(0);
   const [viewMode, setViewMode]         = useState<"grid" | "list" | "scroll">("grid");
   const [deals, setDeals]               = useState<any[]>([]);
 
@@ -223,11 +198,6 @@ export default function HomePageClient({ initialVendors, initialListings, initia
     };
     document.addEventListener("click", handleClick, true);
     return () => document.removeEventListener("click", handleClick, true);
-  }, []);
-
-  useEffect(() => {
-    const t = setInterval(() => setHeroIndex(p => (p + 1) % heroBackgrounds.length), 4000);
-    return () => clearInterval(t);
   }, []);
 
   const switchCampus = async (campus: "pau" | "futo" | "imsu") => {
@@ -430,6 +400,12 @@ export default function HomePageClient({ initialVendors, initialListings, initia
   // only ever appears in the Restaurants strip, never in the general Vendors tab.
   const menuVendors = vendors.filter(v => v.is_menu_vendor);
   const marketplaceVendors = vendors.filter(v => !v.is_menu_vendor);
+
+  // Hero's floating card must be a food vendor specifically (not Vendor-of-Month,
+  // which can be any vendor type) — highest-rated menu vendor, or hidden entirely.
+  const topFoodVendor = menuVendors.length > 0
+    ? [...menuVendors].sort((a, b) => (b.rating || 0) - (a.rating || 0))[0]
+    : null;
 
   const filteredListings = applyPriceFilter(nonDealListings.filter(l => catSlug(l) === activeFilter));
   const rankedListings   = applyPriceFilter(
@@ -953,37 +929,10 @@ export default function HomePageClient({ initialVendors, initialListings, initia
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
             className="relative rounded-2xl overflow-hidden bg-purple-900">
 
-            {/* Carousel backgrounds */}
-            {heroBackgrounds.map((bg, i) =>
-              bg.type === "gradient" ? (
-                <div
-                  key={i}
-                  className="absolute inset-0 transition-opacity duration-1000"
-                  style={{ opacity: i === heroIndex ? 1 : 0, background: bg.value }}
-                />
-              ) : (
-                <img
-                  key={i}
-                  src={bg.value}
-                  alt=""
-                  loading="lazy"
-                  decoding="async"
-                  className="absolute inset-0 w-full h-full object-cover transition-opacity duration-1000"
-                  style={{ opacity: i === heroIndex ? 1 : 0, objectPosition: 'center' }}
-                />
-              )
-            )}
+            {/* Static background — the one dark gradient, no rotation */}
+            <div className="absolute inset-0" style={{ background: HERO_GRAD }} />
 
-            {/* Dark overlay for image slides so text stays readable */}
-            <div
-              className="absolute inset-0 transition-opacity duration-1000 pointer-events-none"
-              style={{
-                opacity: heroBackgrounds[heroIndex]?.type === "image" ? 1 : 0,
-                background: "linear-gradient(135deg,rgba(13,148,136,0.82) 0%,rgba(124,58,237,0.72) 100%)",
-              }}
-            />
-
-            {/* Decorative blobs — visible on gradient slide */}
+            {/* Decorative blobs */}
             <div className="absolute top-1/2 left-[45%] -translate-y-1/2 w-80 h-80 rounded-full pointer-events-none"
               style={{ background: "radial-gradient(circle,rgba(124,58,237,0.30) 0%,transparent 70%)" }} />
             <div className="absolute bottom-0 left-[20%] w-56 h-56 rounded-full pointer-events-none"
@@ -1023,38 +972,20 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                     alt="Fresh food from a campus vendor on StudEx"
                     className="w-full h-full object-cover"
                   />
-                  {/* Floating trust card — real Vendor-of-Month data when one exists, generic real figures otherwise */}
-                  <div className="absolute bottom-1.5 left-1.5 right-1.5 sm:bottom-2 sm:left-2 sm:right-2 bg-white/95 backdrop-blur-sm rounded-lg sm:rounded-xl px-2 py-1.5 sm:px-3 sm:py-2 shadow-lg">
-                    {vendorOfMonth ? (
-                      <>
-                        <p className="text-[10px] sm:text-xs font-black text-stone-900 truncate">🏆 {vendorOfMonth.business_name}</p>
-                        {vendorOfMonth.rating > 0 && (
-                          <p className="text-[9px] sm:text-[11px] text-stone-500 mt-0.5">
-                            ⭐ {vendorOfMonth.rating.toFixed(1)}{vendorOfMonth.total_reviews > 0 && ` (${vendorOfMonth.total_reviews})`}
-                          </p>
-                        )}
-                      </>
-                    ) : (
-                      <>
-                        <p className="text-[10px] sm:text-xs font-black text-stone-900">⭐ 4.9 Avg Rating</p>
-                        <p className="text-[9px] sm:text-[11px] text-stone-500 mt-0.5">70+ verified vendors</p>
-                      </>
-                    )}
-                  </div>
+                  {/* Floating trust card — real top-rated menu (food) vendor only; hidden entirely if none qualify */}
+                  {topFoodVendor && (
+                    <div className="absolute bottom-1.5 left-1.5 right-1.5 sm:bottom-2 sm:left-2 sm:right-2 bg-white/95 backdrop-blur-sm rounded-lg sm:rounded-xl px-2 py-1.5 sm:px-3 sm:py-2 shadow-lg">
+                      <p className="text-[10px] sm:text-xs font-black text-stone-900 truncate">
+                        🍽️ {topFoodVendor.business_name || topFoodVendor.username}
+                      </p>
+                      {topFoodVendor.rating > 0 && (
+                        <p className="text-[9px] sm:text-[11px] text-stone-500 mt-0.5">
+                          ⭐ {topFoodVendor.rating.toFixed(1)}{topFoodVendor.total_reviews > 0 && ` (${topFoodVendor.total_reviews})`}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
-              </div>
-
-              {/* Hero dot indicators */}
-              <div className="flex justify-center gap-2 mt-5">
-                {heroBackgrounds.map((_, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setHeroIndex(i)}
-                    className={`rounded-full transition-all duration-300 ${
-                      i === heroIndex ? "w-6 h-1.5 bg-white" : "w-1.5 h-1.5 bg-white/40 hover:bg-white/60"
-                    }`}
-                  />
-                ))}
               </div>
             </div>
           </motion.div>
