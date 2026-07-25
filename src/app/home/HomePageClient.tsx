@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   Search, ArrowRight, Heart, X, Sparkles, Star,
   ChevronRight, ChevronDown, Clock, Plus, Trophy, ShoppingCart, LayoutGrid, List, GalleryHorizontal, MapPin,
-  Share2, ShieldCheck, Tag, Zap, Headphones,
+  Share2, ShieldCheck, Tag, Zap, Headphones, Lock,
   Shirt, Monitor, Home, BookOpen, Car,
   UtensilsCrossed, Smartphone, Scissors, WashingMachine,
   Flower2, Dumbbell, Package, Palette, Music, Camera,
@@ -88,8 +88,9 @@ function getCategoryIcon(slug: string): LucideIcon {
 }
 
 const TRUST_ITEMS = [
-  { icon: ShieldCheck, title: "Trusted Vendors", desc: "Verified sellers you can trust" },
   { icon: Zap,         title: "Fast Service",    desc: "Get it done on campus quickly" },
+  { icon: Lock,        title: "Escrow Safe",     desc: "Funds held till you confirm" },
+  { icon: ShieldCheck, title: "Trusted Vendors", desc: "Verified sellers you can trust" },
 ];
 
 const HERO_GRAD = "linear-gradient(135deg,#0D9488 0%,#7C3AED 100%)";
@@ -1020,30 +1021,38 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                   />
                   {/* Floating trust card — real top-rated menu (food) vendor only; hidden entirely if none qualify */}
                   {topFoodVendor && (
-                    <div className="absolute bottom-1.5 left-1.5 right-1.5 sm:bottom-2.5 sm:left-2.5 sm:right-2.5 bg-white/95 backdrop-blur-sm rounded-lg sm:rounded-xl px-2 py-1.5 sm:px-3 sm:py-2.5 shadow-lg">
-                      <p className="text-[10px] sm:text-sm font-black text-stone-900 truncate">
-                        🍽️ {topFoodVendor.business_name || topFoodVendor.username}
-                      </p>
-                      {topFoodVendor.rating > 0 && (
-                        <p className="text-[9px] sm:text-xs text-stone-500 mt-0.5">
-                          ⭐ {topFoodVendor.rating.toFixed(1)}{topFoodVendor.total_reviews > 0 && ` (${topFoodVendor.total_reviews})`}
+                    <div className="absolute bottom-1.5 left-1.5 right-1.5 sm:bottom-2.5 sm:left-2.5 sm:right-2.5 bg-white/95 backdrop-blur-sm rounded-lg sm:rounded-xl px-2 py-1.5 sm:px-3 sm:py-2 shadow-lg flex items-center gap-2">
+                      <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-full overflow-hidden flex-shrink-0 bg-amber-100 border border-white flex items-center justify-center">
+                        {topFoodVendor.profile_picture?.startsWith("http")
+                          ? <img src={topFoodVendor.profile_picture} alt={topFoodVendor.business_name || topFoodVendor.username} className="w-full h-full object-cover" />
+                          : <UtensilsCrossed className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-600" />
+                        }
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[10px] sm:text-sm font-black text-stone-900 truncate">
+                          {topFoodVendor.business_name || topFoodVendor.username}
                         </p>
-                      )}
+                        {topFoodVendor.rating > 0 && (
+                          <p className="text-[9px] sm:text-xs text-stone-500 mt-0.5">
+                            ⭐ {topFoodVendor.rating.toFixed(1)}{topFoodVendor.total_reviews > 0 && ` (${topFoodVendor.total_reviews})`}
+                          </p>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
               </div>
 
-              {/* Trust row — folded in from the standalone bar below the hero, matching the reference's in-hero icon strip */}
-              <div className="grid grid-cols-2 gap-2 sm:gap-3 mt-5 sm:mt-7">
+              {/* Trust row — plain icon + label, no card background, matching the reference exactly */}
+              <div className="grid grid-cols-3 gap-2 sm:gap-4 mt-5 sm:mt-7">
                 {TRUST_ITEMS.map(({ icon: Icon, title, desc }) => (
-                  <div key={title} className="flex items-center gap-2 sm:gap-3 bg-white/10 border border-white/15 rounded-xl px-2.5 py-2 sm:px-4 sm:py-3">
-                    <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-full bg-white/15 flex items-center justify-center flex-shrink-0">
-                      <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
+                  <div key={title} className="flex items-center gap-1.5 sm:gap-2.5">
+                    <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full border border-white/40 flex items-center justify-center flex-shrink-0">
+                      <Icon className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-white" />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-white font-bold text-[11px] sm:text-sm leading-tight truncate">{title}</p>
-                      <p className="text-white/60 text-[9px] sm:text-xs leading-tight truncate hidden sm:block">{desc}</p>
+                      <p className="text-white font-bold text-[10px] sm:text-sm leading-tight truncate">{title}</p>
+                      <p className="text-white/60 text-[8px] sm:text-xs leading-tight truncate hidden sm:block">{desc}</p>
                     </div>
                   </div>
                 ))}
