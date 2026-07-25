@@ -1013,7 +1013,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                 </div>
 
                 {/* Image — real food photo anchor, the hero's dominant visual element */}
-                <div className="relative w-32 h-40 sm:w-56 sm:h-64 lg:w-72 lg:h-80 rounded-xl sm:rounded-2xl overflow-hidden shadow-2xl border-2 border-white/20 flex-shrink-0">
+                <div className="relative w-32 h-40 sm:w-56 sm:h-64 lg:w-72 lg:h-80 rounded-xl sm:rounded-2xl overflow-hidden shadow-2xl flex-shrink-0">
                   <img
                     src="/images/food-1.jpg"
                     alt="Fresh food from a campus vendor on StudEx"
