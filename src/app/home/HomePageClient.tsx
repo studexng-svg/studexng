@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   Search, ArrowRight, Heart, X, Sparkles, Star,
   ChevronRight, ChevronDown, Clock, Plus, Trophy, ShoppingCart, LayoutGrid, List, GalleryHorizontal, MapPin,
-  Share2, ShieldCheck, Tag, Zap, Headphones, Lock,
+  Share2, ShieldCheck, Tag, Zap, Headphones, Lock, Store,
   Shirt, Monitor, Home, BookOpen, Car,
   UtensilsCrossed, Smartphone, Scissors, WashingMachine,
   Flower2, Dumbbell, Package, Palette, Music, Camera,
@@ -397,8 +397,8 @@ export default function HomePageClient({ initialVendors, initialListings, initia
   );
   const nonDealListings = allListings.filter(l => !adminDealIds.has(l.id));
 
-  // Hard split for the Food/Marketplace separation: a menu vendor (is_menu_vendor)
-  // only ever appears in the Restaurants strip, never in the general Vendors tab.
+  // Hard split for the Stores/Marketplace separation: a menu vendor (is_menu_vendor)
+  // only ever appears in the Stores strip, never in the general Vendors tab.
   const menuVendors = vendors.filter(v => v.is_menu_vendor);
   const marketplaceVendors = vendors.filter(v => !v.is_menu_vendor);
 
@@ -693,8 +693,10 @@ export default function HomePageClient({ initialVendors, initialListings, initia
     const displaySrc = src?.startsWith("http") ? src : null;
     const initials = (vendor.business_name || vendor.username || "??").slice(0, 2).toUpperCase();
 
-    // Restaurant variant is a genuinely different card shape (landscape photo,
-    // cuisine-style subtitle, dish count) — not a recolored product/profile card.
+    // Store variant is a genuinely different card shape (landscape photo,
+    // store-style subtitle, item count) — not a recolored product/profile card.
+    // Deliberately generic wording ("Store", not "Restaurant"): is_menu_vendor is
+    // a general capability, not a food-only one — see the section header comment.
     if (variant === "restaurant") {
       return (
         <div key={vendor.id} className="animate-fadeUp" style={{ animationDelay: `${Math.min(i * 0.05, 0.3)}s` }}>
@@ -703,7 +705,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
               <div className="relative w-full h-28 sm:h-32 overflow-hidden bg-stone-50">
                 {displaySrc
                   ? <img src={displaySrc} alt={vendor.business_name || vendor.username} className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                  : <div className="absolute inset-0 flex items-center justify-center" style={{ background: "linear-gradient(135deg,#F59E0B 0%,#EA580C 100%)" }}><UtensilsCrossed className="w-8 h-8 text-white/80" /></div>
+                  : <div className="absolute inset-0 flex items-center justify-center" style={{ background: "linear-gradient(135deg,#F59E0B 0%,#EA580C 100%)" }}><Store className="w-8 h-8 text-white/80" /></div>
                 }
                 <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
                 {vendor.is_online && (
@@ -721,8 +723,8 @@ export default function HomePageClient({ initialVendors, initialListings, initia
               <div className="p-3">
                 <p className="font-bold text-stone-900 text-sm truncate">{vendor.business_name || vendor.username}</p>
                 <p className="text-stone-400 text-xs mt-0.5 truncate flex items-center gap-1">
-                  <UtensilsCrossed className="w-3 h-3 text-amber-500 flex-shrink-0" />
-                  Restaurant{vendor.hostel ? ` · ${vendor.hostel}` : ""}
+                  <Store className="w-3 h-3 text-amber-500 flex-shrink-0" />
+                  Store{vendor.hostel ? ` · ${vendor.hostel}` : ""}
                 </p>
                 <div className="flex items-center justify-between mt-2">
                   {vendor.total_reviews > 0 ? (
@@ -732,7 +734,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                       <span className="text-xs text-stone-400">({vendor.total_reviews})</span>
                     </div>
                   ) : <span />}
-                  <span className="text-xs text-stone-400">{vendor.total_listings} dishes</span>
+                  <span className="text-xs text-stone-400">{vendor.total_listings} items</span>
                 </div>
               </div>
             </div>
@@ -1123,18 +1125,22 @@ export default function HomePageClient({ initialVendors, initialListings, initia
             </div>
           )}
 
-          {/* ── RESTAURANTS (menu-ordering food vendors — hard-separated from Marketplace) ── */}
+          {/* ── STORES (menu-ordering vendors — hard-separated from Marketplace). Not
+               labeled "Food"/"Restaurants": is_menu_vendor is a general menu-ordering
+               capability on VendorType, not a food-specific flag — a future non-food
+               vendor type (e.g. a salon with a menu-style booking catalog) would land
+               here too, so the label can't assume the contents are always food. ── */}
           {menuVendors.length > 0 && (
             <div className="mt-8" id="restaurants" ref={restaurantsRef}>
               <div className="rounded-2xl bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-100 p-4 sm:p-5">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2.5">
                     <div className="w-8 h-8 rounded-full bg-amber-400 flex items-center justify-center flex-shrink-0">
-                      <UtensilsCrossed className="w-4 h-4 text-white" />
+                      <Store className="w-4 h-4 text-white" />
                     </div>
                     <div>
-                      <p className="text-amber-700 text-xs tracking-widest uppercase font-bold">Food</p>
-                      <h2 className="text-lg font-extrabold text-stone-900" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Restaurants</h2>
+                      <p className="text-amber-700 text-xs tracking-widest uppercase font-bold">Stores</p>
+                      <h2 className="text-lg font-extrabold text-stone-900" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Stores</h2>
                     </div>
                   </div>
                 </div>
