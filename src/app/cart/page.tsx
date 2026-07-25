@@ -230,7 +230,7 @@ export default function CartPage() {
                 )}
                 {!!item.selectedAddons?.length && (
                   <p className="text-xs text-stone-400 mt-0.5 truncate">
-                    {item.selectedAddons.map(a => a.name).join(", ")}
+                    {item.selectedAddons.map(a => a.quantity > 1 ? `${a.name} ×${a.quantity}` : a.name).join(", ")}
                   </p>
                 )}
                 <p className="text-xs text-stone-400 mt-0.5">₦{item.price.toLocaleString()} each</p>

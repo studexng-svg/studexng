@@ -19,20 +19,32 @@ class AddonSelectionError(Exception):
         super().__init__(detail)
 
 
-def validate_addon_selection(listing, addon_ids):
+MAX_ADDON_QUANTITY = 20
+
+
+def validate_addon_selection(listing, addon_ids, addon_quantities=None):
     """
     Validates that `addon_ids` is a legal selection for `listing`'s menu item:
     every id must name an Addon belonging to one of this exact menu item's
     add-on groups (never another listing's), every selected addon must be
     available, and every group's required/min/max rule must be satisfied.
+    Group min/max always counts *distinct* add-ons picked, never the sum of
+    their quantities — "Extras: up to 3" means up to 3 different extras,
+    each of which may independently be bumped to 2x, 3x, etc.
 
-    Returns the list of validated Addon instances (order not guaranteed to
+    `addon_quantities` is an optional {addon_id: quantity} mapping — e.g.
+    2x Chicken. Any id in `addon_ids` missing from it defaults to quantity 1
+    (the pre-existing behavior, unaffected by this parameter's addition).
+    Quantity must be a positive integer no greater than MAX_ADDON_QUANTITY.
+
+    Returns a list of (Addon, quantity) tuples (order not guaranteed to
     match input). Raises AddonSelectionError with a buyer-facing message on
     any violation.
     """
     from .availability import check_addon_availability
 
     addon_ids = [int(a) for a in (addon_ids or [])]
+    addon_quantities = {int(k): v for k, v in (addon_quantities or {}).items()}
     menu_item = getattr(listing, 'menu_item', None)
 
     if not addon_ids:
@@ -53,6 +65,11 @@ def validate_addon_selection(listing, addon_ids):
             result = check_addon_availability(addon)
             if not result.available:
                 raise AddonSelectionError(result.message)
+            qty = addon_quantities.get(addon.id, 1)
+            if not isinstance(qty, int) or qty < 1 or qty > MAX_ADDON_QUANTITY:
+                raise AddonSelectionError(
+                    f'Quantity for "{addon.name}" must be between 1 and {MAX_ADDON_QUANTITY}.'
+                )
 
     if menu_item is not None:
         selected_by_group = {}
@@ -72,4 +89,4 @@ def validate_addon_selection(listing, addon_ids):
                     f'"{group.name}" allows at most {group.max_selections} selection(s).'
                 )
 
-    return selected
+    return [(addon, addon_quantities.get(addon.id, 1)) for addon in selected]

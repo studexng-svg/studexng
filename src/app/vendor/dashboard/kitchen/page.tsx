@@ -73,8 +73,17 @@ export default function VendorMenuPage() {
       setMenuItems(toArray(await itemRes.json()));
       setListings(toArray(await listRes.json()));
       const marketplaceCats = toArray(await marketplaceCatRes.json());
-      const food = marketplaceCats.find((c: any) => (c.slug || "").toLowerCase() === "food" || (c.title || "").toLowerCase() === "food");
-      setFoodCategorySlug(food?.slug || marketplaceCats[0]?.slug || null);
+      // Categories are returned alphabetically by title (services.models.
+      // Category.Meta.ordering) — falling back to marketplaceCats[0] here
+      // used to silently mis-file a new menu item under whichever category
+      // happened to sort first (e.g. "Beauty & Makeup") on a campus where
+      // no exact "Food" match was found, instead of surfacing the "No
+      // category available" error below. Matching is now substring-based
+      // (catches "Food & Drinks"-style titles too) with no unsafe fallback.
+      const food = marketplaceCats.find((c: any) =>
+        (c.slug || "").toLowerCase().includes("food") || (c.title || "").toLowerCase().includes("food")
+      );
+      setFoodCategorySlug(food?.slug || null);
     } catch {
       setError("Could not load your menu. Please refresh.");
     } finally {

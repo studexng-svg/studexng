@@ -31,6 +31,21 @@ def add_to_cart(request):
     listing_id = request.data.get('listing_id')
     quantity = max(1, int(request.data.get('quantity', 1)))
     addon_ids = request.data.get('addon_ids', [])
+    # Optional per-addon quantity (e.g. 2x Chicken) — either a {id: qty}
+    # object or a [{id, quantity}] list, both accepted so the frontend can
+    # send whichever shape is more convenient to build. Absent/empty means
+    # every addon in addon_ids defaults to quantity 1, exactly the
+    # pre-existing behavior.
+    raw_addon_quantities = request.data.get('addon_quantities')
+    if isinstance(raw_addon_quantities, dict):
+        addon_quantities = raw_addon_quantities
+    elif isinstance(raw_addon_quantities, list):
+        addon_quantities = {
+            entry.get('id'): entry.get('quantity', 1)
+            for entry in raw_addon_quantities if isinstance(entry, dict) and entry.get('id') is not None
+        }
+    else:
+        addon_quantities = {}
 
     if not listing_id:
         return Response({'error': 'listing_id is required.'}, status=400)
@@ -46,11 +61,11 @@ def add_to_cart(request):
     # (no addon_ids, no MenuItem) behaves exactly as before: addon_signature
     # stays '', matching the original (user, listing) uniqueness exactly.
     try:
-        selected_addons = validate_addon_selection(listing, addon_ids)
+        selected_addons = validate_addon_selection(listing, addon_ids, addon_quantities)
     except AddonSelectionError as e:
         return Response({'error': e.detail}, status=400)
 
-    addon_signature = compute_addon_signature([a.id for a in selected_addons])
+    addon_signature = compute_addon_signature({addon.id: qty for addon, qty in selected_addons})
 
     # Single-stock reservation gate
     is_single_stock = listing.track_inventory and listing.stock_quantity == 1
@@ -71,9 +86,9 @@ def add_to_cart(request):
         defaults={'quantity': quantity, 'reserved_at': now},
     )
     if created:
-        for addon in selected_addons:
+        for addon, addon_qty in selected_addons:
             CartItemAddon.objects.create(
-                cart_item=item, addon=addon, price_delta_at_add_time=addon.price_delta,
+                cart_item=item, addon=addon, price_delta_at_add_time=addon.price_delta, quantity=addon_qty,
             )
     else:
         update_fields = ['quantity', 'updated_at']

@@ -35,7 +35,37 @@ class ValidateAddonSelectionTests(TestCase):
 
     def test_valid_selection_passes(self):
         selected = validate_addon_selection(self.listing, [self.chicken.id, self.plantain.id])
-        self.assertEqual({a.id for a in selected}, {self.chicken.id, self.plantain.id})
+        self.assertEqual({a.id for a, qty in selected}, {self.chicken.id, self.plantain.id})
+        self.assertTrue(all(qty == 1 for a, qty in selected))
+
+    def test_addon_quantity_defaults_to_one(self):
+        selected = validate_addon_selection(self.listing, [self.chicken.id])
+        [(addon, qty)] = selected
+        self.assertEqual(qty, 1)
+
+    def test_addon_quantity_honored(self):
+        selected = validate_addon_selection(
+            self.listing, [self.chicken.id], addon_quantities={self.chicken.id: 3}
+        )
+        [(addon, qty)] = selected
+        self.assertEqual(qty, 3)
+
+    def test_addon_quantity_zero_rejected(self):
+        with self.assertRaises(AddonSelectionError):
+            validate_addon_selection(self.listing, [self.chicken.id], addon_quantities={self.chicken.id: 0})
+
+    def test_addon_quantity_over_max_rejected(self):
+        with self.assertRaises(AddonSelectionError):
+            validate_addon_selection(self.listing, [self.chicken.id], addon_quantities={self.chicken.id: 21})
+
+    def test_addon_quantity_does_not_affect_group_max_selections(self):
+        # "Extras: up to 2" counts distinct add-ons, not total quantity —
+        # picking 2 distinct extras at any quantity each is still allowed.
+        selected = validate_addon_selection(
+            self.listing, [self.chicken.id, self.plantain.id, self.egg.id],
+            addon_quantities={self.plantain.id: 5, self.egg.id: 5},
+        )
+        self.assertEqual(len(selected), 3)
 
     def test_empty_selection_on_plain_listing_passes(self):
         plain_listing = Listing.objects.create(

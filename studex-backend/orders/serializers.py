@@ -39,7 +39,11 @@ class OrderSerializer(serializers.ModelSerializer):
                 'line_total': str(item.line_total),
                 'status': item.status,
                 'addons': [
-                    {'name': a.name_snapshot, 'price_delta': str(a.price_delta_snapshot)}
+                    {
+                        'name': a.name_snapshot,
+                        'price_delta': str(a.price_delta_snapshot),
+                        'quantity': a.quantity,
+                    }
                     for a in item.selected_addons.all()
                 ],
             }

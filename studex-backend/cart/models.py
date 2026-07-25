@@ -4,12 +4,27 @@ from django.contrib.auth import get_user_model
 User = get_user_model()
 
 
-def compute_addon_signature(addon_ids):
+def compute_addon_signature(addon_quantities):
     """
-    Deterministic, order-independent signature for a set of selected Addon
-    ids (Phase 1 — Food Commerce Engine). Choosing the same add-ons in a
-    different order still resolves to the same signature, so it correctly
-    merges into one cart line rather than creating a duplicate.
+    Deterministic, order-independent signature for a selection of Addons and
+    their per-addon quantities (Phase 1 — Food Commerce Engine; quantity
+    added in the customizations-UX pass). Choosing the same add-ons at the
+    same quantities in a different order still resolves to the same
+    signature, so it correctly merges into one cart line rather than
+    creating a duplicate — but 2x Chicken and 1x Chicken are deliberately
+    *different* signatures, since they're different customizations with
+    different prices.
+
+    `addon_quantities` accepts either a plain iterable of addon ids (the
+    original calling convention — every id implies quantity 1, exactly the
+    old set-based signature) or a {addon_id: quantity} mapping. Whenever
+    every quantity actually is 1, this always collapses to the plain
+    comma-separated-ids format regardless of which form was passed in — so
+    every pre-existing CartItem row (all created before quantity existed,
+    hence all effectively "qty 1 each") keeps matching new computations for
+    the same picks exactly. The richer "id:qty" form only appears once some
+    add-on's quantity is genuinely not 1, which never happened before this
+    feature existed.
 
     An empty selection — every add-to-cart call for a non-menu listing, and
     a menu item ordered with no customization — always produces '', which is
@@ -20,9 +35,15 @@ def compute_addon_signature(addon_ids):
     identically to the old "(user, listing)", because '' is the only
     signature that can ever occur for it.
     """
-    if not addon_ids:
+    if not addon_quantities:
         return ''
-    return ','.join(str(i) for i in sorted({int(a) for a in addon_ids}))
+    if isinstance(addon_quantities, dict):
+        pairs = {int(k): int(v) for k, v in addon_quantities.items()}
+    else:
+        pairs = {int(a): 1 for a in addon_quantities}
+    if all(qty == 1 for qty in pairs.values()):
+        return ','.join(str(i) for i in sorted(pairs))
+    return ','.join(f'{addon_id}:{qty}' for addon_id, qty in sorted(pairs.items()))
 
 
 class CartItem(models.Model):
@@ -66,6 +87,11 @@ class CartItemAddon(models.Model):
     cart_item = models.ForeignKey(CartItem, on_delete=models.CASCADE, related_name='selected_addons')
     addon = models.ForeignKey('services.Addon', on_delete=models.CASCADE, related_name='cart_selections')
     price_delta_at_add_time = models.DecimalField(max_digits=10, decimal_places=2)
+    # How many units of this add-on within this one dish (e.g. 2x Chicken) —
+    # multiplies price_delta_at_add_time in pricing, independent of the
+    # cart item's own `quantity` (how many of the whole dish). Default 1
+    # keeps every pre-existing row's math identical to before this existed.
+    quantity = models.PositiveIntegerField(default=1)
 
     class Meta:
         verbose_name = "Cart Item Add-on"

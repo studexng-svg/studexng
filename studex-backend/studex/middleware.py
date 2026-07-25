@@ -22,8 +22,8 @@ class RateLimitMiddleware(MiddlewareMixin):
     ADMIN_LOCKOUT_SECONDS = 900
 
     def process_request(self, request):
-        # ── Completely skip rate limiting in development ──────────────────────
-        if settings.DEBUG:
+        # ── Completely skip rate limiting in development or under the test runner ──
+        if settings.DEBUG or getattr(settings, 'TESTING', False):
             return None
 
         # Skip rate limiting for static files

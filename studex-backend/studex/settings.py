@@ -6,9 +6,19 @@ from datetime import timedelta
 from pathlib import Path
 from decouple import config
 import os
+import sys
 import dj_database_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# True whenever `manage.py test` (or pytest) is what's running — distinct
+# from DEBUG, which is an env-var-driven deploy setting. RateLimitMiddleware
+# uses this to skip rate limiting during tests: without it, a full,
+# unfiltered test-suite run (hundreds of requests to the same endpoint from
+# the test client's fixed IP inside the same 60s window) trips the real
+# rate limiter and fails otherwise-correct tests with 429s that have nothing
+# to do with what's actually being tested.
+TESTING = 'test' in sys.argv or 'pytest' in sys.modules
 
 # =======================================
 # SECURITY

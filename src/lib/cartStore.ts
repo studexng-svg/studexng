@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-export type CartAddon = { id: number; name: string; price_delta: number };
+export type CartAddon = { id: number; name: string; price_delta: number; quantity: number };
 
 export type CartItem = {
   id: number;       // listing_id
@@ -39,7 +39,8 @@ type CartStore = {
   // Menu items with add-on selections (Phase 2) — requires login; always
   // round-trips through the backend (which computes addon_signature and
   // re-validates group rules) rather than replicating that logic in JS.
-  addToCartWithAddons: (listingId: number, quantity: number, addonIds: number[]) => Promise<void>;
+  // Each selection carries its own quantity (e.g. 2x Chicken).
+  addToCartWithAddons: (listingId: number, quantity: number, addonSelections: { id: number; quantity: number }[]) => Promise<void>;
   // Per-line (by CartItem id) actions — the only correct way to target one
   // line once a listing can have several add-on-distinct lines.
   updateCartLineQuantity: (cartItemId: number, quantity: number) => Promise<void>;
@@ -89,7 +90,7 @@ export type RawCartRow = {
   vendor_id?: number;
   vendor_username?: string;
   addon_signature?: string;
-  selected_addons?: Array<{ id: number; name: string; price_delta: string | number }>;
+  selected_addons?: Array<{ id: number; name: string; price_delta: string | number; quantity?: number }>;
   uses_menu_checkout?: boolean;
 };
 
@@ -119,7 +120,7 @@ export function mapCartRow(item: RawCartRow): CartItem {
     vendorUsername: item.vendor_username,
     addonSignature: item.addon_signature || "",
     selectedAddons: (item.selected_addons || []).map(a => ({
-      id: a.id, name: a.name, price_delta: parseFloat(String(a.price_delta)),
+      id: a.id, name: a.name, price_delta: parseFloat(String(a.price_delta)), quantity: a.quantity ?? 1,
     })),
     usesMenuCheckout: !!item.uses_menu_checkout,
   };
@@ -191,8 +192,13 @@ export const useCart = create<CartStore>()((set, get) => ({
     } catch {}
   },
 
-  addToCartWithAddons: async (listingId, quantity, addonIds) => {
-    const res = await cartApi().add({ listing_id: listingId, quantity, addon_ids: addonIds });
+  addToCartWithAddons: async (listingId, quantity, addonSelections) => {
+    const res = await cartApi().add({
+      listing_id: listingId,
+      quantity,
+      addon_ids: addonSelections.map(a => a.id),
+      addon_quantities: Object.fromEntries(addonSelections.map(a => [a.id, a.quantity])),
+    });
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
       throw new Error(data.error || "Could not add to cart.");

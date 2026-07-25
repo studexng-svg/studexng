@@ -369,7 +369,7 @@ export default function CheckoutPage() {
                   <div className="min-w-0">
                     <p className="font-medium text-stone-900 text-sm truncate">{item.title}</p>
                     {!!item.selectedAddons?.length && (
-                      <p className="text-xs text-stone-400 truncate">{item.selectedAddons.map(a => a.name).join(", ")}</p>
+                      <p className="text-xs text-stone-400 truncate">{item.selectedAddons.map(a => a.quantity > 1 ? `${a.name} ×${a.quantity}` : a.name).join(", ")}</p>
                     )}
                     <div className="flex items-center gap-2 mt-0.5">
                       <p className="text-xs text-stone-400">× {item.quantity}</p>

@@ -10,7 +10,7 @@ from decimal import Decimal
 from django.core.files.uploadedfile import SimpleUploadedFile
 
 from accounts.models import User
-from services.models import Category, Subcategory, Listing, ListingVariant, Transaction
+from services.models import Category, Subcategory, Listing, ListingVariant, Transaction, Deal
 from orders.models import Order
 
 
@@ -647,6 +647,49 @@ class VendorOwnListingsVisibilityTests(APITestCase):
         self.pending.save(update_fields=['is_available'])
         response = self.client.get(self.url)
         self.assertIn(self.pending.id, self._ids(response))
+
+
+class DealsListAPITests(APITestCase):
+    """
+    Regression test for DealsListView.get() returning HTTP 500 on every
+    request — an earlier edit inserted a large block of unrelated ViewSet
+    code between the vendor-discount loop and its `return Response(...)`,
+    which silently detached the return statement onto the tail of a
+    completely different view (AddonViewSet.get_queryset(), as dead/
+    unreachable code) instead of raising anything at review time. The
+    homepage's Hot Deals section depends on this endpoint returning 200.
+    """
+
+    def setUp(self):
+        self.client = APIClient()
+        self.vendor = User.objects.create_user(
+            username='dealsvendor', email='dealsvendor@pau.edu.ng',
+            password='pass123', user_type='vendor', is_verified_vendor=True,
+        )
+        self.category = Category.objects.create(title='Food', slug='food')
+
+    def test_deals_endpoint_returns_200_with_no_deals(self):
+        response = self.client.get('/api/services/deals/?campus=pau')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, [])
+
+    def test_deals_endpoint_merges_admin_and_vendor_deals(self):
+        admin_listing = Listing.objects.create(
+            vendor=self.vendor, category=self.category, title='Admin Deal Dish',
+            description='desc', price=Decimal('2000.00'), is_available=True, campus='pau',
+        )
+        Deal.objects.create(listing=admin_listing, discount_percent=10, is_active=True)
+        Listing.objects.create(
+            vendor=self.vendor, category=self.category, title='Vendor Discount Dish',
+            description='desc', price=Decimal('1000.00'), is_available=True, campus='pau',
+            discount_percent=15,
+        )
+
+        response = self.client.get('/api/services/deals/?campus=pau')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        sources = {d['source'] for d in response.data}
+        self.assertEqual(sources, {'admin', 'vendor'})
+        self.assertEqual(len(response.data), 2)
 
 
 class TransactionAPITests(APITestCase):

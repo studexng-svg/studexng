@@ -80,6 +80,35 @@ class PriceCartItemTests(TestCase):
 
         self.assertEqual(priced['combined_payout_per_unit'], Decimal('4000'))  # uses live Addon.price_delta (1000), not the stale 1
 
+    def test_addon_quantity_multiplies_combined_payout(self):
+        """
+        2x Extra Chicken (+₦1,000 each) on a ₦3,000 item → combined payout is
+        ₦5,000, folded into the per-unit price the same way a single add-on
+        is — not a separate per-addon-unit fee application.
+        """
+        cart_item = CartItem.objects.create(user=self.buyer, listing=self.listing, quantity=1)
+        CartItemAddon.objects.create(
+            cart_item=cart_item, addon=self.chicken, price_delta_at_add_time=self.chicken.price_delta, quantity=2,
+        )
+
+        priced = price_cart_item(cart_item, vendor_type=None)
+
+        self.assertEqual(priced['combined_payout_per_unit'], Decimal('5000'))
+        self.assertEqual(priced['unit_price'], calculate_final_price(Decimal('5000')))
+
+    def test_addon_quantity_and_dish_quantity_both_scale_the_total(self):
+        """2 dishes, each with 2x Extra Chicken → line_total reflects both multipliers."""
+        cart_item = CartItem.objects.create(user=self.buyer, listing=self.listing, quantity=2)
+        CartItemAddon.objects.create(
+            cart_item=cart_item, addon=self.chicken, price_delta_at_add_time=self.chicken.price_delta, quantity=2,
+        )
+
+        priced = price_cart_item(cart_item, vendor_type=None)
+
+        expected_unit = calculate_final_price(Decimal('5000'))
+        self.assertEqual(priced['unit_price'], expected_unit)
+        self.assertEqual(priced['line_total'], (expected_unit * 2).quantize(Decimal('0.01')))
+
     def test_unavailable_listing_raises_checkout_error(self):
         self.listing.is_available = False
         self.listing.save(update_fields=['is_available'])
@@ -202,6 +231,27 @@ class CreateOrderFromPricedLinesTests(TestCase):
         addon_row = order_item.selected_addons.get()
         self.assertEqual(addon_row.name_snapshot, 'Extra Chicken')
         self.assertEqual(addon_row.price_delta_snapshot, Decimal('1000'))
+        self.assertEqual(addon_row.quantity, 1)
+
+    def test_order_item_addon_quantity_snapshot(self):
+        cart_item = CartItem.objects.create(user=self.buyer, listing=self.listing_a, quantity=1)
+        CartItemAddon.objects.create(
+            cart_item=cart_item, addon=self.chicken, price_delta_at_add_time=self.chicken.price_delta, quantity=3,
+        )
+
+        priced_lines, total, _ = price_vendor_cart(self.buyer, self.vendor_a.id)
+        order, total_payout = create_order_from_priced_lines(
+            buyer=self.buyer, priced_lines=priced_lines, reference='STX-CART-TEST-0004', amount_paid=total,
+        )
+
+        order_item = order.items.get(listing=self.listing_a)
+        addon_row = order_item.selected_addons.get()
+        # price_delta_snapshot stays the per-unit delta; quantity is separate
+        # so a receipt can render "3x Extra Chicken (+₦1,000 each)" instead
+        # of a pre-multiplied, unlabeled blob.
+        self.assertEqual(addon_row.price_delta_snapshot, Decimal('1000'))
+        self.assertEqual(addon_row.quantity, 3)
+        self.assertEqual(total_payout, Decimal('3000') + Decimal('1000') * 3)
 
     def test_reduces_stock_per_line(self):
         self.listing_a.track_inventory = True

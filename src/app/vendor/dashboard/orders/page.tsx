@@ -282,7 +282,7 @@ export default function OrdersPage() {
                           {item.listing_title} × {item.quantity}
                         </p>
                         {item.addons?.length > 0 && (
-                          <p className="text-[11px] text-stone-400 truncate">{item.addons.map((a: any) => a.name).join(", ")}</p>
+                          <p className="text-[11px] text-stone-400 truncate">{item.addons.map((a: any) => a.quantity > 1 ? `${a.name} ×${a.quantity}` : a.name).join(", ")}</p>
                         )}
                       </div>
                       {item.status === "fulfilled" ? (

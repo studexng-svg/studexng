@@ -124,6 +124,10 @@ class OrderItemAddon(models.Model):
     )
     name_snapshot = models.CharField(max_length=100)
     price_delta_snapshot = models.DecimalField(max_digits=10, decimal_places=2)
+    # How many units of this add-on were on the dish (e.g. 2x Chicken),
+    # frozen at order time same as the other snapshot fields. Default 1
+    # keeps every pre-existing row's meaning identical to before this existed.
+    quantity = models.PositiveIntegerField(default=1)
 
     class Meta:
         verbose_name = "Order Item Add-on"

@@ -300,6 +300,92 @@ class AddToCartWithAddonsTests(TestCase):
         self.assertEqual(item.selected_addons.count(), 1)
 
 
+class AddToCartWithAddonQuantitiesTests(TestCase):
+    """
+    Per-addon quantity (e.g. 2x Chicken) — additive on top of the existing
+    addon_ids selection. Every test in AddToCartWithAddonsTests above still
+    passes unmodified since omitting addon_quantities defaults every addon
+    to quantity 1, exactly the pre-existing behavior.
+    """
+
+    def setUp(self):
+        self.client = APIClient()
+        self.buyer = User.objects.create_user(username='qty_buyer', email='qty_buyer@pau.edu.ng', password='pass123')
+        self.vendor = User.objects.create_user(username='qty_vendor', email='qty_vendor@pau.edu.ng', password='pass123')
+        self.category = Category.objects.create(title='FoodQty', slug='food-qty')
+        self.listing = Listing.objects.create(
+            title='Jollof Rice', description='x', price=Decimal('1500.00'),
+            vendor=self.vendor, category=self.category, is_available=True,
+        )
+        self.menu_item = MenuItem.objects.create(listing=self.listing)
+        self.group = AddonGroup.objects.create(menu_item=self.menu_item, name='Extras', max_selections=2)
+        self.chicken = Addon.objects.create(group=self.group, name='Chicken', price_delta=Decimal('300.00'))
+        self.client.force_authenticate(user=self.buyer)
+
+    def test_addon_quantity_persisted(self):
+        response = self.client.post(
+            '/api/cart/add/',
+            {'listing_id': self.listing.id, 'quantity': 1, 'addon_ids': [self.chicken.id],
+             'addon_quantities': {str(self.chicken.id): 3}},
+            format='json',
+        )
+        self.assertEqual(response.status_code, 201)
+        item = CartItem.objects.get(user=self.buyer, listing=self.listing)
+        self.assertEqual(item.selected_addons.first().quantity, 3)
+
+    def test_addon_quantity_multiplies_effective_price(self):
+        from payments.pricing import calculate_final_price
+
+        self.client.post(
+            '/api/cart/add/',
+            {'listing_id': self.listing.id, 'quantity': 1, 'addon_ids': [self.chicken.id],
+             'addon_quantities': {str(self.chicken.id): 2}},
+            format='json',
+        )
+        response = self.client.get('/api/cart/')
+        row = response.data[0]
+        expected = calculate_final_price(Decimal('1500.00') + Decimal('300.00') * 2)
+        self.assertEqual(Decimal(str(row['effective_price'])), expected)
+
+    def test_different_quantities_of_same_addon_create_separate_lines(self):
+        r1 = self.client.post(
+            '/api/cart/add/',
+            {'listing_id': self.listing.id, 'quantity': 1, 'addon_ids': [self.chicken.id],
+             'addon_quantities': {str(self.chicken.id): 1}},
+            format='json',
+        )
+        r2 = self.client.post(
+            '/api/cart/add/',
+            {'listing_id': self.listing.id, 'quantity': 1, 'addon_ids': [self.chicken.id],
+             'addon_quantities': {str(self.chicken.id): 2}},
+            format='json',
+        )
+        self.assertEqual(r1.status_code, 201)
+        self.assertEqual(r2.status_code, 201)  # different signature, not merged
+        self.assertEqual(CartItem.objects.filter(user=self.buyer, listing=self.listing).count(), 2)
+
+    def test_invalid_addon_quantity_rejected(self):
+        response = self.client.post(
+            '/api/cart/add/',
+            {'listing_id': self.listing.id, 'quantity': 1, 'addon_ids': [self.chicken.id],
+             'addon_quantities': {str(self.chicken.id): 0}},
+            format='json',
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(CartItem.objects.filter(user=self.buyer, listing=self.listing).count(), 0)
+
+    def test_addon_quantities_as_list_shape_also_accepted(self):
+        response = self.client.post(
+            '/api/cart/add/',
+            {'listing_id': self.listing.id, 'quantity': 1, 'addon_ids': [self.chicken.id],
+             'addon_quantities': [{'id': self.chicken.id, 'quantity': 4}]},
+            format='json',
+        )
+        self.assertEqual(response.status_code, 201)
+        item = CartItem.objects.get(user=self.buyer, listing=self.listing)
+        self.assertEqual(item.selected_addons.first().quantity, 4)
+
+
 class CartItemByIdEndpointsTests(TestCase):
     """
     Phase 1 — Food Commerce Engine, Step 3: update_cart_item_by_id /

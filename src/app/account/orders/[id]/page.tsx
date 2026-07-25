@@ -62,7 +62,7 @@ interface OrderLineItem {
   unit_price: string;
   line_total: string;
   status: "fulfilled" | "unavailable";
-  addons: { name: string; price_delta: string }[];
+  addons: { name: string; price_delta: string; quantity: number }[];
 }
 
 interface Order {
@@ -446,7 +446,7 @@ export default function OrderDetailPage() {
                         {item.listing_title} × {item.quantity}
                       </p>
                       {item.addons.length > 0 && (
-                        <p className="text-xs text-stone-400">{item.addons.map(a => a.name).join(", ")}</p>
+                        <p className="text-xs text-stone-400">{item.addons.map(a => a.quantity > 1 ? `${a.name} ×${a.quantity}` : a.name).join(", ")}</p>
                       )}
                       {item.status === "unavailable" && (
                         <p className="text-xs text-red-500 font-medium">Unavailable — refunded</p>

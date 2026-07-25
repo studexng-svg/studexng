@@ -479,6 +479,8 @@ class DealsListView(APIView):
                 'source': 'vendor',
             })
 
+        return Response(list(admin_data) + vendor_data)
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Phase 1 — Food Commerce Engine: menu management (Step 2)
@@ -587,5 +589,3 @@ class AddonViewSet(ReorderMixin, viewsets.ModelViewSet):
         return Addon.objects.filter(group__menu_item__listing__vendor=self.request.user).select_related(
             'group__menu_item__listing',
         )
-
-        return Response(list(admin_data) + vendor_data)

@@ -7,6 +7,7 @@ class CartItemAddonSerializer(serializers.Serializer):
     id = serializers.IntegerField(source='addon.id')
     name = serializers.CharField(source='addon.name')
     price_delta = serializers.DecimalField(source='price_delta_at_add_time', max_digits=10, decimal_places=2)
+    quantity = serializers.IntegerField()
 
 
 class CartItemSerializer(serializers.ModelSerializer):
@@ -80,7 +81,9 @@ class CartItemSerializer(serializers.ModelSerializer):
             from payments.settlement import get_vendor_type
             listing = obj.listing
             base = Decimal(str(listing.payout_amount if listing.payout_amount is not None else listing.price))
-            addon_total = sum((Decimal(str(a.price_delta_at_add_time)) for a in selected), Decimal('0'))
+            addon_total = sum(
+                (Decimal(str(a.price_delta_at_add_time)) * a.quantity for a in selected), Decimal('0')
+            )
             combined = max(base + addon_total, Decimal('0'))
             vendor_type = get_vendor_type(listing.vendor)
             return float(calculate_final_price(combined, campus=listing.campus, vendor_type=vendor_type))

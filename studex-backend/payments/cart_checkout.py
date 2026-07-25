@@ -15,7 +15,7 @@ Pricing decision (explicit product call): the platform fee applies to the
 selected add-on's price_delta — not to the item and each add-on separately.
 "A ₦3,000 item costs 3,000 + 8% fee. A ₦4,000 item with add-ons costs 4,000
 + 8% fee." Concretely: combined_payout = listing.payout_amount +
-sum(addon.price_delta for selected addons); unit_price =
+sum(addon.price_delta * addon_quantity for selected addons); unit_price =
 calculate_final_price(combined_payout, ...). This reuses
 payments.pricing.calculate_final_price/get_service_fee_percent (the
 Campus+VendorType hierarchy, Blocker 6) completely unchanged — no new fee
@@ -86,8 +86,12 @@ def price_cart_item(cart_item, vendor_type):
         if not addon_result.available:
             raise CartCheckoutError(addon_result.message)
         delta = Decimal(str(addon.price_delta))
-        addons.append((addon, delta))
-        deltas.append(delta)
+        addon_qty = selection.quantity
+        addons.append((addon, delta, addon_qty))
+        # Folded into the per-unit combined payout below — e.g. 2 dishes
+        # each with 2x Chicken charges the chicken delta four times total,
+        # via (base + 2*chicken_delta) * dish_quantity.
+        deltas.append(delta * addon_qty)
 
     combined_payout = _combined_payout_per_unit(listing, deltas)
     unit_price = calculate_final_price(combined_payout, campus=listing.campus, vendor_type=vendor_type)
@@ -176,9 +180,10 @@ def create_order_from_priced_lines(buyer, priced_lines, reference, amount_paid, 
                 unit_price_at_order_time=line['unit_price'],
                 line_total=line['line_total'],
             )
-            for addon, delta in line['addons']:
+            for addon, delta, addon_qty in line['addons']:
                 OrderItemAddon.objects.create(
-                    order_item=order_item, addon=addon, name_snapshot=addon.name, price_delta_snapshot=delta,
+                    order_item=order_item, addon=addon, name_snapshot=addon.name,
+                    price_delta_snapshot=delta, quantity=addon_qty,
                 )
 
             try:
