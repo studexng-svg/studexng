@@ -37,7 +37,22 @@
       "Bash(python manage.py makemigrations payments --name \"dynamic_service_fee\")",
       "Bash(echo \"EXIT_CODE: $?\")",
       "Read(//c/Users/HomePC/Documents/studex-mobile/**)",
-      "Bash(npx expo *)"
+      "Bash(npx expo *)",
+      "Bash(git -C \"C:\\\\Users\\\\HomePC\\\\Documents\\\\studexng\" log --oneline -10 -- studex-frontend)",
+      "Bash(git -C \"C:\\\\Users\\\\HomePC\\\\Documents\\\\studexng\" log -1 --format=%ci -- studex-frontend)",
+      "Bash(ls .github/workflows)",
+      "Bash(find .github -type f)",
+      "Bash(find studex-frontend *)",
+      "Bash(gh pr *)",
+      "Bash(gh run *)",
+      "PowerShell(gh pr list --state open)",
+      "PowerShell(gh run list --limit 5)",
+      "Bash(git fetch *)",
+      "Bash(git rev-list *)",
+      "Bash(SECRET_KEY=\"test-secret-key-for-ci-cd-only\" DEBUG=\"True\" ALLOWED_HOSTS=\"localhost,127.0.0.1\" python manage.py test accounts orders wallet services chat)",
+      "Bash(python manage.py showmigrations accounts orders services cart payments)",
+      "Bash(timeout 60 python manage.py showmigrations accounts orders services cart payments delivery)",
+      "Bash(python manage.py showmigrations accounts orders services cart payments delivery)"
     ]
   }
 }

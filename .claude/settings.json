@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p .github/workflows)",
+      "Bash(git mv *)",
+      "Bash(rmdir studex-backend/.github/workflows studex-backend/.github)",
+      "PowerShell(cd \"c:\\\\Users\\\\HomePC\\\\Documents\\\\studexng\\\\studex-backend\"; $env:SECRET_KEY=\"test-secret-key-for-ci-cd-only\"; $env:DEBUG=\"False\"; $env:ALLOWED_HOSTS=\"localhost,127.0.0.1\"; python manage.py check --deploy 2>&1 | Out-String)",
+      "Bash(python -c \"import yaml; d=yaml.safe_load\\(open\\('.github/workflows/backend-tests.yml'\\)\\); print\\('YAML OK, jobs:', list\\(d['jobs'].keys\\(\\)\\)\\)\")",
+      "Bash(git push *)",
+      "PowerShell(cd \"c:\\\\Users\\\\HomePC\\\\Documents\\\\studexng\\\\studex-backend\"; $env:SECRET_KEY=\"test-secret-key-for-ci-cd-only\"; $env:DEBUG=\"True\"; $env:ALLOWED_HOSTS=\"localhost,127.0.0.1\"; python manage.py makemigrations --check --dry-run 2>&1 | Out-String)",
+      "Bash(iconv -f UTF-16LE -t UTF-8 reconciliation_test.log)"
+    ]
+  }
+}

@@ -78,6 +78,28 @@ class ListingVariantInline(admin.TabularInline):
     readonly_fields = ('price',)
 
 
+class MenuItemInline(admin.StackedInline):
+    """
+    MenuItem is a OneToOne extension of Listing (Phase 1 — Food Commerce
+    Engine) — inlining it here lets a vendor's menu item be created in the
+    same screen as the Listing itself, instead of a separate Menu Items
+    page requiring a raw-ID lookup of the Listing just created.
+    `show_change_link` jumps straight to MenuItemAdmin's own page (which
+    carries AddonGroupInline below) — Django doesn't support nesting an
+    inline inside another inline, so AddonGroups still need that one extra
+    hop from here.
+    """
+    model = MenuItem
+    extra = 0
+    max_num = 1
+    fields = (
+        'menu_category', 'prep_time_minutes', 'allergens', 'ingredients',
+        'is_seasonal', 'is_hidden', 'is_archived',
+        'availability_window_start', 'availability_window_end',
+    )
+    show_change_link = True
+
+
 class ListingChangelistForm(forms.ModelForm):
     """Minimal form used by list_editable — just overrides the dropdown labels."""
     listing_type = forms.ChoiceField(choices=_ORDER_TYPE_CHOICES)
@@ -166,7 +188,7 @@ class CategoryAdmin(admin.ModelAdmin):
 @admin.register(Listing)
 class ListingAdmin(admin.ModelAdmin):
     form = ListingAdminForm
-    inlines = [ListingVariantInline]
+    inlines = [ListingVariantInline, MenuItemInline]
 
     list_display = (
         'title', 'vendor', 'campus', 'vendor_status', 'category',
@@ -646,7 +668,27 @@ class AddonGroupAdmin(admin.ModelAdmin):
     list_display = ['name', 'menu_item', 'is_required', 'min_selections', 'max_selections', 'display_order']
     list_filter = ['is_required']
     search_fields = ['name', 'menu_item__listing__title']
+    # Matches the raw_id_fields precedent on ListingAdmin.vendor — avoids an
+    # unpaginated <select> of every MenuItem once a vendor has many listings.
+    # Requires MenuItemAdmin.search_fields, which already exists below.
+    autocomplete_fields = ['menu_item']
     inlines = [AddonInline]
+
+
+class AddonGroupInline(admin.StackedInline):
+    """
+    Lets AddonGroups be added directly from MenuItemAdmin's own page
+    (reached via MenuItemInline's show_change_link on the Listing screen).
+    Deliberately does NOT nest AddonInline underneath — Django admin
+    doesn't support a third level of inline nesting (Addon-inside-
+    AddonGroup-inside-MenuItem-inside-Listing), so entering the 3-5 actual
+    Addons per group still requires one more hop to AddonGroupAdmin's own
+    page, where AddonInline (above) already handles that.
+    """
+    model = AddonGroup
+    extra = 0
+    fields = ('name', 'is_required', 'min_selections', 'max_selections', 'display_order')
+    show_change_link = True
 
 
 @admin.register(MenuItem)
@@ -655,3 +697,4 @@ class MenuItemAdmin(admin.ModelAdmin):
     list_filter = ['is_seasonal', 'is_hidden', 'is_archived']
     search_fields = ['listing__title']
     raw_id_fields = ['listing']
+    inlines = [AddonGroupInline]
