@@ -1186,6 +1186,10 @@ class ListingAdminFeeCalculationTests(TestCase):
             # without this Django rejects the whole admin form as invalid.
             'variants-TOTAL_FORMS': '0', 'variants-INITIAL_FORMS': '0',
             'variants-MIN_NUM_FORMS': '0', 'variants-MAX_NUM_FORMS': '1000',
+            # Same for MenuItemInline (prefix "menu_item", from MenuItem.listing's
+            # related_name) — added alongside ListingVariantInline on ListingAdmin.
+            'menu_item-TOTAL_FORMS': '0', 'menu_item-INITIAL_FORMS': '0',
+            'menu_item-MIN_NUM_FORMS': '0', 'menu_item-MAX_NUM_FORMS': '1',
         }
         data.update(overrides)
         return data

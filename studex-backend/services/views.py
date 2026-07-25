@@ -231,6 +231,15 @@ class ListingViewSet(viewsets.ModelViewSet):
         else:
             qs = Listing.objects.filter(campus=campus, is_available=True)
 
+        # Store/menu vendors (Vendor.vendor_type.supports_menu_ordering — same
+        # relationship chain get_vendor_type() in payments/settlement.py reads)
+        # are discoverable only via their own vendor profile page (the
+        # vendor_username branch above) or the Restaurants strip on /home —
+        # never through general browsing, category chips, or search, all of
+        # which flow through this branch. Excluded at the query level, not
+        # just hidden client-side.
+        qs = qs.exclude(vendor__vendor__vendor_type__supports_menu_ordering=True)
+
         search = self.request.query_params.get('search')
         if search:
             qs = qs.filter(
