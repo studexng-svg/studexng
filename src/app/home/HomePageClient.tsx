@@ -120,6 +120,18 @@ export default function HomePageClient({ initialVendors, initialListings, initia
   const [viewMode, setViewMode]         = useState<"grid" | "list" | "scroll">("grid");
   const [deals, setDeals]               = useState<any[]>([]);
 
+  // Flash Offers bar countdown — cosmetic/placeholder only. The Deal model has no
+  // expiry/end-time field (confirmed in services/models.py), so there is no real
+  // deadline to count down to. This is a locally-simulated ticking clock that loops
+  // back to the top when it hits zero; it is NOT wired to any real deal expiry.
+  // Only shown at all when `deals` (real data) is non-empty, so the bar never
+  // appears over zero actual deals — but the specific numbers in it are fake.
+  const [flashSeconds, setFlashSeconds] = useState(2 * 3600 + 18 * 60 + 46);
+  useEffect(() => {
+    const t = setInterval(() => setFlashSeconds(s => (s <= 0 ? 3 * 3600 : s - 1)), 1000);
+    return () => clearInterval(t);
+  }, []);
+
   const fetchDeals = useCallback(async (campus: string) => {
     try {
       const res = await api.pub.deals(campus);
@@ -396,6 +408,15 @@ export default function HomePageClient({ initialVendors, initialListings, initia
     deals.filter((d: any) => d.source === 'admin').map((d: any) => d.listing?.id).filter(Boolean)
   );
   const nonDealListings = allListings.filter(l => !adminDealIds.has(l.id));
+
+  // Real max discount across currently-active deals, for the "Meal Deals" promo
+  // card — not fabricated. Falls back to generic copy when there are none.
+  const maxDealDiscount = deals.length > 0
+    ? Math.max(...deals.map((d: any) => Number(d.discount_percent) || 0))
+    : 0;
+  const flashHrs  = String(Math.floor(flashSeconds / 3600)).padStart(2, "0");
+  const flashMins = String(Math.floor((flashSeconds % 3600) / 60)).padStart(2, "0");
+  const flashSecs = String(flashSeconds % 60).padStart(2, "0");
 
   // Hard split for the Stores/Marketplace separation: a menu vendor (is_menu_vendor)
   // only ever appears in the Stores strip, never in the general Vendors tab.
@@ -973,7 +994,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
 
           {/* ── HERO ── */}
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
-            className="relative rounded-2xl overflow-hidden bg-purple-900">
+            className="relative rounded-2xl overflow-hidden">
 
             {/* Static background — the one dark gradient, no rotation */}
             <div className="absolute inset-0" style={{ background: HERO_GRAD }} />
@@ -1015,7 +1036,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                 </div>
 
                 {/* Image — real food photo anchor, the hero's dominant visual element */}
-                <div className="relative w-32 h-40 sm:w-56 sm:h-64 lg:w-72 lg:h-80 rounded-xl sm:rounded-2xl overflow-hidden shadow-2xl flex-shrink-0">
+                <div className="relative w-32 h-40 sm:w-56 sm:h-64 lg:w-72 lg:h-80 rounded-tl-lg rounded-br-lg rounded-tr-[2.5rem] rounded-bl-[2.5rem] sm:rounded-tr-[4rem] sm:rounded-bl-[4rem] overflow-hidden flex-shrink-0">
                   <img
                     src="/images/food-1.jpg"
                     alt="Fresh food from a campus vendor on StudEx"
@@ -1023,7 +1044,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                   />
                   {/* Floating trust card — real top-rated menu (food) vendor only; hidden entirely if none qualify */}
                   {topFoodVendor && (
-                    <div className="absolute bottom-1.5 left-1.5 right-1.5 sm:bottom-2.5 sm:left-2.5 sm:right-2.5 bg-white/95 backdrop-blur-sm rounded-lg sm:rounded-xl px-2 py-1.5 sm:px-3 sm:py-2 shadow-lg flex items-center gap-2">
+                    <div className="absolute bottom-2 right-2 sm:bottom-3 sm:right-3 max-w-[80%] bg-white/95 backdrop-blur-sm rounded-xl px-2 py-1.5 sm:px-3 sm:py-2 shadow-lg flex items-center gap-2">
                       <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-full overflow-hidden flex-shrink-0 bg-amber-100 border border-white flex items-center justify-center">
                         {topFoodVendor.profile_picture?.startsWith("http")
                           ? <img src={topFoodVendor.profile_picture} alt={topFoodVendor.business_name || topFoodVendor.username} className="w-full h-full object-cover" />
@@ -1076,15 +1097,36 @@ export default function HomePageClient({ initialVendors, initialListings, initia
             </div>
           </Link>
 
-          {/* ── CATEGORY TABS ── */}
-          <div className="mt-4 flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
-            {[{ slug: "All", title: "All Products" }, ...categories.map(c => ({ slug: c.slug, title: c.title }))].map(tab => (
-              <button key={tab.slug} onClick={() => { setActiveTab("listings"); handleFilter(tab.slug); }}
-                className={`flex-shrink-0 px-4 py-1.5 rounded-full text-xs font-semibold transition-all border ${activeFilter === tab.slug && activeTab === "listings" ? "text-white shadow-sm border-transparent" : "bg-white text-stone-500 border-stone-200 hover:border-stone-300"}`}
-                style={activeFilter === tab.slug && activeTab === "listings" ? { background: TEAL } : {}}>
-                {tab.title}
-              </button>
-            ))}
+          {/* ── CATEGORY ICON PILLS — replaces the old text-pill tabs (same handleFilter/
+               activeFilter mechanism underneath, just a circular-icon treatment) rather
+               than running both side by side, which read as two redundant category navs
+               stacked on top of each other. Real categories from the categories prop,
+               not a hardcoded list. ── */}
+          <div className="mt-4 flex gap-4 overflow-x-auto pb-1 -mx-4 px-4" style={{ scrollbarWidth: "none" }}>
+            {[{ slug: "All", title: "All" }, ...categories.slice(0, 6).map(c => ({ slug: c.slug, title: c.title }))].map(tab => {
+              const Icon = tab.slug === "All" ? LayoutGrid : getCategoryIcon(tab.slug);
+              const active = activeFilter === tab.slug && activeTab === "listings";
+              return (
+                <button key={tab.slug} onClick={() => { setActiveTab("listings"); handleFilter(tab.slug); }}
+                  className="flex-shrink-0 flex flex-col items-center gap-1.5 w-16">
+                  <div className="w-12 h-12 rounded-full flex items-center justify-center transition-all"
+                    style={active ? { background: GRAD } : { background: "#fff", border: "1px solid #e7e5e4" }}>
+                    <Icon className={`w-5 h-5 ${active ? "text-white" : "text-stone-500"}`} />
+                  </div>
+                  <span className={`text-[11px] font-semibold text-center leading-tight truncate w-full ${active ? "text-stone-900" : "text-stone-500"}`}>
+                    {tab.title}
+                  </span>
+                </button>
+              );
+            })}
+            {categories.length > 6 && (
+              <Link href="/categories" className="flex-shrink-0 flex flex-col items-center gap-1.5 w-16">
+                <div className="w-12 h-12 rounded-full flex items-center justify-center bg-white border border-stone-200">
+                  <ChevronRight className="w-5 h-5 text-stone-400" />
+                </div>
+                <span className="text-[11px] font-semibold text-stone-500 text-center">More</span>
+              </Link>
+            )}
           </div>
           {mounted && (!isLoggedIn || (!user?.email || !["@pau.edu.ng", "@futo.edu.ng", "@imsu.edu.ng"].some(domain => user.email?.toLowerCase().includes(domain)))) && (!isLoggedIn || !(user as any)?.school) && (
             <div className="flex items-center gap-3 mt-3">
@@ -1099,6 +1141,52 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                 <option value="imsu">IMSU</option>
               </select>
             </div>
+          )}
+
+          {/* ── PROMO CARDS — static/placeholder content, not backend-driven (no "market
+               picks" curation or free-delivery-threshold feature exists yet). "Meal
+               Deals" is the one exception: its percentage is real, computed from the
+               actual `deals` data already fetched above, not fabricated. Colors are
+               TEAL/PURPLE/GRAD tokens only. ── */}
+          <div className="mt-5 flex gap-3 overflow-x-auto pb-1 -mx-4 px-4 sm:grid sm:grid-cols-3 sm:overflow-visible sm:mx-0 sm:px-0" style={{ scrollbarWidth: "none" }}>
+            <Link href="/deals" className="flex-shrink-0 w-40 sm:w-auto rounded-2xl p-4 text-white" style={{ background: `linear-gradient(135deg, ${TEAL} 0%, #0f766e 100%)` }}>
+              <p className="text-[10px] font-bold uppercase tracking-wide text-white/70">Meal Deals</p>
+              <p className="font-bold text-sm mt-1 leading-snug">
+                {maxDealDiscount > 0 ? `Up to ${maxDealDiscount}% off on select meals` : "New meal deals dropping soon"}
+              </p>
+              <span className="inline-block mt-3 text-xs font-bold bg-white/20 px-3 py-1 rounded-full">Order Now</span>
+            </Link>
+            <Link href="/categories" className="flex-shrink-0 w-40 sm:w-auto rounded-2xl p-4 text-white" style={{ background: `linear-gradient(135deg, ${PURPLE} 0%, #5b21b6 100%)` }}>
+              <p className="text-[10px] font-bold uppercase tracking-wide text-white/70">Market Picks</p>
+              {/* Placeholder copy — no curated "picks" backend exists yet */}
+              <p className="font-bold text-sm mt-1 leading-snug">Handpicked essentials from campus stores</p>
+              <span className="inline-block mt-3 text-xs font-bold bg-white/20 px-3 py-1 rounded-full">Shop Now</span>
+            </Link>
+            <div className="flex-shrink-0 w-40 sm:w-auto rounded-2xl p-4 text-white" style={{ background: HERO_GRAD }}>
+              <p className="text-[10px] font-bold uppercase tracking-wide text-white/70">Free Delivery</p>
+              {/* Placeholder copy — no delivery-fee-threshold feature exists in the
+                  backend yet; this card is purely illustrative until one does */}
+              <p className="font-bold text-sm mt-1 leading-snug">On select campus orders</p>
+              <span className="inline-block mt-3 text-xs font-bold bg-white/20 px-3 py-1 rounded-full">Learn More</span>
+            </div>
+          </div>
+
+          {/* ── FLASH OFFERS BAR — the countdown is cosmetic/simulated, see the
+               flashSeconds comment above; only rendered when real deals exist so the
+               bar is never shown floating over zero actual offers. ── */}
+          {dealsReady && deals.length > 0 && (
+            <Link href="/deals" className="mt-4 flex items-center justify-between rounded-2xl px-4 py-3 text-white" style={{ background: PURPLE }}>
+              <div className="flex items-center gap-2">
+                <Zap className="w-4 h-4 fill-white" />
+                <span className="font-bold text-sm">Flash Offers</span>
+                <div className="flex items-center gap-1 ml-1 font-mono text-xs font-bold">
+                  <span className="bg-white/20 rounded px-1.5 py-0.5">{flashHrs}</span>:
+                  <span className="bg-white/20 rounded px-1.5 py-0.5">{flashMins}</span>:
+                  <span className="bg-white/20 rounded px-1.5 py-0.5">{flashSecs}</span>
+                </div>
+              </div>
+              <span className="text-xs font-semibold flex items-center gap-1 flex-shrink-0">View all deals <ChevronRight className="w-3.5 h-3.5" /></span>
+            </Link>
           )}
 
           {/* ── PRICE FILTER ── */}
@@ -1125,11 +1213,12 @@ export default function HomePageClient({ initialVendors, initialListings, initia
             </div>
           )}
 
-          {/* ── STORES (menu-ordering vendors — hard-separated from Marketplace). Not
-               labeled "Food"/"Restaurants": is_menu_vendor is a general menu-ordering
-               capability on VendorType, not a food-specific flag — a future non-food
-               vendor type (e.g. a salon with a menu-style booking catalog) would land
-               here too, so the label can't assume the contents are always food. ── */}
+          {/* ── "Explore what's hot" — menu-ordering vendors, hard-separated from
+               Marketplace. Section heading is intentionally food-forward/playful per
+               the Milo reference, but per-card labels stay generic ("Store", not
+               "Restaurant"): is_menu_vendor is a general menu-ordering capability on
+               VendorType, not a food-specific flag — a future non-food vendor type
+               (e.g. a salon with a menu-style booking catalog) would land here too. ── */}
           {menuVendors.length > 0 && (
             <div className="mt-8" id="restaurants" ref={restaurantsRef}>
               <div className="rounded-2xl bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-100 p-4 sm:p-5">
@@ -1140,7 +1229,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                     </div>
                     <div>
                       <p className="text-amber-700 text-xs tracking-widest uppercase font-bold">Stores</p>
-                      <h2 className="text-lg font-extrabold text-stone-900" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Stores</h2>
+                      <h2 className="text-lg font-extrabold text-stone-900" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Explore what's hot</h2>
                     </div>
                   </div>
                 </div>
@@ -1153,8 +1242,20 @@ export default function HomePageClient({ initialVendors, initialListings, initia
             </div>
           )}
 
+          {/* ── "Shop beyond the ordinary" — a promotional header band introducing the
+               existing Marketplace/Listings section below; the functional grid, tabs,
+               and filters underneath are unchanged, this is a visual banner only, not
+               a second/duplicate marketplace section. ── */}
+          <div className="mt-8 rounded-2xl p-4 sm:p-5" style={{ background: `linear-gradient(135deg, ${PURPLE}14 0%, ${PURPLE}08 100%)`, border: `1px solid ${PURPLE}22` }}>
+            <p className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: PURPLE }}>Discover More</p>
+            <h2 className="text-lg sm:text-xl font-extrabold text-stone-900" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+              Shop beyond the ordinary
+            </h2>
+            <p className="text-stone-500 text-sm mt-0.5">From trending gadgets to everyday must-haves.</p>
+          </div>
+
           {/* ── FEATURED SECTION ── */}
-          <div className="mt-8" ref={featuredRef}>
+          <div className="mt-4" ref={featuredRef}>
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
               <div>
                 {menuVendors.length > 0 && (
