@@ -212,7 +212,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
     const handleClick = (e: MouseEvent) => {
       const link = (e.target as Element).closest("a");
       const href = link?.getAttribute("href") ?? "";
-      if (href.startsWith("/vendor/") || href.startsWith("/listing/")) {
+      if (href.startsWith("/vendor/") || href.startsWith("/store/") || href.startsWith("/listing/")) {
         sessionStorage.setItem("home_page_state", JSON.stringify({
           scrollY: window.scrollY,
           tab: activeTabRef.current,
@@ -709,6 +709,9 @@ export default function HomePageClient({ initialVendors, initialListings, initia
     const src = vendor.username === (user as any)?.username && (user as any)?.profile_image ? (user as any).profile_image : vendor.profile_picture;
     const displaySrc = src?.startsWith("http") ? src : null;
     const initials = (vendor.business_name || vendor.username || "??").slice(0, 2).toUpperCase();
+    // Store vs Vendor is a routing distinction only (same underlying data) —
+    // is_menu_vendor decides which of the two URL patterns this card links to.
+    const profileHref = vendor.is_menu_vendor ? `/store/${vendor.username}` : `/vendor/${vendor.username}`;
 
     // Store variant is a genuinely different card shape (landscape photo,
     // store-style subtitle, item count) — not a recolored product/profile card.
@@ -717,7 +720,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
     if (variant === "restaurant") {
       return (
         <div key={vendor.id} className="animate-fadeUp" style={{ animationDelay: `${Math.min(i * 0.05, 0.3)}s` }}>
-          <Link href={`/vendor/${vendor.username}`}>
+          <Link href={profileHref}>
             {/* Single full-bleed photo card, text overlaid at the bottom — no separate
                 white info panel below the image. A deliberately different shape from
                 the top-image/panel-below card used everywhere else. */}
@@ -765,7 +768,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
 
     return (
       <div key={vendor.id} className="animate-fadeUp" style={{ animationDelay: `${Math.min(i * 0.05, 0.3)}s` }}>
-        <Link href={`/vendor/${vendor.username}`}>
+        <Link href={profileHref}>
           <div className="bg-white rounded-xl border border-stone-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow group cursor-pointer">
             <div className="relative w-full aspect-square overflow-hidden bg-stone-50">
               {displaySrc

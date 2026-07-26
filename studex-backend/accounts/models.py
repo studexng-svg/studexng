@@ -271,6 +271,23 @@ class VendorType(models.Model):
         default=False,
         help_text="Vendors of this type can use scheduled Delivery Batches with capacity limits.",
     )
+    # User-facing vocabulary for this type's catalog (only shown to vendors
+    # where supports_menu_ordering=True today, but kept independent of that
+    # flag so a future type can carry its own wording before opting in).
+    # Defaults match Food's existing behavior so a brand new VendorType row
+    # created without explicit values reads the same as it always has.
+    catalog_label = models.CharField(
+        max_length=50, default="Menu",
+        help_text="What the catalog is called for this vendor type, e.g. \"Menu\" or \"Services\".",
+    )
+    catalog_item_label = models.CharField(
+        max_length=50, default="Item",
+        help_text="What a single catalog entry is called, e.g. \"Dish\" or \"Service\".",
+    )
+    catalog_route_slug = models.SlugField(
+        max_length=50, default="catalog",
+        help_text="URL segment for this type's catalog-management page under /vendor/dashboard/, e.g. \"kitchen\".",
+    )
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

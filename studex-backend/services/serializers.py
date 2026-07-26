@@ -63,10 +63,16 @@ class ListingVendorSerializer(serializers.ModelSerializer):
     total_reviews = serializers.IntegerField(source='profile.total_reviews', default=0)
     profile = serializers.SerializerMethodField()
     profile_picture = serializers.SerializerMethodField()
+    is_menu_vendor = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ['id', 'username', 'business_name', 'hostel', 'vendor_badge', 'completion_rate', 'rating', 'total_reviews', 'profile', 'profile_picture']
+        fields = ['id', 'username', 'business_name', 'hostel', 'vendor_badge', 'completion_rate', 'rating', 'total_reviews', 'profile', 'profile_picture', 'is_menu_vendor']
+
+    def get_is_menu_vendor(self, obj):
+        from payments.settlement import get_vendor_type
+        vt = get_vendor_type(obj)
+        return bool(vt and vt.supports_menu_ordering)
 
     def get_profile_picture(self, obj):
         try:

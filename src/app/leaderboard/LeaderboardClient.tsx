@@ -36,12 +36,14 @@ interface Vendor {
   total_reviews: number;
   completion_rate: number;
   completed_order_count?: number;
+  is_menu_vendor?: boolean;
 }
 
 interface Votm {
   username: string;
   business_name: string;
   month: string;
+  is_menu_vendor?: boolean;
 }
 
 interface Props {
@@ -56,7 +58,7 @@ function PodiumCard({ vendor, rank, isVotm }: { vendor: Vendor; rank: 1 | 2 | 3;
   const hasBadge = vendor.vendor_badge && vendor.vendor_badge !== "none";
 
   return (
-    <Link href={`/vendor/${vendor.username}`} className={`flex-1 min-w-0 overflow-hidden ${isFirst ? "" : rank === 2 ? "mt-8" : "mt-20"}`}>
+    <Link href={vendor.is_menu_vendor ? `/store/${vendor.username}` : `/vendor/${vendor.username}`} className={`flex-1 min-w-0 overflow-hidden ${isFirst ? "" : rank === 2 ? "mt-8" : "mt-20"}`}>
       <div className="bg-white rounded-2xl shadow-md border border-stone-100 flex flex-col items-center px-2 pt-4 pb-4 hover:shadow-lg transition-shadow cursor-pointer h-full">
         {isFirst && <span className="text-3xl leading-none mb-2">👑</span>}
 
@@ -150,7 +152,7 @@ export default function LeaderboardClient({ initialVendors, initialCampus, curre
               <p className="text-xs font-bold text-amber-800">Vendor of the Month · {currentVotm.month}</p>
               <p className="text-sm font-black text-amber-900 truncate">{currentVotm.business_name}</p>
             </div>
-            <Link href={`/vendor/${currentVotm.username}`} className="ml-auto flex-shrink-0 text-xs font-bold text-amber-700 hover:underline">
+            <Link href={currentVotm.is_menu_vendor ? `/store/${currentVotm.username}` : `/vendor/${currentVotm.username}`} className="ml-auto flex-shrink-0 text-xs font-bold text-amber-700 hover:underline">
               Shop →
             </Link>
           </div>
@@ -195,7 +197,7 @@ export default function LeaderboardClient({ initialVendors, initialCampus, curre
                 const hasBadge = vendor.vendor_badge && vendor.vendor_badge !== "none";
                 const isVotm = vendor.username === votmUsername;
                 return (
-                  <Link key={vendor.id} href={`/vendor/${vendor.username}`}>
+                  <Link key={vendor.id} href={vendor.is_menu_vendor ? `/store/${vendor.username}` : `/vendor/${vendor.username}`}>
                     <div className={`bg-white rounded-2xl p-3 flex items-center gap-3 shadow-sm border transition-shadow cursor-pointer hover:shadow-md ${isVotm ? "border-amber-200 bg-amber-50/40" : "border-stone-100"}`}>
                       <VendorAvatar
                         name={vendor.business_name || vendor.username}

@@ -48,6 +48,10 @@ export interface UserProfile {
   hostel?: string;
   business_name?: string;
   is_verified_vendor: boolean;
+  is_menu_vendor?: boolean;
+  catalog_label?: string;
+  catalog_item_label?: string;
+  catalog_route_slug?: string;
   bio?: string;
   profile_image?: string;
   wallet_balance: string;

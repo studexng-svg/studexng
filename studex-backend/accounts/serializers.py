@@ -206,6 +206,10 @@ class UserProfileSerializer(serializers.ModelSerializer):
     disclaimer_accepted = serializers.BooleanField(required=False)
     disclaimer_accepted_at = serializers.SerializerMethodField()
     vendor_application_pending = serializers.SerializerMethodField()
+    is_menu_vendor = serializers.SerializerMethodField()
+    catalog_label = serializers.SerializerMethodField()
+    catalog_item_label = serializers.SerializerMethodField()
+    catalog_route_slug = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -218,13 +222,37 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'whatsapp', 'instagram', 'available_days', 'opening_time', 'closing_time',
             'date_of_birth', 'gender', 'department', 'level',
             'disclaimer_accepted', 'disclaimer_accepted_at',
-            'vendor_application_pending',
+            'vendor_application_pending', 'is_menu_vendor',
+            'catalog_label', 'catalog_item_label', 'catalog_route_slug',
         ]
         read_only_fields = ['wallet_balance', 'is_verified_vendor', 'created_at', 'is_staff', 'is_superuser', 'is_admin']
 
     def get_is_admin(self, obj):
         from studex.permissions import is_platform_admin
         return is_platform_admin(obj)
+
+    def get_is_menu_vendor(self, obj):
+        # Same signal renderVendorCard/VendorListSerializer use everywhere
+        # else — lets a logged-in vendor's own dashboard share/copy-link
+        # buttons point at /store/ vs /vendor/ correctly.
+        from payments.settlement import get_vendor_type
+        vt = get_vendor_type(obj)
+        return bool(vt and vt.supports_menu_ordering)
+
+    def get_catalog_label(self, obj):
+        from payments.settlement import get_vendor_type
+        vt = get_vendor_type(obj)
+        return vt.catalog_label if vt else "Menu"
+
+    def get_catalog_item_label(self, obj):
+        from payments.settlement import get_vendor_type
+        vt = get_vendor_type(obj)
+        return vt.catalog_item_label if vt else "Item"
+
+    def get_catalog_route_slug(self, obj):
+        from payments.settlement import get_vendor_type
+        vt = get_vendor_type(obj)
+        return vt.catalog_route_slug if vt else "catalog"
 
     def get_disclaimer_accepted_at(self, obj):
         try:
@@ -560,6 +588,9 @@ class VendorListSerializer(serializers.ModelSerializer):
     opening_time = serializers.SerializerMethodField()
     closing_time = serializers.SerializerMethodField()
     is_menu_vendor = serializers.SerializerMethodField()
+    catalog_label = serializers.SerializerMethodField()
+    catalog_item_label = serializers.SerializerMethodField()
+    catalog_route_slug = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -569,12 +600,28 @@ class VendorListSerializer(serializers.ModelSerializer):
             'completion_rate', 'total_listings', 'hostel', 'is_online', 'school',
             'completed_order_count', 'available_days', 'opening_time', 'closing_time',
             'avg_response_minutes', 'is_menu_vendor',
+            'catalog_label', 'catalog_item_label', 'catalog_route_slug',
         ]
 
     def get_is_menu_vendor(self, obj):
         from payments.settlement import get_vendor_type
         vt = get_vendor_type(obj)
         return bool(vt and vt.supports_menu_ordering)
+
+    def get_catalog_label(self, obj):
+        from payments.settlement import get_vendor_type
+        vt = get_vendor_type(obj)
+        return vt.catalog_label if vt else "Menu"
+
+    def get_catalog_item_label(self, obj):
+        from payments.settlement import get_vendor_type
+        vt = get_vendor_type(obj)
+        return vt.catalog_item_label if vt else "Item"
+
+    def get_catalog_route_slug(self, obj):
+        from payments.settlement import get_vendor_type
+        vt = get_vendor_type(obj)
+        return vt.catalog_route_slug if vt else "catalog"
 
     def get_is_online(self, obj):
         from django.utils import timezone

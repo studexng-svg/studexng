@@ -153,11 +153,11 @@ export default function ListingsPage() {
           </div>
           <div className="flex-1 min-w-0">
             <p className="font-bold text-stone-900 text-sm">Share your store</p>
-            <p className="text-stone-400 text-xs mt-0.5 truncate">studex.com.ng/vendor/{(user as any).username}</p>
+            <p className="text-stone-400 text-xs mt-0.5 truncate">studex.com.ng/{(user as any).is_menu_vendor ? "store" : "vendor"}/{(user as any).username}</p>
           </div>
           <button
             onClick={async () => {
-              const url = `${window.location.origin}/vendor/${(user as any).username}`;
+              const url = `${window.location.origin}/${(user as any).is_menu_vendor ? "store" : "vendor"}/${(user as any).username}`;
               if (navigator.share) {
                 await navigator.share({ title: (user as any).business_name || (user as any).username, url }).catch(() => {});
               } else {

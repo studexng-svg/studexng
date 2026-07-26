@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useAuth } from "@/lib/authStore";
 import { api } from "@/lib/api";
 import { TEAL, toArray } from "@/lib/tokens";
 import { compressImage } from "@/lib/utils";
@@ -29,6 +30,9 @@ const emptyGroupForm = { name: "", is_required: false, min_selections: 0, max_se
 const emptyAddonForm = { name: "", price_delta: "0", is_available: true, display_order: 0 };
 
 export default function VendorMenuPage() {
+  const { user } = useAuth();
+  const catalogLabel = user?.catalog_label || "Menu";
+  const catalogItemLabel = user?.catalog_item_label || "Item";
   const [loading, setLoading] = useState(true);
   const [notEnabled, setNotEnabled] = useState(false);
   const [error, setError] = useState("");
@@ -85,7 +89,7 @@ export default function VendorMenuPage() {
       );
       setFoodCategorySlug(food?.slug || null);
     } catch {
-      setError("Could not load your menu. Please refresh.");
+      setError(`Could not load your ${catalogLabel.toLowerCase()}. Please refresh.`);
     } finally {
       setLoading(false);
     }
@@ -119,7 +123,7 @@ export default function VendorMenuPage() {
       const listingRes = await api.services.createListing(fd);
       if (!listingRes.ok) {
         const d = await listingRes.json().catch(() => ({}));
-        setError(Object.values(d)[0]?.toString() || "Could not create menu item.");
+        setError(Object.values(d)[0]?.toString() || `Could not create ${catalogItemLabel.toLowerCase()}.`);
         return;
       }
       // The backend attaches the menu record automatically for a menu-ordering
@@ -260,7 +264,7 @@ export default function VendorMenuPage() {
     return (
       <div className="bg-white border border-stone-200 rounded-2xl p-10 text-center">
         <ChefHat className="w-10 h-10 text-stone-200 mx-auto mb-3" />
-        <p className="font-bold text-stone-900">Menu isn't enabled for your account</p>
+        <p className="font-bold text-stone-900">{catalogLabel} isn't enabled for your account</p>
         <p className="text-stone-400 text-sm mt-1">This feature is only available to vendor types that support menu-based ordering.</p>
       </div>
     );
@@ -279,12 +283,12 @@ export default function VendorMenuPage() {
       <div className="flex items-center justify-between">
         <div>
           <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-bold mb-0.5">Manage</p>
-          <h2 className="font-black text-stone-900 text-xl tracking-tight" style={HEADING_FONT}>Menu</h2>
+          <h2 className="font-black text-stone-900 text-xl tracking-tight" style={HEADING_FONT}>{catalogLabel}</h2>
           <p className="text-stone-400 text-xs mt-0.5">{menuItems.length} {menuItems.length === 1 ? "item" : "items"}</p>
         </div>
         <button onClick={() => { setItemForm(emptyItemForm); setError(""); setShowItemForm(true); }}
           className="flex items-center gap-1.5 px-4 py-2 text-white rounded-full font-semibold text-sm transition active:scale-95" style={{ background: TEAL }}>
-          <Plus className="w-4 h-4" /> Add Menu Item
+          <Plus className="w-4 h-4" /> Add {catalogItemLabel}
         </button>
       </div>
 
@@ -292,7 +296,7 @@ export default function VendorMenuPage() {
 
       {/* ── Menu items ── */}
       {menuItems.length === 0 ? (
-        <EmptyState icon={ChefHat} message="No menu items yet — tap Add Menu Item to create your first one" />
+        <EmptyState icon={ChefHat} message={`Nothing added yet — tap "Add ${catalogItemLabel}" to create your first one`} />
       ) : (
         <div className="space-y-3">
           {menuItems.map(item => {
@@ -383,7 +387,7 @@ export default function VendorMenuPage() {
           </button>
         </div>
         {sortedCategories.length === 0 ? (
-          <p className="text-stone-400 text-sm py-2">Group your menu into sections like "Rice Dishes" or "Drinks" — optional.</p>
+          <p className="text-stone-400 text-sm py-2">Group your {catalogLabel.toLowerCase()} into sections like "Rice Dishes" or "Drinks" — optional.</p>
         ) : (
           <div className="space-y-1.5">
             {sortedCategories.map(c => (
@@ -400,7 +404,7 @@ export default function VendorMenuPage() {
 
       {/* ── Add Menu Item modal ── */}
       {showItemForm && (
-        <Modal title="Add Menu Item" onClose={() => setShowItemForm(false)}>
+        <Modal title={`Add ${catalogItemLabel}`} onClose={() => setShowItemForm(false)}>
           <Field label="Photo (optional)">
             <label className="w-24 h-24 rounded-xl border-2 border-dashed border-stone-200 flex items-center justify-center cursor-pointer hover:border-teal-400 transition overflow-hidden">
               {itemForm.imagePreview ? (
@@ -420,14 +424,14 @@ export default function VendorMenuPage() {
           <Field label="Description (optional)">
             <textarea value={itemForm.description} onChange={e => setItemForm(f => ({ ...f, description: e.target.value }))} rows={2} className={inputCls} placeholder="e.g. Smoky party jollof with plantain" />
           </Field>
-          <SaveButton saving={saving} onClick={saveItem} label="Add Menu Item" />
+          <SaveButton saving={saving} onClick={saveItem} label={`Add ${catalogItemLabel}`} />
           <p className="text-xs text-stone-400 text-center">Add customizations like "Protein" or "Extras" after creating the item.</p>
         </Modal>
       )}
 
       {/* ── Item details modal (category, prep time, allergens) ── */}
       {detailsModal && (
-        <Modal title="Menu Item Details" onClose={() => setDetailsModal(null)}>
+        <Modal title={`${catalogItemLabel} Details`} onClose={() => setDetailsModal(null)}>
           <Field label="Category">
             <select value={detailsForm.menu_category} onChange={e => setDetailsForm(f => ({ ...f, menu_category: e.target.value ? Number(e.target.value) : "" }))} className={inputCls}>
               <option value="">Uncategorized</option>

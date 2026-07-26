@@ -32,11 +32,12 @@ export interface MenuOrderingItem {
 // support menu ordering; no backend change needed since ListingSerializer
 // already exposes this on every listing).
 export default function RestaurantMenuView({
-  listings, isOwn, onSelectItem,
+  listings, isOwn, onSelectItem, catalogLabel = "Menu",
 }: {
   listings: MenuOrderingItem[];
   isOwn: boolean;
   onSelectItem: (item: MenuOrderingItem) => void;
+  catalogLabel?: string;
 }) {
   const [activeCategory, setActiveCategory] = useState("All");
 
@@ -47,19 +48,19 @@ export default function RestaurantMenuView({
 
   const categories = useMemo(() => {
     const names = new Set<string>();
-    items.forEach(i => names.add(i.menu_item?.menu_category || "Menu"));
+    items.forEach(i => names.add(i.menu_item?.menu_category || catalogLabel));
     return ["All", ...Array.from(names).sort()];
-  }, [items]);
+  }, [items, catalogLabel]);
 
   const visible = activeCategory === "All"
     ? items
-    : items.filter(i => (i.menu_item?.menu_category || "Menu") === activeCategory);
+    : items.filter(i => (i.menu_item?.menu_category || catalogLabel) === activeCategory);
 
   if (items.length === 0) {
     return (
       <div className="bg-stone-50 rounded-2xl p-16 text-center border border-stone-100">
         <UtensilsCrossed className="w-10 h-10 text-stone-200 mx-auto mb-3" />
-        <p className="text-stone-400 font-semibold text-sm">No menu items yet</p>
+        <p className="text-stone-400 font-semibold text-sm">Nothing on the {catalogLabel.toLowerCase()} yet</p>
       </div>
     );
   }

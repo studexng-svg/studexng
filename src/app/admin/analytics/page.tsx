@@ -405,7 +405,7 @@ export default function AdminAnalytics() {
                         <p className="text-sm font-semibold text-stone-800">{v.business_name || v.username}</p>
                         <p className="text-xs text-stone-400">@{v.username} · {(v.school || "").toUpperCase()}</p>
                       </div>
-                      <a href={`/vendor/${v.username}`} target="_blank" rel="noreferrer"
+                      <a href={v.is_menu_vendor ? `/store/${v.username}` : `/vendor/${v.username}`} target="_blank" rel="noreferrer"
                         className="text-xs text-teal-600 font-semibold hover:underline flex-shrink-0">
                         View →
                       </a>

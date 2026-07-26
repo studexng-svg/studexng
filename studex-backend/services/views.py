@@ -204,12 +204,12 @@ class ListingViewSet(viewsets.ModelViewSet):
                 # approved listings; the vendor viewing their own dashboard
                 # needs to see pending ones too so they can track approval status.
                 qs = qs.filter(is_available=True)
-            return qs.select_related('vendor', 'category').prefetch_related('vendor__profile', 'variants')
+            return qs.select_related('vendor', 'category', 'vendor__vendor__vendor_type').prefetch_related('vendor__profile', 'variants')
 
         # For retrieve/update/delete — no campus filter so any listing is accessible
         # by ID regardless of which campus the requester is on (fixes SSR 404 for FUTO listings)
         if self.action != 'list':
-            return Listing.objects.all().select_related('vendor', 'category').prefetch_related('vendor__profile', 'variants')
+            return Listing.objects.all().select_related('vendor', 'category', 'vendor__vendor__vendor_type').prefetch_related('vendor__profile', 'variants')
 
         # List action only — campus-scoped listings
         campus = 'pau'
@@ -256,7 +256,7 @@ class ListingViewSet(viewsets.ModelViewSet):
             else:
                 qs = qs.filter(category__slug=category_param)
 
-        return qs.select_related('vendor', 'category').prefetch_related('vendor__profile', 'variants')
+        return qs.select_related('vendor', 'category', 'vendor__vendor__vendor_type').prefetch_related('vendor__profile', 'variants')
 
     def update(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -347,10 +347,11 @@ class VendorOfMonthView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
+        from payments.settlement import get_vendor_type
         try:
             campus = (request.query_params.get('campus') or 'futo').lower()
             votm = VendorOfTheMonth.objects.select_related(
-                'vendor', 'vendor__profile'
+                'vendor', 'vendor__profile', 'vendor__vendor__vendor_type'
             ).filter(campus=campus).first()
             if not votm or not votm.vendor:
                 return Response(None)
@@ -371,6 +372,8 @@ class VendorOfMonthView(APIView):
                         except Exception:
                             pass
 
+            vt = get_vendor_type(vendor)
+
             return Response({
                 'id': vendor.id,
                 'username': vendor.username,
@@ -383,6 +386,7 @@ class VendorOfMonthView(APIView):
                 'total_orders': votm.total_orders,
                 'completion_rate': votm.completion_rate,
                 'campus': votm.campus,
+                'is_menu_vendor': bool(vt and vt.supports_menu_ordering),
             })
         except Exception as e:
             import logging
@@ -410,9 +414,10 @@ class VendorOfMonthHistoryView(APIView):
             return None
 
     def get(self, request):
+        from payments.settlement import get_vendor_type
         try:
             entries = VendorOfTheMonth.objects.select_related(
-                'vendor', 'vendor__profile'
+                'vendor', 'vendor__profile', 'vendor__vendor__vendor_type'
             ).order_by('-month')
 
             results = []
@@ -421,6 +426,7 @@ class VendorOfMonthHistoryView(APIView):
                 if not vendor:
                     continue
                 profile = getattr(vendor, 'profile', None)
+                vt = get_vendor_type(vendor)
                 results.append({
                     'month': entry.month.strftime('%B %Y'),
                     'month_key': entry.month.strftime('%Y-%m'),
@@ -433,6 +439,7 @@ class VendorOfMonthHistoryView(APIView):
                     'total_orders': entry.total_orders,
                     'completion_rate': entry.completion_rate,
                     'is_manual_override': entry.is_manual_override,
+                    'is_menu_vendor': bool(vt and vt.supports_menu_ordering),
                 })
             return Response(results)
         except Exception as e:

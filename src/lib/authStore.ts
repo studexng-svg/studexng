@@ -18,6 +18,10 @@ interface UserProfile {
   wallet_balance: string;
   profile_image?: string | null;
   school?: string;
+  is_menu_vendor?: boolean;
+  catalog_label?: string;
+  catalog_item_label?: string;
+  catalog_route_slug?: string;
   profile?: {
     vendor_badge?: string;
     rating?: string;

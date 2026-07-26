@@ -269,6 +269,7 @@ class AdminAnalytics:
             from accounts.models import User as UserModel
             from orders.models import Order
             from datetime import timedelta
+            from django.db.models import F
             cutoff = timezone.now() - timedelta(days=14)
             active_vendor_ids = (
                 Order.objects
@@ -276,14 +277,25 @@ class AdminAnalytics:
                 .values_list('listing__vendor_id', flat=True)
                 .distinct()
             )
+            # is_menu_vendor read straight off the same relationship
+            # get_vendor_type() walks (seller.vendor.vendor_type) — .values()
+            # returns plain dicts, not model instances, so the helper itself
+            # can't be called here; F() traverses the identical FK chain.
+            # NULL (no Vendor row / no vendor_type) needs coercing to False —
+            # .values() would otherwise return None, unlike get_vendor_type()'s
+            # own bool(vt and vt.supports_menu_ordering).
             churning = (
                 UserModel.objects
                 .filter(is_verified_vendor=True, is_active=True)
                 .exclude(id__in=active_vendor_ids)
                 .order_by('username')
-                .values('id', 'username', 'business_name', 'school')[:20]
+                .values('id', 'username', 'business_name', 'school',
+                        is_menu_vendor=F('vendor__vendor_type__supports_menu_ordering'))[:20]
             )
-            return list(churning)
+            churning = list(churning)
+            for row in churning:
+                row['is_menu_vendor'] = bool(row['is_menu_vendor'])
+            return churning
         except Exception:
             return []
 

@@ -57,6 +57,7 @@ interface Listing {
     completion_rate?: number;
     rating?: number;
     total_reviews?: number;
+    is_menu_vendor?: boolean;
   };
 }
 
@@ -274,6 +275,7 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
   );
 
   const vendorName    = listing.vendor.business_name || listing.vendor.username;
+  const vendorHref    = listing.vendor.is_menu_vendor ? `/store/${listing.vendor.username}` : `/vendor/${listing.vendor.username}`;
   const badge         = listing.vendor.vendor_badge;
   const rating        = Number(listing.vendor.rating) || 0;
   const totalReviews  = Number(listing.vendor.total_reviews) || 0;
@@ -604,7 +606,7 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
                 )}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <Link href={`/vendor/${listing.vendor.username}`} className="font-bold text-stone-900 text-sm hover:text-teal-600 transition truncate">
+                    <Link href={vendorHref} className="font-bold text-stone-900 text-sm hover:text-teal-600 transition truncate">
                       {vendorName}
                     </Link>
                     {badge && badge !== "none" && <VendorBadge badge={badge} size="sm" />}
@@ -752,7 +754,7 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
               <section>
                 <div className="flex items-center justify-between mb-5">
                   <h2 className="text-xl font-black text-stone-900" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>More from {vendorName}</h2>
-                  <Link href={`/vendor/${listing.vendor.username}`} className="text-teal-600 text-sm font-semibold hover:text-teal-700 transition">View store →</Link>
+                  <Link href={vendorHref} className="text-teal-600 text-sm font-semibold hover:text-teal-700 transition">View store →</Link>
                 </div>
                 {vendorLoading ? <RelatedSkeleton /> : (
                   <div className="flex gap-4 overflow-x-auto pb-2" style={{ scrollbarWidth:"none" }}>

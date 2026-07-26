@@ -17,6 +17,7 @@ interface VendorOfMonth {
   month: string;
   total_orders: number;
   completion_rate: number;
+  is_menu_vendor?: boolean;
 }
 
 const STORAGE_KEY_PREFIX = "votm_seen_";
@@ -124,7 +125,7 @@ export default function VendorOfMonthModal({ vendor }: { vendor: VendorOfMonth |
                 </div>
               </div>
 
-              <Link href={`/vendor/${vendor.username}`} onClick={dismiss}>
+              <Link href={vendor.is_menu_vendor ? `/store/${vendor.username}` : `/vendor/${vendor.username}`} onClick={dismiss}>
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.97 }}

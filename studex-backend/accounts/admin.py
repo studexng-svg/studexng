@@ -386,10 +386,15 @@ class SellerApplicationAdmin(admin.ModelAdmin):
 class VendorTypeAdmin(admin.ModelAdmin):
     list_display = [
         'display_name', 'name', 'settlement_trigger',
-        'supports_menu_ordering', 'supports_batched_delivery', 'is_active', 'updated_at',
+        'supports_menu_ordering', 'supports_batched_delivery',
+        'catalog_label', 'catalog_item_label', 'catalog_route_slug',
+        'is_active', 'updated_at',
     ]
     list_filter = ['settlement_trigger', 'supports_menu_ordering', 'supports_batched_delivery', 'is_active']
-    list_editable = ['supports_menu_ordering', 'supports_batched_delivery']
+    list_editable = [
+        'supports_menu_ordering', 'supports_batched_delivery',
+        'catalog_label', 'catalog_item_label', 'catalog_route_slug',
+    ]
     search_fields = ['name', 'display_name']
     readonly_fields = ['created_at', 'updated_at']
     ordering = ['display_name']

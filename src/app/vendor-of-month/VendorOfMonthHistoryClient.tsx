@@ -19,6 +19,7 @@ interface VotmEntry {
   total_orders: number;
   completion_rate: number;
   is_manual_override: boolean;
+  is_menu_vendor?: boolean;
 }
 
 export default function VendorOfMonthHistoryClient({ history }: { history: VotmEntry[] }) {
@@ -56,7 +57,7 @@ export default function VendorOfMonthHistoryClient({ history }: { history: VotmE
             {history.map((entry, i) => (
               <Link
                 key={entry.month_key}
-                href={`/vendor/${entry.username}`}
+                href={entry.is_menu_vendor ? `/store/${entry.username}` : `/vendor/${entry.username}`}
                 className="relative flex items-center gap-4 bg-white rounded-2xl p-4 shadow-sm border border-gray-100 hover:shadow-md transition-shadow active:scale-[0.98]"
               >
                 <div className="relative">

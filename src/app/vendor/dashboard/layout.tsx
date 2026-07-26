@@ -42,7 +42,14 @@ export default function VendorDashboardLayout({ children }: { children: React.Re
   const [bookingBadge, setBookingBadge] = useState(0);
   const [disputeBadge, setDisputeBadge] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [isMenuVendor, setIsMenuVendor] = useState<boolean | null>(null);
+
+  // Same is_menu_vendor field that backs the public vendor profile
+  // (VendorListSerializer) and UserProfileSerializer — one signal read off
+  // the already-fetched auth profile, not a second independent lookup.
+  // null while the profile hasn't hydrated yet, so tabs can hide instead of
+  // flashing the wrong set.
+  const isMenuVendor = isHydrated && user ? !!user.is_menu_vendor : null;
+  const catalogLabel = user?.catalog_label || "Menu";
 
   useEffect(() => {
     if (!isHydrated) return;
@@ -50,20 +57,20 @@ export default function VendorDashboardLayout({ children }: { children: React.Re
     if (!user?.is_verified_vendor) { router.push("/vendor/apply"); return; }
   }, [isHydrated, isLoggedIn, user]);
 
-  useEffect(() => {
-    if (!user) return;
-    api.services.menuItems()
-      .then(r => setIsMenuVendor(r.status !== 403))
-      .catch(() => setIsMenuVendor(false));
-  }, [user]);
-
   // Hide both "Listings"/"Kitchen" while this is still resolving to avoid a
   // flash of the wrong one; swap to the right single tab once known.
-  const TABS = ALL_TABS.filter(tab => {
-    if (isMenuVendor === null) return tab.id !== "listings" && tab.id !== "kitchen";
-    if (isMenuVendor) return tab.id !== "listings" && tab.id !== "bookings";
-    return tab.id !== "kitchen";
-  });
+  const TABS = ALL_TABS
+    .filter(tab => {
+      if (isMenuVendor === null) return tab.id !== "listings" && tab.id !== "kitchen";
+      if (isMenuVendor) return tab.id !== "listings" && tab.id !== "bookings";
+      return tab.id !== "kitchen";
+    })
+    .map(tab => tab.id === "kitchen" ? { ...tab, label: catalogLabel } : tab);
+
+  // Same signal already driving the tab visibility above — reused here so the
+  // share link agrees with what the tabs show. Defaults to /vendor/ while
+  // still resolving.
+  const storefrontPath = isMenuVendor ? "store" : "vendor";
 
   useEffect(() => {
     if (!user) return;
@@ -157,10 +164,10 @@ export default function VendorDashboardLayout({ children }: { children: React.Re
           <p className="text-[10px] text-stone-400 uppercase font-bold tracking-widest px-1">Share profile</p>
           <div className="bg-stone-50 rounded-xl px-3 py-2 flex items-center gap-2">
             <Link2 className="w-3.5 h-3.5 text-teal-500 flex-shrink-0" />
-            <p className="text-xs text-stone-500 font-medium truncate flex-1">studex.com.ng/vendor/{user.username}</p>
+            <p className="text-xs text-stone-500 font-medium truncate flex-1">studex.com.ng/{storefrontPath}/{user.username}</p>
             <button
               onClick={() => {
-                navigator.clipboard.writeText(`https://studex.com.ng/vendor/${user.username}`);
+                navigator.clipboard.writeText(`https://studex.com.ng/${storefrontPath}/${user.username}`);
                 setLinkCopied(true);
                 setTimeout(() => setLinkCopied(false), 2000);
               }}
@@ -175,7 +182,7 @@ export default function VendorDashboardLayout({ children }: { children: React.Re
                 navigator.share({
                   title: `${user.username} on StudEx`,
                   text: "Check out my store on StudEx",
-                  url: `https://studex.com.ng/vendor/${user.username}`,
+                  url: `https://studex.com.ng/${storefrontPath}/${user.username}`,
                 }).catch(() => {});
               }}
               className="w-full py-2 rounded-xl text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-opacity hover:opacity-90"
