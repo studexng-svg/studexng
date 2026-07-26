@@ -133,6 +133,7 @@ def auto_release_orders():
     """
     from django.db import transaction as db_tx
     from orders.models import Order
+    from orders.views import award_vendor_badge_progress
     from accounts.utils import send_notification
     from payments.models import PaymentTransaction
     from payments.views import trigger_vendor_payout
@@ -162,6 +163,7 @@ def auto_release_orders():
                 locked.auto_released = True
                 locked.buyer_confirmed_at = timezone.now()
                 locked.save(update_fields=['status', 'auto_released', 'buyer_confirmed_at'])
+                award_vendor_badge_progress(locked)
 
             # Same payout trigger as OrderViewSet.confirm() — outside the lock,
             # same as the view does, since it's an external API call.

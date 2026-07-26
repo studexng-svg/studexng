@@ -36,6 +36,58 @@ def _notify(recipient, notification_type, title, message, action_url=""):
         logger.warning(f"Notification failed: {e}")
 
 
+def award_vendor_badge_progress(order):
+    """
+    Increments a vendor's on_platform_sales/vendor_badge/completion_rate for
+    one completed order. Vendor-type-agnostic by construction — a Store's
+    orders count exactly the same as a marketplace vendor's, since this only
+    ever looks at order.listing.vendor and Order.status, never VendorType.
+
+    Every code path that marks an Order 'completed' must call this — it used
+    to live only inline in OrderViewSet.confirm() (the buyer explicitly
+    confirms), which meant orders finalized by scheduler.auto_release_orders()
+    (the 24h no-response auto-release) never incremented badge progress at
+    all. Extracted so both paths share one implementation instead of drifting.
+    """
+    try:
+        vendor = order.listing.vendor
+        vp = vendor.profile
+        old_badge = vp.vendor_badge or 'none'
+        vp.on_platform_sales = (vp.on_platform_sales or 0) + 1
+        sales = vp.on_platform_sales
+        if sales >= 50: vp.vendor_badge = 'top'
+        elif sales >= 30: vp.vendor_badge = 'trusted'
+        elif sales >= 10: vp.vendor_badge = 'rising'
+
+        vendor_orders = Order.objects.filter(listing__vendor=vendor)
+        completed_count = vendor_orders.filter(status='completed').count()
+        finalized_count = vendor_orders.filter(
+            status__in=['completed', 'cancelled', 'disputed']
+        ).count()
+        vp.completion_rate = round(
+            (completed_count / finalized_count * 100), 2
+        ) if finalized_count > 0 else 0
+
+        vp.save(update_fields=['on_platform_sales', 'vendor_badge', 'completion_rate'])
+
+        if vp.vendor_badge != old_badge and vp.vendor_badge != 'none':
+            badge_labels = {
+                'rising': ('🌟 Rising Vendor', 'You just earned the Rising Vendor badge — 10 completed sales!'),
+                'trusted': ('⭐ Trusted Vendor', 'Amazing! You just earned the Trusted Vendor badge — 30 completed sales!'),
+                'top': ('👑 Top Vendor', 'Outstanding! You just earned the Top Vendor badge — 50 completed sales!'),
+            }
+            title, msg = badge_labels.get(vp.vendor_badge, (f'Badge Upgrade: {vp.vendor_badge}', ''))
+            _notify(
+                recipient=vendor,
+                notification_type='badge_upgrade',
+                title=title,
+                message=f'{msg} Keep delivering great service to maintain your badge.',
+                action_url='/vendor/dashboard',
+            )
+    except Exception as e:
+        logger.warning(f"Vendor badge/completion update skipped: {e}")
+
+
 class OrderViewSet(viewsets.ModelViewSet):
     queryset = Order.objects.all()
     serializer_class = OrderSerializer
@@ -508,44 +560,7 @@ class OrderViewSet(viewsets.ModelViewSet):
         except Exception as e:
             logger.warning(f"Loyalty award skipped for order {order.id}: {e}")
 
-        # Vendor badge + completion rate
-        try:
-            vendor = order.listing.vendor
-            vp = vendor.profile
-            old_badge = vp.vendor_badge or 'none'
-            vp.on_platform_sales = (vp.on_platform_sales or 0) + 1
-            sales = vp.on_platform_sales
-            if sales >= 50: vp.vendor_badge = 'top'
-            elif sales >= 30: vp.vendor_badge = 'trusted'
-            elif sales >= 10: vp.vendor_badge = 'rising'
-
-            vendor_orders = Order.objects.filter(listing__vendor=vendor)
-            completed_count = vendor_orders.filter(status='completed').count()
-            finalized_count = vendor_orders.filter(
-                status__in=['completed', 'cancelled', 'disputed']
-            ).count()
-            vp.completion_rate = round(
-                (completed_count / finalized_count * 100), 2
-            ) if finalized_count > 0 else 0
-
-            vp.save(update_fields=['on_platform_sales', 'vendor_badge', 'completion_rate'])
-
-            if vp.vendor_badge != old_badge and vp.vendor_badge != 'none':
-                badge_labels = {
-                    'rising': ('🌟 Rising Vendor', 'You just earned the Rising Vendor badge — 10 completed sales!'),
-                    'trusted': ('⭐ Trusted Vendor', 'Amazing! You just earned the Trusted Vendor badge — 30 completed sales!'),
-                    'top': ('👑 Top Vendor', 'Outstanding! You just earned the Top Vendor badge — 50 completed sales!'),
-                }
-                title, msg = badge_labels.get(vp.vendor_badge, (f'Badge Upgrade: {vp.vendor_badge}', ''))
-                _notify(
-                    recipient=vendor,
-                    notification_type='badge_upgrade',
-                    title=title,
-                    message=f'{msg} Keep delivering great service to maintain your badge.',
-                    action_url='/vendor/dashboard',
-                )
-        except Exception as e:
-            logger.warning(f"Vendor badge/completion update skipped: {e}")
+        award_vendor_badge_progress(order)
 
         response_data = {
             "message": "Order confirmed! Paystack will transfer payment to the vendor.",

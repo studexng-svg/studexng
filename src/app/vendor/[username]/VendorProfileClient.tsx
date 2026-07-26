@@ -17,6 +17,7 @@ import { useCart } from "@/lib/cartStore";
 import { useAuth } from "@/lib/authStore";
 import AddonPickerModal, { AddonGroupData } from "@/components/cart/AddonPickerModal";
 import RestaurantMenuView, { MenuOrderingItem } from "./RestaurantMenuView";
+import VerifiedTick from "@/components/VerifiedTick";
 
 /* ── helpers ───────────────────────────────────────────────────────────── */
 
@@ -297,6 +298,9 @@ export default function VendorProfileClient() {
                   <h1 className="text-3xl lg:text-4xl font-black text-stone-900 [overflow-wrap:anywhere] leading-tight" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                     {vendor.business_name || vendor.username}
                   </h1>
+                  {isMenuVendor
+                    ? <VerifiedTick color="#000000" label="Verified Store" />
+                    : <VerifiedTick color="#10b981" label="Verified Vendor" />}
                   {badge && (
                     <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-teal-50 text-teal-700 border border-teal-200 flex-shrink-0">
                       {badge.emoji} {badge.label}

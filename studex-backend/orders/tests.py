@@ -1000,3 +1000,24 @@ class AutoReleaseOrdersPayoutTests(TestCase):
         self.order.refresh_from_db()
         self.assertEqual(self.order.status, 'seller_completed')
         mock_transfer.assert_not_called()
+
+    def test_auto_release_awards_vendor_badge_progress(self):
+        """
+        Regression test: auto_release_orders() used to mark an order
+        'completed' and pay the vendor out without ever incrementing
+        Profile.on_platform_sales/vendor_badge — only OrderViewSet.confirm()
+        (the buyer's explicit confirm) did. A vendor whose orders always
+        auto-release (buyer never explicitly confirms) would never earn
+        rising/trusted/top badge progress. Must increment exactly like
+        confirm() does, for any vendor type.
+        """
+        from scheduler import auto_release_orders
+
+        profile = self.seller.profile
+        self.assertEqual(profile.on_platform_sales or 0, 0)
+
+        with patch('payments.views.trigger_vendor_payout'):
+            auto_release_orders()
+
+        profile.refresh_from_db()
+        self.assertEqual(profile.on_platform_sales, 1)
