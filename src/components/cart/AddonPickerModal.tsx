@@ -73,9 +73,9 @@ export default function AddonPickerModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[60] bg-black/40 flex items-end sm:items-center justify-center sm:p-4" onClick={() => !submitting && onClose()}>
-      <div className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl w-full sm:max-w-md max-h-[92vh] sm:max-h-[85vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
-        <div className="overflow-y-auto">
+    <div className="fixed inset-0 z-[60] bg-black/30 backdrop-blur-md flex items-center justify-center p-4" onClick={() => !submitting && onClose()}>
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md max-h-[85vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="overflow-y-auto hide-scrollbar">
           {listing.image && (
             <div className="w-full aspect-[16/9] bg-stone-50 overflow-hidden">
               <img src={listing.image} alt={listing.title} className="w-full h-full object-cover" />

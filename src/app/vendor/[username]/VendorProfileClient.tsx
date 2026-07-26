@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   Star, Sparkles, MapPin, Shield, BellRing, UserX, X as XIcon,
-  Clock, Share2, MessageCircle, Zap, ShoppingCart,
+  Clock, Share2, Zap, ShoppingCart,
   Calendar, Package, CheckCircle2,
 } from "lucide-react";
 import TopNav from "@/components/layout/TopNav";
@@ -333,12 +333,6 @@ export default function VendorProfileClient() {
                     className="px-5 py-2.5 rounded-2xl border border-stone-200 bg-white text-stone-800 text-sm font-semibold hover:bg-stone-50 active:scale-95 transition-all flex items-center gap-1.5 shadow-sm">
                     <Share2 className="w-4 h-4" /> Share
                   </button>
-                  <Link href={`/chat?vendor=${vendor.username}`}>
-                    <button className="px-5 py-2.5 rounded-2xl text-white text-sm font-semibold hover:opacity-90 active:scale-95 transition-all flex items-center gap-1.5 shadow-md"
-                      style={{ background: "#0d9488" }}>
-                      <MessageCircle className="w-4 h-4" /> Chat
-                    </button>
-                  </Link>
                 </div>
               </div>
 
