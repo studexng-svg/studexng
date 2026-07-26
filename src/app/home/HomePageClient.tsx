@@ -21,6 +21,7 @@ import { GRAD, GRAD_TEXT, TEAL, PURPLE } from "@/lib/tokens";
 import VendorOfMonthModal from "@/components/VendorOfMonthModal";
 import { useScrollRestoration } from "@/hooks/useScrollRestoration";
 import WhatsAppGroupModal from "@/components/WhatsAppGroupModal";
+import VerifiedTick from "@/components/VerifiedTick";
 
 
 interface Vendor {
@@ -744,7 +745,10 @@ export default function HomePageClient({ initialVendors, initialListings, initia
               )}
 
               <div className="absolute bottom-0 left-0 right-0 p-3">
-                <p className="font-bold text-white text-sm truncate">{vendor.business_name || vendor.username}</p>
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <p className="font-bold text-white text-sm truncate">{vendor.business_name || vendor.username}</p>
+                  <VerifiedTick color="#000000" label="Verified Store" className="ring-2 ring-white" />
+                </div>
                 <p className="text-white/70 text-xs mt-0.5 truncate flex items-center gap-1">
                   <Store className="w-3 h-3 flex-shrink-0" />
                   Store{vendor.hostel ? ` · ${vendor.hostel}` : ""}
