@@ -380,6 +380,9 @@ export const api = {
     previewPrice: (body: Record<string, unknown>) =>
       fetchWithAuth(u("/api/payments/preview-price/"), { method: "POST", body: s(body) }),
 
+    previewAddonPrice: (body: Record<string, unknown>) =>
+      fetchWithAuth(u("/api/payments/preview-addon-price/"), { method: "POST", body: s(body) }),
+
     payWithCredits: (body: Record<string, unknown>) =>
       fetchWithAuth(u("/api/payments/pay-with-credits/"), { method: "POST", body: s(body) }),
 

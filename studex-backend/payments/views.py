@@ -1386,6 +1386,64 @@ def preview_price(request):
     })
 
 
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def preview_addon_price(request):
+    """
+    The buyer-facing preview of a listing + selected add-ons, before anything
+    is added to cart. Must return exactly what checkout will actually charge
+    (payments.cart_checkout.price_cart_item) — the platform fee applies to
+    the *combined* payout (base + every add-on delta), never to the item and
+    each add-on separately. Re-derives everything from listing_id/addon ids;
+    never trusts a client-supplied price.
+    """
+    from services.models import Listing, Addon
+    from payments.cart_checkout import _combined_payout_per_unit
+    from payments.pricing import calculate_final_price
+    from payments.settlement import get_vendor_type
+
+    listing_id = request.data.get("listing_id")
+    if not listing_id:
+        return Response({"error": "listing_id is required."}, status=400)
+    try:
+        listing = Listing.objects.select_related("vendor").get(id=listing_id)
+    except Listing.DoesNotExist:
+        return Response({"error": "Listing not found."}, status=404)
+
+    try:
+        quantity = max(1, int(request.data.get("quantity", 1)))
+    except (TypeError, ValueError):
+        return Response({"error": "quantity must be an integer."}, status=400)
+
+    addon_selections = request.data.get("addons") or []
+    addon_ids = [a.get("id") for a in addon_selections if a.get("id") is not None]
+    addons_by_id = {
+        a.id: a for a in Addon.objects.filter(id__in=addon_ids, group__menu_item__listing_id=listing.id)
+    }
+
+    deltas = []
+    for sel in addon_selections:
+        addon = addons_by_id.get(sel.get("id"))
+        if addon is None:
+            return Response({"error": "One of the selected add-ons is invalid for this item."}, status=400)
+        try:
+            addon_qty = max(1, int(sel.get("quantity", 1)))
+        except (TypeError, ValueError):
+            return Response({"error": "addon quantity must be an integer."}, status=400)
+        deltas.append(Decimal(str(addon.price_delta)) * addon_qty)
+
+    vendor_type = get_vendor_type(listing.vendor)
+    combined_payout = _combined_payout_per_unit(listing, deltas)
+    unit_price = calculate_final_price(combined_payout, campus=listing.campus, vendor_type=vendor_type)
+    line_total = (unit_price * quantity).quantize(Decimal("0.01"))
+
+    return Response({
+        "unit_price": str(unit_price),
+        "line_total": str(line_total),
+        "combined_payout_per_unit": str(combined_payout),
+    })
+
+
 # ─────────────────────────────────────────
 # REFUND
 # ─────────────────────────────────────────

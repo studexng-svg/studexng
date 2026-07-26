@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { X, Minus, Plus } from "lucide-react";
 import { TEAL } from "@/lib/tokens";
 import { useCartStore } from "@/lib/cartStore";
+import { api } from "@/lib/api";
 
 export interface AddonOption { id: number; name: string; price_delta: string; is_available: boolean; }
 export interface AddonGroupData { id: number; name: string; is_required: boolean; min_selections: number; max_selections: number; addons: AddonOption[]; }
@@ -54,6 +55,27 @@ export default function AddonPickerModal({
   const addonTotal = addonGroups
     .flatMap(g => g.addons)
     .reduce((sum, a) => (a.id in qtyByAddonId ? sum + parseFloat(a.price_delta) * qtyByAddonId[a.id] : sum), 0);
+
+  // The real charge applies the platform fee to the combined (base + add-ons)
+  // amount, not to each piece separately (payments/cart_checkout.py) — so a
+  // naive listing.price + addonTotal undercounts the fee once any add-on is
+  // selected. Ask the server for the true total instead of re-deriving fee
+  // math here; fall back to the naive sum only while that request is in
+  // flight or if it fails, so the footer is never blank.
+  const [lineTotal, setLineTotal] = useState<number | null>(null);
+  useEffect(() => {
+    if (Object.keys(qtyByAddonId).length === 0) { setLineTotal(null); return; }
+    const addonSelections = Object.entries(qtyByAddonId).map(([id, q]) => ({ id: Number(id), quantity: q }));
+    const t = setTimeout(() => {
+      api.payments.previewAddonPrice({ listing_id: listing.id, quantity: qty, addons: addonSelections })
+        .then(r => r.ok ? r.json() : null)
+        .then(d => setLineTotal(d ? parseFloat(d.line_total) : null))
+        .catch(() => setLineTotal(null));
+    }, 300);
+    return () => clearTimeout(t);
+  }, [listing.id, qty, JSON.stringify(qtyByAddonId)]);
+
+  const estimatedTotal = lineTotal ?? (listing.price + addonTotal) * qty;
 
   const missingRequired = addonGroups.some(g => g.is_required && Object.keys(selections[g.id] || {}).length === 0);
 
@@ -180,7 +202,7 @@ export default function AddonPickerModal({
         <div className="p-5 sm:p-6 pt-3 border-t border-stone-100 space-y-3 flex-shrink-0">
           <div className="flex items-center justify-between">
             <span className="text-sm font-semibold text-stone-600">Estimated total</span>
-            <span className="text-lg font-bold" style={{ color: TEAL }}>₦{((listing.price + addonTotal) * qty).toLocaleString()}</span>
+            <span className="text-lg font-bold" style={{ color: TEAL }}>₦{estimatedTotal.toLocaleString()}</span>
           </div>
           <button onClick={submit} disabled={submitting || missingRequired}
             className="w-full py-3.5 rounded-full font-bold text-white text-sm disabled:opacity-50 transition"
