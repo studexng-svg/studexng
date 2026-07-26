@@ -181,6 +181,8 @@ export const api = {
     deals: (campus?: string) =>
       fetch(u(`/api/services/deals/${campus ? "?campus=" + campus : ""}`)),
 
+    heroSlides: () => fetch(u("/api/services/hero-slides/")),
+
     reviews: (params?: Record<string, string>) => {
       const qs = params ? "?" + new URLSearchParams(params) : "";
       return fetch(u(`/api/reviews/reviews/${qs}`));

@@ -1,6 +1,7 @@
 # services/models.py
 from django.db import models
 from django.contrib.auth import get_user_model
+from studex.validators import validate_image
 
 User = get_user_model()
 
@@ -428,3 +429,27 @@ class SearchQuery(models.Model):
 
     def __str__(self):
         return self.query
+
+
+class HeroSlide(models.Model):
+    """
+    Admin-uploaded images shown as the rotating background on the home feed
+    hero (src/app/home/HomePageClient.tsx). Deliberately a real ImageField
+    (Cloudinary-backed, same pattern as User.profile_image) rather than a
+    pasted URL like Category.image — the whole point is that any image an
+    admin uploads through Django admin shows up on the hero, no external
+    hosting step required. Multiple rows = the slideshow; is_active lets an
+    admin pull a slide without deleting it, display_order controls sequence.
+    """
+    image = models.ImageField(upload_to='hero_slides/', validators=[validate_image])
+    display_order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['display_order', 'created_at']
+        verbose_name = "Hero Slide"
+        verbose_name_plural = "Hero Slides"
+
+    def __str__(self):
+        return f"Hero Slide #{self.display_order} ({'active' if self.is_active else 'inactive'})"

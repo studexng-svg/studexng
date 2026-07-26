@@ -1,7 +1,7 @@
 # services/serializers.py
 import json
 from rest_framework import serializers
-from .models import Category, Listing, ListingVariant, Transaction, Deal
+from .models import Category, Listing, ListingVariant, Transaction, Deal, HeroSlide
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
@@ -12,6 +12,29 @@ class CategorySerializer(serializers.ModelSerializer):
         model = Category
         fields = ['id', 'title', 'slug', 'image']
         read_only_fields = ['id']
+
+
+class HeroSlideSerializer(serializers.ModelSerializer):
+    image = serializers.SerializerMethodField()
+
+    class Meta:
+        model = HeroSlide
+        fields = ['id', 'image', 'display_order']
+
+    def get_image(self, obj):
+        # Same absolute-URL resolution as VendorListSerializer.get_profile_picture —
+        # Cloudinary already returns a full http(s) URL; the request-based fallback
+        # only matters for local/non-Cloudinary dev setups.
+        if not obj.image:
+            return None
+        try:
+            url = obj.image.url
+        except Exception:
+            return None
+        if url.startswith('http'):
+            return url
+        request = self.context.get('request')
+        return request.build_absolute_uri(url) if request else url
 
 
 class ListingVariantSerializer(serializers.ModelSerializer):

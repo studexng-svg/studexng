@@ -35,16 +35,18 @@ export default async function HomePage() {
   let initialCategories: any[] = [];
   let vendorOfMonth: any = null;
   let initialDeals: any[] = [];
+  let initialHeroSlides: any[] = [];
 
   const opts = { next: { revalidate: 60 }, headers: { "Content-Type": "application/json" } };
 
   try {
-    const [vRes, lRes, cRes, mRes, dRes] = await Promise.all([
+    const [vRes, lRes, cRes, mRes, dRes, hRes] = await Promise.all([
       fetch(`${API_URL}/api/auth/vendors/?campus=${campus}&page_size=100`, opts),
       fetch(`${API_URL}/api/services/listings/?campus=${campus}&page_size=100`, opts),
       fetch(`${API_URL}/api/services/categories/?campus=${campus}`, opts),
       fetch(`${API_URL}/api/services/vendor-of-month/?campus=${campus}`, opts),
       fetch(`${API_URL}/api/services/deals/?campus=${campus}`, opts),
+      fetch(`${API_URL}/api/services/hero-slides/`, opts),
     ]);
     if (vRes.ok) { const d = await vRes.json(); initialVendors = d.results || d || []; }
     if (lRes.ok) { const d = await lRes.json(); initialListings = d.results || d || []; }
@@ -54,6 +56,7 @@ export default async function HomePage() {
       vendorOfMonth = votm?.username ? votm : null;
     }
     if (dRes.ok) { const d = await dRes.json(); initialDeals = Array.isArray(d) ? d : []; }
+    if (hRes.ok) { const d = await hRes.json(); initialHeroSlides = Array.isArray(d) ? d : []; }
   } catch {}
 
   return (
@@ -63,6 +66,7 @@ export default async function HomePage() {
       initialCategories={initialCategories}
       vendorOfMonth={vendorOfMonth}
       initialDeals={initialDeals}
+      initialHeroSlides={initialHeroSlides}
     />
   );
 }

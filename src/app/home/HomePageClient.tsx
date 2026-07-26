@@ -88,12 +88,17 @@ function getCategoryIcon(slug: string): LucideIcon {
 }
 
 const TRUST_ITEMS = [
-  { icon: Zap,         title: "Fast Service",    desc: "Get it done on campus quickly" },
   { icon: Lock,        title: "Escrow Safe",     desc: "Funds held till you confirm" },
   { icon: ShieldCheck, title: "Trusted Vendors", desc: "Verified sellers you can trust" },
 ];
 
 const HERO_GRAD = "linear-gradient(135deg,#0D9488 0%,#7C3AED 100%)";
+
+interface HeroSlide {
+  id: number;
+  image: string | null;
+  display_order: number;
+}
 
 interface Props {
   initialVendors: Vendor[];
@@ -101,9 +106,10 @@ interface Props {
   initialCategories: Category[];
   vendorOfMonth?: any;
   initialDeals?: any[];
+  initialHeroSlides?: HeroSlide[];
 }
 
-export default function HomePageClient({ initialVendors, initialListings, initialCategories, vendorOfMonth = null, initialDeals = [] }: Props) {
+export default function HomePageClient({ initialVendors, initialListings, initialCategories, vendorOfMonth = null, initialDeals = [], initialHeroSlides = [] }: Props) {
   const { isLoggedIn, user, isHydrated, updateUser } = useAuth();
   const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlistStore();
   const { addToCart, cart } = useCart();
@@ -120,17 +126,22 @@ export default function HomePageClient({ initialVendors, initialListings, initia
   const [viewMode, setViewMode]         = useState<"grid" | "list" | "scroll">("grid");
   const [deals, setDeals]               = useState<any[]>([]);
 
-  // Flash Offers bar countdown — cosmetic/placeholder only. The Deal model has no
-  // expiry/end-time field (confirmed in services/models.py), so there is no real
-  // deadline to count down to. This is a locally-simulated ticking clock that loops
-  // back to the top when it hits zero; it is NOT wired to any real deal expiry.
-  // Only shown at all when `deals` (real data) is non-empty, so the bar never
-  // appears over zero actual deals — but the specific numbers in it are fake.
-  const [flashSeconds, setFlashSeconds] = useState(2 * 3600 + 18 * 60 + 46);
+  // Admin-uploaded hero slideshow (HeroSlide model, /api/services/hero-slides/).
+  // Not campus-scoped, so no refetch-on-campus-switch needed — initialHeroSlides
+  // from SSR is the whole dataset for the session. Falls back to a fixed photo
+  // (heroFallbackImage below) if the admin hasn't uploaded any slides yet.
+  const heroSlideImages = initialHeroSlides
+    .filter(s => !!s.image)
+    .sort((a, b) => a.display_order - b.display_order)
+    .map(s => s.image as string);
+  const [heroSlideIndex, setHeroSlideIndex] = useState(0);
   useEffect(() => {
-    const t = setInterval(() => setFlashSeconds(s => (s <= 0 ? 3 * 3600 : s - 1)), 1000);
+    if (heroSlideImages.length < 2) return;
+    const t = setInterval(() => setHeroSlideIndex(i => (i + 1) % heroSlideImages.length), 5000);
     return () => clearInterval(t);
-  }, []);
+  }, [heroSlideImages.length]);
+  const heroFallbackImage = "https://images.unsplash.com/photo-1664992960082-0ea299a9c53e?w=1600&q=80";
+  const heroBackgroundImage = heroSlideImages[heroSlideIndex] || heroFallbackImage;
 
   const fetchDeals = useCallback(async (campus: string) => {
     try {
@@ -409,25 +420,10 @@ export default function HomePageClient({ initialVendors, initialListings, initia
   );
   const nonDealListings = allListings.filter(l => !adminDealIds.has(l.id));
 
-  // Real max discount across currently-active deals, for the "Meal Deals" promo
-  // card — not fabricated. Falls back to generic copy when there are none.
-  const maxDealDiscount = deals.length > 0
-    ? Math.max(...deals.map((d: any) => Number(d.discount_percent) || 0))
-    : 0;
-  const flashHrs  = String(Math.floor(flashSeconds / 3600)).padStart(2, "0");
-  const flashMins = String(Math.floor((flashSeconds % 3600) / 60)).padStart(2, "0");
-  const flashSecs = String(flashSeconds % 60).padStart(2, "0");
-
   // Hard split for the Stores/Marketplace separation: a menu vendor (is_menu_vendor)
   // only ever appears in the Stores strip, never in the general Vendors tab.
   const menuVendors = vendors.filter(v => v.is_menu_vendor);
   const marketplaceVendors = vendors.filter(v => !v.is_menu_vendor);
-
-  // Hero's floating card must be a food vendor specifically (not Vendor-of-Month,
-  // which can be any vendor type) — highest-rated menu vendor, or hidden entirely.
-  const topFoodVendor = menuVendors.length > 0
-    ? [...menuVendors].sort((a, b) => (b.rating || 0) - (a.rating || 0))[0]
-    : null;
 
   const filteredListings = applyPriceFilter(nonDealListings.filter(l => catSlug(l) === activeFilter));
   const rankedListings   = applyPriceFilter(
@@ -722,40 +718,43 @@ export default function HomePageClient({ initialVendors, initialListings, initia
       return (
         <div key={vendor.id} className="animate-fadeUp" style={{ animationDelay: `${Math.min(i * 0.05, 0.3)}s` }}>
           <Link href={`/vendor/${vendor.username}`}>
-            <div className="bg-white rounded-2xl border border-amber-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow group cursor-pointer">
-              <div className="relative w-full h-28 sm:h-32 overflow-hidden bg-stone-50">
-                {displaySrc
-                  ? <img src={displaySrc} alt={vendor.business_name || vendor.username} className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                  : <div className="absolute inset-0 flex items-center justify-center" style={{ background: "linear-gradient(135deg,#F59E0B 0%,#EA580C 100%)" }}><Store className="w-8 h-8 text-white/80" /></div>
-                }
-                <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
-                {vendor.is_online && (
-                  <div className="absolute top-2 right-2 flex items-center gap-1 bg-white/90 px-2 py-0.5 rounded-full shadow-sm">
-                    <div className="w-1.5 h-1.5 rounded-full bg-green-400" />
-                    <span className="text-[10px] font-semibold text-stone-700">Online</span>
-                  </div>
-                )}
-                {vendor.vendor_badge && vendor.vendor_badge !== "none" && (
-                  <span className={`absolute top-2 left-2 text-[10px] font-bold px-2 py-0.5 rounded-full ${BADGE_STYLES[vendor.vendor_badge]}`}>
-                    {BADGE_LABELS[vendor.vendor_badge]}
-                  </span>
-                )}
-              </div>
-              <div className="p-3">
-                <p className="font-bold text-stone-900 text-sm truncate">{vendor.business_name || vendor.username}</p>
-                <p className="text-stone-400 text-xs mt-0.5 truncate flex items-center gap-1">
-                  <Store className="w-3 h-3 text-amber-500 flex-shrink-0" />
+            {/* Single full-bleed photo card, text overlaid at the bottom — no separate
+                white info panel below the image. A deliberately different shape from
+                the top-image/panel-below card used everywhere else. */}
+            <div className="relative w-full aspect-[3/4] rounded-2xl overflow-hidden shadow-sm hover:shadow-lg transition-shadow group cursor-pointer bg-stone-100">
+              {displaySrc
+                ? <img src={displaySrc} alt={vendor.business_name || vendor.username} className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                : <div className="absolute inset-0 flex items-center justify-center" style={{ background: `linear-gradient(135deg, ${PURPLE} 0%, #5b21b6 100%)` }}><Store className="w-10 h-10 text-white/80" /></div>
+              }
+              <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
+
+              {vendor.is_online && (
+                <div className="absolute top-2.5 right-2.5 flex items-center gap-1 bg-white/90 px-2 py-0.5 rounded-full shadow-sm">
+                  <div className="w-1.5 h-1.5 rounded-full bg-green-400" />
+                  <span className="text-[10px] font-semibold text-stone-700">Online</span>
+                </div>
+              )}
+              {vendor.vendor_badge && vendor.vendor_badge !== "none" && (
+                <span className={`absolute top-2.5 left-2.5 text-[10px] font-bold px-2 py-0.5 rounded-full ${BADGE_STYLES[vendor.vendor_badge]}`}>
+                  {BADGE_LABELS[vendor.vendor_badge]}
+                </span>
+              )}
+
+              <div className="absolute bottom-0 left-0 right-0 p-3">
+                <p className="font-bold text-white text-sm truncate">{vendor.business_name || vendor.username}</p>
+                <p className="text-white/70 text-xs mt-0.5 truncate flex items-center gap-1">
+                  <Store className="w-3 h-3 flex-shrink-0" />
                   Store{vendor.hostel ? ` · ${vendor.hostel}` : ""}
                 </p>
-                <div className="flex items-center justify-between mt-2">
+                <div className="flex items-center justify-between mt-1.5">
                   {vendor.total_reviews > 0 ? (
                     <div className="flex items-center gap-0.5">
                       <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
-                      <span className="text-xs text-stone-600 font-medium">{vendor.rating}</span>
-                      <span className="text-xs text-stone-400">({vendor.total_reviews})</span>
+                      <span className="text-xs text-white font-medium">{vendor.rating}</span>
+                      <span className="text-xs text-white/60">({vendor.total_reviews})</span>
                     </div>
                   ) : <span />}
-                  <span className="text-xs text-stone-400">{vendor.total_listings} items</span>
+                  <span className="text-xs text-white/60">{vendor.total_listings} items</span>
                 </div>
               </div>
             </div>
@@ -996,90 +995,87 @@ export default function HomePageClient({ initialVendors, initialListings, initia
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
             className="relative rounded-2xl overflow-hidden">
 
-            {/* Static background — the one dark gradient, no rotation */}
-            <div className="absolute inset-0" style={{ background: HERO_GRAD }} />
+            {/* Background — admin-uploaded slideshow (HeroSlide) when any slides exist,
+                cross-fading every 5s; falls back to a fixed photo otherwise. Shown at
+                true color, no brand-color tint — just a neutral dark scrim (black, not
+                teal/purple) so the white text stays legible against whatever photo is
+                underneath. */}
+            {heroSlideImages.length > 0 ? (
+              heroSlideImages.map((src, i) => (
+                <img key={src + i} src={src} alt=""
+                  className="absolute inset-0 w-full h-full object-cover transition-opacity duration-1000"
+                  style={{ opacity: i === heroSlideIndex ? 1 : 0 }}
+                />
+              ))
+            ) : (
+              <img src={heroFallbackImage} alt="" className="absolute inset-0 w-full h-full object-cover" />
+            )}
+            <div className="absolute inset-0" style={{ background: "linear-gradient(90deg, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.4) 55%, rgba(0,0,0,0.15) 100%)" }} />
 
-            {/* Decorative blobs */}
-            <div className="absolute top-1/2 left-[45%] -translate-y-1/2 w-80 h-80 rounded-full pointer-events-none"
-              style={{ background: "radial-gradient(circle,rgba(124,58,237,0.30) 0%,transparent 70%)" }} />
-            <div className="absolute bottom-0 left-[20%] w-56 h-56 rounded-full pointer-events-none"
-              style={{ background: "radial-gradient(circle,rgba(13,148,136,0.25) 0%,transparent 70%)" }} />
-
-            <div className="relative z-10 px-4 py-8 sm:px-8 sm:py-9 lg:px-10 lg:py-10">
-              {/* Always side-by-side — scaled down on mobile */}
-              <div className="flex items-center gap-3 sm:gap-6">
+            {/* Fluid clamp()-based sizing below instead of fixed Tailwind breakpoints —
+                the composition (side-by-side text + image, same elements, same order)
+                never restructures at any width; it scales continuously instead of
+                jumping at a couple of fixed breakpoints, which is what kept looking
+                either jam-packed or too-tiny depending on the exact viewport width. */}
+            <div className="relative z-10" style={{ padding: "clamp(14px,4vw,40px) clamp(14px,4vw,40px)" }}>
+              <div className="flex items-center" style={{ gap: "clamp(10px,3vw,24px)" }}>
 
                 {/* Text */}
                 <div className="flex-1 min-w-0">
-                  <p className="text-teal-200 text-[10px] sm:text-xs font-bold tracking-[0.18em] uppercase mb-1.5 sm:mb-2">
+                  <p className="text-teal-200 font-bold uppercase mb-1"
+                    style={{ fontSize: "clamp(8px,1.8vw,12px)", letterSpacing: "0.16em" }}>
                     Campus Shopping
                   </p>
-                  <h1 className="text-xl sm:text-3xl lg:text-5xl font-black text-white leading-[1.1] mb-1.5 sm:mb-3"
-                    style={{ fontFamily: "var(--font-jakarta),'Plus Jakarta Sans',sans-serif" }}>
+                  <h1 className="font-black text-white leading-[1.1] mb-1"
+                    style={{ fontFamily: "var(--font-jakarta),'Plus Jakarta Sans',sans-serif", fontSize: "clamp(19px,5.2vw,48px)" }}>
                     Shop Smart.<br className="sm:hidden" /> Live Campus.
                   </h1>
-                  <p className="text-white/80 text-xs sm:text-sm lg:text-base mb-3 sm:mb-4 leading-relaxed line-clamp-2 sm:line-clamp-none">
+                  <p className="text-white/80 leading-snug mb-2 line-clamp-2 sm:line-clamp-none" style={{ fontSize: "clamp(10px,2.1vw,16px)" }}>
                     Explore hundreds of services from verified vendors on your campus, every day.
                   </p>
-                  <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                  <div className="flex items-center" style={{ gap: "clamp(5px,1.2vw,8px)" }}>
                     <motion.button whileTap={{ scale: 0.97 }}
                       onClick={() => restaurantsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
-                      className="bg-white text-stone-900 font-bold px-3 py-1.5 sm:px-6 sm:py-2.5 rounded-full text-xs sm:text-sm inline-flex items-center gap-1 sm:gap-2 shadow-lg">
-                      <UtensilsCrossed className="w-3 h-3 sm:w-4 sm:h-4" /> Order Food
+                      className="bg-white text-stone-900 font-bold rounded-full inline-flex items-center justify-center shadow-lg whitespace-nowrap"
+                      style={{ fontSize: "clamp(9px,1.9vw,14px)", padding: "clamp(5px,1.4vw,10px) clamp(9px,2.6vw,24px)", gap: "clamp(3px,0.8vw,8px)" }}>
+                      <Store style={{ width: "clamp(9px,2vw,16px)", height: "clamp(9px,2vw,16px)" }} /> Browse Stores
                     </motion.button>
                     <motion.button whileTap={{ scale: 0.97 }}
                       onClick={() => { setActiveTab("listings"); setTimeout(() => featuredRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); }}
-                      className="bg-white/20 border border-white/30 text-white font-semibold px-3 py-1.5 sm:px-6 sm:py-2.5 rounded-full text-xs sm:text-sm inline-flex items-center gap-1 sm:gap-1.5 backdrop-blur-sm hover:bg-white/30 transition">
-                      <ShoppingCart className="w-3 h-3 sm:w-4 sm:h-4" /> Shop Marketplace
+                      className="bg-white/20 border border-white/30 text-white font-semibold rounded-full backdrop-blur-sm hover:bg-white/30 transition inline-flex items-center justify-center whitespace-nowrap"
+                      style={{ fontSize: "clamp(9px,1.9vw,14px)", padding: "clamp(5px,1.4vw,10px) clamp(9px,2.6vw,24px)", gap: "clamp(3px,0.8vw,6px)" }}>
+                      <ShoppingCart style={{ width: "clamp(9px,2vw,16px)", height: "clamp(9px,2vw,16px)" }} /> Shop Marketplace
                     </motion.button>
                   </div>
-                </div>
-
-                {/* Image — real food photo anchor, the hero's dominant visual element */}
-                <div className="relative w-32 h-40 sm:w-56 sm:h-64 lg:w-72 lg:h-80 rounded-tl-lg rounded-br-lg rounded-tr-[2.5rem] rounded-bl-[2.5rem] sm:rounded-tr-[4rem] sm:rounded-bl-[4rem] overflow-hidden flex-shrink-0">
-                  <img
-                    src="/images/food-1.jpg"
-                    alt="Fresh food from a campus vendor on StudEx"
-                    className="w-full h-full object-cover"
-                  />
-                  {/* Floating trust card — real top-rated menu (food) vendor only; hidden entirely if none qualify */}
-                  {topFoodVendor && (
-                    <div className="absolute bottom-2 right-2 sm:bottom-3 sm:right-3 max-w-[80%] bg-white/95 backdrop-blur-sm rounded-xl px-2 py-1.5 sm:px-3 sm:py-2 shadow-lg flex items-center gap-2">
-                      <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-full overflow-hidden flex-shrink-0 bg-amber-100 border border-white flex items-center justify-center">
-                        {topFoodVendor.profile_picture?.startsWith("http")
-                          ? <img src={topFoodVendor.profile_picture} alt={topFoodVendor.business_name || topFoodVendor.username} className="w-full h-full object-cover" />
-                          : <UtensilsCrossed className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-600" />
-                        }
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-[10px] sm:text-sm font-black text-stone-900 truncate">
-                          {topFoodVendor.business_name || topFoodVendor.username}
-                        </p>
-                        {topFoodVendor.rating > 0 && (
-                          <p className="text-[9px] sm:text-xs text-stone-500 mt-0.5">
-                            ⭐ {topFoodVendor.rating.toFixed(1)}{topFoodVendor.total_reviews > 0 && ` (${topFoodVendor.total_reviews})`}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  )}
                 </div>
               </div>
 
               {/* Trust row — plain icon + label, no card background, matching the reference exactly */}
-              <div className="grid grid-cols-3 gap-2 sm:gap-4 mt-5 sm:mt-7">
+              <div className="grid grid-cols-2 mt-5 sm:mt-7" style={{ gap: "clamp(6px,2vw,16px)" }}>
                 {TRUST_ITEMS.map(({ icon: Icon, title, desc }) => (
-                  <div key={title} className="flex items-center gap-1.5 sm:gap-2.5">
-                    <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full border border-white/40 flex items-center justify-center flex-shrink-0">
-                      <Icon className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-white" />
+                  <div key={title} className="flex items-center" style={{ gap: "clamp(5px,1.4vw,10px)" }}>
+                    <div className="rounded-full border border-white/40 flex items-center justify-center flex-shrink-0"
+                      style={{ width: "clamp(20px,5.5vw,32px)", height: "clamp(20px,5.5vw,32px)" }}>
+                      <Icon style={{ width: "clamp(10px,2.6vw,14px)", height: "clamp(10px,2.6vw,14px)" }} className="text-white" />
                     </div>
                     <div className="min-w-0">
-                      <p className="text-white font-bold text-[10px] sm:text-sm leading-tight truncate">{title}</p>
-                      <p className="text-white/60 text-[8px] sm:text-xs leading-tight truncate hidden sm:block">{desc}</p>
+                      <p className="text-white font-bold leading-tight truncate" style={{ fontSize: "clamp(9px,2vw,14px)" }}>{title}</p>
+                      <p className="text-white/60 leading-tight truncate hidden sm:block" style={{ fontSize: "clamp(8px,1.6vw,12px)" }}>{desc}</p>
                     </div>
                   </div>
                 ))}
               </div>
+
+              {/* Slideshow dots — only when the admin has uploaded more than one slide */}
+              {heroSlideImages.length > 1 && (
+                <div className="flex justify-center gap-2 mt-4">
+                  {heroSlideImages.map((_, i) => (
+                    <button key={i} onClick={() => setHeroSlideIndex(i)}
+                      aria-label={`Show slide ${i + 1}`}
+                      className={`rounded-full transition-all duration-300 ${i === heroSlideIndex ? "w-6 h-1.5 bg-white" : "w-1.5 h-1.5 bg-white/40 hover:bg-white/60"}`} />
+                  ))}
+                </div>
+              )}
             </div>
           </motion.div>
 
@@ -1110,7 +1106,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                 <button key={tab.slug} onClick={() => { setActiveTab("listings"); handleFilter(tab.slug); }}
                   className="flex-shrink-0 flex flex-col items-center gap-1.5 w-16">
                   <div className="w-12 h-12 rounded-full flex items-center justify-center transition-all"
-                    style={active ? { background: GRAD } : { background: "#fff", border: "1px solid #e7e5e4" }}>
+                    style={active ? { background: TEAL } : { background: "#fff", border: "1px solid #e7e5e4" }}>
                     <Icon className={`w-5 h-5 ${active ? "text-white" : "text-stone-500"}`} />
                   </div>
                   <span className={`text-[11px] font-semibold text-center leading-tight truncate w-full ${active ? "text-stone-900" : "text-stone-500"}`}>
@@ -1143,47 +1139,14 @@ export default function HomePageClient({ initialVendors, initialListings, initia
             </div>
           )}
 
-          {/* ── PROMO CARDS — static/placeholder content, not backend-driven (no "market
-               picks" curation or free-delivery-threshold feature exists yet). "Meal
-               Deals" is the one exception: its percentage is real, computed from the
-               actual `deals` data already fetched above, not fabricated. Colors are
-               TEAL/PURPLE/GRAD tokens only. ── */}
-          <div className="mt-5 flex gap-3 overflow-x-auto pb-1 -mx-4 px-4 sm:grid sm:grid-cols-3 sm:overflow-visible sm:mx-0 sm:px-0" style={{ scrollbarWidth: "none" }}>
-            <Link href="/deals" className="flex-shrink-0 w-40 sm:w-auto rounded-2xl p-4 text-white" style={{ background: `linear-gradient(135deg, ${TEAL} 0%, #0f766e 100%)` }}>
-              <p className="text-[10px] font-bold uppercase tracking-wide text-white/70">Meal Deals</p>
-              <p className="font-bold text-sm mt-1 leading-snug">
-                {maxDealDiscount > 0 ? `Up to ${maxDealDiscount}% off on select meals` : "New meal deals dropping soon"}
-              </p>
-              <span className="inline-block mt-3 text-xs font-bold bg-white/20 px-3 py-1 rounded-full">Order Now</span>
-            </Link>
-            <Link href="/categories" className="flex-shrink-0 w-40 sm:w-auto rounded-2xl p-4 text-white" style={{ background: `linear-gradient(135deg, ${PURPLE} 0%, #5b21b6 100%)` }}>
-              <p className="text-[10px] font-bold uppercase tracking-wide text-white/70">Market Picks</p>
-              {/* Placeholder copy — no curated "picks" backend exists yet */}
-              <p className="font-bold text-sm mt-1 leading-snug">Handpicked essentials from campus stores</p>
-              <span className="inline-block mt-3 text-xs font-bold bg-white/20 px-3 py-1 rounded-full">Shop Now</span>
-            </Link>
-            <div className="flex-shrink-0 w-40 sm:w-auto rounded-2xl p-4 text-white" style={{ background: HERO_GRAD }}>
-              <p className="text-[10px] font-bold uppercase tracking-wide text-white/70">Free Delivery</p>
-              {/* Placeholder copy — no delivery-fee-threshold feature exists in the
-                  backend yet; this card is purely illustrative until one does */}
-              <p className="font-bold text-sm mt-1 leading-snug">On select campus orders</p>
-              <span className="inline-block mt-3 text-xs font-bold bg-white/20 px-3 py-1 rounded-full">Learn More</span>
-            </div>
-          </div>
-
-          {/* ── FLASH OFFERS BAR — the countdown is cosmetic/simulated, see the
-               flashSeconds comment above; only rendered when real deals exist so the
-               bar is never shown floating over zero actual offers. ── */}
+          {/* ── FLASH OFFERS BAR — only rendered when real deals exist so it never
+               shows over zero actual offers. No countdown (removed — the Deal model
+               has no expiry field, so there was never a real deadline behind it). ── */}
           {dealsReady && deals.length > 0 && (
             <Link href="/deals" className="mt-4 flex items-center justify-between rounded-2xl px-4 py-3 text-white" style={{ background: PURPLE }}>
               <div className="flex items-center gap-2">
                 <Zap className="w-4 h-4 fill-white" />
                 <span className="font-bold text-sm">Flash Offers</span>
-                <div className="flex items-center gap-1 ml-1 font-mono text-xs font-bold">
-                  <span className="bg-white/20 rounded px-1.5 py-0.5">{flashHrs}</span>:
-                  <span className="bg-white/20 rounded px-1.5 py-0.5">{flashMins}</span>:
-                  <span className="bg-white/20 rounded px-1.5 py-0.5">{flashSecs}</span>
-                </div>
               </div>
               <span className="text-xs font-semibold flex items-center gap-1 flex-shrink-0">View all deals <ChevronRight className="w-3.5 h-3.5" /></span>
             </Link>
@@ -1221,14 +1184,14 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                (e.g. a salon with a menu-style booking catalog) would land here too. ── */}
           {menuVendors.length > 0 && (
             <div className="mt-8" id="restaurants" ref={restaurantsRef}>
-              <div className="rounded-2xl bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-100 p-4 sm:p-5">
+              <div className="rounded-2xl bg-gradient-to-br from-violet-50 to-violet-100/60 border border-violet-100 p-4 sm:p-5">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-full bg-amber-400 flex items-center justify-center flex-shrink-0">
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: PURPLE }}>
                       <Store className="w-4 h-4 text-white" />
                     </div>
                     <div>
-                      <p className="text-amber-700 text-xs tracking-widest uppercase font-bold">Stores</p>
+                      <p className="text-xs tracking-widest uppercase font-bold" style={{ color: PURPLE }}>Stores</p>
                       <h2 className="text-lg font-extrabold text-stone-900" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Explore what's hot</h2>
                     </div>
                   </div>

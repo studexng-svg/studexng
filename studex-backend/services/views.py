@@ -1,5 +1,5 @@
 # services/views.py
-from rest_framework import viewsets, permissions
+from rest_framework import viewsets, permissions, generics
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
@@ -439,6 +439,24 @@ class VendorOfMonthHistoryView(APIView):
             import logging
             logging.getLogger(__name__).error(f"VendorOfMonthHistoryView error: {e}", exc_info=True)
             return Response([])
+
+
+class HeroSlideListView(generics.ListAPIView):
+    """GET /api/services/hero-slides/ — active hero slides, admin-uploaded, in display order.
+
+    Powers the home feed hero's slideshow (HomePageClient.tsx). No campus filter —
+    an uploaded hero image is a platform-wide visual, not campus-scoped content.
+    """
+    permission_classes = [AllowAny]
+    pagination_class = None
+
+    def get_queryset(self):
+        from services.models import HeroSlide
+        return HeroSlide.objects.filter(is_active=True).order_by('display_order', 'created_at')
+
+    def get_serializer_class(self):
+        from services.serializers import HeroSlideSerializer
+        return HeroSlideSerializer
 
 
 class DealsListView(APIView):

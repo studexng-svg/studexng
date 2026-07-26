@@ -8,7 +8,7 @@ from django import forms
 import csv
 from .models import (
     Category, Listing, ListingVariant, Transaction, VendorOfTheMonth,
-    MenuCategory, MenuItem, AddonGroup, Addon,
+    MenuCategory, MenuItem, AddonGroup, Addon, HeroSlide,
 )
 
 
@@ -698,3 +698,17 @@ class MenuItemAdmin(admin.ModelAdmin):
     search_fields = ['listing__title']
     raw_id_fields = ['listing']
     inlines = [AddonGroupInline]
+
+
+@admin.register(HeroSlide)
+class HeroSlideAdmin(admin.ModelAdmin):
+    list_display = ['id', 'thumbnail', 'display_order', 'is_active', 'created_at']
+    list_editable = ['display_order', 'is_active']
+    list_filter = ['is_active']
+    ordering = ['display_order', 'created_at']
+
+    def thumbnail(self, obj):
+        if not obj.image:
+            return '—'
+        return format_html('<img src="{}" style="height:48px;border-radius:6px;" />', obj.image.url)
+    thumbnail.short_description = 'Preview'

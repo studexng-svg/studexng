@@ -2,7 +2,7 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import CategoryViewSet, ListingViewSet, TransactionViewSet
-from .views import ChangePasswordView, VendorOfMonthView, VendorOfMonthHistoryView, DealsListView
+from .views import ChangePasswordView, VendorOfMonthView, VendorOfMonthHistoryView, DealsListView, HeroSlideListView
 from .views import PreviewPriceView
 from .views import MenuCategoryViewSet, MenuItemViewSet, AddonGroupViewSet, AddonViewSet
 
@@ -23,5 +23,6 @@ urlpatterns = [
     path('vendor-of-month/', VendorOfMonthView.as_view(), name='vendor-of-month'),
     path('vendor-of-month/history/', VendorOfMonthHistoryView.as_view(), name='vendor-of-month-history'),
     path('deals/', DealsListView.as_view(), name='deals'),
+    path('hero-slides/', HeroSlideListView.as_view(), name='hero-slides'),
     path('preview-price/', PreviewPriceView.as_view(), name='preview-price'),
 ]
