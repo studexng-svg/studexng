@@ -22,6 +22,14 @@ export default function BottomNav() {
   const { cart } = useCart();
   const showCheckout = cart.length > 0 && pathname === "/home";
 
+  // Checkout itself only scopes to one vendor when it gets a ?vendor= param
+  // (see checkout/page.tsx) — a cart spanning several vendors (e.g. a Store
+  // item + a marketplace item) must go through /cart's per-vendor grouping
+  // instead of jumping straight past it into an unscoped, mixed-vendor
+  // checkout.
+  const vendorIds = new Set(cart.map(i => i.vendorId).filter((id): id is number => id != null));
+  const checkoutHref = vendorIds.size > 1 ? "/cart" : vendorIds.size === 1 ? `/checkout?vendor=${[...vendorIds][0]}` : "/checkout";
+
   // Hide on auth/admin/rider pages, individual chat rooms, and the vendor
   // dashboard (which has its own dedicated nav — /vendor/[username], the
   // public storefront, is intentionally NOT excluded here since buyers
@@ -49,7 +57,7 @@ export default function BottomNav() {
           transition={{ type: "spring", stiffness: 380, damping: 22 }}
           className="fixed bottom-[100px] right-4 z-50"
         >
-          <Link href="/checkout">
+          <Link href={checkoutHref}>
             <button
               className="animate-buzz relative w-14 h-14 rounded-full flex items-center justify-center text-white"
               style={{ background: TEAL, boxShadow: `0 6px 24px rgba(13,148,136,0.55)` }}

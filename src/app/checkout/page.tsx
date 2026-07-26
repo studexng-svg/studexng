@@ -40,6 +40,18 @@ export default function CheckoutPage() {
   const cartItemsForCheckout = vendorId != null ? cart.filter(i => i.vendorId === vendorId) : cart;
   const usesMenuCheckout = vendorId != null && cartItemsForCheckout.some(i => i.usesMenuCheckout);
 
+  // Safety net: no ?vendor= param means "checkout the whole cart" by
+  // convention above, but if the cart actually spans more than one vendor
+  // (reached here via a stale link, back button, or anything else that
+  // skips /cart's own per-vendor grouping) that would silently combine
+  // items from different vendors into one order. Bounce back to /cart,
+  // which forces picking one vendor's "Checkout @username" button instead.
+  useEffect(() => {
+    if (vendorId != null) return;
+    const vendorIds = new Set(cart.map(i => i.vendorId).filter((id): id is number => id != null));
+    if (vendorIds.size > 1) router.replace("/cart");
+  }, [vendorId, cart, router]);
+
   const isServiceBooking = !!booking && cartItemsForCheckout.length === 0;
   const isFoodOrder = cartItemsForCheckout.length > 0;
 
