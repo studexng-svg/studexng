@@ -1107,19 +1107,19 @@ export default function HomePageClient({ initialVendors, initialListings, initia
               const active = activeFilter === tab.slug && activeTab === "listings";
               return (
                 <button key={tab.slug} onClick={() => { setActiveTab("listings"); handleFilter(tab.slug); }}
-                  className="flex-shrink-0 flex flex-col items-center gap-1.5 w-16">
+                  className="flex-shrink-0 flex flex-col items-center gap-1.5 w-20">
                   <div className="w-12 h-12 rounded-full flex items-center justify-center transition-all"
                     style={active ? { background: TEAL } : { background: "#fff", border: "1px solid #e7e5e4" }}>
                     <Icon className={`w-5 h-5 ${active ? "text-white" : "text-stone-500"}`} />
                   </div>
-                  <span className={`text-[11px] font-semibold text-center leading-tight truncate w-full ${active ? "text-stone-900" : "text-stone-500"}`}>
+                  <span className={`text-[11px] font-semibold text-center leading-tight line-clamp-2 w-full ${active ? "text-stone-900" : "text-stone-500"}`}>
                     {tab.title}
                   </span>
                 </button>
               );
             })}
             {categories.length > 6 && (
-              <Link href="/categories" className="flex-shrink-0 flex flex-col items-center gap-1.5 w-16">
+              <Link href="/categories" className="flex-shrink-0 flex flex-col items-center gap-1.5 w-20">
                 <div className="w-12 h-12 rounded-full flex items-center justify-center bg-white border border-stone-200">
                   <ChevronRight className="w-5 h-5 text-stone-400" />
                 </div>
@@ -1140,19 +1140,6 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                 <option value="imsu">IMSU</option>
               </select>
             </div>
-          )}
-
-          {/* ── FLASH OFFERS BAR — only rendered when real deals exist so it never
-               shows over zero actual offers. No countdown (removed — the Deal model
-               has no expiry field, so there was never a real deadline behind it). ── */}
-          {dealsReady && deals.length > 0 && (
-            <Link href="/deals" className="mt-4 flex items-center justify-between rounded-2xl px-4 py-3 text-white" style={{ background: PURPLE }}>
-              <div className="flex items-center gap-2">
-                <Zap className="w-4 h-4 fill-white" />
-                <span className="font-bold text-sm">Flash Offers</span>
-              </div>
-              <span className="text-xs font-semibold flex items-center gap-1 flex-shrink-0">View all deals <ChevronRight className="w-3.5 h-3.5" /></span>
-            </Link>
           )}
 
           {/* ── PRICE FILTER ── */}
