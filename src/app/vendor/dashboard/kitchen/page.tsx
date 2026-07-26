@@ -106,6 +106,7 @@ export default function VendorMenuPage() {
 
   const saveItem = async () => {
     if (!itemForm.title.trim() || !itemForm.price) { setError("Name and price are required."); return; }
+    if (!itemForm.image) { setError("A photo is required."); return; }
     if (!foodCategorySlug) { setError("No category available — please contact support."); return; }
     setSaving(true); setError("");
     try {
@@ -405,7 +406,7 @@ export default function VendorMenuPage() {
       {/* ── Add Menu Item modal ── */}
       {showItemForm && (
         <Modal title={`Add ${catalogItemLabel}`} onClose={() => setShowItemForm(false)}>
-          <Field label="Photo (optional)">
+          <Field label="Photo">
             <label className="w-24 h-24 rounded-xl border-2 border-dashed border-stone-200 flex items-center justify-center cursor-pointer hover:border-teal-400 transition overflow-hidden">
               {itemForm.imagePreview ? (
                 <img src={itemForm.imagePreview} alt="" className="w-full h-full object-cover" />

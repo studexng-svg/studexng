@@ -4,12 +4,13 @@ Test suite for services app - categories, listings, transactions
 from django.test import TestCase, Client
 from django.utils import timezone
 from unittest import skip
+from unittest.mock import patch
 from rest_framework.test import APIClient, APITestCase
 from rest_framework import status
 from decimal import Decimal
 from django.core.files.uploadedfile import SimpleUploadedFile
 
-from accounts.models import User
+from accounts.models import User, Vendor, VendorType
 from services.models import Category, Subcategory, Listing, ListingVariant, Transaction, Deal
 from orders.models import Order
 
@@ -551,6 +552,60 @@ class ListingAPITests(APITestCase):
 
         # Vendor should see all their listings including unavailable (paginated endpoint)
         self.assertEqual(len(response.data['results']), 2)
+
+
+class MenuVendorListingImageRequiredTests(APITestCase):
+    """
+    A menu-ordering vendor's (Store's) listings must always include a photo -
+    a plain marketplace vendor's listings stay photo-optional. Enforced in
+    ListingViewSet.perform_create, not ListingSerializer.validate(), since
+    the raw file upload is pulled straight from request.FILES in the view
+    (see perform_create/perform_update) and never reaches serializer data.
+    """
+    def setUp(self):
+        self.client = APIClient()
+        self.category = Category.objects.create(title='Food', slug='food')
+        self.listing_url = '/api/services/listings/'
+
+        food_type = VendorType.objects.create(
+            name='menu_test', display_name='Menu Test', supports_menu_ordering=True,
+        )
+        self.store_vendor = User.objects.create_user(
+            username='store_vendor', email='store_vendor@pau.edu.ng', password='pass123',
+            user_type='vendor', is_verified_vendor=True,
+        )
+        Vendor.objects.create(user=self.store_vendor, vendor_type=food_type)
+
+        self.plain_vendor = User.objects.create_user(
+            username='plain_vendor', email='plain_vendor@pau.edu.ng', password='pass123',
+            user_type='vendor', is_verified_vendor=True,
+        )
+
+    def test_menu_vendor_listing_without_image_is_rejected(self):
+        self.client.force_authenticate(user=self.store_vendor)
+        response = self.client.post(self.listing_url, {
+            'category': 'food', 'title': 'Jollof Rice', 'description': 'x', 'payout_amount': '1500.00',
+        })
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('image', response.data)
+
+    def test_menu_vendor_listing_with_image_succeeds(self):
+        self.client.force_authenticate(user=self.store_vendor)
+        image = SimpleUploadedFile('dish.jpg', b'fake-image-bytes', content_type='image/jpeg')
+        with patch('services.views.upload_to_cloudinary', return_value='https://res.cloudinary.com/fake/dish.jpg'):
+            response = self.client.post(self.listing_url, {
+                'category': 'food', 'title': 'Jollof Rice', 'description': 'x', 'payout_amount': '1500.00',
+                'image': image,
+            }, format='multipart')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    def test_plain_vendor_listing_without_image_still_allowed(self):
+        """Regression guard: the mandatory-photo rule is Store-only, never a global requirement."""
+        self.client.force_authenticate(user=self.plain_vendor)
+        response = self.client.post(self.listing_url, {
+            'category': 'food', 'title': 'Ring Light', 'description': 'x', 'payout_amount': '2000.00',
+        })
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
 
 class VendorOwnListingsVisibilityTests(APITestCase):

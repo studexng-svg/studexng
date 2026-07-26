@@ -76,6 +76,11 @@ export default function CheckoutPage() {
   } | null>(null);
   const [loyaltyBalance, setLoyaltyBalance] = useState(0);
   const [useCredits, setUseCredits] = useState(false);
+  const [batchInfo, setBatchInfo] = useState<{
+    uses_batched_delivery: boolean;
+    batches: { id: number; display_name: string; delivery_time: string; remaining_slots: number }[];
+  } | null>(null);
+  const [selectedBatchId, setSelectedBatchId] = useState<number | null>(null);
 
   // discountedBase is already all-inclusive (vendor payout + platform fee baked in
   // at listing-creation time) — no separate fee gets added at checkout anymore.
@@ -121,6 +126,39 @@ export default function CheckoutPage() {
       .catch(() => setPickupPointsLoaded(true));
   }, [isLoggedIn, user?.school, isFoodOrder]);
 
+  // Preview which delivery batch (and how many slots are left) this order
+  // will land in — before paying, not just from a post-payment refund if
+  // none turn out to be eligible. No-op (batchInfo stays null) for any
+  // vendor that doesn't use batched delivery at all. Polls every 15s so the
+  // remaining-slots count stays live while the buyer sits on this page —
+  // there's no push channel for this (see accounts/utils.py: no SSE, by
+  // deliberate architecture decision), so polling is how it stays current.
+  useEffect(() => {
+    if (!usesMenuCheckout || vendorId == null) { setBatchInfo(null); setSelectedBatchId(null); return; }
+
+    let cancelled = false;
+    const fetchBatches = () => {
+      api.delivery.vendorEligibleBatches(vendorId)
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          if (!data || cancelled) return;
+          setBatchInfo(data);
+          // Keep the buyer's manual pick if it's still valid after the
+          // refresh; only fall back to the soonest batch if it disappeared
+          // (filled up, or its cutoff just passed).
+          setSelectedBatchId((prev: number | null) => {
+            const stillEligible = prev != null && data.batches?.some((b: { id: number }) => b.id === prev);
+            return stillEligible ? prev : (data.batches?.[0]?.id ?? null);
+          });
+        })
+        .catch(() => {});
+    };
+
+    fetchBatches();
+    const interval = setInterval(fetchBatches, 15000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [usesMenuCheckout, vendorId]);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
     if ((window as any).PaystackPop) { setPaystackLoaded(true); return; }
@@ -162,6 +200,7 @@ export default function CheckoutPage() {
         reference: txRef,
         vendor_id: vendorId,
         delivery_location: deliveryLocation.trim(),
+        ...(selectedBatchId != null ? { batch_id: selectedBatchId } : {}),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Order creation failed");
@@ -231,6 +270,7 @@ export default function CheckoutPage() {
             vendor_id: vendorId,
             cart_amount: foodTotal,
             ...(deliveryLocation.trim() ? { delivery_location: deliveryLocation.trim() } : {}),
+            ...(selectedBatchId != null ? { batch_id: selectedBatchId } : {}),
           })
         : await api.payments.initialize({
             listing_id: listingId,
@@ -278,7 +318,7 @@ export default function CheckoutPage() {
       setPaymentError(err.message || "Payment failed. Please try again.");
       setIsProcessing(false);
     }
-  }, [finalTotal, foodTotal, user, isFoodOrder, isServiceBooking, booking, cartItemsForCheckout, vendorId, usesMenuCheckout, paystackLoaded, deliveryLocation, useCredits, creditsToApply, isFullyCoveredByCredits]);
+  }, [finalTotal, foodTotal, user, isFoodOrder, isServiceBooking, booking, cartItemsForCheckout, vendorId, usesMenuCheckout, paystackLoaded, deliveryLocation, useCredits, creditsToApply, isFullyCoveredByCredits, selectedBatchId]);
 
   // ── EMPTY STATE ──────────────────────────────────────────────────────────
   if (!isFoodOrder && !isServiceBooking) {
@@ -450,6 +490,42 @@ export default function CheckoutPage() {
           </motion.div>
         )}
 
+        {/* ── DELIVERY SLOT (batching vendors only) ── */}
+        {usesMenuCheckout && batchInfo?.uses_batched_delivery && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.09 }}
+            className="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm space-y-2">
+            <div className="flex items-center gap-2 mb-1">
+              <Clock className="w-4 h-4 text-teal-600" />
+              <p className="font-semibold text-stone-900 text-sm">Delivery Slot</p>
+            </div>
+            {batchInfo.batches.length === 0 ? (
+              <p className="text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+                No delivery slots are currently available for this vendor. Please try again later.
+              </p>
+            ) : (
+              <>
+                <p className="text-xs text-stone-400">Choose which batch your order should be part of.</p>
+                <div className="space-y-2">
+                  {batchInfo.batches.map(b => {
+                    const timeLabel = new Date(b.delivery_time).toLocaleTimeString("en-NG", {
+                      hour: "numeric", minute: "2-digit", timeZone: "Africa/Lagos",
+                    });
+                    return (
+                      <button key={b.id} type="button" onClick={() => setSelectedBatchId(b.id)}
+                        className={`w-full flex items-center justify-between rounded-xl border px-4 py-3 text-left transition ${
+                          selectedBatchId === b.id ? "border-teal-400 bg-teal-50" : "border-stone-200 bg-stone-50 hover:border-stone-300"
+                        }`}>
+                        <span className="text-sm font-semibold text-stone-900">{b.display_name} — {timeLabel}</span>
+                        <span className="text-xs text-stone-500">{b.remaining_slots} slot{b.remaining_slots !== 1 ? "s" : ""} left</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </motion.div>
+        )}
+
         {/* ── ORDER SUMMARY ── */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
           className="bg-white border border-stone-200 rounded-2xl p-5 shadow-sm">
@@ -613,7 +689,7 @@ export default function CheckoutPage() {
               type="submit"
               whileHover={{ scale: isProcessing ? 1 : 1.02 }}
               whileTap={{ scale: isProcessing ? 1 : 0.97 }}
-              disabled={isProcessing || !isLoggedIn || !paystackLoaded}
+              disabled={isProcessing || !isLoggedIn || !paystackLoaded || (usesMenuCheckout && !!batchInfo?.uses_batched_delivery && batchInfo.batches.length === 0)}
               className="w-full py-4 rounded-full font-semibold text-white text-base shadow-lg shadow-teal-200/60 flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               style={{ background: TEAL }}>
               {isProcessing ? (

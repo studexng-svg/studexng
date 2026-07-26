@@ -803,6 +803,9 @@ export const api = {
 
     myBatches: () => fetchWithAuth(u("/api/delivery/my-batches/")),
 
+    vendorEligibleBatches: (vendorId: number | string) =>
+      fetchWithAuth(u(`/api/delivery/vendor-batches/${vendorId}/`)),
+
     updateStatus: (assignmentId: number | string, newStatus: string) =>
       fetchWithAuth(u(`/api/delivery/assignments/${assignmentId}/update-status/`), {
         method: "POST",

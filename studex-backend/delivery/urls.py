@@ -5,6 +5,7 @@ from .views import (
     RiderBatchListView,
     RiderUpdateStatusView,
     OrderDeliveryStatusView,
+    VendorEligibleBatchesView,
 )
 
 urlpatterns = [
@@ -14,4 +15,5 @@ urlpatterns = [
     path('my-batches/', RiderBatchListView.as_view(), name='rider-batches'),
     path('assignments/<int:pk>/update-status/', RiderUpdateStatusView.as_view(), name='update-status'),
     path('order/<int:order_id>/', OrderDeliveryStatusView.as_view(), name='order-delivery-status'),
+    path('vendor-batches/<int:vendor_id>/', VendorEligibleBatchesView.as_view(), name='vendor-eligible-batches'),
 ]

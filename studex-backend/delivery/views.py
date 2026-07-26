@@ -33,6 +33,51 @@ class PickupPointListView(APIView):
         return Response(CampusPickupPointSerializer(qs, many=True).data)
 
 
+class VendorEligibleBatchesView(APIView):
+    """
+    GET /api/delivery/vendor-batches/<vendor_id>/ — public preview used at
+    checkout so a buyer sees which delivery batch (and how many slots are
+    left) their order will land in *before* paying, instead of only finding
+    out from a post-payment refund if none are eligible. Read-only — nothing
+    reserved here (see delivery.capacity.reserve_capacity for the real,
+    race-safe reservation at verify time).
+
+    `uses_batched_delivery: false` means this vendor doesn't use batching at
+    all (VendorType-incapable, or capable but no admin has set them up with
+    a BatchTemplate yet) — the frontend should hide the batch UI entirely in
+    that case, not show an empty/misleading "no slots" state.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, vendor_id):
+        from django.contrib.auth import get_user_model
+        from delivery.capacity import vendor_uses_batched_delivery, list_eligible_batches
+        User = get_user_model()
+
+        try:
+            vendor = User.objects.get(id=vendor_id)
+        except User.DoesNotExist:
+            return Response({'error': 'Vendor not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        if not vendor_uses_batched_delivery(vendor):
+            return Response({'uses_batched_delivery': False, 'batches': []})
+
+        campus = (getattr(vendor, 'school', '') or '').lower()
+        batches = list_eligible_batches(vendor, campus)
+        return Response({
+            'uses_batched_delivery': True,
+            'batches': [
+                {
+                    'id': b.id,
+                    'display_name': b.display_name,
+                    'delivery_time': b.delivery_time.isoformat(),
+                    'remaining_slots': b.max_orders - b.current_orders,
+                }
+                for b in batches
+            ],
+        })
+
+
 class AdminPickupPointListView(APIView):
     """GET/POST /api/admin/pickup-points/"""
     permission_classes = [IsAdminUser]

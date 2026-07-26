@@ -35,6 +35,7 @@ class Notification(models.Model):
         ('vendor_of_month', 'Vendor of the Month'),
         ('badge_upgrade', 'Vendor Badge Upgrade'),
         ('welcome', 'Welcome'),
+        ('admin_new_order', 'New Paid Order (Admin)'),
     )
 
     recipient = models.ForeignKey(

@@ -3,9 +3,11 @@
 Central notification helper for StudEx.
 All functions route through send_notification() which handles:
   - DB record
-  - SSE real-time push
-  - FCM push to phone
+  - Expo/FCM push to phone (the only genuinely instant path)
   - Email (Resend → Brevo fallback)
+No SSE/live push to open web tabs — deliberately rejected, see the
+architecture decision at the top of notifications/views.py. Those clients
+pick up new notifications via 30s polling instead.
 """
 import logging
 from accounts.utils import send_notification
@@ -33,6 +35,33 @@ def notify_admin_new_listing(listing):
             )
     except Exception as e:
         logger.warning(f"notify_admin_new_listing failed: {e}")
+
+
+def notify_admin_new_order(order, buyer, vendor, amount, description):
+    """
+    Called whenever a paid order is created — every checkout path (single-
+    listing Paystack, vendor-scoped cart/menu checkout, full loyalty-credits
+    payment) must call this, same as they already notify the buyer and
+    vendor. `description` is a short human string identifying what was
+    bought (a listing title, or "N item(s)" for a multi-line cart order).
+    """
+    try:
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        for admin in User.objects.filter(is_staff=True):
+            send_notification(
+                recipient=admin,
+                notification_type='admin_new_order',
+                title=f'New Paid Order — ₦{amount:,.0f}',
+                message=(
+                    f'{buyer.username} paid ₦{amount:,.0f} for {description} '
+                    f'from "{vendor.username}".'
+                ),
+                action_url=f'/admin/orders/{order.id}',
+                send_email=False,
+            )
+    except Exception as e:
+        logger.warning(f"notify_admin_new_order failed: {e}")
 
 
 def notify_admin_new_application(application):

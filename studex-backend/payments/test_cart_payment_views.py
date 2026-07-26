@@ -155,6 +155,28 @@ class VerifyCartPaymentTests(CartPaymentViewsTestBase):
         self.assertEqual(txn.platform_amount, Decimal('240.00'))
 
     @patch('payments.views.requests.get')
+    def test_verify_notifies_every_admin_of_the_paid_order(self, mock_get):
+        """Admin must see every paid order (food/store or otherwise), not just buyer+vendor."""
+        from notifications.models import Notification
+        admin = User.objects.create_user(
+            username='cpv_admin', email='cpv_admin@pau.edu.ng', password='pass123', is_staff=True,
+        )
+        reference = 'STX-CART-VERIFYTEST-ADMIN'
+        cache.set(f'pay_init:{reference}', {'min_kobo': 324000, 'max_kobo': 400000}, 3600)
+        CartItem.objects.create(user=self.buyer, listing=self.listing_a, quantity=1)
+        mock_get.return_value = self._mock_verify_response(324000, reference, vendor_id=self.vendor_a.id)
+
+        response = self.client.post(
+            '/api/payments/verify-cart/', {'reference': reference, 'vendor_id': self.vendor_a.id}, format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        notif = Notification.objects.get(recipient=admin, notification_type='admin_new_order')
+        self.assertIn(self.buyer.username, notif.message)
+        self.assertIn(self.vendor_a.username, notif.message)
+        self.assertEqual(notif.action_url, f"/admin/orders/{response.data['order_id']}")
+
+    @patch('payments.views.requests.get')
     def test_already_processed_is_idempotent(self, mock_get):
         reference = 'STX-CART-VERIFYTEST-0002'
         CartItem.objects.create(user=self.buyer, listing=self.listing_a, quantity=1)
@@ -230,12 +252,18 @@ class CartPaymentViewsBatchReservationTests(CartPaymentViewsTestBase):
     def setUp(self):
         super().setUp()
         from accounts.models import Vendor, VendorType
-        from delivery.models import DeliveryBatch
+        from delivery.models import DeliveryBatch, BatchTemplate
         from datetime import date, timedelta
         from django.utils import timezone
 
         self.food = VendorType.objects.get(name='food')
         Vendor.objects.create(user=self.vendor_a, vendor_type=self.food)
+        # vendor_uses_batched_delivery requires an active BatchTemplate, not
+        # just a batching-capable VendorType.
+        BatchTemplate.objects.create(
+            vendor=self.vendor_a, campus='pau', display_name='Lunch',
+            delivery_time=timezone.now().time(), max_orders=10, days_of_week=list(range(7)),
+        )
 
         now = timezone.now()
         self.batch = DeliveryBatch.objects.create(
@@ -282,6 +310,36 @@ class CartPaymentViewsBatchReservationTests(CartPaymentViewsTestBase):
         self.assertEqual(order.delivery_batch_id, self.batch.id)
         self.batch.refresh_from_db()
         self.assertEqual(self.batch.current_orders, 1)
+
+    @patch('payments.views.requests.get')
+    def test_verify_sends_batch_aware_notification_to_buyer(self, mock_get):
+        """
+        The buyer's "Order Confirmed" notification must mention the batch's
+        delivery time — a generic "vendor has been notified" message left
+        the buyer with no idea their food was part of a scheduled batch at
+        all, let alone when to expect it.
+        """
+        from zoneinfo import ZoneInfo
+        from notifications.models import Notification
+
+        reference = 'STX-CART-BATCHVERIFY-NOTIF'
+        cache.set(f'pay_init:{reference}', {'min_kobo': 324000, 'max_kobo': 400000}, 3600)
+        CartItem.objects.create(user=self.buyer, listing=self.listing_a, quantity=1)
+        mock_get.return_value = self._mock_verify_response(324000, reference, vendor_id=self.vendor_a.id)
+
+        response = self.client.post(
+            '/api/payments/verify-cart/', {'reference': reference, 'vendor_id': self.vendor_a.id}, format='json',
+        )
+        self.assertEqual(response.status_code, 200)
+
+        order = Order.objects.get(id=response.data['order_id'])
+        local_dt = order.delivery_batch.delivery_time.astimezone(ZoneInfo("Africa/Lagos"))
+        hour12 = local_dt.hour % 12 or 12
+        expected_time = f"{hour12}:{local_dt.minute:02d} {'AM' if local_dt.hour < 12 else 'PM'}"
+
+        notif = Notification.objects.filter(recipient=self.buyer, notification_type='order_placed').latest('id')
+        self.assertIn(expected_time, notif.message)
+        self.assertIn('batch', notif.message.lower())
 
     @patch('payments.views.refund_paystack_transaction')
     @patch('payments.views.requests.get')

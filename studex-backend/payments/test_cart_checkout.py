@@ -19,7 +19,7 @@ from accounts.models import User, Vendor, VendorType
 from services.models import Category, Listing, MenuItem, AddonGroup, Addon
 from cart.models import CartItem, CartItemAddon
 from orders.models import Order, OrderItem, OrderItemAddon
-from delivery.models import DeliveryBatch
+from delivery.models import DeliveryBatch, BatchTemplate
 from delivery.capacity import NoBatchCapacityError
 from payments.models import PricingSettings
 from payments.pricing import calculate_final_price
@@ -284,6 +284,13 @@ class CreateOrderFromPricedLinesBatchReservationTests(TestCase):
 
         self.batching_vendor = User.objects.create_user(username='batch_vendor', email='batch_vendor@pau.edu.ng', password='pass123')
         Vendor.objects.create(user=self.batching_vendor, vendor_type=self.food)
+        # vendor_uses_batched_delivery requires an active BatchTemplate, not
+        # just a batching-capable VendorType — this is what an admin setting
+        # this specific vendor up for batching looks like.
+        BatchTemplate.objects.create(
+            vendor=self.batching_vendor, campus='pau', display_name='Lunch',
+            delivery_time=timezone.now().time(), max_orders=10, days_of_week=list(range(7)),
+        )
 
         self.non_batching_vendor = User.objects.create_user(username='nonbatch_vendor', email='nonbatch_vendor@pau.edu.ng', password='pass123')
         Vendor.objects.create(user=self.non_batching_vendor, vendor_type=self.beauty)

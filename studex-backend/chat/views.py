@@ -340,7 +340,7 @@ class ConversationViewSet(viewsets.ModelViewSet):
         conversation.last_message_at = timezone.now()
         conversation.save()
 
-        # Notify the other participant (SSE + FCM + email)
+        # Notify the other participant (Expo/FCM push + email; web tabs poll, no SSE)
         recipient = conversation.seller if request.user == conversation.buyer else conversation.buyer
         try:
             from accounts.utils import send_notification

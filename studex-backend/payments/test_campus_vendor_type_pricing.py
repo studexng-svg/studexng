@@ -14,8 +14,10 @@ listing-creation test proving a Level-1 override reaches the buyer-facing
 price for a vendor with a VendorType assigned.
 """
 from decimal import Decimal
+from unittest.mock import patch
 
 from django.test import TestCase
+from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework.test import APIClient
 from rest_framework import status
 
@@ -266,9 +268,16 @@ class ListingCreationEndToEndVendorTypePricingTests(TestCase):
         Vendor.objects.create(user=vendor, vendor_type=food)
         self.client.force_authenticate(user=vendor)
 
-        response = self.client.post('/api/services/listings/', {
-            'category': 'food', 'title': 'FUTO Jollof', 'description': 'desc', 'payout_amount': '10000.00',
-        })
+        # food is a menu-ordering VendorType, so a photo is mandatory on
+        # create (see ListingViewSet.perform_create) — unrelated to what
+        # this test actually checks (campus+vendor_type pricing), but still
+        # required for the create to succeed.
+        image = SimpleUploadedFile('dish.jpg', b'fake-image-bytes', content_type='image/jpeg')
+        with patch('services.views.upload_to_cloudinary', return_value='https://res.cloudinary.com/fake/dish.jpg'):
+            response = self.client.post('/api/services/listings/', {
+                'category': 'food', 'title': 'FUTO Jollof', 'description': 'desc', 'payout_amount': '10000.00',
+                'image': image,
+            }, format='multipart')
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
         # 15% (Level 1), not 10% (Level 2) or 8% (Level 3)

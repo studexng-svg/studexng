@@ -47,8 +47,33 @@ class CapacityTestBase(TestCase):
 
 
 class VendorUsesBatchedDeliveryTests(CapacityTestBase):
-    def test_food_vendor_type_supports_batching(self):
+    def test_food_vendor_type_alone_is_not_enough(self):
+        """
+        VendorType.supports_batched_delivery says Food *can* batch — it
+        doesn't mean every Food vendor *does*. Without an active
+        BatchTemplate, a vendor of a batching-capable type must behave
+        exactly like a non-batching vendor (regular checkout, no forced
+        batch reservation) rather than being permanently stuck with "No
+        delivery slots are currently available."
+        """
+        self.assertFalse(vendor_uses_batched_delivery(self.vendor))
+
+    def test_food_vendor_with_active_batch_template_uses_batching(self):
+        """An admin 'sets' a vendor as needing batches by creating their first BatchTemplate."""
+        from delivery.models import BatchTemplate
+        BatchTemplate.objects.create(
+            vendor=self.vendor, campus='pau', display_name='Lunch', delivery_time=time(12, 0),
+            max_orders=10, days_of_week=[0, 1, 2, 3, 4], is_active=True,
+        )
         self.assertTrue(vendor_uses_batched_delivery(self.vendor))
+
+    def test_inactive_batch_template_does_not_count(self):
+        from delivery.models import BatchTemplate
+        BatchTemplate.objects.create(
+            vendor=self.vendor, campus='pau', display_name='Lunch', delivery_time=time(12, 0),
+            max_orders=10, days_of_week=[0, 1, 2, 3, 4], is_active=False,
+        )
+        self.assertFalse(vendor_uses_batched_delivery(self.vendor))
 
     def test_beauty_vendor_type_does_not_support_batching(self):
         self.assertFalse(vendor_uses_batched_delivery(self.non_batching_vendor))
@@ -151,6 +176,28 @@ class HasEligibleBatchTests(CapacityTestBase):
     def test_false_when_only_full_batch_exists(self):
         make_batch(self.vendor, max_orders=1, current_orders=1, status='full')
         self.assertFalse(has_eligible_batch(self.vendor, 'pau'))
+
+
+class ListEligibleBatchesTests(CapacityTestBase):
+    """Read-only checkout preview — must never reserve anything."""
+    def test_returns_soonest_cutoff_first(self):
+        from delivery.capacity import list_eligible_batches
+        later = make_batch(self.vendor, max_orders=5, current_orders=0, hours_until_cutoff=5, display_name='5pm')
+        sooner = make_batch(self.vendor, max_orders=5, current_orders=0, hours_until_cutoff=1, display_name='12pm')
+        result = list_eligible_batches(self.vendor, 'pau')
+        self.assertEqual([b.id for b in result], [sooner.id, later.id])
+
+    def test_excludes_full_batches(self):
+        from delivery.capacity import list_eligible_batches
+        make_batch(self.vendor, max_orders=1, current_orders=1, status='full')
+        self.assertEqual(list_eligible_batches(self.vendor, 'pau'), [])
+
+    def test_does_not_reserve_anything(self):
+        from delivery.capacity import list_eligible_batches
+        batch = make_batch(self.vendor, max_orders=5, current_orders=0)
+        list_eligible_batches(self.vendor, 'pau')
+        batch.refresh_from_db()
+        self.assertEqual(batch.current_orders, 0)
 
     def test_does_not_consume_capacity(self):
         batch = make_batch(self.vendor, max_orders=5, current_orders=0)

@@ -291,6 +291,19 @@ class ListingViewSet(viewsets.ModelViewSet):
                 url = upload_to_cloudinary(f, folder='studex/listings')
                 if url:
                     extra[slot] = url
+
+        # A menu-ordering vendor's (Store's) listings are always food/dish
+        # photos, shown prominently in the buyer-facing menu — never
+        # optional, unlike a plain marketplace listing. Enforced here, not
+        # just in the kitchen dashboard form, since the raw upload never
+        # passes through ListingSerializer.validate() (image files are
+        # pulled straight from request.FILES above, not serializer data).
+        from payments.settlement import get_vendor_type
+        vendor_type = get_vendor_type(self.request.user)
+        if vendor_type and vendor_type.supports_menu_ordering and 'image' not in extra:
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError({'image': 'A photo is required.'})
+
         campus = (getattr(self.request.user, 'school', '') or 'pau').lower()
         listing = serializer.save(
             vendor=self.request.user,

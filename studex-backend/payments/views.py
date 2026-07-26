@@ -892,14 +892,31 @@ def verify_cart_payment(request):
             ),
             action_url='/vendor/dashboard', send_email=False,
         )
+        if order.delivery_batch_id:
+            from zoneinfo import ZoneInfo
+            local_dt = order.delivery_batch.delivery_time.astimezone(ZoneInfo("Africa/Lagos"))
+            hour12 = local_dt.hour % 12 or 12
+            batch_time = f"{hour12}:{local_dt.minute:02d} {'AM' if local_dt.hour < 12 else 'PM'}"
+            batch_message = (
+                f'Your payment of ₦{amount_paid:,.0f} was successful. '
+                f'Your order is part of the {batch_time} batch — expect delivery around then.'
+            )
+        else:
+            batch_message = f'Your payment of ₦{amount_paid:,.0f} was successful. The vendor has been notified.'
         send_notification(
             recipient=request.user, notification_type='order_placed',
             title='Order Confirmed',
-            message=f'Your payment of ₦{amount_paid:,.0f} was successful. The vendor has been notified.',
+            message=batch_message,
             action_url='/account/orders',
         )
     except Exception as ne:
         logger.warning(f"verify_cart_payment: notification failed: {ne}")
+
+    try:
+        from studex.notifications import notify_admin_new_order
+        notify_admin_new_order(order, request.user, seller, amount_paid, f'{item_count} item(s)')
+    except Exception as ne:
+        logger.warning(f"verify_cart_payment: admin notification failed: {ne}")
 
     return Response({"order_id": order.id, "message": "Payment verified. Order created."})
 
@@ -1284,6 +1301,12 @@ def pay_with_credits(request):
         )
     except Exception as ne:
         logger.warning(f"pay_with_credits: notification failed: {ne}")
+
+    try:
+        from studex.notifications import notify_admin_new_order
+        notify_admin_new_order(order, buyer, listing.vendor, listing_price, f'"{listing.title}"')
+    except Exception as ne:
+        logger.warning(f"pay_with_credits: admin notification failed: {ne}")
 
     return Response({"order_id": order_id, "message": "Order placed using loyalty credits."})
 
@@ -1943,6 +1966,12 @@ def _create_order_from_paystack_data(paystack_data, buyer, listing_id, order_typ
                 )
             except Exception as ne:
                 logger.warning(f"Order notification failed: {ne}")
+
+            try:
+                from studex.notifications import notify_admin_new_order
+                notify_admin_new_order(order, buyer, listing.vendor, amount_paid, f'"{listing.title}"')
+            except Exception as ne:
+                logger.warning(f"Admin order notification failed: {ne}")
 
     except Exception as e:
         logger.error(f"Order creation failed: {e}", exc_info=True)

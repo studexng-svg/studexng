@@ -28,9 +28,24 @@ class NoBatchCapacityError(Exception):
 
 
 def vendor_uses_batched_delivery(vendor):
+    """
+    Two-level gate: VendorType.supports_batched_delivery says a *category*
+    of vendor (e.g. Food) is capable of batching at all; an active
+    BatchTemplate says *this specific vendor* actually uses it. Without the
+    second check, every vendor of a batching-capable type would be forced
+    through batch-reservation checkout the moment they're onboarded, even
+    if no admin ever set up a schedule for them — checkout would fail for
+    them permanently with "No delivery slots are currently available"
+    rather than falling back to the normal (non-batched) checkout path.
+    An admin "sets" a vendor as needing batches simply by creating their
+    first BatchTemplate at /admin/batch-templates — no separate toggle.
+    """
     from payments.settlement import get_vendor_type
+    from delivery.models import BatchTemplate
     vendor_type = get_vendor_type(vendor)
-    return bool(vendor_type and vendor_type.supports_batched_delivery)
+    if not (vendor_type and vendor_type.supports_batched_delivery):
+        return False
+    return BatchTemplate.objects.filter(vendor=vendor, is_active=True).exists()
 
 
 def _eligible_batches_locked(vendor, campus, now):
@@ -59,6 +74,23 @@ def has_eligible_batch(vendor, campus):
     return DeliveryBatch.objects.filter(
         vendor=vendor, campus=campus, status='open', cutoff_time__gt=now, current_orders__lt=F('max_orders'),
     ).exists()
+
+
+def list_eligible_batches(vendor, campus):
+    """
+    Read-only preview of every batch a buyer could currently order into for
+    this vendor+campus, soonest-cutoff-first — same eligibility rule as
+    reserve_capacity (open, cutoff not passed, room left), no lock, nothing
+    reserved. Lets checkout show "This order is part of the 12pm batch, 4
+    slots left" before the buyer pays, instead of them finding out only
+    after a failed/refunded payment.
+    """
+    now = timezone.now()
+    return list(
+        DeliveryBatch.objects.filter(
+            vendor=vendor, campus=campus, status='open', cutoff_time__gt=now, current_orders__lt=F('max_orders'),
+        ).order_by('cutoff_time', 'delivery_time', 'id')
+    )
 
 
 def reserve_capacity(vendor, campus, preferred_batch_id=None):

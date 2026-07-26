@@ -1,7 +1,12 @@
 # accounts/utils.py
 """
-send_notification — creates a DB notification AND instantly pushes it
-to any open browser tabs via SSE, FCM, and email.
+send_notification — creates a DB notification row, then pushes it to the
+recipient's registered devices via Expo push (mobile) and Firebase Cloud
+Messaging (web push), and optionally sends an email. There is no
+SSE/WebSocket channel in this codebase — an open web tab discovers new
+notifications by polling (see the frontend's 30s poll interval on the
+account page), not a live server push. FCM/Expo push is the only genuinely
+instant delivery path.
 
 Deduplication: identical notifications to the same recipient within 60 seconds
 are silently dropped — prevents duplicates from signals, retries, or double-calls.
@@ -26,7 +31,9 @@ def send_notification(
     send_email: bool = True,
 ):
     """
-    Creates a Notification record and immediately pushes it via SSE, FCM, and email.
+    Creates a Notification record and pushes it via Expo/FCM push to the
+    recipient's registered devices, plus email. No SSE/live push to open web
+    tabs — those pick it up on their next poll.
 
     Args:
         recipient:          User instance
