@@ -1020,7 +1020,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                 never restructures at any width; it scales continuously instead of
                 jumping at a couple of fixed breakpoints, which is what kept looking
                 either jam-packed or too-tiny depending on the exact viewport width. */}
-            <div className="relative z-10" style={{ padding: "clamp(14px,4vw,40px) clamp(14px,4vw,40px)" }}>
+            <div className="relative z-10" style={{ padding: "clamp(24px,7vw,72px) clamp(14px,4vw,40px)" }}>
               <div className="flex items-center" style={{ gap: "clamp(10px,3vw,24px)" }}>
 
                 {/* Text */}
