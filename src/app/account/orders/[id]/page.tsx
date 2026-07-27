@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import {
   Package, CheckCircle, Clock, AlertCircle, MessageCircle, XCircle, MapPin, Timer,
-  Camera, ImagePlus, X, Lock,
+  Camera, ImagePlus, X, Lock, Truck,
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/lib/authStore";
@@ -84,6 +84,14 @@ interface Order {
   has_rider_delivery?: boolean;
 }
 
+interface DeliveryStatus {
+  rider_username: string;
+  status: "assigned" | "picked_up" | "at_pickup_point" | "completed";
+  pickup_point_name?: string;
+  pickup_point_campus?: string;
+  delivery_code: string | null;
+}
+
 interface LoyaltyStatus {
   total_completed_orders: number;
   orders_until_next_reward: number;
@@ -141,6 +149,19 @@ export default function OrderDetailPage() {
     },
     enabled: isHydrated && isLoggedIn,
     staleTime: 30_000,
+  });
+
+  const { data: deliveryStatus } = useQuery<DeliveryStatus>({
+    queryKey: ["delivery-status", orderId],
+    queryFn: async () => {
+      const r = await api.delivery.orderStatus(orderId);
+      if (!r.ok) throw new Error("delivery status fetch failed");
+      return r.json();
+    },
+    enabled: isHydrated && isLoggedIn && !!order?.has_rider_delivery && order?.status === "paid",
+    refetchInterval: 10_000,
+    staleTime: 5_000,
+    retry: false,
   });
 
   const { data: canReviewData } = useQuery<{ can_review: boolean }>({
@@ -563,6 +584,27 @@ export default function OrderDetailPage() {
             </button>
           </div>
         )}
+
+        {/* RIDER DELIVERY STATUS + HANDOFF CODE */}
+        {awaitingVendor && deliveryStatus && (
+          <div className="bg-white rounded-2xl p-4 shadow-sm border border-stone-200 animate-fadeUp space-y-3">
+            <div className="flex items-center gap-2 text-sm text-stone-700">
+              <Truck className="w-4 h-4 text-teal-600 flex-shrink-0" />
+              <span>Rider <span className="font-semibold">@{deliveryStatus.rider_username}</span> {
+                deliveryStatus.status === "assigned" ? "is heading to the vendor"
+                : deliveryStatus.status === "picked_up" ? "has picked up your order"
+                : "has arrived with your order"
+              }</span>
+            </div>
+            {deliveryStatus.status === "at_pickup_point" && deliveryStatus.delivery_code && (
+              <div className="bg-teal-50 border border-teal-200 rounded-xl p-3 text-center">
+                <p className="text-xs text-teal-700 font-semibold mb-1">Give this code to the rider to receive your order</p>
+                <p className="text-2xl font-black tracking-[0.3em] text-teal-900">{deliveryStatus.delivery_code}</p>
+              </div>
+            )}
+          </div>
+        )}
+
         {awaitingVendor && (
           <div className="space-y-3 animate-fadeUp">
             <div className="w-full py-4 bg-stone-100 text-stone-400 rounded-full font-semibold text-base flex items-center justify-center gap-2 cursor-not-allowed select-none">
