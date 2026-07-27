@@ -22,6 +22,7 @@ from unittest.mock import patch, MagicMock
 
 from django.test import TestCase
 from django.contrib.auth import get_user_model
+from django.db.models.query import QuerySet
 from rest_framework.test import APIClient
 from rest_framework import status
 
@@ -192,6 +193,48 @@ class PickupEvidenceTests(DeliveryTestBase):
         self.assertEqual(response.status_code, 500)
         assignment.refresh_from_db()
         self.assertEqual(assignment.status, "assigned")
+
+
+class RiderUpdateStatusPostgresLockingTests(DeliveryTestBase):
+    """
+    Regression for a production-only bug: RiderUpdateStatusView's row lock
+    combined select_for_update() with select_related('pickup_point') — a
+    nullable FK, so select_related turns it into a LEFT OUTER JOIN. Postgres
+    raises "FOR UPDATE cannot be applied to the nullable side of an outer
+    join" on every single call, a 500 that hit every rider status update in
+    production. SQLite (this suite's DB) doesn't enforce that restriction at
+    all, so no amount of exercising the view's behavior on this DB can catch
+    a regression here — this asserts the actual fix (scoping the lock to
+    of=('self',), which Postgres accepts regardless of the joined tables)
+    is really what the view's queryset uses, by capturing the real call the
+    view makes rather than a hand-copied duplicate query.
+    """
+    def test_lookup_scopes_for_update_to_self_only(self):
+        assignment = self.assign()
+        self.client.force_authenticate(user=self.rider)
+        proof = make_proof_file()
+
+        original = QuerySet.select_for_update
+        captured = []
+
+        def spy(self, *args, **kwargs):
+            captured.append(kwargs)
+            return original(self, *args, **kwargs)
+
+        QuerySet.select_for_update = spy
+        try:
+            with patch("services.views.upload_to_cloudinary", return_value="https://cdn.example.com/pickup.jpg"):
+                response = self.client.post(
+                    f"/api/delivery/assignments/{assignment.id}/update-status/",
+                    {"status": "picked_up", "proof_image": proof},
+                    format="multipart",
+                )
+        finally:
+            QuerySet.select_for_update = original
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(captured), 1)
+        self.assertEqual(captured[0].get("of"), ("self",))
 
 
 class CompletionEvidenceTests(DeliveryTestBase):

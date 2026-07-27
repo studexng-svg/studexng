@@ -444,7 +444,13 @@ class RiderUpdateStatusView(APIView):
         try:
             with db_transaction.atomic():
                 try:
-                    assignment = DeliveryAssignment.objects.select_for_update().select_related(
+                    # of=('self',) scopes FOR UPDATE to just this table — without it,
+                    # Postgres raises "FOR UPDATE cannot be applied to the nullable
+                    # side of an outer join" because pickup_point is nullable and
+                    # select_related() turns it into a LEFT OUTER JOIN. SQLite (the
+                    # local test DB) doesn't enforce this, so it only ever surfaced
+                    # in production — every rider status update was 500ing.
+                    assignment = DeliveryAssignment.objects.select_for_update(of=('self',)).select_related(
                         'order__buyer', 'order__listing__vendor', 'pickup_point',
                     ).get(pk=pk, rider=request.user)
                 except DeliveryAssignment.DoesNotExist:
