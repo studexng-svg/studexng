@@ -8,7 +8,7 @@ import { compressImage } from "@/lib/utils";
 import { TEAL } from "@/lib/tokens";
 import TopNav from "@/components/layout/TopNav";
 import {
-  Package, MapPin, CheckCircle, Truck, Clock, Camera, X, AlertCircle,
+  Package, CheckCircle, Truck, Clock, Camera, X, AlertCircle,
   TrendingUp, CalendarCheck, ListChecks, Activity,
 } from "lucide-react";
 import { BarChart, Bar, ResponsiveContainer, Tooltip, XAxis } from "recharts";
@@ -33,7 +33,7 @@ interface Assignment {
   completion_proof_image?: string | null;
   batch_id?: number | null;
   batch_display_name?: string | null;
-  items?: { listing_title: string; quantity: number; addons: { name: string }[] }[];
+  items?: { listing_title: string; image: string | null; quantity: number; addons: { name: string }[] }[];
 }
 
 interface BatchGroup {
@@ -200,53 +200,77 @@ function AssignmentCard({
   onUpdate: (a: Assignment) => void;
   error?: string;
 }) {
+  const heroImage = a.items?.find(item => item.image)?.image;
+  const dropoffLabel = a.pickup_point_name
+    ? `${a.pickup_point_name} · ${a.pickup_point_campus}`
+    : (a.delivery_location || "Location not provided");
+
   return (
-    <div className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden">
-      <div className="p-4 space-y-3">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0 flex-1">
-            <p className="text-xs text-stone-400">Order #{a.order_reference}</p>
-            {a.items?.length ? (
-              <ul className="mt-1 space-y-1">
-                {a.items.map((item, i) => (
-                  <li key={i} className="text-sm">
-                    <span className="font-bold text-stone-900">{item.quantity}x {item.listing_title}</span>
-                    {!!item.addons?.length && (
-                      <span className="block text-xs text-stone-500 mt-0.5">
-                        + {item.addons.map(ad => ad.name).join(", ")}
-                      </span>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="font-bold text-stone-900 text-sm">{a.listing_title}</p>
-            )}
+    <div className="bg-white rounded-3xl border border-stone-100 shadow-sm overflow-hidden">
+      {/* Hero image */}
+      <div className="relative h-32 bg-stone-100">
+        {heroImage ? (
+          <img src={heroImage} alt="" className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-stone-100 to-stone-200">
+            <Package className="w-9 h-9 text-stone-300" />
           </div>
-          <span className={`text-xs font-semibold px-2.5 py-1 rounded-full flex-shrink-0 ${STATUS_COLOR[a.status] || "bg-stone-100 text-stone-500"}`}>
-            {STATUS_LABELS[a.status] || a.status}
-          </span>
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/0 to-black/0" />
+        <span className={`absolute top-3 right-3 text-xs font-bold px-2.5 py-1 rounded-full shadow-sm ${STATUS_COLOR[a.status] || "bg-stone-100 text-stone-500"}`}>
+          {STATUS_LABELS[a.status] || a.status}
+        </span>
+        <p className="absolute bottom-2.5 left-3.5 right-3.5 text-white text-xs font-medium drop-shadow">
+          Order #{a.order_reference}
+        </p>
+      </div>
+
+      <div className="p-4 space-y-4">
+        {/* Items */}
+        {a.items?.length ? (
+          <ul className="space-y-1.5">
+            {a.items.map((item, i) => (
+              <li key={i} className="text-sm">
+                <span className="font-bold text-stone-900">{item.quantity}x {item.listing_title}</span>
+                {!!item.addons?.length && (
+                  <span className="block text-xs text-stone-500 mt-0.5">
+                    + {item.addons.map(ad => ad.name).join(", ")}
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="font-bold text-stone-900 text-sm">{a.listing_title}</p>
+        )}
+
+        {/* Route timeline: vendor -> drop-off */}
+        <div className="flex gap-3 bg-stone-50 rounded-2xl p-3">
+          <div className="flex flex-col items-center pt-1">
+            <span className="w-2 h-2 rounded-full bg-stone-300 flex-shrink-0" />
+            <span className="w-px flex-1 bg-stone-200 my-1" />
+            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: TEAL }} />
+          </div>
+          <div className="flex-1 min-w-0 space-y-3">
+            <div>
+              <p className="text-[10px] uppercase tracking-wide text-stone-400 font-bold">Pickup</p>
+              <p className="text-sm text-stone-800 font-semibold truncate">@{a.vendor_username}</p>
+            </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-wide text-stone-400 font-bold">Drop-off</p>
+              <p className="text-sm text-stone-800 font-semibold truncate">{dropoffLabel}</p>
+            </div>
+          </div>
         </div>
 
-        <div className="space-y-1.5">
-          <div className="flex items-center gap-2 text-xs text-stone-500">
-            <Package className="w-3.5 h-3.5 text-stone-400 flex-shrink-0" />
-            <span>Pick up from <span className="font-semibold text-stone-700">@{a.vendor_username}</span></span>
-          </div>
-          <div className="flex items-center gap-2 text-xs text-stone-500">
-            <MapPin className="w-3.5 h-3.5 text-teal-500 flex-shrink-0" />
-            {a.pickup_point_name ? (
-              <span>Drop at <span className="font-semibold text-stone-700">{a.pickup_point_name}</span> · {a.pickup_point_campus}</span>
-            ) : (
-              <span>Drop at <span className="font-semibold text-stone-700">{a.delivery_location || "location not provided"}</span></span>
-            )}
-          </div>
-          <div className="flex items-center gap-2 text-xs text-stone-500">
-            <Clock className="w-3.5 h-3.5 text-stone-400 flex-shrink-0" />
+        {/* Meta */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-stone-400">
+          <div className="flex items-center gap-1.5">
+            <Clock className="w-3.5 h-3.5 flex-shrink-0" />
             <span>Assigned {new Date(a.assigned_at).toLocaleDateString("en-NG", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
           </div>
           {a.picked_up_at && (
-            <div className="flex items-center gap-2 text-xs text-teal-600">
+            <div className="flex items-center gap-1.5 text-teal-600 font-medium">
               <CheckCircle className="w-3.5 h-3.5 flex-shrink-0" />
               <span>Picked up {new Date(a.picked_up_at).toLocaleTimeString("en-NG", { hour: "2-digit", minute: "2-digit" })}</span>
             </div>
