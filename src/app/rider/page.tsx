@@ -21,8 +21,9 @@ interface Assignment {
   listing_title: string;
   vendor_username: string;
   buyer_username: string;
-  pickup_point_name: string;
-  pickup_point_campus: string;
+  pickup_point_name: string | null;
+  pickup_point_campus: string | null;
+  delivery_location: string | null;
   status: string;
   assigned_at: string;
   picked_up_at: string | null;
@@ -203,11 +204,23 @@ function AssignmentCard({
     <div className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden">
       <div className="p-4 space-y-3">
         <div className="flex items-start justify-between gap-2">
-          <div>
-            <p className="font-bold text-stone-900 text-sm">{a.listing_title}</p>
-            <p className="text-xs text-stone-400 mt-0.5">Order #{a.order_reference}</p>
-            {!!a.items?.length && a.items.length > 1 && (
-              <p className="text-xs text-stone-400 mt-0.5">+{a.items.length - 1} more item{a.items.length > 2 ? "s" : ""}</p>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs text-stone-400">Order #{a.order_reference}</p>
+            {a.items?.length ? (
+              <ul className="mt-1 space-y-1">
+                {a.items.map((item, i) => (
+                  <li key={i} className="text-sm">
+                    <span className="font-bold text-stone-900">{item.quantity}x {item.listing_title}</span>
+                    {!!item.addons?.length && (
+                      <span className="block text-xs text-stone-500 mt-0.5">
+                        + {item.addons.map(ad => ad.name).join(", ")}
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="font-bold text-stone-900 text-sm">{a.listing_title}</p>
             )}
           </div>
           <span className={`text-xs font-semibold px-2.5 py-1 rounded-full flex-shrink-0 ${STATUS_COLOR[a.status] || "bg-stone-100 text-stone-500"}`}>
@@ -222,7 +235,11 @@ function AssignmentCard({
           </div>
           <div className="flex items-center gap-2 text-xs text-stone-500">
             <MapPin className="w-3.5 h-3.5 text-teal-500 flex-shrink-0" />
-            <span>Drop at <span className="font-semibold text-stone-700">{a.pickup_point_name}</span> · {a.pickup_point_campus}</span>
+            {a.pickup_point_name ? (
+              <span>Drop at <span className="font-semibold text-stone-700">{a.pickup_point_name}</span> · {a.pickup_point_campus}</span>
+            ) : (
+              <span>Drop at <span className="font-semibold text-stone-700">{a.delivery_location || "location not provided"}</span></span>
+            )}
           </div>
           <div className="flex items-center gap-2 text-xs text-stone-500">
             <Clock className="w-3.5 h-3.5 text-stone-400 flex-shrink-0" />
