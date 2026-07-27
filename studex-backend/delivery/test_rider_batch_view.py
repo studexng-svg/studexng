@@ -30,7 +30,7 @@ class RiderBatchListViewTests(TestCase):
         self.category = Category.objects.create(title='FoodRB', slug='food-rb')
         self.point = CampusPickupPoint.objects.create(name='Hostel A', campus='pau')
         self.listing = Listing.objects.create(
-            title='Jollof Rice', description='x', price=Decimal('1500'),
+            title='Jollof Rice', description='x', price=Decimal('1500'), image='https://cdn.example.com/jollof.jpg',
             vendor=self.vendor, category=self.category, is_available=True,
         )
 
@@ -130,6 +130,7 @@ class RiderBatchListViewTests(TestCase):
         items = response.data['batches'][0]['assignments'][0]['items']
         self.assertEqual(len(items), 1)
         self.assertEqual(items[0]['listing_title'], 'Jollof Rice')
+        self.assertEqual(items[0]['image'], 'https://cdn.example.com/jollof.jpg')
         self.assertEqual(items[0]['quantity'], 2)
         self.assertEqual(items[0]['addons'], [{'name': 'Extra Chicken', 'price_delta': '300.00'}])
 
@@ -143,6 +144,7 @@ class RiderBatchListViewTests(TestCase):
         items = response.data['batches'][0]['assignments'][0]['items']
         self.assertEqual(len(items), 1)
         self.assertEqual(items[0]['listing_title'], 'Jollof Rice')
+        self.assertEqual(items[0]['image'], 'https://cdn.example.com/jollof.jpg')
 
     def test_existing_my_assignments_endpoint_unaffected(self):
         """Regression: RiderAssignmentListView (flat list) keeps working with the serializer's new fields present but harmless."""

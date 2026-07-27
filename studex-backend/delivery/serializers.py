@@ -56,6 +56,7 @@ class DeliveryAssignmentSerializer(serializers.ModelSerializer):
             return [
                 {
                     'listing_title': item.listing.title,
+                    'image': item.listing.image,
                     'quantity': item.quantity,
                     'unit_price': str(item.unit_price_at_order_time),
                     'line_total': str(item.line_total),
@@ -68,7 +69,7 @@ class DeliveryAssignmentSerializer(serializers.ModelSerializer):
                 for item in order_items
             ]
         return [{
-            'listing_title': obj.order.listing.title, 'quantity': obj.order.quantity,
+            'listing_title': obj.order.listing.title, 'image': obj.order.listing.image, 'quantity': obj.order.quantity,
             'unit_price': str(obj.order.amount), 'line_total': str(obj.order.amount),
             'status': 'fulfilled', 'addons': [],
         }]
