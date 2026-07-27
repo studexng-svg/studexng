@@ -295,14 +295,39 @@ export default function CheckoutPage() {
         ref: reference,
         callback: function(response: any) {
           if (response.status === "success") {
+            const succeed = (orderId: number | string) => {
+              if (isFoodOrder) cleanupCart();
+              if (isServiceBooking) clearBooking();
+              router.push(`/order-confirmation/${orderId}`);
+            };
             createOrder(response.reference, response.reference, appliedCredits)
-              .then(orderId => {
-                if (isFoodOrder) cleanupCart();
-                if (isServiceBooking) clearBooking();
-                router.push(`/order-confirmation/${orderId}`);
-              })
-              .catch(() => {
-                setPaymentError(`Payment received but order failed. Save this reference and contact support: ${response.reference}`);
+              .then(succeed)
+              .catch(async (err: any) => {
+                // The order-creation request can fail client-side (timeout,
+                // dropped connection) *after* the server already finished
+                // creating the order — the buyer then sees a scary failure
+                // for an order that actually exists. Before showing anything,
+                // check the server's own record of this reference; if it
+                // says paid, treat it as a success exactly like the happy path.
+                try {
+                  const statusRes = await api.payments.checkStatus(response.reference);
+                  const statusData = await statusRes.json();
+                  if (statusData?.status === "paid" && statusData?.order_id) {
+                    succeed(statusData.order_id);
+                    return;
+                  }
+                } catch {}
+                // createOrder() throws new Error(data.error || ...) for any
+                // backend-rejected order (e.g. NoBatchCapacityError, which
+                // auto-refunds and says so) — show that real reason instead
+                // of always implying the payment is stuck/lost. Only fall
+                // back to the scary generic message when there's truly no
+                // specific reason (network failure, unparseable response).
+                setPaymentError(
+                  err?.message
+                    ? `${err.message} (Reference: ${response.reference})`
+                    : `Payment received but order failed. Save this reference and contact support: ${response.reference}`
+                );
                 setIsProcessing(false);
               });
           } else {

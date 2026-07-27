@@ -24,6 +24,14 @@ class OrderSerializer(serializers.ModelSerializer):
     buyer_profile_picture = serializers.SerializerMethodField()
     dispute = serializers.SerializerMethodField()
     items = serializers.SerializerMethodField()
+    has_rider_delivery = serializers.SerializerMethodField()
+
+    def get_has_rider_delivery(self, obj):
+        # Lets the frontend show a rider-delivery-appropriate status message
+        # instead of the vendor-fulfilled-order default ("waiting for vendor
+        # to confirm delivery" never applied once a rider was involved).
+        from delivery.models import DeliveryAssignment
+        return DeliveryAssignment.objects.filter(order=obj).exists()
 
     def get_items(self, obj):
         # Phase 2 — Frontend Integration: itemized breakdown for a multi-item
@@ -96,7 +104,7 @@ class OrderSerializer(serializers.ModelSerializer):
             'amount', 'quantity', 'status', 'current_status', 'estimated_time',
             'delivery_location', 'created_at', 'paid_at',
             'vendor_accepted_at', 'service_started_at', 'seller_completed_at', 'buyer_confirmed_at',
-            'delivery_proof_1', 'delivery_proof_2', 'dispute', 'items',
+            'delivery_proof_1', 'delivery_proof_2', 'dispute', 'items', 'has_rider_delivery',
         ]
         read_only_fields = [
             'reference', 'amount', 'quantity', 'status', 'current_status', 'estimated_time',

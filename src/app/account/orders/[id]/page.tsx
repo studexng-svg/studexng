@@ -81,6 +81,7 @@ interface Order {
   delivery_location?: string;
   delivery_proof_1?: string | null;
   delivery_proof_2?: string | null;
+  has_rider_delivery?: boolean;
 }
 
 interface LoyaltyStatus {
@@ -565,7 +566,8 @@ export default function OrderDetailPage() {
         {awaitingVendor && (
           <div className="space-y-3 animate-fadeUp">
             <div className="w-full py-4 bg-stone-100 text-stone-400 rounded-full font-semibold text-base flex items-center justify-center gap-2 cursor-not-allowed select-none">
-              <Clock className="w-5 h-5" /> Waiting for vendor to confirm delivery
+              <Clock className="w-5 h-5" />
+              {order?.has_rider_delivery ? "Your order is being prepared" : "Waiting for vendor to confirm delivery"}
             </div>
             <button
               onClick={() => { resetDisputeModal(); setShowDisputeModal(true); }}

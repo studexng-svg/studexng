@@ -467,12 +467,40 @@ class OrderViewSet(viewsets.ModelViewSet):
 
     def _booking_timeline(self, order):
         """
-        The 7-step buyer-facing timeline (distinct from the delivery-tracking `history`
+        The buyer-facing timeline (distinct from the delivery-tracking `history`
         above). Every step is derived from an existing timestamp — no separate history
         table for this, it's presentation logic over Order/Booking fields.
+
+        Branches into two shapes: the original 7-step service/booking
+        timeline (Vendor Accepted, Service Started, ...) for orders a vendor
+        fulfills themselves, and a rider-delivery timeline (Picked Up, At
+        Pickup Point, Delivered) for any order with a DeliveryAssignment —
+        "Vendor Accepted"/"Service Started" describe a vendor-fulfilled
+        appointment and never applied to a rider-delivered order; showing
+        them was just confusing, not wrong-but-harmless.
         """
-        booking = Booking.objects.filter(buyer=order.buyer, listing=order.listing).order_by('-created_at').first()
+        from delivery.models import DeliveryAssignment
+        assignment = DeliveryAssignment.objects.filter(order=order).first()
         payout_released = order.status == 'completed' and order.buyer_confirmed_at is not None
+
+        if assignment is not None:
+            return [
+                {"key": "payment_completed", "label": "Payment Completed",
+                 "done": order.paid_at is not None, "at": order.paid_at.isoformat() if order.paid_at else None},
+                {"key": "picked_up", "label": "Picked Up by Rider",
+                 "done": assignment.picked_up_at is not None,
+                 "at": assignment.picked_up_at.isoformat() if assignment.picked_up_at else None},
+                {"key": "at_pickup_point", "label": "At Pickup Point",
+                 "done": assignment.at_pickup_point_at is not None,
+                 "at": assignment.at_pickup_point_at.isoformat() if assignment.at_pickup_point_at else None},
+                {"key": "delivered", "label": "Delivered",
+                 "done": assignment.completed_at is not None,
+                 "at": assignment.completed_at.isoformat() if assignment.completed_at else None},
+                {"key": "payment_released", "label": "Payment Released",
+                 "done": payout_released, "at": order.buyer_confirmed_at.isoformat() if payout_released else None},
+            ]
+
+        booking = Booking.objects.filter(buyer=order.buyer, listing=order.listing).order_by('-created_at').first()
         steps = [
             {"key": "booking_created", "label": "Booking Created",
              "done": booking is not None, "at": booking.created_at.isoformat() if booking else None},

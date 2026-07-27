@@ -676,3 +676,94 @@ class SettlementPolicyTests(DeliveryTestBase):
         mock_notify.assert_called_once()
         self.assertEqual(mock_notify.call_args.kwargs.get("recipient"), self.buyer)
         self.assertIn("picked up", mock_notify.call_args.kwargs.get("title", "").lower())
+
+
+class OrderStatusFinalizationOnCompletionTests(DeliveryTestBase):
+    """
+    Regression coverage: nothing in the delivery app used to touch
+    Order.status at all — a rider-delivered order stayed stuck at 'paid'
+    forever regardless of what the rider did, so the buyer never saw
+    resolution and award_vendor_badge_progress never fired for it. Covers
+    both settlement branches: pickup-verification vendors (payout already
+    happened at pickup, so completion just finalizes status + badge
+    progress) and buyer-confirmation vendors (completion hands off to the
+    existing seller_completed -> buyer-confirm/auto-release machinery,
+    exactly like a non-delivery-app order — never bypassing that buyer
+    protection just because a rider was involved).
+    """
+
+    def _advance_to_at_pickup_point(self):
+        assignment = self.assign()
+        self.client.force_authenticate(user=self.rider)
+        with patch("services.views.upload_to_cloudinary", return_value="https://cdn.example.com/pickup.jpg"):
+            self.client.post(
+                f"/api/delivery/assignments/{assignment.id}/update-status/",
+                {"status": "picked_up", "proof_image": make_proof_file()},
+                format="multipart",
+            )
+        self.client.post(
+            f"/api/delivery/assignments/{assignment.id}/update-status/",
+            {"status": "at_pickup_point"},
+        )
+        assignment.refresh_from_db()
+        self.assertEqual(assignment.status, "at_pickup_point")
+        return assignment
+
+    def _complete(self, assignment):
+        with patch("services.views.upload_to_cloudinary", return_value="https://cdn.example.com/complete.jpg"):
+            return self.client.post(
+                f"/api/delivery/assignments/{assignment.id}/update-status/",
+                {"status": "completed", "delivery_code": assignment.delivery_code, "proof_image": make_proof_file()},
+                format="multipart",
+            )
+
+    def test_pickup_verification_vendor_order_marked_completed_and_earns_badge_progress(self):
+        food = VendorType.objects.get(name="food")
+        Vendor.objects.create(user=self.vendor, vendor_type=food)
+        PaymentTransaction.objects.create(
+            reference=self.order.reference, amount=Decimal("1000.00"),
+            seller_amount=Decimal("950.00"), platform_amount=Decimal("50.00"),
+            buyer_email=self.buyer.email, status="success", seller=self.vendor,
+        )
+        assignment = self._advance_to_at_pickup_point()
+
+        with patch("payments.views.trigger_vendor_payout"):
+            response = self._complete(assignment)
+
+        self.assertEqual(response.status_code, 200)
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.status, "completed")
+        self.assertIsNotNone(self.order.buyer_confirmed_at)
+        self.vendor.profile.refresh_from_db()
+        self.assertEqual(self.vendor.profile.on_platform_sales, 1)
+
+    def test_buyer_confirmation_vendor_order_marked_seller_completed_not_completed(self):
+        """No VendorType at all -> default buyer_confirmation trigger — payout was never triggered at pickup."""
+        assignment = self._advance_to_at_pickup_point()
+
+        response = self._complete(assignment)
+
+        self.assertEqual(response.status_code, 200)
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.status, "seller_completed")
+        self.assertIsNotNone(self.order.seller_completed_at)
+        self.assertIsNone(self.order.buyer_confirmed_at)
+        self.vendor.profile.refresh_from_db()
+        self.assertEqual(self.vendor.profile.on_platform_sales or 0, 0)
+
+    def test_buyer_confirmation_vendor_can_still_confirm_after_rider_delivery(self):
+        """The buyer's own Confirm button (existing payout/badge machinery) must work normally afterward."""
+        assignment = self._advance_to_at_pickup_point()
+        self._complete(assignment)
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.status, "seller_completed")
+
+        self.client.force_authenticate(user=self.buyer)
+        with patch("payments.views.trigger_vendor_payout"):
+            response = self.client.post(f"/api/orders/orders/{self.order.id}/confirm/")
+
+        self.assertEqual(response.status_code, 200)
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.status, "completed")
+        self.vendor.profile.refresh_from_db()
+        self.assertEqual(self.vendor.profile.on_platform_sales, 1)

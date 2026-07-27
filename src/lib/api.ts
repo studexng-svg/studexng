@@ -377,6 +377,9 @@ export const api = {
     verify: (body: Record<string, unknown>) =>
       fetchWithAuth(u("/api/payments/verify/"), { method: "POST", body: s(body) }),
 
+    checkStatus: (txRef: string) =>
+      fetchWithAuth(u(`/api/payments/check-status/?tx_ref=${encodeURIComponent(txRef)}`)),
+
     previewPrice: (body: Record<string, unknown>) =>
       fetchWithAuth(u("/api/payments/preview-price/"), { method: "POST", body: s(body) }),
 
@@ -803,14 +806,36 @@ export const api = {
 
     myBatches: () => fetchWithAuth(u("/api/delivery/my-batches/")),
 
+    myHistory: () => fetchWithAuth(u("/api/delivery/my-history/")),
+
+    myStats: () => fetchWithAuth(u("/api/delivery/my-stats/")),
+
     vendorEligibleBatches: (vendorId: number | string) =>
       fetchWithAuth(u(`/api/delivery/vendor-batches/${vendorId}/`)),
 
-    updateStatus: (assignmentId: number | string, newStatus: string) =>
-      fetchWithAuth(u(`/api/delivery/assignments/${assignmentId}/update-status/`), {
+    updateStatus: (
+      assignmentId: number | string,
+      newStatus: string,
+      extra?: { proofImage?: File; deliveryCode?: string },
+    ) => {
+      // 'picked_up' and 'completed' require a proof photo (and 'completed'
+      // also a delivery code) — see delivery/views.py RiderUpdateStatusView.
+      // 'at_pickup_point' needs neither, so keep sending plain JSON for it.
+      if (extra?.proofImage) {
+        const fd = new FormData();
+        fd.append("status", newStatus);
+        if (extra.deliveryCode) fd.append("delivery_code", extra.deliveryCode);
+        fd.append("proof_image", extra.proofImage);
+        return fetchWithAuth(u(`/api/delivery/assignments/${assignmentId}/update-status/`), {
+          method: "POST",
+          body: fd,
+        });
+      }
+      return fetchWithAuth(u(`/api/delivery/assignments/${assignmentId}/update-status/`), {
         method: "POST",
         body: s({ status: newStatus }),
-      }),
+      });
+    },
 
     orderStatus: (orderId: number | string) =>
       fetchWithAuth(u(`/api/delivery/order/${orderId}/`)),

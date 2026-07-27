@@ -292,6 +292,70 @@ class RiderAssignmentListView(APIView):
         return Response(DeliveryAssignmentSerializer(qs, many=True).data)
 
 
+class RiderHistoryView(APIView):
+    """GET /api/delivery/my-history/ — completed deliveries, newest first."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        if request.user.user_type != 'rider':
+            return Response({'error': 'Not a rider'}, status=status.HTTP_403_FORBIDDEN)
+        qs = DeliveryAssignment.objects.filter(
+            rider=request.user, status='completed',
+        ).select_related(
+            'order__buyer', 'order__listing__vendor', 'pickup_point',
+        ).order_by('-completed_at')[:100]
+        return Response(DeliveryAssignmentSerializer(qs, many=True).data)
+
+
+class RiderStatsView(APIView):
+    """
+    GET /api/delivery/my-stats/ — overview numbers for the rider dashboard
+    (active count, completed today/this week/all-time, and a 7-day daily
+    breakdown for the chart). Riders have no earnings/commission concept
+    anywhere else in this codebase, so "analytics" here means delivery
+    activity, not money.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        if request.user.user_type != 'rider':
+            return Response({'error': 'Not a rider'}, status=status.HTTP_403_FORBIDDEN)
+
+        from datetime import timedelta
+        from zoneinfo import ZoneInfo
+        LAGOS = ZoneInfo("Africa/Lagos")
+        now_lagos = timezone.now().astimezone(LAGOS)
+        today = now_lagos.date()
+        week_start = today - timedelta(days=6)
+
+        base = DeliveryAssignment.objects.filter(rider=request.user)
+        completed = base.filter(status='completed', completed_at__isnull=False)
+
+        total_completed = completed.count()
+        active_count = base.exclude(status='completed').count()
+
+        completed_local_dates = [c.astimezone(LAGOS).date() for c in completed.values_list('completed_at', flat=True)]
+        completed_today = sum(1 for d in completed_local_dates if d == today)
+        completed_this_week = sum(1 for d in completed_local_dates if week_start <= d <= today)
+
+        daily_counts = []
+        for i in range(6, -1, -1):
+            day = today - timedelta(days=i)
+            daily_counts.append({
+                'date': day.isoformat(),
+                'label': day.strftime('%a'),
+                'count': sum(1 for d in completed_local_dates if d == day),
+            })
+
+        return Response({
+            'active_count': active_count,
+            'completed_today': completed_today,
+            'completed_this_week': completed_this_week,
+            'total_completed': total_completed,
+            'daily_counts': daily_counts,
+        })
+
+
 class RiderBatchListView(APIView):
     """
     GET /api/delivery/my-batches/ (Phase 1 — Food Commerce Engine, Step 5).
@@ -470,6 +534,35 @@ class RiderUpdateStatusView(APIView):
                         )
                     assignment.completion_proof_image = proof_url
                     assignment.completed_at = now
+
+                    # Nothing else in the delivery app ever touches
+                    # Order.status — without this, a rider-delivered order
+                    # stays stuck at 'paid' forever: the buyer never sees
+                    # resolution on their order page, and
+                    # award_vendor_badge_progress (orders/views.py) never
+                    # fires for it (that's exactly why Store vendors weren't
+                    # accruing badge progress from these orders).
+                    order = assignment.order
+                    from payments.settlement import should_settle_on_pickup
+                    if should_settle_on_pickup(order.listing.vendor):
+                        # Payout already happened at pickup (Settlement
+                        # Policy) — this only finalizes the order's status
+                        # and counts it toward the vendor's badge progress.
+                        order.status = 'completed'
+                        order.buyer_confirmed_at = now
+                        order.save(update_fields=['status', 'buyer_confirmed_at'])
+                        from orders.views import award_vendor_badge_progress
+                        award_vendor_badge_progress(order)
+                    else:
+                        # Buyer-confirmation vendor: mirror the existing
+                        # "vendor marks ready" step so the buyer's own
+                        # Confirm button (or 24h auto-release) still
+                        # triggers payout — same buyer protection as every
+                        # non-delivery-app order, not bypassed just because
+                        # a rider was involved.
+                        order.status = 'seller_completed'
+                        order.seller_completed_at = now
+                        order.save(update_fields=['status', 'seller_completed_at'])
 
                 assignment.status = new_status
                 assignment.save()
