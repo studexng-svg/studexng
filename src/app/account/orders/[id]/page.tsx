@@ -794,11 +794,11 @@ export default function OrderDetailPage() {
       {/* CONFIRM MODAL */}
       {showModal && (
         <div
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4 animate-fadeIn"
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fadeIn"
           onClick={() => !confirming && (setShowModal(false), setAcknowledged(false))}
         >
           <div
-            className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl border border-stone-100 mb-20 sm:mb-0 animate-fadeUp"
+            className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl border border-stone-100 animate-fadeUp"
             onClick={e => e.stopPropagation()}
           >
             <h3 className="text-xl font-bold text-stone-900 mb-2">Confirm Service Received?</h3>

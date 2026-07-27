@@ -131,8 +131,8 @@ function ProofModal({
   const canSubmit = !!image && (!isCompletion || code.trim().length > 0);
 
   return (
-    <div className="fixed inset-0 z-[70] bg-black/40 flex items-end sm:items-center justify-center sm:p-4" onClick={() => !submitting && onClose()}>
-      <div className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl w-full sm:max-w-sm p-5 space-y-4" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 z-[70] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => !submitting && onClose()}>
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-5 space-y-4 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between">
           <p className="font-bold text-stone-900 text-base">
             {isCompletion ? "Confirm Handoff to Buyer" : "Confirm Pickup from Vendor"}

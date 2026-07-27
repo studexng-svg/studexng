@@ -56,7 +56,7 @@ export default function VendorOfMonthModal({ vendor }: { vendor: VendorOfMonth |
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[9998] flex items-end sm:items-center justify-center p-0 sm:p-4"
+          className="fixed inset-0 z-[9998] flex items-center justify-center p-4"
           style={{ background: "rgba(0,0,0,0.65)", backdropFilter: "blur(4px)" }}
           onClick={dismiss}
         >
@@ -66,7 +66,7 @@ export default function VendorOfMonthModal({ vendor }: { vendor: VendorOfMonth |
             exit={{ y: 60, opacity: 0, scale: 0.95 }}
             transition={{ type: "spring", damping: 26, stiffness: 300 }}
             onClick={(e) => e.stopPropagation()}
-            className="relative w-full sm:max-w-sm rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl"
+            className="relative w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl"
             style={{ fontFamily: "'DM Sans', sans-serif" }}
           >
             {/* Hero image or gradient */}
