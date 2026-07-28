@@ -243,39 +243,44 @@ class VerifyCartPaymentTests(CartPaymentViewsTestBase):
 
 class CartPaymentViewsBatchReservationTests(CartPaymentViewsTestBase):
     """
-    Phase 1 — Food Commerce Engine, Step 4 (Delivery Batch Reservation) —
-    full initialize/verify flow for a vendor with
-    VendorType.supports_batched_delivery, including the fail-fast pre-flight
-    check at initialize and the auto-refund-on-exhaustion path at verify.
+    Phase 2 simplification (Delivery Slot Reservation) — full
+    initialize/verify flow for a vendor with an active DeliverySlot,
+    including the fail-fast pre-flight check at initialize and the
+    auto-refund-on-exhaustion path at verify.
     """
 
     def setUp(self):
         super().setUp()
         from accounts.models import Vendor, VendorType
-        from delivery.models import DeliveryBatch, BatchTemplate
-        from datetime import date, timedelta
-        from django.utils import timezone
+        from delivery.models import DeliverySlot
+        from delivery.capacity import LAGOS
+        from datetime import datetime, timedelta
+        from unittest import mock
+
+        # Fixed at noon Lagos — see delivery/test_capacity.py for why this
+        # needs to be frozen rather than derived from the real "now" the
+        # suite happens to run at.
+        self.FROZEN_NOW = datetime(2026, 6, 15, 12, 0, 0, tzinfo=LAGOS)
+        self._time_patcher = mock.patch('django.utils.timezone.now', return_value=self.FROZEN_NOW)
+        self._time_patcher.start()
+        self.addCleanup(self._time_patcher.stop)
 
         self.food = VendorType.objects.get(name='food')
         Vendor.objects.create(user=self.vendor_a, vendor_type=self.food)
-        # vendor_uses_batched_delivery requires an active BatchTemplate, not
-        # just a batching-capable VendorType.
-        BatchTemplate.objects.create(
+        # vendor_uses_batched_delivery requires an active DeliverySlot, not
+        # just a slot-capable VendorType.
+        self.batch = DeliverySlot.objects.create(
             vendor=self.vendor_a, campus='pau', display_name='Lunch',
-            delivery_time=timezone.now().time(), max_orders=10, days_of_week=list(range(7)),
-        )
-
-        now = timezone.now()
-        self.batch = DeliveryBatch.objects.create(
-            vendor=self.vendor_a, campus='pau', batch_date=date.today(), display_name='Lunch',
-            delivery_time=now + timedelta(hours=3), cutoff_time=now + timedelta(hours=2),
-            max_orders=5, current_orders=0, status='open',
+            delivery_time=(self.FROZEN_NOW + timedelta(hours=3)).time(), max_orders=5,
         )
 
     @patch('payments.views.requests.post')
     def test_initialize_rejects_when_no_eligible_batch(self, mock_post):
-        self.batch.status = 'closed'
-        self.batch.save(update_fields=['status'])
+        # Slot stays active (vendor still "uses batched delivery") but has
+        # zero room today — the actual no-capacity scenario, distinct from
+        # "doesn't use slots at all".
+        self.batch.max_orders = 0
+        self.batch.save(update_fields=['max_orders'])
         CartItem.objects.create(user=self.buyer, listing=self.listing_a, quantity=1)
 
         response = self.client.post('/api/payments/initialize-cart/', {'vendor_id': self.vendor_a.id}, format='json')
@@ -307,19 +312,16 @@ class CartPaymentViewsBatchReservationTests(CartPaymentViewsTestBase):
 
         self.assertEqual(response.status_code, 200)
         order = Order.objects.get(id=response.data['order_id'])
-        self.assertEqual(order.delivery_batch_id, self.batch.id)
-        self.batch.refresh_from_db()
-        self.assertEqual(self.batch.current_orders, 1)
+        self.assertEqual(order.delivery_slot_id, self.batch.id)
 
     @patch('payments.views.requests.get')
     def test_verify_sends_batch_aware_notification_to_buyer(self, mock_get):
         """
-        The buyer's "Order Confirmed" notification must mention the batch's
+        The buyer's "Order Confirmed" notification must mention the slot's
         delivery time — a generic "vendor has been notified" message left
-        the buyer with no idea their food was part of a scheduled batch at
+        the buyer with no idea their food was part of a scheduled slot at
         all, let alone when to expect it.
         """
-        from zoneinfo import ZoneInfo
         from notifications.models import Notification
 
         reference = 'STX-CART-BATCHVERIFY-NOTIF'
@@ -333,9 +335,9 @@ class CartPaymentViewsBatchReservationTests(CartPaymentViewsTestBase):
         self.assertEqual(response.status_code, 200)
 
         order = Order.objects.get(id=response.data['order_id'])
-        local_dt = order.delivery_batch.delivery_time.astimezone(ZoneInfo("Africa/Lagos"))
-        hour12 = local_dt.hour % 12 or 12
-        expected_time = f"{hour12}:{local_dt.minute:02d} {'AM' if local_dt.hour < 12 else 'PM'}"
+        slot_time = order.delivery_slot.delivery_time
+        hour12 = slot_time.hour % 12 or 12
+        expected_time = f"{hour12}:{slot_time.minute:02d} {'AM' if slot_time.hour < 12 else 'PM'}"
 
         notif = Notification.objects.filter(recipient=self.buyer, notification_type='order_placed').latest('id')
         self.assertIn(expected_time, notif.message)
@@ -344,10 +346,8 @@ class CartPaymentViewsBatchReservationTests(CartPaymentViewsTestBase):
     @patch('payments.views.refund_paystack_transaction')
     @patch('payments.views.requests.get')
     def test_verify_refunds_and_rejects_when_capacity_exhausted(self, mock_get, mock_refund):
-        self.batch.max_orders = 1
-        self.batch.current_orders = 1
-        self.batch.status = 'full'
-        self.batch.save(update_fields=['max_orders', 'current_orders', 'status'])
+        self.batch.max_orders = 0
+        self.batch.save(update_fields=['max_orders'])
 
         reference = 'STX-CART-BATCHVERIFY-0002'
         cache.set(f'pay_init:{reference}', {'min_kobo': 324000, 'max_kobo': 400000}, 3600)
@@ -366,7 +366,7 @@ class CartPaymentViewsBatchReservationTests(CartPaymentViewsTestBase):
 
     @patch('payments.views.requests.get')
     def test_non_batching_vendor_checkout_unaffected(self, mock_get):
-        """vendor_b has no Vendor row at all — completely unaffected by batching."""
+        """vendor_b has no Vendor row at all — completely unaffected by slotted delivery."""
         reference = 'STX-CART-BATCHVERIFY-0003'
         cache.set(f'pay_init:{reference}', {'min_kobo': 216000, 'max_kobo': 300000}, 3600)
         CartItem.objects.create(user=self.buyer, listing=self.listing_b, quantity=1)
@@ -378,4 +378,4 @@ class CartPaymentViewsBatchReservationTests(CartPaymentViewsTestBase):
 
         self.assertEqual(response.status_code, 200)
         order = Order.objects.get(id=response.data['order_id'])
-        self.assertIsNone(order.delivery_batch_id)
+        self.assertIsNone(order.delivery_slot_id)

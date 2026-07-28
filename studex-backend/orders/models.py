@@ -40,19 +40,18 @@ class Order(models.Model):
     delivery_location = models.CharField(max_length=200, blank=True, default="")
     delivery_proof_1 = models.URLField(max_length=500, null=True, blank=True)
     delivery_proof_2 = models.URLField(max_length=500, null=True, blank=True)
-    # Phase 1 — Food Commerce Engine, Step 4 (Delivery Batch Reservation).
-    # Null for every order from a vendor that doesn't use batching (i.e.
-    # every order type that existed before this phase, and every non-
-    # batching vendor type after it) — identical to today's behavior in
-    # that case. Set exactly once, at checkout (see
-    # payments.cart_checkout.create_order_from_priced_lines), by the one
-    # reservation service (delivery.capacity) — never written to directly
-    # anywhere else. String FK to avoid a circular import with delivery,
-    # the same convention delivery.models.DeliveryAssignment.order already
-    # uses in reverse.
-    delivery_batch = models.ForeignKey(
-        'delivery.DeliveryBatch', on_delete=models.SET_NULL, null=True, blank=True,
-        related_name='reserved_orders',
+    # Null for every order from a vendor that doesn't use delivery slots —
+    # identical to today's behavior in that case. Set exactly once, at
+    # checkout (see payments.cart_checkout.create_order_from_priced_lines),
+    # by the one reservation service (delivery.capacity) — never written to
+    # directly anywhere else. String FK to avoid a circular import with
+    # delivery, the same convention delivery.models.DeliveryAssignment.order
+    # already uses in reverse. "Today's" capacity against this slot is
+    # counted live from Order rows placed against it, not a separate
+    # generated-per-day row.
+    delivery_slot = models.ForeignKey(
+        'delivery.DeliverySlot', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='orders',
     )
 
     def __str__(self):

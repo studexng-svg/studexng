@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import CampusPickupPoint, DeliveryAssignment, BatchTemplate, DeliveryBatch
+from .models import CampusPickupPoint, DeliveryAssignment, DeliverySlot
 
 
 class CampusPickupPointSerializer(serializers.ModelSerializer):
@@ -14,13 +14,17 @@ class DeliveryAssignmentSerializer(serializers.ModelSerializer):
     pickup_point_campus = serializers.CharField(source='pickup_point.campus', read_only=True)
     order_reference = serializers.CharField(source='order.reference', read_only=True)
     order_id = serializers.IntegerField(source='order.id', read_only=True)
+    # The buyer's own typed drop-off location (Order.delivery_location) —
+    # what an auto-assigned rider actually sees, since auto-assignment
+    # (delivery.assignment.auto_assign_rider) never sets a pickup_point.
+    delivery_location = serializers.CharField(source='order.delivery_location', read_only=True)
     buyer_username = serializers.CharField(source='order.buyer.username', read_only=True)
     listing_title = serializers.CharField(source='order.listing.title', read_only=True)
     vendor_username = serializers.CharField(source='order.listing.vendor.username', read_only=True)
     order_status = serializers.CharField(source='order.status', read_only=True)
-    # Phase 1 — Food Commerce Engine, Step 5 (Rider Batch Workflow). Both
-    # null for every order from a non-batching vendor, and for every order
-    # that predates this phase — identical to today's shape in that case.
+    # Both null for every order from a non-slotted vendor. Field names kept
+    # as batch_id/batch_display_name on the wire (backed by delivery_slot
+    # internally) — purely a naming choice, no frontend change needed.
     batch_id = serializers.SerializerMethodField()
     batch_display_name = serializers.SerializerMethodField()
     # Itemized contents — from OrderItem when this order has them (a menu
@@ -32,7 +36,7 @@ class DeliveryAssignmentSerializer(serializers.ModelSerializer):
         model = DeliveryAssignment
         fields = [
             'id', 'order_id', 'order_reference', 'order_status',
-            'rider_username', 'pickup_point_name', 'pickup_point_campus',
+            'rider_username', 'pickup_point_name', 'pickup_point_campus', 'delivery_location',
             'buyer_username', 'listing_title', 'vendor_username',
             'status', 'assigned_at', 'picked_up_at', 'at_pickup_point_at', 'completed_at',
             'pickup_proof_image', 'completion_proof_image',
@@ -45,10 +49,10 @@ class DeliveryAssignmentSerializer(serializers.ModelSerializer):
         # from the API. See BuyerDeliveryStatusSerializer below.
 
     def get_batch_id(self, obj):
-        return obj.batch_id
+        return obj.delivery_slot_id
 
     def get_batch_display_name(self, obj):
-        return obj.batch.display_name if obj.batch_id else None
+        return obj.delivery_slot.display_name if obj.delivery_slot_id else None
 
     def get_items(self, obj):
         order_items = list(obj.order.items.all())
@@ -92,44 +96,25 @@ class BuyerDeliveryStatusSerializer(DeliveryAssignmentSerializer):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Phase 1 — Food Commerce Engine, Step 7: admin batch controls (FR-12, FR-13).
+# Admin: Delivery Slots (Phase 2 simplification — one row per recurring
+# window, replacing the earlier BatchTemplate + DeliveryBatch pair).
 # ─────────────────────────────────────────────────────────────────────────────
 
-class BatchTemplateSerializer(serializers.ModelSerializer):
+class DeliverySlotSerializer(serializers.ModelSerializer):
     vendor_username = serializers.CharField(source='vendor.username', read_only=True)
+    used_today = serializers.SerializerMethodField()
 
     class Meta:
-        model = BatchTemplate
+        model = DeliverySlot
         fields = [
             'id', 'vendor', 'vendor_username', 'campus', 'display_name', 'delivery_time',
-            'cutoff_offset_minutes', 'max_orders', 'days_of_week', 'is_active',
+            'cutoff_offset_minutes', 'max_orders', 'is_active', 'used_today',
             'created_at', 'updated_at',
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
 
-
-class DeliveryBatchSerializer(serializers.ModelSerializer):
-    """
-    Admin-facing read/override serializer (FR-12/FR-13). vendor/campus/
-    batch_date/template/current_orders are read-only here — an admin
-    override changes this one day's delivery_time/cutoff_time/max_orders/
-    display_name/status, never the batch's identity or its live counter
-    (which only delivery.capacity.reserve_capacity/release_capacity touch).
-    """
-    vendor_username = serializers.CharField(source='vendor.username', read_only=True)
-    template_id = serializers.SerializerMethodField()
-
-    class Meta:
-        model = DeliveryBatch
-        fields = [
-            'id', 'vendor', 'vendor_username', 'template_id', 'campus', 'batch_date',
-            'display_name', 'delivery_time', 'cutoff_time', 'max_orders', 'current_orders',
-            'status', 'created_at', 'updated_at',
-        ]
-        read_only_fields = [
-            'id', 'vendor', 'template_id', 'campus', 'batch_date', 'current_orders',
-            'created_at', 'updated_at',
-        ]
-
-    def get_template_id(self, obj):
-        return obj.template_id
+    def get_used_today(self, obj):
+        from django.utils import timezone
+        from delivery.capacity import LAGOS, _orders_today_count
+        today = timezone.now().astimezone(LAGOS).date()
+        return _orders_today_count(obj, today)

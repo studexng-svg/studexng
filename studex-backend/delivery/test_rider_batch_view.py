@@ -1,21 +1,23 @@
 # delivery/test_rider_batch_view.py
 """
-Test suite for GET /api/delivery/my-batches/ (Phase 1 — Food Commerce
-Engine, Step 5 — Rider Batch Workflow). Read-only grouping layer over
-existing DeliveryAssignment data — pickup/completion verification mechanics
-(RiderUpdateStatusView) are untouched and not exercised here.
+Test suite for GET /api/delivery/my-batches/ (Phase 2 simplification —
+RiderBatchListView now groups by DeliverySlot instead of the old
+DeliveryBatch). Read-only grouping layer over existing DeliveryAssignment
+data — pickup/completion verification mechanics (RiderUpdateStatusView) are
+untouched and not exercised here. Field names on the wire (batch_id,
+batches, unbatched) are kept as-is for frontend compatibility even though
+they're now backed by DeliverySlot.
 """
-from datetime import date, timedelta
+from datetime import time
 from decimal import Decimal
 
 from django.test import TestCase
-from django.utils import timezone
 from rest_framework.test import APIClient
 
 from accounts.models import User, Vendor, VendorType
 from services.models import Category, Listing, MenuItem, AddonGroup, Addon
 from orders.models import Order, OrderItem, OrderItemAddon
-from delivery.models import DeliveryBatch, DeliveryAssignment, CampusPickupPoint
+from delivery.models import DeliverySlot, DeliveryAssignment, CampusPickupPoint
 
 
 class RiderBatchListViewTests(TestCase):
@@ -34,11 +36,9 @@ class RiderBatchListViewTests(TestCase):
             vendor=self.vendor, category=self.category, is_available=True,
         )
 
-        now = timezone.now()
-        self.batch = DeliveryBatch.objects.create(
-            vendor=self.vendor, campus='pau', batch_date=date.today(), display_name='Lunch Batch',
-            delivery_time=now + timedelta(hours=1), cutoff_time=now + timedelta(minutes=45),
-            max_orders=10, current_orders=2, status='open',
+        self.slot = DeliverySlot.objects.create(
+            vendor=self.vendor, campus='pau', display_name='Lunch Batch',
+            delivery_time=time(13, 0), cutoff_offset_minutes=15, max_orders=10,
         )
 
     def _make_order(self, ref):
@@ -52,9 +52,9 @@ class RiderBatchListViewTests(TestCase):
         response = self.client.get('/api/delivery/my-batches/')
         self.assertEqual(response.status_code, 403)
 
-    def test_assignment_with_batch_grouped_under_batches(self):
+    def test_assignment_with_slot_grouped_under_batches(self):
         order = self._make_order('STX-RB-0001')
-        DeliveryAssignment.objects.create(order=order, rider=self.rider, pickup_point=self.point, batch=self.batch)
+        DeliveryAssignment.objects.create(order=order, rider=self.rider, pickup_point=self.point, delivery_slot=self.slot)
 
         self.client.force_authenticate(user=self.rider)
         response = self.client.get('/api/delivery/my-batches/')
@@ -62,16 +62,16 @@ class RiderBatchListViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data['batches']), 1)
         group = response.data['batches'][0]
-        self.assertEqual(group['batch_id'], self.batch.id)
+        self.assertEqual(group['batch_id'], self.slot.id)
         self.assertEqual(group['display_name'], 'Lunch Batch')
         self.assertEqual(len(group['assignments']), 1)
         self.assertEqual(response.data['unbatched'], [])
 
-    def test_multiple_assignments_same_batch_grouped_together(self):
+    def test_multiple_assignments_same_slot_grouped_together(self):
         order1 = self._make_order('STX-RB-0002')
         order2 = self._make_order('STX-RB-0003')
-        DeliveryAssignment.objects.create(order=order1, rider=self.rider, pickup_point=self.point, batch=self.batch)
-        DeliveryAssignment.objects.create(order=order2, rider=self.rider, pickup_point=self.point, batch=self.batch)
+        DeliveryAssignment.objects.create(order=order1, rider=self.rider, pickup_point=self.point, delivery_slot=self.slot)
+        DeliveryAssignment.objects.create(order=order2, rider=self.rider, pickup_point=self.point, delivery_slot=self.slot)
 
         self.client.force_authenticate(user=self.rider)
         response = self.client.get('/api/delivery/my-batches/')
@@ -79,9 +79,9 @@ class RiderBatchListViewTests(TestCase):
         self.assertEqual(len(response.data['batches']), 1)
         self.assertEqual(len(response.data['batches'][0]['assignments']), 2)
 
-    def test_assignment_without_batch_goes_to_unbatched(self):
+    def test_assignment_without_slot_goes_to_unbatched(self):
         order = self._make_order('STX-RB-0004')
-        DeliveryAssignment.objects.create(order=order, rider=self.rider, pickup_point=self.point, batch=None)
+        DeliveryAssignment.objects.create(order=order, rider=self.rider, pickup_point=self.point, delivery_slot=None)
 
         self.client.force_authenticate(user=self.rider)
         response = self.client.get('/api/delivery/my-batches/')
@@ -92,7 +92,7 @@ class RiderBatchListViewTests(TestCase):
     def test_completed_assignment_excluded(self):
         order = self._make_order('STX-RB-0005')
         DeliveryAssignment.objects.create(
-            order=order, rider=self.rider, pickup_point=self.point, batch=self.batch, status='completed',
+            order=order, rider=self.rider, pickup_point=self.point, delivery_slot=self.slot, status='completed',
         )
 
         self.client.force_authenticate(user=self.rider)
@@ -103,7 +103,7 @@ class RiderBatchListViewTests(TestCase):
 
     def test_other_riders_assignments_not_visible(self):
         order = self._make_order('STX-RB-0006')
-        DeliveryAssignment.objects.create(order=order, rider=self.other_rider, pickup_point=self.point, batch=self.batch)
+        DeliveryAssignment.objects.create(order=order, rider=self.other_rider, pickup_point=self.point, delivery_slot=self.slot)
 
         self.client.force_authenticate(user=self.rider)
         response = self.client.get('/api/delivery/my-batches/')
@@ -122,7 +122,7 @@ class RiderBatchListViewTests(TestCase):
             unit_price_at_order_time=Decimal('1620'), line_total=Decimal('3240'),
         )
         OrderItemAddon.objects.create(order_item=order_item, addon=addon, name_snapshot='Extra Chicken', price_delta_snapshot=Decimal('300'))
-        DeliveryAssignment.objects.create(order=order, rider=self.rider, pickup_point=self.point, batch=self.batch)
+        DeliveryAssignment.objects.create(order=order, rider=self.rider, pickup_point=self.point, delivery_slot=self.slot)
 
         self.client.force_authenticate(user=self.rider)
         response = self.client.get('/api/delivery/my-batches/')
@@ -136,7 +136,7 @@ class RiderBatchListViewTests(TestCase):
 
     def test_legacy_single_item_order_falls_back_to_anchor_listing(self):
         order = self._make_order('STX-RB-0008')  # no OrderItem rows
-        DeliveryAssignment.objects.create(order=order, rider=self.rider, pickup_point=self.point, batch=self.batch)
+        DeliveryAssignment.objects.create(order=order, rider=self.rider, pickup_point=self.point, delivery_slot=self.slot)
 
         self.client.force_authenticate(user=self.rider)
         response = self.client.get('/api/delivery/my-batches/')
@@ -149,11 +149,25 @@ class RiderBatchListViewTests(TestCase):
     def test_existing_my_assignments_endpoint_unaffected(self):
         """Regression: RiderAssignmentListView (flat list) keeps working with the serializer's new fields present but harmless."""
         order = self._make_order('STX-RB-0009')
-        DeliveryAssignment.objects.create(order=order, rider=self.rider, pickup_point=self.point, batch=self.batch)
+        DeliveryAssignment.objects.create(order=order, rider=self.rider, pickup_point=self.point, delivery_slot=self.slot)
 
         self.client.force_authenticate(user=self.rider)
         response = self.client.get('/api/delivery/my-assignments/')
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data), 1)
-        self.assertEqual(response.data[0]['batch_id'], self.batch.id)
+        self.assertEqual(response.data[0]['batch_id'], self.slot.id)
+
+    def test_auto_assigned_order_with_no_pickup_point_shows_delivery_location(self):
+        """Auto-assignment never sets a pickup_point — the rider must still see where to drop off, from the buyer's own typed location."""
+        order = self._make_order('STX-RB-0010')
+        order.delivery_location = '3rd floor, Block C, Room 12'
+        order.save(update_fields=['delivery_location'])
+        DeliveryAssignment.objects.create(order=order, rider=self.rider, pickup_point=None, delivery_slot=self.slot)
+
+        self.client.force_authenticate(user=self.rider)
+        response = self.client.get('/api/delivery/my-batches/')
+
+        assignment_data = response.data['batches'][0]['assignments'][0]
+        self.assertIsNone(assignment_data.get('pickup_point_name'))
+        self.assertEqual(assignment_data['delivery_location'], '3rd floor, Block C, Room 12')

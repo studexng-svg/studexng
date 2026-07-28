@@ -15,8 +15,9 @@ interface Delivery {
   vendor_username: string;
   buyer_username: string;
   rider_username: string;
-  pickup_point_name: string;
-  pickup_point_campus: string;
+  pickup_point_name: string | null;
+  pickup_point_campus: string | null;
+  delivery_location: string | null;
   status: string;
   assigned_at: string;
   picked_up_at: string | null;
@@ -111,7 +112,7 @@ export default function AdminDeliveriesPage() {
                   </div>
                   <div className="flex items-center gap-1.5 text-xs text-stone-500">
                     <MapPin className="w-3 h-3 text-teal-500" />
-                    <span>{d.pickup_point_name} · {d.pickup_point_campus}</span>
+                    <span>{d.pickup_point_name ? `${d.pickup_point_name} · ${d.pickup_point_campus}` : (d.delivery_location || "location not provided")}</span>
                   </div>
                   <div className="flex items-center gap-1.5 text-xs text-stone-500">
                     <Package className="w-3 h-3" />

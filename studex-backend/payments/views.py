@@ -590,11 +590,11 @@ def initialize_cart_payment(request):
     POST /api/payments/initialize-cart/
     Body: { vendor_id, delivery_location?, batch_id?, cart_amount? }
 
-    batch_id is the buyer's preferred DeliveryBatch (Phase 1 — Food Commerce
-    Engine, Step 4), only meaningful for a vendor with
-    VendorType.supports_batched_delivery — optional; the reservation service
-    auto-selects the next eligible batch if omitted or unavailable. Ignored
-    entirely for a non-batching vendor.
+    batch_id is the buyer's preferred DeliverySlot id, only meaningful for
+    a vendor with an active slot (VendorType.supports_batched_delivery +
+    an admin-created DeliverySlot) — optional; the reservation service
+    auto-selects the next eligible slot if omitted or unavailable. Ignored
+    entirely for a non-slotted vendor.
 
     Prices and validates only the buyer's cart lines belonging to one
     vendor — every other vendor's cart items are left untouched (see
@@ -639,8 +639,8 @@ def initialize_cart_payment(request):
     # other piece of this checkout's pricing/availability being re-checked
     # fresh at verify rather than trusted from initialize.
     anchor_listing = priced_lines[0]['listing']
-    from delivery.capacity import vendor_uses_batched_delivery, has_eligible_batch
-    if vendor_uses_batched_delivery(anchor_listing.vendor) and not has_eligible_batch(anchor_listing.vendor, anchor_listing.campus):
+    from delivery.capacity import vendor_uses_batched_delivery, has_eligible_slot
+    if vendor_uses_batched_delivery(anchor_listing.vendor) and not has_eligible_slot(anchor_listing.vendor, anchor_listing.campus):
         return Response({"error": "No delivery slots are currently available for this vendor. Please try again later."}, status=400)
 
     total_amount_kobo = int(total_amount * 100)
@@ -831,18 +831,30 @@ def verify_cart_payment(request):
     # the vendor never had any slots), the whole order creation has already
     # rolled back — refund the buyer exactly like the underpayment/overpayment
     # paths above, since money was collected but no order was created.
-    from delivery.capacity import NoBatchCapacityError
+    from delivery.capacity import NoDeliverySlotCapacityError
     try:
         order, total_payout_amount = create_order_from_priced_lines(
             buyer=request.user, priced_lines=priced_lines, reference=reference,
             amount_paid=amount_paid, delivery_location=delivery_location, batch_id=batch_id,
         )
-    except NoBatchCapacityError as e:
-        logger.warning(f"verify_cart_payment: no batch capacity for {reference}: {e.detail}")
+    except NoDeliverySlotCapacityError as e:
+        logger.warning(f"verify_cart_payment: no delivery slot capacity for {reference}: {e.detail}")
         refund_paystack_transaction(reference, actual_kobo)
         return Response({
             "error": f"{e.detail} Your payment has been refunded automatically."
         }, status=400)
+
+    # Automatic rider assignment (Phase 2 simplification) — no admin step
+    # required for a slotted order to reach a rider. Called after the
+    # order has already committed (this sends a push notification, an
+    # external call, same convention as every other post-creation side
+    # effect below). No-op for a non-slotted vendor's order.
+    if order.delivery_slot_id:
+        try:
+            from delivery.assignment import auto_assign_rider
+            auto_assign_rider(order)
+        except Exception as e:
+            logger.warning(f"verify_cart_payment: auto_assign_rider failed for order {order.id}: {e}")
 
     seller = priced_lines[0]['listing'].vendor
     vendor_amount, platform_amount = split_settlement(amount_paid, total_payout_amount)
@@ -892,11 +904,13 @@ def verify_cart_payment(request):
             ),
             action_url='/vendor/dashboard', send_email=False,
         )
-        if order.delivery_batch_id:
-            from zoneinfo import ZoneInfo
-            local_dt = order.delivery_batch.delivery_time.astimezone(ZoneInfo("Africa/Lagos"))
-            hour12 = local_dt.hour % 12 or 12
-            batch_time = f"{hour12}:{local_dt.minute:02d} {'AM' if local_dt.hour < 12 else 'PM'}"
+        if order.delivery_slot_id:
+            # DeliverySlot.delivery_time is a plain wall-clock TimeField (it
+            # always means "this time in Lagos", never a UTC-anchored
+            # timestamp) — no timezone conversion needed here.
+            slot_time = order.delivery_slot.delivery_time
+            hour12 = slot_time.hour % 12 or 12
+            batch_time = f"{hour12}:{slot_time.minute:02d} {'AM' if slot_time.hour < 12 else 'PM'}"
             batch_message = (
                 f'Your payment of ₦{amount_paid:,.0f} was successful. '
                 f'Your order is part of the {batch_time} batch — expect delivery around then.'

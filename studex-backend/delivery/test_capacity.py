@@ -1,41 +1,57 @@
 # delivery/test_capacity.py
 """
-Test suite for delivery/capacity.py — the race-safe reservation/release
-service for DeliveryBatch (Phase 1 — Food Commerce Engine, Step 4).
+Test suite for delivery/capacity.py — the DeliverySlot live-counted
+capacity service (Phase 2 simplification, replaces the earlier
+BatchTemplate + nightly-generated DeliveryBatch pair).
 
 Concurrency is simulated sequentially — the same convention already
 established in payments/test_refund_locking.py — since select_for_update()'s
 row lock is what serializes real concurrent callers onto exactly this
 sequence; a genuinely threaded test would need a locking-capable DB backend
 the test suite doesn't run against (SQLite in-memory).
+
+There is no counter to release on cancellation any more — "today's count"
+is always computed live from real (non-cancelled) Order rows, so a
+cancelled order simply drops out of the count with no explicit release step.
 """
-from datetime import date, time, timedelta
+from datetime import datetime, timedelta
 from decimal import Decimal
+from unittest import mock
 
 from django.test import TestCase
 from django.utils import timezone
 
 from accounts.models import User, Vendor, VendorType
-from delivery.models import DeliveryBatch
+from delivery.models import DeliverySlot
 from delivery.capacity import (
-    reserve_capacity, release_capacity, has_eligible_batch, vendor_uses_batched_delivery,
-    NoBatchCapacityError,
+    reserve_delivery_slot, has_eligible_slot, list_eligible_slots,
+    vendor_uses_batched_delivery, NoDeliverySlotCapacityError, LAGOS,
 )
 
+# Fixed at noon Lagos — delivery_time is built as "now + N minutes then take
+# just the time-of-day", which silently wraps to the wrong side of midnight
+# whenever the real wall-clock is late enough that the offset crosses into
+# tomorrow (e.g. a test run at 11pm adding 3 hours lands on 2am *today*,
+# which reads as already-past-cutoff). Freezing timezone.now() removes any
+# dependency on what time it actually is when the suite runs.
+FROZEN_NOW = datetime(2026, 6, 15, 12, 0, 0, tzinfo=LAGOS)
 
-def make_batch(vendor, campus='pau', max_orders=5, current_orders=0, status='open',
-                hours_until_cutoff=2, hours_until_delivery=3, display_name='Lunch Batch'):
-    now = timezone.now()
-    return DeliveryBatch.objects.create(
-        vendor=vendor, campus=campus, batch_date=date.today(), display_name=display_name,
-        delivery_time=now + timedelta(hours=hours_until_delivery),
-        cutoff_time=now + timedelta(hours=hours_until_cutoff),
-        max_orders=max_orders, current_orders=current_orders, status=status,
+
+def make_slot(vendor, campus='pau', max_orders=5, minutes_until_delivery=180,
+              cutoff_offset_minutes=15, is_active=True, display_name='Lunch Slot'):
+    """delivery_time/cutoff_offset_minutes are wall-clock-today concepts (no date on the model)."""
+    delivery_time = (FROZEN_NOW + timedelta(minutes=minutes_until_delivery)).time()
+    return DeliverySlot.objects.create(
+        vendor=vendor, campus=campus, display_name=display_name, delivery_time=delivery_time,
+        cutoff_offset_minutes=cutoff_offset_minutes, max_orders=max_orders, is_active=is_active,
     )
 
 
 class CapacityTestBase(TestCase):
     def setUp(self):
+        self._time_patcher = mock.patch('django.utils.timezone.now', return_value=FROZEN_NOW)
+        self._time_patcher.start()
+        self.addCleanup(self._time_patcher.stop)
         self.food = VendorType.objects.get(name='food')
         self.beauty = VendorType.objects.get(name='beauty')
         self.vendor = User.objects.create_user(username='cap_vendor', email='cap_vendor@pau.edu.ng', password='pass123')
@@ -45,34 +61,41 @@ class CapacityTestBase(TestCase):
         self.non_batching_vendor = User.objects.create_user(username='cap_vendor3', email='cap_vendor3@pau.edu.ng', password='pass123')
         Vendor.objects.create(user=self.non_batching_vendor, vendor_type=self.beauty)
 
+    def _place_order(self, slot, status='paid'):
+        from services.models import Category, Listing
+        from orders.models import Order
+        n = Order.objects.count()
+        category = Category.objects.create(title=f'FoodCap{n}', slug=f'food-cap-{slot.id}-{n}')
+        listing = Listing.objects.create(
+            title='Jollof Rice', description='x', price=Decimal('1500'),
+            vendor=slot.vendor, category=category, is_available=True,
+        )
+        buyer = User.objects.create_user(username=f'cap_buyer_{slot.id}_{n}', email=f'cap_buyer_{slot.id}_{n}@pau.edu.ng', password='pass123')
+        return Order.objects.create(
+            buyer=buyer, listing=listing, amount=Decimal('1500'), reference=f'STX-CAP-{slot.id}-{n}',
+            status=status, delivery_slot=slot,
+        )
+
 
 class VendorUsesBatchedDeliveryTests(CapacityTestBase):
     def test_food_vendor_type_alone_is_not_enough(self):
         """
-        VendorType.supports_batched_delivery says Food *can* batch — it
+        VendorType.supports_batched_delivery says Food *can* use slots — it
         doesn't mean every Food vendor *does*. Without an active
-        BatchTemplate, a vendor of a batching-capable type must behave
-        exactly like a non-batching vendor (regular checkout, no forced
-        batch reservation) rather than being permanently stuck with "No
-        delivery slots are currently available."
+        DeliverySlot, a vendor of a slot-capable type must behave exactly
+        like a non-batching vendor (regular checkout, no forced slot
+        reservation) rather than being permanently stuck with "No delivery
+        slots are currently available."
         """
         self.assertFalse(vendor_uses_batched_delivery(self.vendor))
 
-    def test_food_vendor_with_active_batch_template_uses_batching(self):
-        """An admin 'sets' a vendor as needing batches by creating their first BatchTemplate."""
-        from delivery.models import BatchTemplate
-        BatchTemplate.objects.create(
-            vendor=self.vendor, campus='pau', display_name='Lunch', delivery_time=time(12, 0),
-            max_orders=10, days_of_week=[0, 1, 2, 3, 4], is_active=True,
-        )
+    def test_food_vendor_with_active_slot_uses_batching(self):
+        """An admin 'sets' a vendor as needing slots by creating their first DeliverySlot."""
+        make_slot(self.vendor)
         self.assertTrue(vendor_uses_batched_delivery(self.vendor))
 
-    def test_inactive_batch_template_does_not_count(self):
-        from delivery.models import BatchTemplate
-        BatchTemplate.objects.create(
-            vendor=self.vendor, campus='pau', display_name='Lunch', delivery_time=time(12, 0),
-            max_orders=10, days_of_week=[0, 1, 2, 3, 4], is_active=False,
-        )
+    def test_inactive_slot_does_not_count(self):
+        make_slot(self.vendor, is_active=False)
         self.assertFalse(vendor_uses_batched_delivery(self.vendor))
 
     def test_beauty_vendor_type_does_not_support_batching(self):
@@ -83,184 +106,133 @@ class VendorUsesBatchedDeliveryTests(CapacityTestBase):
         self.assertFalse(vendor_uses_batched_delivery(plain))
 
 
-class ReserveCapacityTests(CapacityTestBase):
-    def test_reserves_and_increments_current_orders(self):
-        batch = make_batch(self.vendor, max_orders=5, current_orders=0)
-        reserved = reserve_capacity(self.vendor, 'pau')
-        batch.refresh_from_db()
-        self.assertEqual(reserved.id, batch.id)
-        self.assertEqual(batch.current_orders, 1)
-        self.assertEqual(batch.status, 'open')
+class ReserveDeliverySlotTests(CapacityTestBase):
+    def test_reserves_slot_with_room(self):
+        slot = make_slot(self.vendor, max_orders=5)
+        reserved = reserve_delivery_slot(self.vendor, 'pau')
+        self.assertEqual(reserved.id, slot.id)
 
-    def test_flips_to_full_when_last_slot_taken(self):
-        batch = make_batch(self.vendor, max_orders=1, current_orders=0)
-        reserve_capacity(self.vendor, 'pau')
-        batch.refresh_from_db()
-        self.assertEqual(batch.current_orders, 1)
-        self.assertEqual(batch.status, 'full')
+    def test_no_slot_at_all_raises(self):
+        with self.assertRaises(NoDeliverySlotCapacityError):
+            reserve_delivery_slot(self.vendor, 'pau')
 
-    def test_no_eligible_batch_raises(self):
-        with self.assertRaises(NoBatchCapacityError):
-            reserve_capacity(self.vendor, 'pau')
+    def test_full_slot_not_eligible(self):
+        slot = make_slot(self.vendor, max_orders=1)
+        self._place_order(slot)
+        with self.assertRaises(NoDeliverySlotCapacityError):
+            reserve_delivery_slot(self.vendor, 'pau')
 
-    def test_full_batch_not_eligible(self):
-        make_batch(self.vendor, max_orders=1, current_orders=1, status='full')
-        with self.assertRaises(NoBatchCapacityError):
-            reserve_capacity(self.vendor, 'pau')
+    def test_cancelled_orders_dont_count_against_capacity(self):
+        """Live-counting means a cancelled order frees the slot automatically — no explicit release needed."""
+        slot = make_slot(self.vendor, max_orders=1)
+        self._place_order(slot, status='cancelled')
+        reserved = reserve_delivery_slot(self.vendor, 'pau')
+        self.assertEqual(reserved.id, slot.id)
 
-    def test_past_cutoff_batch_not_eligible(self):
-        make_batch(self.vendor, max_orders=5, current_orders=0, hours_until_cutoff=-1, hours_until_delivery=1)
-        with self.assertRaises(NoBatchCapacityError):
-            reserve_capacity(self.vendor, 'pau')
+    def test_past_cutoff_slot_not_eligible(self):
+        # Delivery time 5 min from now, cutoff 15 min before delivery -> cutoff already passed.
+        slot = make_slot(self.vendor, minutes_until_delivery=5, cutoff_offset_minutes=15)
+        with self.assertRaises(NoDeliverySlotCapacityError):
+            reserve_delivery_slot(self.vendor, 'pau')
 
-    def test_closed_or_suspended_batch_not_eligible(self):
-        make_batch(self.vendor, max_orders=5, current_orders=0, status='closed')
-        with self.assertRaises(NoBatchCapacityError):
-            reserve_capacity(self.vendor, 'pau')
+    def test_inactive_slot_not_eligible(self):
+        make_slot(self.vendor, max_orders=5, is_active=False)
+        with self.assertRaises(NoDeliverySlotCapacityError):
+            reserve_delivery_slot(self.vendor, 'pau')
 
     def test_cross_vendor_isolation(self):
-        make_batch(self.other_vendor, max_orders=5, current_orders=0)
-        with self.assertRaises(NoBatchCapacityError):
-            reserve_capacity(self.vendor, 'pau')
+        make_slot(self.other_vendor, max_orders=5)
+        with self.assertRaises(NoDeliverySlotCapacityError):
+            reserve_delivery_slot(self.vendor, 'pau')
 
     def test_cross_campus_isolation(self):
-        make_batch(self.vendor, campus='futo', max_orders=5, current_orders=0)
-        with self.assertRaises(NoBatchCapacityError):
-            reserve_capacity(self.vendor, 'pau')
+        make_slot(self.vendor, campus='futo', max_orders=5)
+        with self.assertRaises(NoDeliverySlotCapacityError):
+            reserve_delivery_slot(self.vendor, 'pau')
 
-    def test_preferred_batch_chosen_when_open_with_room(self):
-        earlier = make_batch(self.vendor, max_orders=5, current_orders=0, hours_until_cutoff=1, display_name='Earlier')
-        preferred = make_batch(self.vendor, max_orders=5, current_orders=0, hours_until_cutoff=3, display_name='Preferred')
-        reserved = reserve_capacity(self.vendor, 'pau', preferred_batch_id=preferred.id)
+    def test_preferred_slot_chosen_when_eligible(self):
+        earlier = make_slot(self.vendor, max_orders=5, minutes_until_delivery=60, display_name='Earlier')
+        preferred = make_slot(self.vendor, max_orders=5, minutes_until_delivery=180, display_name='Preferred')
+        reserved = reserve_delivery_slot(self.vendor, 'pau', preferred_slot_id=preferred.id)
         self.assertEqual(reserved.id, preferred.id)
 
-    def test_falls_back_when_preferred_batch_is_full(self):
-        full_preferred = make_batch(self.vendor, max_orders=1, current_orders=1, status='full', display_name='Full')
-        fallback = make_batch(self.vendor, max_orders=5, current_orders=0, display_name='Fallback')
-        reserved = reserve_capacity(self.vendor, 'pau', preferred_batch_id=full_preferred.id)
+    def test_falls_back_when_preferred_slot_is_full(self):
+        full_preferred = make_slot(self.vendor, max_orders=1, display_name='Full')
+        self._place_order(full_preferred)
+        fallback = make_slot(self.vendor, max_orders=5, display_name='Fallback')
+        reserved = reserve_delivery_slot(self.vendor, 'pau', preferred_slot_id=full_preferred.id)
         self.assertEqual(reserved.id, fallback.id)
 
-    def test_falls_back_when_preferred_batch_id_unknown(self):
-        fallback = make_batch(self.vendor, max_orders=5, current_orders=0)
-        reserved = reserve_capacity(self.vendor, 'pau', preferred_batch_id=999999)
+    def test_falls_back_when_preferred_slot_id_unknown(self):
+        fallback = make_slot(self.vendor, max_orders=5)
+        reserved = reserve_delivery_slot(self.vendor, 'pau', preferred_slot_id=999999)
         self.assertEqual(reserved.id, fallback.id)
 
     def test_no_preference_picks_earliest_cutoff(self):
-        later = make_batch(self.vendor, max_orders=5, current_orders=0, hours_until_cutoff=5, display_name='Later')
-        sooner = make_batch(self.vendor, max_orders=5, current_orders=0, hours_until_cutoff=1, display_name='Sooner')
-        reserved = reserve_capacity(self.vendor, 'pau')
+        later = make_slot(self.vendor, max_orders=5, minutes_until_delivery=300, display_name='Later')
+        sooner = make_slot(self.vendor, max_orders=5, minutes_until_delivery=60, display_name='Sooner')
+        reserved = reserve_delivery_slot(self.vendor, 'pau')
         self.assertEqual(reserved.id, sooner.id)
 
     def test_sequential_race_on_last_slot_second_call_fails(self):
         """
         Simulates the race directly (same convention as
         payments/test_refund_locking.py): two sequential calls against the
-        real service for a batch with exactly one slot left — the second
-        must see the already-exhausted state and raise, never double-book.
+        real service for a slot with exactly one spot left today — the
+        second must see the already-exhausted count and raise, never
+        double-book.
         """
-        make_batch(self.vendor, max_orders=1, current_orders=0)
-        first = reserve_capacity(self.vendor, 'pau')
-        self.assertEqual(first.current_orders, 1)
-        with self.assertRaises(NoBatchCapacityError):
-            reserve_capacity(self.vendor, 'pau')
+        slot = make_slot(self.vendor, max_orders=1)
+        first = reserve_delivery_slot(self.vendor, 'pau')
+        self.assertEqual(first.id, slot.id)
+        self._place_order(slot)  # simulates the first call's order having committed
+        with self.assertRaises(NoDeliverySlotCapacityError):
+            reserve_delivery_slot(self.vendor, 'pau')
 
 
-class HasEligibleBatchTests(CapacityTestBase):
-    def test_true_when_open_batch_with_room_exists(self):
-        make_batch(self.vendor, max_orders=5, current_orders=0)
-        self.assertTrue(has_eligible_batch(self.vendor, 'pau'))
+class HasEligibleSlotTests(CapacityTestBase):
+    def test_true_when_open_slot_with_room_exists(self):
+        make_slot(self.vendor, max_orders=5)
+        self.assertTrue(has_eligible_slot(self.vendor, 'pau'))
 
-    def test_false_when_no_batches(self):
-        self.assertFalse(has_eligible_batch(self.vendor, 'pau'))
+    def test_false_when_no_slots(self):
+        self.assertFalse(has_eligible_slot(self.vendor, 'pau'))
 
-    def test_false_when_only_full_batch_exists(self):
-        make_batch(self.vendor, max_orders=1, current_orders=1, status='full')
-        self.assertFalse(has_eligible_batch(self.vendor, 'pau'))
-
-
-class ListEligibleBatchesTests(CapacityTestBase):
-    """Read-only checkout preview — must never reserve anything."""
-    def test_returns_soonest_cutoff_first(self):
-        from delivery.capacity import list_eligible_batches
-        later = make_batch(self.vendor, max_orders=5, current_orders=0, hours_until_cutoff=5, display_name='5pm')
-        sooner = make_batch(self.vendor, max_orders=5, current_orders=0, hours_until_cutoff=1, display_name='12pm')
-        result = list_eligible_batches(self.vendor, 'pau')
-        self.assertEqual([b.id for b in result], [sooner.id, later.id])
-
-    def test_excludes_full_batches(self):
-        from delivery.capacity import list_eligible_batches
-        make_batch(self.vendor, max_orders=1, current_orders=1, status='full')
-        self.assertEqual(list_eligible_batches(self.vendor, 'pau'), [])
-
-    def test_does_not_reserve_anything(self):
-        from delivery.capacity import list_eligible_batches
-        batch = make_batch(self.vendor, max_orders=5, current_orders=0)
-        list_eligible_batches(self.vendor, 'pau')
-        batch.refresh_from_db()
-        self.assertEqual(batch.current_orders, 0)
+    def test_false_when_only_full_slot_exists(self):
+        slot = make_slot(self.vendor, max_orders=1)
+        self._place_order(slot)
+        self.assertFalse(has_eligible_slot(self.vendor, 'pau'))
 
     def test_does_not_consume_capacity(self):
-        batch = make_batch(self.vendor, max_orders=5, current_orders=0)
-        has_eligible_batch(self.vendor, 'pau')
-        batch.refresh_from_db()
-        self.assertEqual(batch.current_orders, 0)
+        slot = make_slot(self.vendor, max_orders=5)
+        has_eligible_slot(self.vendor, 'pau')
+        from delivery.capacity import _orders_today_count
+        self.assertEqual(_orders_today_count(slot, timezone.now().astimezone(LAGOS).date()), 0)
 
 
-class ReleaseCapacityTests(CapacityTestBase):
-    def _order_with_batch(self, batch):
-        from services.models import Category, Listing
-        from orders.models import Order
-        category = Category.objects.create(title='FoodRel', slug=f'food-rel-{batch.id}')
-        listing = Listing.objects.create(
-            title='Jollof Rice', description='x', price=Decimal('1500'),
-            vendor=self.vendor, category=category, is_available=True,
-        )
-        buyer = User.objects.create_user(username=f'rel_buyer_{batch.id}', email=f'rel_buyer_{batch.id}@pau.edu.ng', password='pass123')
-        return Order.objects.create(
-            buyer=buyer, listing=listing, amount=Decimal('1500'), reference=f'STX-REL-{batch.id}',
-            status='paid', delivery_batch=batch,
-        )
+class ListEligibleSlotsTests(CapacityTestBase):
+    """Read-only checkout preview — must never reserve anything."""
+    def test_returns_soonest_cutoff_first_with_remaining_count(self):
+        later = make_slot(self.vendor, max_orders=5, minutes_until_delivery=300, display_name='5pm')
+        sooner = make_slot(self.vendor, max_orders=5, minutes_until_delivery=60, display_name='12pm')
+        result = list_eligible_slots(self.vendor, 'pau')
+        self.assertEqual([entry['slot'].id for entry in result], [sooner.id, later.id])
+        self.assertEqual(result[0]['remaining'], 5)
 
-    def test_reopens_capacity_before_cutoff(self):
-        batch = make_batch(self.vendor, max_orders=5, current_orders=3, hours_until_cutoff=2)
-        order = self._order_with_batch(batch)
-        release_capacity(order)
-        batch.refresh_from_db()
-        self.assertEqual(batch.current_orders, 2)
+    def test_excludes_full_slots(self):
+        slot = make_slot(self.vendor, max_orders=1)
+        self._place_order(slot)
+        self.assertEqual(list_eligible_slots(self.vendor, 'pau'), [])
 
-    def test_flips_full_back_to_open_when_room_reopens(self):
-        batch = make_batch(self.vendor, max_orders=3, current_orders=3, status='full', hours_until_cutoff=2)
-        order = self._order_with_batch(batch)
-        release_capacity(order)
-        batch.refresh_from_db()
-        self.assertEqual(batch.current_orders, 2)
-        self.assertEqual(batch.status, 'open')
+    def test_remaining_reflects_existing_orders(self):
+        slot = make_slot(self.vendor, max_orders=5)
+        self._place_order(slot)
+        self._place_order(slot)
+        result = list_eligible_slots(self.vendor, 'pau')
+        self.assertEqual(result[0]['remaining'], 3)
 
-    def test_no_op_after_cutoff(self):
-        batch = make_batch(self.vendor, max_orders=5, current_orders=3, hours_until_cutoff=-1, hours_until_delivery=1)
-        order = self._order_with_batch(batch)
-        release_capacity(order)
-        batch.refresh_from_db()
-        self.assertEqual(batch.current_orders, 3)
-
-    def test_no_op_when_order_has_no_batch(self):
-        from services.models import Category, Listing
-        from orders.models import Order
-        category = Category.objects.create(title='FoodNoBatch', slug='food-no-batch')
-        listing = Listing.objects.create(
-            title='Plain Item', description='x', price=Decimal('1000'),
-            vendor=self.non_batching_vendor, category=category, is_available=True,
-        )
-        buyer = User.objects.create_user(username='rel_buyer_none', email='rel_buyer_none@pau.edu.ng', password='pass123')
-        order = Order.objects.create(
-            buyer=buyer, listing=listing, amount=Decimal('1000'), reference='STX-REL-NONE', status='paid',
-        )
-        release_capacity(order)  # must not raise
-        self.assertIsNone(order.delivery_batch_id)
-
-    def test_never_goes_negative(self):
-        batch = make_batch(self.vendor, max_orders=5, current_orders=0, hours_until_cutoff=2)
-        order = self._order_with_batch(batch)
-        release_capacity(order)
-        batch.refresh_from_db()
-        self.assertEqual(batch.current_orders, 0)
+    def test_does_not_reserve_anything(self):
+        slot = make_slot(self.vendor, max_orders=5)
+        list_eligible_slots(self.vendor, 'pau')
+        from delivery.capacity import _orders_today_count
+        self.assertEqual(_orders_today_count(slot, timezone.now().astimezone(LAGOS).date()), 0)

@@ -4,7 +4,7 @@ from django.contrib.auth import get_user_model
 from django import forms
 from .models import (
     CampusPickupPoint, DeliveryAssignment, DeliveryVerificationEvent, generate_delivery_code,
-    BatchTemplate, DeliveryBatch,
+    DeliverySlot,
 )
 
 User = get_user_model()
@@ -91,7 +91,7 @@ class DeliveryAssignmentInline(admin.StackedInline):
         'responsibility', 'responsibility_transferred_at',
     ]
     fields = [
-        'rider', 'pickup_point', 'batch', 'status', 'delivery_code',
+        'rider', 'pickup_point', 'delivery_slot', 'status', 'delivery_code',
         'responsibility', 'responsibility_transferred_at',
         'pickup_proof_image', 'completion_proof_image',
         'assigned_at', 'picked_up_at', 'at_pickup_point_at',
@@ -126,7 +126,7 @@ class DeliveryAssignmentAdmin(admin.ModelAdmin):
     ]
     fieldsets = (
         ('Assignment', {
-            'fields': ('order', 'rider', 'pickup_point', 'batch', 'status'),
+            'fields': ('order', 'rider', 'pickup_point', 'delivery_slot', 'status'),
         }),
         ('Responsibility Transfer', {
             'fields': ('responsibility', 'responsibility_transferred_at'),
@@ -216,44 +216,25 @@ class DeliveryVerificationEventAdmin(admin.ModelAdmin):
         return False
 
 
-# ── Phase 1: Food Commerce Engine — batches ────────────────────────────────────
+# ── Delivery Slots (Phase 2 simplification) ────────────────────────────────────
 
-@admin.register(BatchTemplate)
-class BatchTemplateAdmin(admin.ModelAdmin):
-    list_display = ['display_name', 'vendor', 'campus', 'delivery_time', 'max_orders', 'is_active']
+@admin.register(DeliverySlot)
+class DeliverySlotAdmin(admin.ModelAdmin):
+    """
+    One row per recurring delivery window — replaces the earlier
+    BatchTemplate + nightly-generated DeliveryBatch pair. Capacity used
+    today is computed live from real Order rows (see delivery.capacity),
+    not stored here, so there's nothing to reset or regenerate.
+    """
+    list_display = ['display_name', 'vendor', 'campus', 'delivery_time', 'max_orders', 'used_today', 'is_active']
     list_filter = ['campus', 'is_active']
     search_fields = ['display_name', 'vendor__username']
     list_editable = ['is_active']
+    ordering = ['vendor__username', 'delivery_time']
 
-
-@admin.register(DeliveryBatch)
-class DeliveryBatchAdmin(admin.ModelAdmin):
-    list_display = [
-        'display_name', 'vendor', 'campus', 'batch_date', 'delivery_time',
-        'capacity_display', 'colored_batch_status',
-    ]
-    list_filter = ['campus', 'status', 'batch_date']
-    search_fields = ['display_name', 'vendor__username']
-    readonly_fields = ['current_orders', 'created_at', 'updated_at']
-    ordering = ['-batch_date', 'delivery_time']
-    actions = ['force_close']
-
-    def force_close(self, request, queryset):
-        # Phase 1 — Food Commerce Engine, Step 7 (§14): "Force-close a batch
-        # past cutoff" — same shape as VendorDebtAdmin.write_off. Excludes
-        # already-closed rows so the message count reflects real changes.
-        updated = queryset.exclude(status='closed').update(status='closed')
-        self.message_user(request, f"{updated} batch(es) force-closed — no further reservations will be accepted.")
-    force_close.short_description = "Force-close selected batches (stops new reservations)"
-
-    def capacity_display(self, obj):
-        return f'{obj.current_orders} / {obj.max_orders}'
-    capacity_display.short_description = 'Capacity'
-
-    def colored_batch_status(self, obj):
-        colors = {'open': '#10b981', 'full': '#f59e0b', 'closed': '#6b7280', 'suspended': '#ef4444'}
-        return format_html(
-            '<span style="color:{}; font-weight:bold;">{}</span>',
-            colors.get(obj.status, '#6b7280'), obj.get_status_display(),
-        )
-    colored_batch_status.short_description = 'Status'
+    def used_today(self, obj):
+        from delivery.capacity import _orders_today_count, LAGOS
+        from django.utils import timezone
+        today = timezone.now().astimezone(LAGOS).date()
+        return f'{_orders_today_count(obj, today)} / {obj.max_orders}'
+    used_today.short_description = 'Used Today'

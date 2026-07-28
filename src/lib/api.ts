@@ -776,26 +776,18 @@ export const api = {
         body: s({ user_ids: userIds }),
       }),
 
-    // ── Batch templates & delivery batches (Phase 1 Step 7 / Phase 2 integration) ──
-    batchTemplates: (vendorId?: number | string) =>
-      fetchWithAuth(u(`/api/admin/batch-templates/${vendorId ? "?vendor_id=" + vendorId : ""}`)),
+    // ── Delivery slots (Phase 2 simplification — one CRUD surface, was batch-templates + delivery-batches) ──
+    deliverySlots: (vendorId?: number | string) =>
+      fetchWithAuth(u(`/api/admin/delivery-slots/${vendorId ? "?vendor_id=" + vendorId : ""}`)),
 
-    createBatchTemplate: (body: Record<string, unknown>) =>
-      fetchWithAuth(u("/api/admin/batch-templates/"), { method: "POST", body: s(body) }),
+    createDeliverySlot: (body: Record<string, unknown>) =>
+      fetchWithAuth(u("/api/admin/delivery-slots/"), { method: "POST", body: s(body) }),
 
-    updateBatchTemplate: (id: number | string, body: Record<string, unknown>) =>
-      fetchWithAuth(u(`/api/admin/batch-templates/${id}/`), { method: "PATCH", body: s(body) }),
+    updateDeliverySlot: (id: number | string, body: Record<string, unknown>) =>
+      fetchWithAuth(u(`/api/admin/delivery-slots/${id}/`), { method: "PATCH", body: s(body) }),
 
-    deleteBatchTemplate: (id: number | string) =>
-      fetchWithAuth(u(`/api/admin/batch-templates/${id}/`), { method: "DELETE" }),
-
-    deliveryBatches: (params?: { vendor_id?: string; campus?: string; batch_date?: string }) => {
-      const qs = params ? "?" + new URLSearchParams(params as Record<string, string>) : "";
-      return fetchWithAuth(u(`/api/admin/delivery-batches/${qs}`));
-    },
-
-    updateDeliveryBatch: (id: number | string, body: Record<string, unknown>) =>
-      fetchWithAuth(u(`/api/admin/delivery-batches/${id}/`), { method: "PATCH", body: s(body) }),
+    deleteDeliverySlot: (id: number | string) =>
+      fetchWithAuth(u(`/api/admin/delivery-slots/${id}/`), { method: "DELETE" }),
   },
 
   delivery: {

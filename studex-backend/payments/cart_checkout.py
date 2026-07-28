@@ -136,18 +136,18 @@ def create_order_from_priced_lines(buyer, priced_lines, reference, amount_paid, 
     (order, total_payout_amount) — the latter is what payments.pricing.
     split_settlement needs as its payout_amount argument.
 
-    Phase 1 — Food Commerce Engine, Step 4 (Delivery Batch Reservation):
-    if this vendor has VendorType.supports_batched_delivery, reserves one
-    unit of capacity (see delivery.capacity.reserve_capacity) inside this
-    same atomic block and stamps it onto order.delivery_batch — a
-    NoBatchCapacityError propagates out and rolls back the whole order
-    (no Order/OrderItem/stock-reduction/cart-deletion persists), leaving
-    the caller (payments.views.verify_cart_payment) to refund the buyer.
-    Every non-batching vendor's order is completely unaffected:
-    delivery_batch stays None, exactly as before this phase.
+    If this vendor has an active DeliverySlot (VendorType.supports_batched_
+    delivery AND an admin has set one up — see delivery.capacity.
+    vendor_uses_batched_delivery), reserves one inside this same atomic
+    block and stamps it onto order.delivery_slot — a
+    NoDeliverySlotCapacityError propagates out and rolls back the whole
+    order (no Order/OrderItem/stock-reduction/cart-deletion persists),
+    leaving the caller (payments.views.verify_cart_payment) to refund the
+    buyer. Every non-slotted vendor's order is completely unaffected:
+    delivery_slot stays None.
     """
     from orders.models import Order, OrderItem, OrderItemAddon
-    from delivery.capacity import vendor_uses_batched_delivery, reserve_capacity
+    from delivery.capacity import vendor_uses_batched_delivery, reserve_delivery_slot
 
     anchor_listing = priced_lines[0]['listing']
     vendor = anchor_listing.vendor
@@ -165,9 +165,9 @@ def create_order_from_priced_lines(buyer, priced_lines, reference, amount_paid, 
         )
 
         if vendor_uses_batched_delivery(vendor):
-            batch = reserve_capacity(vendor, anchor_listing.campus, preferred_batch_id=batch_id)
-            order.delivery_batch = batch
-            order.save(update_fields=['delivery_batch'])
+            slot = reserve_delivery_slot(vendor, anchor_listing.campus, preferred_slot_id=batch_id)
+            order.delivery_slot = slot
+            order.save(update_fields=['delivery_slot'])
 
         total_payout_amount = Decimal("0")
         for line in priced_lines:

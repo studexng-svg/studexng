@@ -9,8 +9,9 @@ the item and each add-on separately — confirmed explicitly by the product
 owner: "a ₦3,000 item costs 3,000 + 8% fee; a ₦4,000 item with add-ons costs
 4,000 + 8% fee."
 """
-from datetime import date, timedelta
+from datetime import datetime, timedelta
 from decimal import Decimal
+from unittest import mock
 
 from django.test import TestCase
 from django.utils import timezone
@@ -19,8 +20,8 @@ from accounts.models import User, Vendor, VendorType
 from services.models import Category, Listing, MenuItem, AddonGroup, Addon
 from cart.models import CartItem, CartItemAddon
 from orders.models import Order, OrderItem, OrderItemAddon
-from delivery.models import DeliveryBatch, BatchTemplate
-from delivery.capacity import NoBatchCapacityError
+from delivery.models import DeliverySlot
+from delivery.capacity import NoDeliverySlotCapacityError, LAGOS
 from payments.models import PricingSettings
 from payments.pricing import calculate_final_price
 from payments.cart_checkout import (
@@ -268,15 +269,21 @@ class CreateOrderFromPricedLinesTests(TestCase):
         self.assertEqual(self.listing_a.stock_quantity, 7)
 
 
-class CreateOrderFromPricedLinesBatchReservationTests(TestCase):
+class CreateOrderFromPricedLinesSlotReservationTests(TestCase):
     """
-    Phase 1 — Food Commerce Engine, Step 4 (Delivery Batch Reservation):
-    create_order_from_priced_lines reserves capacity for a batching vendor,
-    stamps it onto Order.delivery_batch, and leaves every non-batching
-    vendor's order completely unaffected (delivery_batch stays None).
+    Phase 2 simplification (Delivery Slot Reservation): create_order_from_priced_lines
+    reserves capacity for a slotted vendor, stamps it onto Order.delivery_slot, and
+    leaves every non-slotted vendor's order completely unaffected (delivery_slot stays None).
     """
 
+    # Fixed at noon Lagos — see delivery/test_capacity.py for why this needs
+    # to be frozen rather than derived from the real "now" the suite runs at.
+    FROZEN_NOW = datetime(2026, 6, 15, 12, 0, 0, tzinfo=LAGOS)
+
     def setUp(self):
+        self._time_patcher = mock.patch('django.utils.timezone.now', return_value=self.FROZEN_NOW)
+        self._time_patcher.start()
+        self.addCleanup(self._time_patcher.stop)
         PricingSettings.objects.update_or_create(pk=1, defaults={'service_fee_percent': Decimal('8.00')})
         self.food = VendorType.objects.get(name='food')
         self.beauty = VendorType.objects.get(name='beauty')
@@ -284,12 +291,14 @@ class CreateOrderFromPricedLinesBatchReservationTests(TestCase):
 
         self.batching_vendor = User.objects.create_user(username='batch_vendor', email='batch_vendor@pau.edu.ng', password='pass123')
         Vendor.objects.create(user=self.batching_vendor, vendor_type=self.food)
-        # vendor_uses_batched_delivery requires an active BatchTemplate, not
-        # just a batching-capable VendorType — this is what an admin setting
-        # this specific vendor up for batching looks like.
-        BatchTemplate.objects.create(
+        # vendor_uses_batched_delivery requires an active DeliverySlot, not
+        # just a slot-capable VendorType — this is what an admin setting
+        # this specific vendor up for slotted delivery looks like. max_orders=0
+        # so this baseline row is never itself a real reservable slot — tests
+        # that want an actual open slot create their own via _make_slot.
+        DeliverySlot.objects.create(
             vendor=self.batching_vendor, campus='pau', display_name='Lunch',
-            delivery_time=timezone.now().time(), max_orders=10, days_of_week=list(range(7)),
+            delivery_time=(self.FROZEN_NOW + timedelta(hours=3)).time(), max_orders=0,
         )
 
         self.non_batching_vendor = User.objects.create_user(username='nonbatch_vendor', email='nonbatch_vendor@pau.edu.ng', password='pass123')
@@ -305,16 +314,14 @@ class CreateOrderFromPricedLinesBatchReservationTests(TestCase):
             vendor=self.non_batching_vendor, category=self.category, is_available=True, campus='pau',
         )
 
-    def _make_batch(self, vendor, max_orders=5, current_orders=0, campus='pau'):
-        now = timezone.now()
-        return DeliveryBatch.objects.create(
-            vendor=vendor, campus=campus, batch_date=date.today(), display_name='Lunch',
-            delivery_time=now + timedelta(hours=3), cutoff_time=now + timedelta(hours=2),
-            max_orders=max_orders, current_orders=current_orders, status='open',
+    def _make_slot(self, vendor, max_orders=5, hours_until_delivery=3, campus='pau', display_name='Lunch'):
+        delivery_time = (self.FROZEN_NOW + timedelta(hours=hours_until_delivery)).time()
+        return DeliverySlot.objects.create(
+            vendor=vendor, campus=campus, display_name=display_name, delivery_time=delivery_time, max_orders=max_orders,
         )
 
-    def test_batching_vendor_order_reserves_and_stamps_batch(self):
-        batch = self._make_batch(self.batching_vendor)
+    def test_batching_vendor_order_reserves_and_stamps_slot(self):
+        slot = self._make_slot(self.batching_vendor)
         CartItem.objects.create(user=self.buyer, listing=self.batching_listing, quantity=1)
 
         priced_lines, total, _ = price_vendor_cart(self.buyer, self.batching_vendor.id)
@@ -322,11 +329,9 @@ class CreateOrderFromPricedLinesBatchReservationTests(TestCase):
             buyer=self.buyer, priced_lines=priced_lines, reference='STX-CART-BATCH-0001', amount_paid=total,
         )
 
-        self.assertEqual(order.delivery_batch_id, batch.id)
-        batch.refresh_from_db()
-        self.assertEqual(batch.current_orders, 1)
+        self.assertEqual(order.delivery_slot_id, slot.id)
 
-    def test_non_batching_vendor_order_leaves_delivery_batch_none(self):
+    def test_non_batching_vendor_order_leaves_delivery_slot_none(self):
         """Backward compatibility: a vendor without supports_batched_delivery is completely unaffected."""
         CartItem.objects.create(user=self.buyer, listing=self.non_batching_listing, quantity=1)
 
@@ -335,15 +340,11 @@ class CreateOrderFromPricedLinesBatchReservationTests(TestCase):
             buyer=self.buyer, priced_lines=priced_lines, reference='STX-CART-BATCH-0002', amount_paid=total,
         )
 
-        self.assertIsNone(order.delivery_batch_id)
+        self.assertIsNone(order.delivery_slot_id)
 
     def test_preferred_batch_id_honored(self):
-        self._make_batch(self.batching_vendor)  # earlier/default
-        preferred = DeliveryBatch.objects.create(
-            vendor=self.batching_vendor, campus='pau', batch_date=date.today(), display_name='Dinner',
-            delivery_time=timezone.now() + timedelta(hours=8), cutoff_time=timezone.now() + timedelta(hours=7),
-            max_orders=5, current_orders=0, status='open',
-        )
+        self._make_slot(self.batching_vendor, hours_until_delivery=3)  # earlier/default
+        preferred = self._make_slot(self.batching_vendor, hours_until_delivery=8, display_name='Dinner')
         CartItem.objects.create(user=self.buyer, listing=self.batching_listing, quantity=1)
 
         priced_lines, total, _ = price_vendor_cart(self.buyer, self.batching_vendor.id)
@@ -352,18 +353,22 @@ class CreateOrderFromPricedLinesBatchReservationTests(TestCase):
             amount_paid=total, batch_id=preferred.id,
         )
 
-        self.assertEqual(order.delivery_batch_id, preferred.id)
+        self.assertEqual(order.delivery_slot_id, preferred.id)
 
     def test_no_capacity_raises_and_rolls_back_whole_order(self):
         """
-        NoBatchCapacityError must roll back the entire atomic block — no
-        Order, no OrderItem, no stock reduction, and the cart line must
+        NoDeliverySlotCapacityError must roll back the entire atomic block —
+        no Order, no OrderItem, no stock reduction, and the cart line must
         survive untouched for a retry.
         """
         cart_item = CartItem.objects.create(user=self.buyer, listing=self.batching_listing, quantity=1)
+        # Zero out the setUp slot's capacity — the vendor still "uses batched
+        # delivery" (an active DeliverySlot exists), but nothing is eligible,
+        # which is the actual no-capacity scenario reserve_delivery_slot guards.
+        DeliverySlot.objects.filter(vendor=self.batching_vendor).update(max_orders=0)
 
         priced_lines, total, _ = price_vendor_cart(self.buyer, self.batching_vendor.id)
-        with self.assertRaises(NoBatchCapacityError):
+        with self.assertRaises(NoDeliverySlotCapacityError):
             create_order_from_priced_lines(
                 buyer=self.buyer, priced_lines=priced_lines, reference='STX-CART-BATCH-0004', amount_paid=total,
             )

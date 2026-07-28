@@ -9,11 +9,11 @@ from django.utils import timezone
 from studex.permissions import IsAdminUser
 from .models import (
     CampusPickupPoint, DeliveryAssignment, generate_delivery_code, MAX_CODE_ATTEMPTS,
-    BatchTemplate, DeliveryBatch,
+    DeliverySlot,
 )
 from .serializers import (
     CampusPickupPointSerializer, DeliveryAssignmentSerializer, BuyerDeliveryStatusSerializer,
-    BatchTemplateSerializer, DeliveryBatchSerializer,
+    DeliverySlotSerializer,
 )
 
 logger = logging.getLogger(__name__)
@@ -36,22 +36,22 @@ class PickupPointListView(APIView):
 class VendorEligibleBatchesView(APIView):
     """
     GET /api/delivery/vendor-batches/<vendor_id>/ — public preview used at
-    checkout so a buyer sees which delivery batch (and how many slots are
-    left) their order will land in *before* paying, instead of only finding
-    out from a post-payment refund if none are eligible. Read-only — nothing
-    reserved here (see delivery.capacity.reserve_capacity for the real,
-    race-safe reservation at verify time).
+    checkout so a buyer sees which delivery slot (and how many spots are
+    left today) their order will land in *before* paying, instead of only
+    finding out from a post-payment refund if none are eligible. Read-only
+    — nothing reserved here (see delivery.capacity.reserve_delivery_slot
+    for the real, race-safe reservation at verify time).
 
-    `uses_batched_delivery: false` means this vendor doesn't use batching at
-    all (VendorType-incapable, or capable but no admin has set them up with
-    a BatchTemplate yet) — the frontend should hide the batch UI entirely in
-    that case, not show an empty/misleading "no slots" state.
+    `uses_batched_delivery: false` means this vendor doesn't use delivery
+    slots at all (VendorType-incapable, or capable but no admin has set
+    them up with a DeliverySlot yet) — the frontend should hide the slot UI
+    entirely in that case, not show an empty/misleading "no slots" state.
     """
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request, vendor_id):
         from django.contrib.auth import get_user_model
-        from delivery.capacity import vendor_uses_batched_delivery, list_eligible_batches
+        from delivery.capacity import vendor_uses_batched_delivery, list_eligible_slots
         User = get_user_model()
 
         try:
@@ -62,18 +62,21 @@ class VendorEligibleBatchesView(APIView):
         if not vendor_uses_batched_delivery(vendor):
             return Response({'uses_batched_delivery': False, 'batches': []})
 
+        from datetime import datetime
+        from delivery.capacity import LAGOS
         campus = (getattr(vendor, 'school', '') or '').lower()
-        batches = list_eligible_batches(vendor, campus)
+        today = timezone.now().astimezone(LAGOS).date()
+        eligible = list_eligible_slots(vendor, campus)
         return Response({
             'uses_batched_delivery': True,
             'batches': [
                 {
-                    'id': b.id,
-                    'display_name': b.display_name,
-                    'delivery_time': b.delivery_time.isoformat(),
-                    'remaining_slots': b.max_orders - b.current_orders,
+                    'id': entry['slot'].id,
+                    'display_name': entry['slot'].display_name,
+                    'delivery_time': datetime.combine(today, entry['slot'].delivery_time, tzinfo=LAGOS).isoformat(),
+                    'remaining_slots': entry['remaining'],
                 }
-                for b in batches
+                for entry in eligible
             ],
         })
 
@@ -358,13 +361,15 @@ class RiderStatsView(APIView):
 
 class RiderBatchListView(APIView):
     """
-    GET /api/delivery/my-batches/ (Phase 1 — Food Commerce Engine, Step 5).
-    Groups a rider's incomplete assignments by DeliveryBatch — additive UI
-    layer over the same data RiderAssignmentListView already returns. Pickup
-    and completion actions are untouched — this is a read-only grouping view,
-    not a new verification mechanic (see RiderUpdateStatusView, unmodified).
-    Assignments with no batch (every non-batching vendor's order, and every
-    order that predates this phase) are returned separately under 'unbatched'.
+    GET /api/delivery/my-batches/. Groups a rider's incomplete assignments
+    by DeliverySlot — additive UI layer over the same data
+    RiderAssignmentListView already returns. Pickup and completion actions
+    are untouched — this is a read-only grouping view, not a new
+    verification mechanic (see RiderUpdateStatusView, unmodified).
+    Assignments with no slot (every non-slotted vendor's order) are
+    returned separately under 'unbatched'. delivery_time/cutoff_time are
+    computed for *today* from the slot's recurring delivery_time —
+    there's no per-day row to read them off anymore.
     """
     permission_classes = [permissions.IsAuthenticated]
 
@@ -372,27 +377,33 @@ class RiderBatchListView(APIView):
         if request.user.user_type != 'rider':
             return Response({'error': 'Not a rider'}, status=status.HTTP_403_FORBIDDEN)
 
+        from datetime import datetime, timedelta
+        from delivery.capacity import LAGOS
+        today = timezone.now().astimezone(LAGOS).date()
+
         assignments = DeliveryAssignment.objects.filter(
             rider=request.user,
         ).exclude(status='completed').select_related(
-            'order__buyer', 'order__listing__vendor', 'pickup_point', 'batch__vendor',
+            'order__buyer', 'order__listing__vendor', 'pickup_point', 'delivery_slot__vendor',
         ).prefetch_related('order__items__selected_addons').order_by(
-            'batch__cutoff_time', '-assigned_at',
+            'delivery_slot__delivery_time', '-assigned_at',
         )
 
-        batches = {}
+        slots = {}
         unbatched = []
         for assignment in assignments:
             data = DeliveryAssignmentSerializer(assignment).data
-            if assignment.batch_id:
-                batch = assignment.batch
-                group = batches.setdefault(batch.id, {
-                    'batch_id': batch.id,
-                    'display_name': batch.display_name,
-                    'vendor_username': batch.vendor.username,
-                    'delivery_time': batch.delivery_time.isoformat(),
-                    'cutoff_time': batch.cutoff_time.isoformat(),
-                    'status': batch.status,
+            if assignment.delivery_slot_id:
+                slot = assignment.delivery_slot
+                delivery_dt = datetime.combine(today, slot.delivery_time, tzinfo=LAGOS)
+                cutoff_dt = delivery_dt - timedelta(minutes=slot.cutoff_offset_minutes)
+                group = slots.setdefault(slot.id, {
+                    'batch_id': slot.id,
+                    'display_name': slot.display_name,
+                    'vendor_username': slot.vendor.username,
+                    'delivery_time': delivery_dt.isoformat(),
+                    'cutoff_time': cutoff_dt.isoformat(),
+                    'status': 'open',
                     'assignments': [],
                 })
                 group['assignments'].append(data)
@@ -400,7 +411,7 @@ class RiderBatchListView(APIView):
                 unbatched.append(data)
 
         return Response({
-            'batches': list(batches.values()),
+            'batches': list(slots.values()),
             'unbatched': unbatched,
         })
 
@@ -660,46 +671,46 @@ class OrderDeliveryStatusView(APIView):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Admin: Batch Templates & Delivery Batches
-# Phase 1 — Food Commerce Engine, Step 7 (FR-12, FR-13). Registered under
-# /api/admin/ via accounts/admin_urls.py, same convention as every other
-# Admin*View in this file.
+# Admin: Delivery Slots (Phase 2 simplification — replaces the earlier
+# BatchTemplate + DeliveryBatch pair; one CRUD surface instead of two).
+# Registered under /api/admin/ via accounts/admin_urls.py, same convention
+# as every other Admin*View in this file.
 # ─────────────────────────────────────────────────────────────────────────────
 
-class AdminBatchTemplateListView(APIView):
-    """GET/POST /api/admin/batch-templates/"""
+class AdminDeliverySlotListView(APIView):
+    """GET/POST /api/admin/delivery-slots/"""
     permission_classes = [IsAdminUser]
 
     def get(self, request):
-        qs = BatchTemplate.objects.select_related('vendor').all()
+        qs = DeliverySlot.objects.select_related('vendor').all()
         vendor_id = request.query_params.get('vendor_id')
         if vendor_id:
             qs = qs.filter(vendor_id=vendor_id)
-        return Response(BatchTemplateSerializer(qs, many=True).data)
+        return Response(DeliverySlotSerializer(qs, many=True).data)
 
     def post(self, request):
-        ser = BatchTemplateSerializer(data=request.data)
+        ser = DeliverySlotSerializer(data=request.data)
         if ser.is_valid():
             ser.save()
             return Response(ser.data, status=status.HTTP_201_CREATED)
         return Response(ser.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-class AdminBatchTemplateDetailView(APIView):
-    """PATCH/DELETE /api/admin/batch-templates/<id>/"""
+class AdminDeliverySlotDetailView(APIView):
+    """PATCH/DELETE /api/admin/delivery-slots/<id>/"""
     permission_classes = [IsAdminUser]
 
     def _get(self, pk):
         try:
-            return BatchTemplate.objects.get(pk=pk)
-        except BatchTemplate.DoesNotExist:
+            return DeliverySlot.objects.get(pk=pk)
+        except DeliverySlot.DoesNotExist:
             return None
 
     def patch(self, request, pk):
         obj = self._get(pk)
         if not obj:
             return Response({'error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
-        ser = BatchTemplateSerializer(obj, data=request.data, partial=True)
+        ser = DeliverySlotSerializer(obj, data=request.data, partial=True)
         if ser.is_valid():
             ser.save()
             return Response(ser.data)
@@ -711,47 +722,3 @@ class AdminBatchTemplateDetailView(APIView):
             return Response({'error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
         obj.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
-
-
-class AdminDeliveryBatchListView(APIView):
-    """
-    GET /api/admin/delivery-batches/ — capacity across all vendors/campuses
-    (FR-12): current_orders vs max_orders per batch. Supports ?vendor_id=,
-    ?campus=, ?batch_date= filters.
-    """
-    permission_classes = [IsAdminUser]
-
-    def get(self, request):
-        qs = DeliveryBatch.objects.select_related('vendor', 'template').all()
-        vendor_id = request.query_params.get('vendor_id')
-        campus = request.query_params.get('campus')
-        batch_date = request.query_params.get('batch_date')
-        if vendor_id:
-            qs = qs.filter(vendor_id=vendor_id)
-        if campus:
-            qs = qs.filter(campus__iexact=campus)
-        if batch_date:
-            qs = qs.filter(batch_date=batch_date)
-        return Response(DeliveryBatchSerializer(qs, many=True).data)
-
-
-class AdminDeliveryBatchDetailView(APIView):
-    """
-    PATCH /api/admin/delivery-batches/<id>/ — override one generated day's
-    delivery_time/cutoff_time/max_orders/display_name/status independently
-    of its BatchTemplate (FR-13) — never touches the template or any other
-    day. vendor/campus/batch_date/template/current_orders are read-only
-    (see DeliveryBatchSerializer).
-    """
-    permission_classes = [IsAdminUser]
-
-    def patch(self, request, pk):
-        try:
-            obj = DeliveryBatch.objects.get(pk=pk)
-        except DeliveryBatch.DoesNotExist:
-            return Response({'error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
-        ser = DeliveryBatchSerializer(obj, data=request.data, partial=True)
-        if ser.is_valid():
-            ser.save()
-            return Response(ser.data)
-        return Response(ser.errors, status=status.HTTP_400_BAD_REQUEST)

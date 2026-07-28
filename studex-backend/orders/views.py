@@ -382,18 +382,11 @@ class OrderViewSet(viewsets.ModelViewSet):
 
         OrderStatus.objects.create(order=order, status=new_status, note=note, updated_by=request.user)
 
-        # Phase 1 — Food Commerce Engine, Step 4 (Delivery Batch Reservation):
-        # the one call site that reopens reserved capacity — orders/views.py
-        # never implements batch business logic itself, just invokes the
-        # reservation service. No-op for every order that never reserved
-        # capacity (delivery_batch is None), and for a cancellation landing
-        # after the batch's cutoff (see delivery.capacity.release_capacity).
-        if new_status == 'cancelled' and order.delivery_batch_id:
-            try:
-                from delivery.capacity import release_capacity
-                release_capacity(order)
-            except Exception as e:
-                logger.warning(f"release_capacity failed for order {order.id}: {e}")
+        # Delivery slot capacity is counted live from real Order rows
+        # (delivery.capacity._orders_today_count), excluding cancelled ones
+        # — a cancellation here frees capacity automatically, with no
+        # explicit "release" call needed (there's no denormalized counter
+        # to reopen the way DeliveryBatch.current_orders used to need).
 
         notif = TRACKING_NOTIFICATIONS.get(new_status)
         if notif:

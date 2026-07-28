@@ -195,7 +195,9 @@ export default function AdminOrderDetail() {
               <div className="flex items-center gap-2 text-sm">
                 <MapPin className="w-3.5 h-3.5 text-teal-500" />
                 <span className="text-stone-500">Drop-off:</span>
-                <span className="font-semibold text-stone-900">{delivery.pickup_point_name} · {delivery.pickup_point_campus}</span>
+                <span className="font-semibold text-stone-900">
+                  {delivery.pickup_point_name ? `${delivery.pickup_point_name} · ${delivery.pickup_point_campus}` : (delivery.delivery_location || order.delivery_location || "Not set")}
+                </span>
               </div>
               <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold mt-1 ${
                 delivery.status === "assigned" ? "bg-amber-100 text-amber-700"

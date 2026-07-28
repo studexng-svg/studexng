@@ -37,23 +37,29 @@ class CampusPickupPoint(models.Model):
         return f"{self.name} ({self.campus})"
 
 
-class BatchTemplate(models.Model):
+class DeliverySlot(models.Model):
     """
-    A recurring Delivery Batch pattern (Phase 1 — Food Commerce Engine),
-    e.g. "every weekday, delivery at 1pm, cutoff 15 min before, cap 10."
-    A scheduled job (same APScheduler convention as every existing job in
-    scheduler.py) creates each day's DeliveryBatch from active templates
-    whose day_of_week matches today. Editing a template only changes what
-    *future* days generate — it never retroactively touches an
-    already-generated DeliveryBatch (see DeliveryBatch.template below).
+    A recurring delivery window for a vendor (Phase 2 simplification — see
+    the design discussion: was BatchTemplate + a nightly-generated
+    DeliveryBatch, collapsed into this one row). E.g. "Lunch, 12:00pm, cap
+    10, cutoff 15 min before" — created once, keeps applying every day
+    forever. No generation job, nothing to reset daily.
+
+    "Today's capacity" is never a denormalized counter on a per-day row —
+    it's counted live from real Order rows placed against this slot today
+    (see delivery.capacity.reserve_delivery_slot). A slot applies every
+    day; there's no days-of-week filter — a vendor who doesn't run a given
+    day just gets zero orders against it that day, nothing to configure.
 
     Batching is a vendor capability, not a Food/Restaurant-specific one —
     gated by accounts.VendorType.supports_batched_delivery, never by a
-    hardcoded vendor-type check.
+    hardcoded vendor-type check. A vendor "opts in" to needing slots simply
+    by having an active DeliverySlot — no separate toggle (see
+    delivery.capacity.vendor_uses_batched_delivery).
     """
     CAMPUS_CHOICES = CampusPickupPoint.CAMPUS_CHOICES
 
-    vendor = models.ForeignKey(User, on_delete=models.CASCADE, related_name='batch_templates')
+    vendor = models.ForeignKey(User, on_delete=models.CASCADE, related_name='delivery_slots')
     campus = models.CharField(max_length=20, choices=CAMPUS_CHOICES)
     display_name = models.CharField(max_length=100)
     delivery_time = models.TimeField()
@@ -61,70 +67,17 @@ class BatchTemplate(models.Model):
         default=15, help_text="Ordering closes this many minutes before delivery_time.",
     )
     max_orders = models.PositiveIntegerField()
-    # Python's date.weekday(): Monday=0 .. Sunday=6.
-    days_of_week = models.JSONField(default=list, help_text="List of weekday ints (Monday=0 .. Sunday=6) this template applies to.")
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ['vendor_id', 'display_name']
-        verbose_name = "Batch Template"
-        verbose_name_plural = "Batch Templates"
+        ordering = ['vendor_id', 'delivery_time']
+        verbose_name = "Delivery Slot"
+        verbose_name_plural = "Delivery Slots"
 
     def __str__(self):
         return f"{self.vendor.username} — {self.display_name} ({self.delivery_time})"
-
-
-class DeliveryBatch(models.Model):
-    """
-    One day's time-boxed delivery run for a vendor (Phase 1 — Food Commerce
-    Engine) — scoped to (vendor, campus, batch_date), independent of its
-    originating BatchTemplate once generated. An admin overriding this day's
-    capacity/time/cutoff/name never touches the template or any other day.
-
-    `current_orders` is a denormalized counter, not a live COUNT(*) — kept
-    accurate under concurrency via select_for_update() at the point of
-    reservation (see delivery/capacity.py), the same lock discipline already
-    proven in payments._settle_vendor_debt and refund_payment()'s claim step.
-    """
-    STATUS_CHOICES = (
-        ('open', 'Open'),
-        ('full', 'Full'),
-        ('closed', 'Closed'),
-        ('suspended', 'Suspended'),
-    )
-    CAMPUS_CHOICES = CampusPickupPoint.CAMPUS_CHOICES
-
-    vendor = models.ForeignKey(User, on_delete=models.CASCADE, related_name='delivery_batches')
-    template = models.ForeignKey(
-        BatchTemplate, on_delete=models.SET_NULL, null=True, blank=True, related_name='generated_batches',
-        help_text="Which template generated this batch, if any — traces provenance only; editing this row never edits the template.",
-    )
-    campus = models.CharField(max_length=20, choices=CAMPUS_CHOICES)
-    batch_date = models.DateField()
-    display_name = models.CharField(max_length=100)
-    delivery_time = models.DateTimeField()
-    cutoff_time = models.DateTimeField()
-    max_orders = models.PositiveIntegerField()
-    current_orders = models.PositiveIntegerField(default=0)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='open')
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        ordering = ['-batch_date', 'delivery_time']
-        # Prevents the daily generation job from double-creating the same
-        # template's batch for the same day if it ever runs twice — has no
-        # effect on admin-created batches (template=None), which have no
-        # such uniqueness requirement (a vendor may create several ad hoc
-        # batches on one day with no template at all).
-        unique_together = [('vendor', 'template', 'batch_date')]
-        verbose_name = "Delivery Batch"
-        verbose_name_plural = "Delivery Batches"
-
-    def __str__(self):
-        return f"{self.vendor.username} — {self.display_name} — {self.batch_date}"
 
 
 class DeliveryAssignment(models.Model):
@@ -154,12 +107,13 @@ class DeliveryAssignment(models.Model):
         blank=True,
         related_name='deliveries',
     )
-    # Phase 1 — Food Commerce Engine. Null for every order from a vendor
-    # that doesn't use batching (i.e. every order that existed before this
-    # phase, and every non-batching vendor type after it) — identical to
-    # today's behavior in that case.
-    batch = models.ForeignKey(
-        'delivery.DeliveryBatch', on_delete=models.SET_NULL, null=True, blank=True, related_name='assignments',
+    # Null for every order from a vendor that doesn't use delivery slots
+    # (i.e. every non-batching vendor type) — identical to today's behavior
+    # in that case. Groups a rider's assignments by recurring slot for
+    # display; "today's" capacity against this slot is counted live from
+    # Order rows, not tracked here.
+    delivery_slot = models.ForeignKey(
+        'delivery.DeliverySlot', on_delete=models.SET_NULL, null=True, blank=True, related_name='assignments',
     )
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='assigned')
 

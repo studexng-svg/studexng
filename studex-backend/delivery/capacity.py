@@ -1,27 +1,36 @@
 # delivery/capacity.py
 """
-Delivery batch capacity reservation (Phase 1 — Food Commerce Engine, Step 4).
-The one service checkout, cancellation, and any future caller reserve/release
-DeliveryBatch capacity through — nothing else in the codebase touches
-DeliveryBatch.current_orders/status directly. Same lock discipline already
-proven in payments.settle_vendor_debt and refund_payment()'s claim step:
-transaction.atomic() + select_for_update(), external calls (none here —
-this module makes none) only ever happen after commit.
+Delivery slot capacity (Phase 2 simplification — replaces the earlier
+BatchTemplate + nightly-generated DeliveryBatch design). A DeliverySlot is
+a standing recurring rule (vendor, delivery_time, cutoff_offset_minutes,
+max_orders) that just keeps applying every day forever — there is no
+generation job and no per-day row to create, reset, or go stale.
 
-Batching is a vendor capability (accounts.VendorType.supports_batched_delivery),
-never a hardcoded vendor-type check — see vendor_uses_batched_delivery. A
-vendor without it never has a DeliveryBatch to reserve, so every function
-here is a guaranteed no-op for them, preserving today's behavior exactly.
+"Today's capacity" is never a denormalized counter — it's counted live
+from real Order rows placed against the slot today. Cancelling an order
+frees capacity automatically, since a cancelled order is excluded from the
+count; there is nothing to explicitly "release" the way the old
+DeliveryBatch.current_orders counter needed.
+
+Race-safety: reserve_delivery_slot() locks the candidate DeliverySlot rows
+(select_for_update) for the duration of the check, so two concurrent
+checkouts against the same slot serialize instead of both slipping through
+when only one spot remains — the second transaction blocks until the first
+commits, then re-counts and sees the first's Order already there. Must be
+called inside the same transaction.atomic() block that creates the Order.
 """
-from django.db import transaction as db_transaction
-from django.db.models import F
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
+
 from django.utils import timezone
 
-from delivery.models import DeliveryBatch
+from delivery.models import DeliverySlot
+
+LAGOS = ZoneInfo("Africa/Lagos")
 
 
-class NoBatchCapacityError(Exception):
-    """Raised when no eligible DeliveryBatch has capacity for this vendor+campus right now. `.detail` is buyer-facing."""
+class NoDeliverySlotCapacityError(Exception):
+    """Raised when no eligible DeliverySlot has capacity for this vendor+campus right now. `.detail` is buyer-facing."""
     def __init__(self, detail):
         self.detail = detail
         super().__init__(detail)
@@ -30,135 +39,112 @@ class NoBatchCapacityError(Exception):
 def vendor_uses_batched_delivery(vendor):
     """
     Two-level gate: VendorType.supports_batched_delivery says a *category*
-    of vendor (e.g. Food) is capable of batching at all; an active
-    BatchTemplate says *this specific vendor* actually uses it. Without the
-    second check, every vendor of a batching-capable type would be forced
-    through batch-reservation checkout the moment they're onboarded, even
-    if no admin ever set up a schedule for them — checkout would fail for
-    them permanently with "No delivery slots are currently available"
-    rather than falling back to the normal (non-batched) checkout path.
-    An admin "sets" a vendor as needing batches simply by creating their
-    first BatchTemplate at /admin/batch-templates — no separate toggle.
+    of vendor (e.g. Food) is capable of using delivery slots at all; an
+    active DeliverySlot says *this specific vendor* actually uses one.
+    Without the second check, every vendor of a slot-capable type would be
+    forced through slot-reservation checkout the moment they're onboarded,
+    even if no admin ever set one up — checkout would fail for them
+    permanently with "No delivery slots are currently available" instead
+    of falling back to normal (non-slotted) checkout. An admin "sets" a
+    vendor as needing slots simply by creating their first DeliverySlot —
+    no separate toggle.
     """
     from payments.settlement import get_vendor_type
-    from delivery.models import BatchTemplate
     vendor_type = get_vendor_type(vendor)
     if not (vendor_type and vendor_type.supports_batched_delivery):
         return False
-    return BatchTemplate.objects.filter(vendor=vendor, is_active=True).exists()
+    return DeliverySlot.objects.filter(vendor=vendor, is_active=True).exists()
 
 
-def _eligible_batches_locked(vendor, campus, now):
-    """
-    Row-locked queryset of every batch this vendor+campus could still take
-    an order for: open, cutoff not yet passed, room left. Ordered soonest-
-    cutoff-first so auto-selection always picks the next batch a buyer could
-    actually still make, not an arbitrary one further out.
-    """
+def _cutoff_datetime(slot, day):
+    delivery_dt = datetime.combine(day, slot.delivery_time, tzinfo=LAGOS)
+    return delivery_dt - timedelta(minutes=slot.cutoff_offset_minutes)
+
+
+def _orders_today_count(slot, day):
+    """Real orders placed against this slot today (Lagos-local calendar day) — never cancelled ones."""
+    from orders.models import Order
+    day_start = datetime.combine(day, datetime.min.time(), tzinfo=LAGOS)
+    day_end = day_start + timedelta(days=1)
     return (
-        DeliveryBatch.objects.select_for_update()
-        .filter(vendor=vendor, campus=campus, status='open', cutoff_time__gt=now, current_orders__lt=F('max_orders'))
-        .order_by('cutoff_time', 'delivery_time', 'id')
+        Order.objects.filter(delivery_slot=slot, created_at__gte=day_start, created_at__lt=day_end)
+        .exclude(status='cancelled')
+        .count()
     )
 
 
-def has_eligible_batch(vendor, campus):
+def _eligible_slots(vendor, campus, now_lagos, lock=False):
     """
-    Read-only pre-flight check — no lock, no reservation. Lets checkout fail
-    fast (before charging the buyer) when a batching vendor has nothing open
-    right now, the same way price_vendor_cart already fails fast on
-    availability. Not itself race-safe (nothing is reserved by calling this)
-    — the real guarantee comes from reserve_capacity's row lock.
+    Every slot this vendor+campus could still take an order for right now:
+    active, cutoff not yet passed today, room left today. Soonest-cutoff-
+    first so auto-selection always picks the next slot a buyer could
+    actually still make.
     """
-    now = timezone.now()
-    return DeliveryBatch.objects.filter(
-        vendor=vendor, campus=campus, status='open', cutoff_time__gt=now, current_orders__lt=F('max_orders'),
-    ).exists()
+    today = now_lagos.date()
+    qs = DeliverySlot.objects.filter(vendor=vendor, campus=campus, is_active=True)
+    if lock:
+        qs = qs.select_for_update()
+    eligible = []
+    for slot in qs:
+        if now_lagos >= _cutoff_datetime(slot, today):
+            continue
+        if _orders_today_count(slot, today) >= slot.max_orders:
+            continue
+        eligible.append(slot)
+    eligible.sort(key=lambda s: _cutoff_datetime(s, today))
+    return eligible
 
 
-def list_eligible_batches(vendor, campus):
+def has_eligible_slot(vendor, campus):
     """
-    Read-only preview of every batch a buyer could currently order into for
-    this vendor+campus, soonest-cutoff-first — same eligibility rule as
-    reserve_capacity (open, cutoff not passed, room left), no lock, nothing
-    reserved. Lets checkout show "This order is part of the 12pm batch, 4
-    slots left" before the buyer pays, instead of them finding out only
-    after a failed/refunded payment.
+    Read-only pre-flight check — no lock, nothing reserved. Lets checkout
+    fail fast (before charging the buyer) when a slotted vendor has nothing
+    open right now. Not itself race-safe — the real guarantee comes from
+    reserve_delivery_slot's row lock.
     """
-    now = timezone.now()
-    return list(
-        DeliveryBatch.objects.filter(
-            vendor=vendor, campus=campus, status='open', cutoff_time__gt=now, current_orders__lt=F('max_orders'),
-        ).order_by('cutoff_time', 'delivery_time', 'id')
-    )
+    now_lagos = timezone.now().astimezone(LAGOS)
+    return len(_eligible_slots(vendor, campus, now_lagos, lock=False)) > 0
 
 
-def reserve_capacity(vendor, campus, preferred_batch_id=None):
+def list_eligible_slots(vendor, campus):
     """
-    Reserves one unit of capacity on the earliest eligible DeliveryBatch for
-    this vendor+campus, preferring `preferred_batch_id` if it's still open
-    and has room — automatically falling back to the next eligible batch
+    Read-only preview of every slot a buyer could currently order into,
+    soonest-cutoff-first, with remaining capacity for today — lets
+    checkout show "This order is part of the 12pm slot, 4 left" before the
+    buyer pays, instead of finding out only after a failed/refunded payment.
+    """
+    now_lagos = timezone.now().astimezone(LAGOS)
+    today = now_lagos.date()
+    return [
+        {'slot': slot, 'remaining': slot.max_orders - _orders_today_count(slot, today)}
+        for slot in _eligible_slots(vendor, campus, now_lagos, lock=False)
+    ]
+
+
+def reserve_delivery_slot(vendor, campus, preferred_slot_id=None):
+    """
+    Picks the earliest eligible DeliverySlot for this vendor+campus right
+    now, preferring preferred_slot_id if it's still eligible, falling back
     otherwise (covers both "no preference given" and "preferred one just
-    became unavailable"). Returns the reserved DeliveryBatch.
+    filled up"). Returns the DeliverySlot to stamp onto the Order — there's
+    no counter to increment; the Order itself, once created inside this
+    same transaction, is what the next caller's count will include.
 
     Must be called inside the same transaction.atomic() block the caller
-    uses to create the Order (see payments.cart_checkout), so a failure
-    anywhere else in checkout rolls the reservation back with it. Race-safe:
-    select_for_update() locks the candidate rows, so two concurrent
-    reservations for the last slot on one batch can never both succeed —
-    the second re-evaluates the WHERE clause after acquiring the lock and
-    sees the row as the first one left it.
+    uses to create the Order (see payments.cart_checkout) — the row lock
+    only serializes concurrent reservations if the Order that "fills" the
+    slot is committed (or rolled back) together with releasing this lock.
 
-    Raises NoBatchCapacityError (buyer-facing detail) if nothing is eligible.
+    Raises NoDeliverySlotCapacityError (buyer-facing detail) if nothing is eligible.
     """
-    now = timezone.now()
-    candidates = list(_eligible_batches_locked(vendor, campus, now))
-    if not candidates:
-        raise NoBatchCapacityError(
+    now_lagos = timezone.now().astimezone(LAGOS)
+    eligible = _eligible_slots(vendor, campus, now_lagos, lock=True)
+    if not eligible:
+        raise NoDeliverySlotCapacityError(
             "No delivery slots are currently available for this vendor. Please try again later."
         )
-
-    batch = None
-    if preferred_batch_id:
-        batch = next((b for b in candidates if b.id == int(preferred_batch_id)), None)
-    if batch is None:
-        batch = candidates[0]
-
-    batch.current_orders += 1
-    if batch.current_orders >= batch.max_orders:
-        batch.status = 'full'
-    batch.save(update_fields=['current_orders', 'status', 'updated_at'])
-    return batch
-
-
-def release_capacity(order):
-    """
-    Reopens one unit of capacity on order.delivery_batch — but only for an
-    "eligible" cancellation: one happening strictly before the batch's
-    cutoff_time. After cutoff, the vendor has already committed to prepping
-    for the batch's committed order count, so a late cancellation does not
-    free a slot for someone else. No-op if the order never reserved batch
-    capacity (delivery_batch is None — every non-batching-vendor order, and
-    every order type that predates this phase).
-
-    Idempotency note: the one call site (orders.views.OrderViewSet.
-    update_status) already guarantees an order can only transition to
-    'cancelled' once — its own guard rejects a second cancel attempt before
-    this is ever reached — so no additional dedup is needed here.
-    """
-    if not order.delivery_batch_id:
-        return
-
-    now = timezone.now()
-    with db_transaction.atomic():
-        try:
-            batch = DeliveryBatch.objects.select_for_update().get(pk=order.delivery_batch_id)
-        except DeliveryBatch.DoesNotExist:
-            return
-        if now >= batch.cutoff_time:
-            return  # too late — the slot stays committed
-
-        batch.current_orders = max(0, batch.current_orders - 1)
-        if batch.status == 'full' and batch.current_orders < batch.max_orders:
-            batch.status = 'open'
-        batch.save(update_fields=['current_orders', 'status', 'updated_at'])
+    if preferred_slot_id:
+        slot = next((s for s in eligible if s.id == int(preferred_slot_id)), eligible[0])
+    else:
+        slot = eligible[0]
+    return slot
