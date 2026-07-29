@@ -54,6 +54,19 @@
     scrollbar-width: none;
   }
   .hide-scrollbar::-webkit-scrollbar { display: none; }
+
+  /* Every horizontal-scroll strip site-wide (category chips, listing rows,
+     etc.) keeps its scroll behavior but never shows the scrollbar itself —
+     scrolling still works via touch/trackpad/drag, just no visible bar. */
+  .overflow-x-auto,
+  .overflow-x-scroll {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .overflow-x-auto::-webkit-scrollbar,
+  .overflow-x-scroll::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 /* ==================================================================
