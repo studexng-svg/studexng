@@ -206,44 +206,39 @@ function AssignmentCard({
     : (a.delivery_location || "Location not provided");
 
   return (
-    <div className="bg-white rounded-3xl border border-stone-100 shadow-sm overflow-hidden">
-      {/* Hero image */}
-      <div className="relative h-32 bg-stone-100">
-        {heroImage ? (
-          <img src={heroImage} alt="" className="w-full h-full object-cover" />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-stone-100 to-stone-200">
-            <Package className="w-9 h-9 text-stone-300" />
+    <div className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden">
+      <div className="p-3 flex gap-3">
+        <div className="w-16 h-16 rounded-xl overflow-hidden flex-shrink-0 bg-stone-100">
+          {heroImage ? (
+            <img src={heroImage} alt="" className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-stone-100 to-stone-200">
+              <Package className="w-6 h-6 text-stone-300" />
+            </div>
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-xs text-stone-400 truncate">Order #{a.order_reference}</p>
+            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${STATUS_COLOR[a.status] || "bg-stone-100 text-stone-500"}`}>
+              {STATUS_LABELS[a.status] || a.status}
+            </span>
           </div>
-        )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/0 to-black/0" />
-        <span className={`absolute top-3 right-3 text-xs font-bold px-2.5 py-1 rounded-full shadow-sm ${STATUS_COLOR[a.status] || "bg-stone-100 text-stone-500"}`}>
-          {STATUS_LABELS[a.status] || a.status}
-        </span>
-        <p className="absolute bottom-2.5 left-3.5 right-3.5 text-white text-xs font-medium drop-shadow">
-          Order #{a.order_reference}
-        </p>
+          {a.items?.length ? (
+            <p className="text-sm font-bold text-stone-900 truncate mt-0.5">
+              {a.items[0].quantity}x {a.items[0].listing_title}
+              {a.items.length > 1 && <span className="text-stone-400 font-normal"> +{a.items.length - 1} more</span>}
+            </p>
+          ) : (
+            <p className="text-sm font-bold text-stone-900 truncate mt-0.5">{a.listing_title}</p>
+          )}
+          {!!a.items?.[0]?.addons?.length && (
+            <p className="text-xs text-stone-500 truncate">+ {a.items[0].addons.map(ad => ad.name).join(", ")}</p>
+          )}
+        </div>
       </div>
 
-      <div className="p-4 space-y-4">
-        {/* Items */}
-        {a.items?.length ? (
-          <ul className="space-y-1.5">
-            {a.items.map((item, i) => (
-              <li key={i} className="text-sm">
-                <span className="font-bold text-stone-900">{item.quantity}x {item.listing_title}</span>
-                {!!item.addons?.length && (
-                  <span className="block text-xs text-stone-500 mt-0.5">
-                    + {item.addons.map(ad => ad.name).join(", ")}
-                  </span>
-                )}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="font-bold text-stone-900 text-sm">{a.listing_title}</p>
-        )}
-
+      <div className="px-4 pb-4 space-y-4">
         {/* Route timeline: vendor -> drop-off */}
         <div className="flex gap-3 bg-stone-50 rounded-2xl p-3">
           <div className="flex flex-col items-center pt-1">
