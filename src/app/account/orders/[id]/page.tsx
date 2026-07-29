@@ -339,31 +339,184 @@ export default function OrderDetailPage() {
           </div>
         )}
 
-        {/* ORDER HEADER */}
-        <div className="bg-white rounded-2xl p-5 shadow-sm border border-stone-200 animate-fadeUp">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-xs text-stone-400 font-medium">Reference</p>
-              <p className="font-semibold text-stone-800 text-sm mt-0.5">#{order.reference}</p>
-              <p className="text-xs text-stone-400 mt-1">
-                {new Date(order.paid_at || order.created_at).toLocaleString("en-NG", {
-                  day: "numeric", month: "short", year: "numeric",
-                  hour: "2-digit", minute: "2-digit",
-                })}
-                {elapsed && <span className="ml-1 text-stone-300">({elapsed})</span>}
-              </p>
-            </div>
-            <div className={`px-3 py-1.5 rounded-full font-semibold text-xs flex items-center gap-1.5 ${statusColor(order.status)}`}>
-              {isCompleted ? <CheckCircle className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
-              {escrowStatusLabel(order)}
+        {/* ORDER SUMMARY — one joined card, internal dividers instead of separate boxes */}
+        <div className="bg-white rounded-2xl shadow-sm border border-stone-200 divide-y divide-stone-100 overflow-hidden animate-fadeUp">
+          {/* ORDER HEADER */}
+          <div className="p-5">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-xs text-stone-400 font-medium">Reference</p>
+                <p className="font-semibold text-stone-800 text-sm mt-0.5">#{order.reference}</p>
+                <p className="text-xs text-stone-400 mt-1">
+                  {new Date(order.paid_at || order.created_at).toLocaleString("en-NG", {
+                    day: "numeric", month: "short", year: "numeric",
+                    hour: "2-digit", minute: "2-digit",
+                  })}
+                  {elapsed && <span className="ml-1 text-stone-300">({elapsed})</span>}
+                </p>
+              </div>
+              <div className={`px-3 py-1.5 rounded-full font-semibold text-xs flex items-center gap-1.5 ${statusColor(order.status)}`}>
+                {isCompleted ? <CheckCircle className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
+                {escrowStatusLabel(order)}
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* ORDER TIMELINE */}
-        <div className="bg-white rounded-2xl p-5 shadow-sm border border-stone-200 animate-fadeUp">
-          <p className="text-xs text-stone-400 font-bold uppercase tracking-wide mb-4">Order Timeline</p>
-          <OrderTimeline orderId={order.id} />
+          {/* ORDER TIMELINE */}
+          <div className="p-5">
+            <p className="text-xs text-stone-400 font-bold uppercase tracking-wide mb-4">Order Timeline</p>
+            <OrderTimeline orderId={order.id} />
+          </div>
+
+          {/* ITEMS IN YOUR ORDER */}
+          <div className="p-5">
+            <h3 className="font-semibold text-stone-800 mb-4 flex items-center gap-2">
+              <Package className="w-5 h-5 text-teal-600" /> Items in Your Order
+            </h3>
+            <div className="space-y-3">
+              {order.items && order.items.length > 0 ? (
+                order.items.map(item => (
+                  <div key={item.id} className="flex gap-3 pb-3 border-b border-stone-50 last:border-0 last:pb-0">
+                    <div className="w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 bg-stone-100">
+                      {item.image ? (
+                        <img src={item.image} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Package className="w-5 h-5 text-stone-300" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1 flex justify-between items-start gap-2">
+                      <div className="min-w-0">
+                        <p className={`text-sm font-medium ${item.status === "unavailable" ? "text-stone-400 line-through" : "text-stone-800"}`}>
+                          {item.listing_title} × {item.quantity}
+                        </p>
+                        {item.addons.length > 0 && (
+                          <p className="text-xs text-stone-400">{item.addons.map(a => a.quantity > 1 ? `${a.name} ×${a.quantity}` : a.name).join(", ")}</p>
+                        )}
+                        {item.status === "unavailable" && (
+                          <p className="text-xs text-red-500 font-medium">Unavailable — refunded</p>
+                        )}
+                      </div>
+                      <span className="font-semibold text-stone-700 text-sm flex-shrink-0">
+                        ₦{parseFloat(item.line_total).toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="flex gap-3">
+                  <div className="w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 bg-stone-100">
+                    {order.listing?.image ? (
+                      <img src={order.listing.image} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Package className="w-5 h-5 text-stone-300" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1 flex justify-between items-center gap-2">
+                    <span className="font-semibold text-stone-800 text-sm">{order.listing?.title}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* DELIVERY INFORMATION */}
+          <div className="p-5">
+            <h3 className="font-semibold text-stone-800 mb-4 flex items-center gap-2">
+              <MapPin className="w-5 h-5 text-teal-600" /> Delivery Information
+            </h3>
+            <div className="space-y-3">
+              <div className="flex justify-between py-2 border-b border-stone-50">
+                <span className="text-sm text-stone-400">Vendor</span>
+                <span className="font-semibold text-stone-800 text-sm">{order.listing?.vendor?.username}</span>
+              </div>
+              <div className="py-2">
+                <p className="text-xs text-stone-400 mb-0.5">Delivery Location</p>
+                <p className="font-semibold text-stone-800 text-sm">
+                  {order.delivery_location || <span className="text-stone-400 italic font-normal">Not set</span>}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* PAYMENT INFORMATION */}
+          <div className="p-5">
+            <h3 className="font-semibold text-stone-800 mb-4 flex items-center gap-2">
+              <CheckCircle className="w-5 h-5 text-teal-600" /> Payment Information
+            </h3>
+            <div className="flex justify-between items-center">
+              <span className="font-semibold text-stone-700">Total Paid</span>
+              <span className="font-bold text-2xl text-teal-700">
+                ₦{parseFloat(String(order.amount)).toLocaleString("en-NG", { minimumFractionDigits: 2 })}
+              </span>
+            </div>
+          </div>
+
+          {/* DELIVERY PROOF */}
+          {(order.delivery_proof_1 || order.delivery_proof_2) && (
+            <div className="p-5">
+              <h3 className="font-semibold text-stone-800 mb-3 flex items-center gap-2 text-sm">
+                <Package className="w-4 h-4 text-teal-600" /> Delivery Proof
+              </h3>
+              <div className="flex gap-3">
+                {[order.delivery_proof_1, order.delivery_proof_2].filter(Boolean).map((url, i) => (
+                  <a key={i} href={url!} target="_blank" rel="noopener noreferrer"
+                    className="flex-1 max-w-[140px] aspect-square rounded-xl overflow-hidden border border-stone-200 block">
+                    <img src={url!} alt={`Delivery proof ${i + 1}`} className="w-full h-full object-cover" />
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* LOYALTY PROGRESS */}
+          {loyalty && (
+            <div className="p-5">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-semibold text-stone-700">🎁 Loyalty Rewards</p>
+                <p className="text-xs text-teal-600 font-bold">
+                  {loyalty.total_completed_orders % 10}/10 orders
+                </p>
+              </div>
+              <div className="w-full bg-stone-100 rounded-full h-2 mb-2">
+                <div
+                  className="h-2 rounded-full transition-all duration-500"
+                  style={{ width: `${((loyalty.total_completed_orders % 10) / 10) * 100}%`, background: "linear-gradient(90deg,#0d9488,#7c3aed)" }}
+                />
+              </div>
+              <p className="text-xs text-stone-400">
+                {loyalty.orders_until_next_reward === 0
+                  ? "You just earned ₦200!"
+                  : `${loyalty.orders_until_next_reward} more order${loyalty.orders_until_next_reward === 1 ? "" : "s"} to earn ₦200 credits`}
+                {loyalty.credit_balance > 0 && (
+                  <span className="ml-2 text-teal-600 font-semibold">· Balance: ₦{Number(loyalty.credit_balance).toLocaleString()}</span>
+                )}
+              </p>
+            </div>
+          )}
+
+          {/* RIDER DELIVERY STATUS + HANDOFF CODE */}
+          {awaitingVendor && deliveryStatus && (
+            <div className="p-5 space-y-3">
+              <div className="flex items-center gap-2 text-sm text-stone-700">
+                <Truck className="w-4 h-4 text-teal-600 flex-shrink-0" />
+                <span>Rider <span className="font-semibold">@{deliveryStatus.rider_username}</span> {
+                  deliveryStatus.status === "assigned" ? "is heading to the vendor"
+                  : deliveryStatus.status === "picked_up" ? "has picked up your order"
+                  : "has arrived with your order"
+                }</span>
+              </div>
+              {deliveryStatus.status === "at_pickup_point" && deliveryStatus.delivery_code && (
+                <div className="bg-teal-50 border border-teal-200 rounded-xl p-3 text-center">
+                  <p className="text-xs text-teal-700 font-semibold mb-1">Give this code to the rider to receive your order</p>
+                  <p className="text-2xl font-black tracking-[0.3em] text-teal-900">{deliveryStatus.delivery_code}</p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {isCancelled && (
@@ -453,110 +606,6 @@ export default function OrderDetailPage() {
           </div>
         )}
 
-        {/* ITEMS IN YOUR ORDER */}
-        <div className="bg-white rounded-2xl p-5 shadow-sm border border-stone-200 animate-fadeUp">
-          <h3 className="font-semibold text-stone-800 mb-4 flex items-center gap-2">
-            <Package className="w-5 h-5 text-teal-600" /> Items in Your Order
-          </h3>
-          <div className="space-y-3">
-            {order.items && order.items.length > 0 ? (
-              order.items.map(item => (
-                <div key={item.id} className="flex gap-3 pb-3 border-b border-stone-50 last:border-0 last:pb-0">
-                  <div className="w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 bg-stone-100">
-                    {item.image ? (
-                      <img src={item.image} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <Package className="w-5 h-5 text-stone-300" />
-                      </div>
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1 flex justify-between items-start gap-2">
-                    <div className="min-w-0">
-                      <p className={`text-sm font-medium ${item.status === "unavailable" ? "text-stone-400 line-through" : "text-stone-800"}`}>
-                        {item.listing_title} × {item.quantity}
-                      </p>
-                      {item.addons.length > 0 && (
-                        <p className="text-xs text-stone-400">{item.addons.map(a => a.quantity > 1 ? `${a.name} ×${a.quantity}` : a.name).join(", ")}</p>
-                      )}
-                      {item.status === "unavailable" && (
-                        <p className="text-xs text-red-500 font-medium">Unavailable — refunded</p>
-                      )}
-                    </div>
-                    <span className="font-semibold text-stone-700 text-sm flex-shrink-0">
-                      ₦{parseFloat(item.line_total).toLocaleString()}
-                    </span>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="flex gap-3">
-                <div className="w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 bg-stone-100">
-                  {order.listing?.image ? (
-                    <img src={order.listing.image} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <Package className="w-5 h-5 text-stone-300" />
-                    </div>
-                  )}
-                </div>
-                <div className="min-w-0 flex-1 flex justify-between items-center gap-2">
-                  <span className="font-semibold text-stone-800 text-sm">{order.listing?.title}</span>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* DELIVERY INFORMATION */}
-        <div className="bg-white rounded-2xl p-5 shadow-sm border border-stone-200 animate-fadeUp">
-          <h3 className="font-semibold text-stone-800 mb-4 flex items-center gap-2">
-            <MapPin className="w-5 h-5 text-teal-600" /> Delivery Information
-          </h3>
-          <div className="space-y-3">
-            <div className="flex justify-between py-2 border-b border-stone-50">
-              <span className="text-sm text-stone-400">Vendor</span>
-              <span className="font-semibold text-stone-800 text-sm">{order.listing?.vendor?.username}</span>
-            </div>
-            <div className="py-2">
-              <p className="text-xs text-stone-400 mb-0.5">Delivery Location</p>
-              <p className="font-semibold text-stone-800 text-sm">
-                {order.delivery_location || <span className="text-stone-400 italic font-normal">Not set</span>}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* PAYMENT INFORMATION */}
-        <div className="bg-white rounded-2xl p-5 shadow-sm border border-stone-200 animate-fadeUp">
-          <h3 className="font-semibold text-stone-800 mb-4 flex items-center gap-2">
-            <CheckCircle className="w-5 h-5 text-teal-600" /> Payment Information
-          </h3>
-          <div className="flex justify-between items-center">
-            <span className="font-semibold text-stone-700">Total Paid</span>
-            <span className="font-bold text-2xl text-teal-700">
-              ₦{parseFloat(String(order.amount)).toLocaleString("en-NG", { minimumFractionDigits: 2 })}
-            </span>
-          </div>
-        </div>
-
-        {/* DELIVERY PROOF */}
-        {(order.delivery_proof_1 || order.delivery_proof_2) && (
-          <div className="bg-white rounded-2xl p-5 shadow-sm border border-stone-200 animate-fadeUp">
-            <h3 className="font-semibold text-stone-800 mb-3 flex items-center gap-2 text-sm">
-              <Package className="w-4 h-4 text-teal-600" /> Delivery Proof
-            </h3>
-            <div className="flex gap-3">
-              {[order.delivery_proof_1, order.delivery_proof_2].filter(Boolean).map((url, i) => (
-                <a key={i} href={url!} target="_blank" rel="noopener noreferrer"
-                  className="flex-1 max-w-[140px] aspect-square rounded-xl overflow-hidden border border-stone-200 block">
-                  <img src={url!} alt={`Delivery proof ${i + 1}`} className="w-full h-full object-cover" />
-                </a>
-              ))}
-            </div>
-          </div>
-        )}
-
         {/* PRE-CONFIRM WARNING */}
         {canConfirm && (
           <div className="bg-red-50 border-2 border-red-300 rounded-2xl p-4 animate-fadeUp">
@@ -569,32 +618,6 @@ export default function OrderDetailPage() {
                 </p>
               </div>
             </div>
-          </div>
-        )}
-
-        {/* LOYALTY PROGRESS */}
-        {loyalty && (
-          <div className="bg-white rounded-2xl p-4 shadow-sm border border-stone-200 animate-fadeUp">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-xs font-semibold text-stone-700">🎁 Loyalty Rewards</p>
-              <p className="text-xs text-teal-600 font-bold">
-                {loyalty.total_completed_orders % 10}/10 orders
-              </p>
-            </div>
-            <div className="w-full bg-stone-100 rounded-full h-2 mb-2">
-              <div
-                className="h-2 rounded-full transition-all duration-500"
-                style={{ width: `${((loyalty.total_completed_orders % 10) / 10) * 100}%`, background: "linear-gradient(90deg,#0d9488,#7c3aed)" }}
-              />
-            </div>
-            <p className="text-xs text-stone-400">
-              {loyalty.orders_until_next_reward === 0
-                ? "You just earned ₦200!"
-                : `${loyalty.orders_until_next_reward} more order${loyalty.orders_until_next_reward === 1 ? "" : "s"} to earn ₦200 credits`}
-              {loyalty.credit_balance > 0 && (
-                <span className="ml-2 text-teal-600 font-semibold">· Balance: ₦{Number(loyalty.credit_balance).toLocaleString()}</span>
-              )}
-            </p>
           </div>
         )}
 
@@ -614,26 +637,6 @@ export default function OrderDetailPage() {
             >
               <CheckCircle className="w-4 h-4" /> Confirm
             </button>
-          </div>
-        )}
-
-        {/* RIDER DELIVERY STATUS + HANDOFF CODE */}
-        {awaitingVendor && deliveryStatus && (
-          <div className="bg-white rounded-2xl p-4 shadow-sm border border-stone-200 animate-fadeUp space-y-3">
-            <div className="flex items-center gap-2 text-sm text-stone-700">
-              <Truck className="w-4 h-4 text-teal-600 flex-shrink-0" />
-              <span>Rider <span className="font-semibold">@{deliveryStatus.rider_username}</span> {
-                deliveryStatus.status === "assigned" ? "is heading to the vendor"
-                : deliveryStatus.status === "picked_up" ? "has picked up your order"
-                : "has arrived with your order"
-              }</span>
-            </div>
-            {deliveryStatus.status === "at_pickup_point" && deliveryStatus.delivery_code && (
-              <div className="bg-teal-50 border border-teal-200 rounded-xl p-3 text-center">
-                <p className="text-xs text-teal-700 font-semibold mb-1">Give this code to the rider to receive your order</p>
-                <p className="text-2xl font-black tracking-[0.3em] text-teal-900">{deliveryStatus.delivery_code}</p>
-              </div>
-            )}
           </div>
         )}
 
