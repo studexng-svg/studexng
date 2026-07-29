@@ -93,6 +93,9 @@ class VendorEligibleBatchesViewTests(TestCase):
         self.assertEqual(len(response.data['batches']), 1)
         self.assertEqual(response.data['batches'][0]['display_name'], 'Lunch')
         self.assertEqual(response.data['batches'][0]['remaining_slots'], 7)
+        # delivery_time = FROZEN_NOW (noon) + 180min = 15:00; cutoff = 15
+        # min before that (DeliverySlot's default cutoff_offset_minutes) = 14:45.
+        self.assertEqual(response.data['batches'][0]['cutoff_time'], '2026-06-15T14:45:00+01:00')
 
     def test_non_batching_vendor_type_returns_uses_batched_delivery_false(self):
         response = self.client.get(f'/api/delivery/vendor-batches/{self.beauty_vendor.id}/')

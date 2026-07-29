@@ -63,7 +63,7 @@ class VendorEligibleBatchesView(APIView):
             return Response({'uses_batched_delivery': False, 'batches': []})
 
         from datetime import datetime
-        from delivery.capacity import LAGOS
+        from delivery.capacity import LAGOS, _cutoff_datetime
         campus = (getattr(vendor, 'school', '') or '').lower()
         today = timezone.now().astimezone(LAGOS).date()
         eligible = list_eligible_slots(vendor, campus)
@@ -74,6 +74,10 @@ class VendorEligibleBatchesView(APIView):
                     'id': entry['slot'].id,
                     'display_name': entry['slot'].display_name,
                     'delivery_time': datetime.combine(today, entry['slot'].delivery_time, tzinfo=LAGOS).isoformat(),
+                    # Ordering closes here — lets checkout show a live
+                    # countdown instead of the buyer only finding out the
+                    # slot vanished on the next 15s poll.
+                    'cutoff_time': _cutoff_datetime(entry['slot'], today).isoformat(),
                     'remaining_slots': entry['remaining'],
                 }
                 for entry in eligible

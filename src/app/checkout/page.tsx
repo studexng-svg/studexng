@@ -76,9 +76,10 @@ export default function CheckoutPage() {
   const [useCredits, setUseCredits] = useState(false);
   const [batchInfo, setBatchInfo] = useState<{
     uses_batched_delivery: boolean;
-    batches: { id: number; display_name: string; delivery_time: string; remaining_slots: number }[];
+    batches: { id: number; display_name: string; delivery_time: string; cutoff_time: string; remaining_slots: number }[];
   } | null>(null);
   const [selectedBatchId, setSelectedBatchId] = useState<number | null>(null);
+  const [nowTick, setNowTick] = useState(() => Date.now());
 
   // discountedBase is already all-inclusive (vendor payout + platform fee baked in
   // at listing-creation time) — no separate fee gets added at checkout anymore.
@@ -148,6 +149,19 @@ export default function CheckoutPage() {
     const interval = setInterval(fetchBatches, 15000);
     return () => { cancelled = true; clearInterval(interval); };
   }, [usesMenuCheckout, vendorId]);
+
+  // Ticks every second so a batch's countdown visibly hits 0 and disappears
+  // the instant its cutoff passes, instead of the buyer only finding out on
+  // the next 15s poll (see the batch-fetch effect above).
+  useEffect(() => {
+    if (!batchInfo?.batches?.length) return;
+    const tick = setInterval(() => setNowTick(Date.now()), 1000);
+    return () => clearInterval(tick);
+  }, [batchInfo?.batches?.length]);
+
+  const visibleBatches = (batchInfo?.batches ?? []).filter(
+    b => new Date(b.cutoff_time).getTime() - nowTick > 0
+  );
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -490,7 +504,7 @@ export default function CheckoutPage() {
               <Clock className="w-4 h-4 text-teal-600" />
               <p className="font-semibold text-stone-900 text-sm">Delivery Slot</p>
             </div>
-            {batchInfo.batches.length === 0 ? (
+            {visibleBatches.length === 0 ? (
               <p className="text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
                 No delivery slots are currently available for this vendor. Please try again later.
               </p>
@@ -498,17 +512,26 @@ export default function CheckoutPage() {
               <>
                 <p className="text-xs text-stone-400">Choose which batch your order should be part of.</p>
                 <div className="space-y-2">
-                  {batchInfo.batches.map(b => {
+                  {visibleBatches.map(b => {
                     const timeLabel = new Date(b.delivery_time).toLocaleTimeString("en-NG", {
                       hour: "numeric", minute: "2-digit", timeZone: "Africa/Lagos",
                     });
+                    const msLeft = Math.max(0, new Date(b.cutoff_time).getTime() - nowTick);
+                    const minsLeft = Math.floor(msLeft / 60000);
+                    const secsLeft = Math.floor((msLeft % 60000) / 1000);
+                    const closingSoon = msLeft < 5 * 60000;
                     return (
                       <button key={b.id} type="button" onClick={() => setSelectedBatchId(b.id)}
                         className={`w-full flex items-center justify-between rounded-xl border px-4 py-3 text-left transition ${
                           selectedBatchId === b.id ? "border-teal-400 bg-teal-50" : "border-stone-200 bg-stone-50 hover:border-stone-300"
                         }`}>
-                        <span className="text-sm font-semibold text-stone-900">{b.display_name} — {timeLabel}</span>
-                        <span className="text-xs text-stone-500">{b.remaining_slots} slot{b.remaining_slots !== 1 ? "s" : ""} left</span>
+                        <div>
+                          <span className="text-sm font-semibold text-stone-900 block">{b.display_name} — {timeLabel}</span>
+                          <span className={`text-xs ${closingSoon ? "text-red-500 font-semibold" : "text-stone-400"}`}>
+                            Ordering closes in {minsLeft}:{secsLeft.toString().padStart(2, "0")}
+                          </span>
+                        </div>
+                        <span className="text-xs text-stone-500 flex-shrink-0">{b.remaining_slots} slot{b.remaining_slots !== 1 ? "s" : ""} left</span>
                       </button>
                     );
                   })}
@@ -681,7 +704,7 @@ export default function CheckoutPage() {
               type="submit"
               whileHover={{ scale: isProcessing ? 1 : 1.02 }}
               whileTap={{ scale: isProcessing ? 1 : 0.97 }}
-              disabled={isProcessing || !isLoggedIn || !paystackLoaded || (usesMenuCheckout && !!batchInfo?.uses_batched_delivery && batchInfo.batches.length === 0)}
+              disabled={isProcessing || !isLoggedIn || !paystackLoaded || (usesMenuCheckout && !!batchInfo?.uses_batched_delivery && visibleBatches.length === 0)}
               className="w-full py-4 rounded-full font-semibold text-white text-base shadow-lg shadow-teal-200/60 flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               style={{ background: TEAL }}>
               {isProcessing ? (
