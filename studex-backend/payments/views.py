@@ -862,23 +862,35 @@ def verify_cart_payment(request):
     t_fee = calc_transfer_fee(vendor_amount)
     item_count = order.items.count()
 
-    PaymentTransaction.objects.create(
-        buyer=request.user,
-        seller=seller,
-        paystack_transaction_id=paystack_data.get("id"),
+    # update_or_create, not create: the Paystack webhook (charge.success) has
+    # no listing_id for a cart/menu payment (it's vendor-scoped, not
+    # single-listing), so its fallback branch already wrote a bare
+    # PaymentTransaction for this reference (status=success, order_id=None)
+    # before this request even started reprocessing the same payment. A
+    # plain .create() here 500s on the reference unique constraint the
+    # instant that race happens — the order above still gets created fine,
+    # but the crash means this bookkeeping row (and therefore the vendor's
+    # payout) never gets filled in. update_or_create fills in that same row
+    # instead of colliding with it.
+    PaymentTransaction.objects.update_or_create(
         reference=reference,
-        amount=amount_paid,
-        seller_amount=vendor_amount,
-        platform_amount=platform_amount,
-        service_charge=platform_amount,
-        paystack_charge_fee=paystack_fee,
-        transfer_fee=t_fee,
-        status="success",
-        order_type="product",
-        buyer_email=request.user.email,
-        buyer_name=request.user.get_full_name() or request.user.username,
-        paystack_response=paystack_data,
-        order_id=order.id,
+        defaults=dict(
+            buyer=request.user,
+            seller=seller,
+            paystack_transaction_id=paystack_data.get("id"),
+            amount=amount_paid,
+            seller_amount=vendor_amount,
+            platform_amount=platform_amount,
+            service_charge=platform_amount,
+            paystack_charge_fee=paystack_fee,
+            transfer_fee=t_fee,
+            status="success",
+            order_type="product",
+            buyer_email=request.user.email,
+            buyer_name=request.user.get_full_name() or request.user.username,
+            paystack_response=paystack_data,
+            order_id=order.id,
+        ),
     )
 
     try:

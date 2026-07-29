@@ -197,6 +197,44 @@ class VerifyCartPaymentTests(CartPaymentViewsTestBase):
         mock_get.assert_not_called()
 
     @patch('payments.views.requests.get')
+    def test_webhook_bare_record_race_does_not_500(self, mock_get):
+        """
+        Regression: the Paystack webhook has no listing_id for a cart/menu
+        payment (vendor-scoped, not single-listing), so its charge.success
+        handler's fallback branch writes a bare PaymentTransaction for this
+        reference (status=success, order_id=None) as an audit record, often
+        moments before this endpoint even runs. The old .create() call at
+        the end of this view crashed with a reference-unique-constraint
+        IntegrityError the instant that race happened — the Order still
+        got created (this test also confirms that), but the request 500'd
+        and the PaymentTransaction (and therefore the vendor's payout
+        record) was never filled in. update_or_create must fill in that
+        same bare row instead of colliding with it.
+        """
+        reference = 'STX-CART-VERIFYTEST-RACE'
+        CartItem.objects.create(user=self.buyer, listing=self.listing_a, quantity=1)
+        mock_get.return_value = self._mock_verify_response(324000, reference, vendor_id=self.vendor_a.id)
+        # Simulates the webhook's fallback branch having already run.
+        PaymentTransaction.objects.create(
+            reference=reference, status='success', amount=Decimal('3240'),
+            seller_amount=Decimal('3000'), platform_amount=Decimal('240'),
+            buyer_email=self.buyer.email, order_id=None,
+        )
+
+        response = self.client.post(
+            '/api/payments/verify-cart/', {'reference': reference, 'vendor_id': self.vendor_a.id}, format='json',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        order = Order.objects.get(id=response.data['order_id'])
+        self.assertEqual(order.listing_id, self.listing_a.id)
+
+        txn = PaymentTransaction.objects.get(reference=reference)
+        self.assertEqual(txn.order_id, order.id)
+        self.assertEqual(txn.seller_id, self.vendor_a.id)
+        self.assertEqual(PaymentTransaction.objects.filter(reference=reference).count(), 1)
+
+    @patch('payments.views.requests.get')
     def test_email_mismatch_rejected(self, mock_get):
         reference = 'STX-CART-VERIFYTEST-0003'
         CartItem.objects.create(user=self.buyer, listing=self.listing_a, quantity=1)
