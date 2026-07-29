@@ -588,6 +588,7 @@ class VendorListSerializer(serializers.ModelSerializer):
     opening_time = serializers.SerializerMethodField()
     closing_time = serializers.SerializerMethodField()
     is_menu_vendor = serializers.SerializerMethodField()
+    has_vendor_type = serializers.SerializerMethodField()
     catalog_label = serializers.SerializerMethodField()
     catalog_item_label = serializers.SerializerMethodField()
     catalog_route_slug = serializers.SerializerMethodField()
@@ -599,7 +600,7 @@ class VendorListSerializer(serializers.ModelSerializer):
             'bio', 'vendor_badge', 'rating', 'total_reviews',
             'completion_rate', 'total_listings', 'hostel', 'is_online', 'school',
             'completed_order_count', 'available_days', 'opening_time', 'closing_time',
-            'avg_response_minutes', 'is_menu_vendor',
+            'avg_response_minutes', 'is_menu_vendor', 'has_vendor_type',
             'catalog_label', 'catalog_item_label', 'catalog_route_slug',
         ]
 
@@ -607,6 +608,14 @@ class VendorListSerializer(serializers.ModelSerializer):
         from payments.settlement import get_vendor_type
         vt = get_vendor_type(obj)
         return bool(vt and vt.supports_menu_ordering)
+
+    def get_has_vendor_type(self, obj):
+        # Distinct from is_menu_vendor: any vendor with a VendorType assigned
+        # (retail, beauty, laundry, food — every category, not just menu-
+        # ordering ones) feeds the home page's "Stores" strip. A vendor with
+        # no VendorType at all (never categorized) is excluded from it.
+        from payments.settlement import get_vendor_type
+        return get_vendor_type(obj) is not None
 
     def get_catalog_label(self, obj):
         from payments.settlement import get_vendor_type

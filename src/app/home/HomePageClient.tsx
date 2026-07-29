@@ -37,6 +37,7 @@ interface Vendor {
   is_online?: boolean;
   completed_order_count?: number;
   is_menu_vendor?: boolean;
+  has_vendor_type?: boolean;
 }
 
 interface Category {
@@ -420,9 +421,13 @@ export default function HomePageClient({ initialVendors, initialListings, initia
   );
   const nonDealListings = allListings.filter(l => !adminDealIds.has(l.id));
 
-  // Hard split for the Stores/Marketplace separation: a menu vendor (is_menu_vendor)
-  // only ever appears in the Stores strip, never in the general Vendors tab.
-  const menuVendors = vendors.filter(v => v.is_menu_vendor);
+  // Stores strip: any vendor with a VendorType assigned (retail, beauty,
+  // laundry, food — every category), a curated showcase of properly
+  // categorized vendors. Campus Vendors tab stays keyed on is_menu_vendor
+  // (the actual cart/menu-checkout capability, unrelated to categorization)
+  // so a typed-but-non-menu vendor (e.g. a retail phone seller) shows in
+  // both — Stores as a showcase, Campus Vendors as the full directory.
+  const storeVendors = vendors.filter(v => v.has_vendor_type);
   const marketplaceVendors = vendors.filter(v => !v.is_menu_vendor);
 
   const filteredListings = applyPriceFilter(nonDealListings.filter(l => catSlug(l) === activeFilter));
@@ -1179,13 +1184,12 @@ export default function HomePageClient({ initialVendors, initialListings, initia
             </div>
           )}
 
-          {/* ── "Explore what's hot" — menu-ordering vendors, hard-separated from
-               Marketplace. Section heading is intentionally food-forward/playful per
-               the Milo reference, but per-card labels stay generic ("Store", not
-               "Restaurant"): is_menu_vendor is a general menu-ordering capability on
-               VendorType, not a food-specific flag — a future non-food vendor type
-               (e.g. a salon with a menu-style booking catalog) would land here too. ── */}
-          {menuVendors.length > 0 && (
+          {/* ── "Explore what's hot" — any vendor with a VendorType assigned
+               (retail, beauty, laundry, food), a curated showcase distinct
+               from the full Campus Vendors directory below. Per-card labels
+               stay generic ("Store", not "Restaurant") since this covers
+               every category, not just food. ── */}
+          {storeVendors.length > 0 && (
             <div className="mt-8" id="restaurants" ref={restaurantsRef}>
               <div className="rounded-2xl bg-gradient-to-br from-violet-50 to-violet-100/60 border border-violet-100 p-4 sm:p-5">
                 <div className="flex items-center justify-between mb-4">
@@ -1200,7 +1204,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                   </div>
                 </div>
                 <div className="flex gap-3 overflow-x-auto pb-1 -mx-1 px-1" style={{ scrollbarWidth: "none", msOverflowStyle: "none" } as React.CSSProperties}>
-                  {menuVendors.map((v, i) => (
+                  {storeVendors.map((v, i) => (
                     <div key={v.id} className="flex-shrink-0 w-44">{renderVendorCard(v, i, "restaurant")}</div>
                   ))}
                 </div>
@@ -1224,7 +1228,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
           <div className="mt-4" ref={featuredRef}>
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
               <div>
-                {menuVendors.length > 0 && (
+                {storeVendors.length > 0 && (
                   <p className="text-teal-600 text-xs tracking-widest uppercase font-bold mb-0.5">🛍️ Marketplace</p>
                 )}
                 <h2 className="text-xl font-extrabold text-stone-900" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
