@@ -87,7 +87,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const isMaintenance = headersList.get("x-maintenance-page") === "1";
 
   return (
-    <html lang="en" suppressHydrationWarning className="bg-[#FFF8F0] dark:bg-gray-950">
+    <html lang="en" suppressHydrationWarning className="bg-[#FFF8F0]">
       <head>
         <meta name="theme-color" content="#7C3AED" />
         <link rel="preconnect" href="https://studex-backend-v2.onrender.com" />
@@ -97,7 +97,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       </head>
-      <body className={`${inter.className} bg-[#FFF8F0] dark:bg-gray-950 text-gray-900 dark:text-gray-100`}>
+      <body className={`${inter.className} bg-[#FFF8F0] text-gray-900`}>
         <Script src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`} strategy="afterInteractive" />
         <Script id="ga4-init" strategy="afterInteractive">{`
           window.dataLayer = window.dataLayer || [];
