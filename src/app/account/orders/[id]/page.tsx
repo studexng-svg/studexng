@@ -58,6 +58,7 @@ function useElapsed(isoDate?: string | null) {
 interface OrderLineItem {
   id: number;
   listing_title: string;
+  image: string | null;
   quantity: number;
   unit_price: string;
   line_total: string;
@@ -68,7 +69,7 @@ interface OrderLineItem {
 interface Order {
   id: number;
   reference: string;
-  listing: { id: number; title: string; vendor: { id: number; username: string } };
+  listing: { id: number; title: string; image: string | null; vendor: { id: number; username: string } };
   amount: number;
   items?: OrderLineItem[];
   created_at: string;
@@ -452,17 +453,25 @@ export default function OrderDetailPage() {
           </div>
         )}
 
-        {/* ORDER INFO */}
+        {/* ITEMS IN YOUR ORDER */}
         <div className="bg-white rounded-2xl p-5 shadow-sm border border-stone-200 animate-fadeUp">
           <h3 className="font-semibold text-stone-800 mb-4 flex items-center gap-2">
-            <Package className="w-5 h-5 text-teal-600" /> Order Info
+            <Package className="w-5 h-5 text-teal-600" /> Items in Your Order
           </h3>
           <div className="space-y-3">
             {order.items && order.items.length > 0 ? (
-              <div className="py-2 border-b border-stone-50 space-y-2">
-                <span className="text-sm text-stone-400">Items</span>
-                {order.items.map(item => (
-                  <div key={item.id} className="flex justify-between items-start gap-2 pl-1">
+              order.items.map(item => (
+                <div key={item.id} className="flex gap-3 pb-3 border-b border-stone-50 last:border-0 last:pb-0">
+                  <div className="w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 bg-stone-100">
+                    {item.image ? (
+                      <img src={item.image} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Package className="w-5 h-5 text-stone-300" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1 flex justify-between items-start gap-2">
                     <div className="min-w-0">
                       <p className={`text-sm font-medium ${item.status === "unavailable" ? "text-stone-400 line-through" : "text-stone-800"}`}>
                         {item.listing_title} × {item.quantity}
@@ -478,33 +487,56 @@ export default function OrderDetailPage() {
                       ₦{parseFloat(item.line_total).toLocaleString()}
                     </span>
                   </div>
-                ))}
-              </div>
+                </div>
+              ))
             ) : (
-              <div className="flex justify-between py-2 border-b border-stone-50">
-                <span className="text-sm text-stone-400">Item</span>
-                <span className="font-semibold text-stone-800 text-sm">{order.listing?.title}</span>
+              <div className="flex gap-3">
+                <div className="w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 bg-stone-100">
+                  {order.listing?.image ? (
+                    <img src={order.listing.image} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Package className="w-5 h-5 text-stone-300" />
+                    </div>
+                  )}
+                </div>
+                <div className="min-w-0 flex-1 flex justify-between items-center gap-2">
+                  <span className="font-semibold text-stone-800 text-sm">{order.listing?.title}</span>
+                </div>
               </div>
             )}
+          </div>
+        </div>
+
+        {/* DELIVERY INFORMATION */}
+        <div className="bg-white rounded-2xl p-5 shadow-sm border border-stone-200 animate-fadeUp">
+          <h3 className="font-semibold text-stone-800 mb-4 flex items-center gap-2">
+            <MapPin className="w-5 h-5 text-teal-600" /> Delivery Information
+          </h3>
+          <div className="space-y-3">
             <div className="flex justify-between py-2 border-b border-stone-50">
               <span className="text-sm text-stone-400">Vendor</span>
               <span className="font-semibold text-stone-800 text-sm">{order.listing?.vendor?.username}</span>
             </div>
-              <div className="flex items-start gap-2 py-2 border-b border-stone-50">
-                <MapPin className="w-4 h-4 text-teal-500 mt-0.5 shrink-0" />
-                <div>
-                  <p className="text-xs text-stone-400 mb-0.5">Delivery Location</p>
-                  <p className="font-semibold text-stone-800 text-sm">
-                    {order.delivery_location || <span className="text-stone-400 italic font-normal">Not set</span>}
-                  </p>
-                </div>
-              </div>
-            <div className="flex justify-between pt-2">
-              <span className="font-semibold text-stone-700">Total</span>
-              <span className="font-bold text-2xl text-teal-700">
-                ₦{parseFloat(String(order.amount)).toLocaleString("en-NG", { minimumFractionDigits: 2 })}
-              </span>
+            <div className="py-2">
+              <p className="text-xs text-stone-400 mb-0.5">Delivery Location</p>
+              <p className="font-semibold text-stone-800 text-sm">
+                {order.delivery_location || <span className="text-stone-400 italic font-normal">Not set</span>}
+              </p>
             </div>
+          </div>
+        </div>
+
+        {/* PAYMENT INFORMATION */}
+        <div className="bg-white rounded-2xl p-5 shadow-sm border border-stone-200 animate-fadeUp">
+          <h3 className="font-semibold text-stone-800 mb-4 flex items-center gap-2">
+            <CheckCircle className="w-5 h-5 text-teal-600" /> Payment Information
+          </h3>
+          <div className="flex justify-between items-center">
+            <span className="font-semibold text-stone-700">Total Paid</span>
+            <span className="font-bold text-2xl text-teal-700">
+              ₦{parseFloat(String(order.amount)).toLocaleString("en-NG", { minimumFractionDigits: 2 })}
+            </span>
           </div>
         </div>
 

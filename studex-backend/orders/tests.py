@@ -1021,3 +1021,31 @@ class AutoReleaseOrdersPayoutTests(TestCase):
 
         profile.refresh_from_db()
         self.assertEqual(profile.on_platform_sales, 1)
+
+
+class OrderItemImageTests(APITestCase):
+    """Each itemized line in a GET order response carries the listing's image, so the buyer/vendor order UIs can show a real thumbnail instead of a title-only row."""
+
+    def setUp(self):
+        self.buyer = User.objects.create_user(username='img_buyer', email='img_buyer@pau.edu.ng', password='pass123')
+        self.vendor = User.objects.create_user(username='img_vendor', email='img_vendor@pau.edu.ng', password='pass123')
+        self.category = Category.objects.create(title='ImgCat', slug='img-cat')
+        self.listing = Listing.objects.create(
+            title='Jollof Rice', description='x', price=Decimal('1500'), image='https://cdn.example.com/jollof.jpg',
+            vendor=self.vendor, category=self.category, is_available=True,
+        )
+        self.order = Order.objects.create(
+            buyer=self.buyer, listing=self.listing, amount=Decimal('1500'),
+            reference='ORD-IMG-1', status='paid',
+        )
+
+    def test_itemized_line_includes_listing_image(self):
+        from orders.models import OrderItem
+        OrderItem.objects.create(
+            order=self.order, listing=self.listing, quantity=1,
+            unit_price_at_order_time=Decimal('1500'), line_total=Decimal('1500'),
+        )
+        self.client.force_authenticate(user=self.buyer)
+        response = self.client.get(f'/api/orders/orders/{self.order.id}/')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['items'][0]['image'], 'https://cdn.example.com/jollof.jpg')

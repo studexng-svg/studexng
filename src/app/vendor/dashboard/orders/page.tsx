@@ -246,9 +246,20 @@ export default function OrdersPage() {
           {activeOrders.map(order => (
             <div key={order.id} className="bg-white border border-stone-200 rounded-2xl p-4 shadow-sm">
               <div className="flex items-center justify-between mb-3">
-                <div>
-                  <p className="font-semibold text-stone-900 text-sm">{order.listing?.title}</p>
-                  <p className="text-xs text-stone-400">#{order.reference}</p>
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-11 h-11 rounded-xl overflow-hidden flex-shrink-0 bg-stone-100">
+                    {(order.items?.find((it: any) => it.image)?.image || order.listing?.image) ? (
+                      <img src={order.items?.find((it: any) => it.image)?.image || order.listing?.image} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <ShoppingBag className="w-4 h-4 text-stone-300" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-semibold text-stone-900 text-sm truncate">{order.listing?.title}</p>
+                    <p className="text-xs text-stone-400">#{order.reference}</p>
+                  </div>
                 </div>
                 <StatusBadge status={order.status} />
               </div>
@@ -277,13 +288,24 @@ export default function OrdersPage() {
                 <div className="mb-3 space-y-1.5">
                   {order.items.map((item: any) => (
                     <div key={item.id} className="flex items-center justify-between gap-2 bg-stone-50 rounded-xl px-3 py-2">
-                      <div className="min-w-0">
-                        <p className={`text-xs font-medium ${item.status === "unavailable" ? "text-stone-400 line-through" : "text-stone-700"}`}>
-                          {item.listing_title} × {item.quantity}
-                        </p>
-                        {item.addons?.length > 0 && (
-                          <p className="text-[11px] text-stone-400 truncate">{item.addons.map((a: any) => a.quantity > 1 ? `${a.name} ×${a.quantity}` : a.name).join(", ")}</p>
-                        )}
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-9 h-9 rounded-lg overflow-hidden flex-shrink-0 bg-stone-200">
+                          {item.image ? (
+                            <img src={item.image} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <ShoppingBag className="w-3.5 h-3.5 text-stone-400" />
+                            </div>
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <p className={`text-xs font-medium ${item.status === "unavailable" ? "text-stone-400 line-through" : "text-stone-700"}`}>
+                            {item.listing_title} × {item.quantity}
+                          </p>
+                          {item.addons?.length > 0 && (
+                            <p className="text-[11px] text-stone-400 truncate">{item.addons.map((a: any) => a.quantity > 1 ? `${a.name} ×${a.quantity}` : a.name).join(", ")}</p>
+                          )}
+                        </div>
                       </div>
                       {item.status === "fulfilled" ? (
                         <button

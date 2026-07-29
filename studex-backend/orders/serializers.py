@@ -42,6 +42,7 @@ class OrderSerializer(serializers.ModelSerializer):
             {
                 'id': item.id,
                 'listing_title': item.listing.title,
+                'image': item.listing.image,
                 'quantity': item.quantity,
                 'unit_price': str(item.unit_price_at_order_time),
                 'line_total': str(item.line_total),

@@ -17,8 +17,10 @@ interface Order {
   reference: string;
   listing: {
     title: string;
+    image: string | null;
     vendor: { username: string };
   };
+  items?: { listing_title: string; image: string | null; quantity: number }[];
   amount: number;
   created_at: string;
   status: "pending" | "paid" | "seller_completed" | "completed" | "disputed" | "cancelled" | "vendor_declined";
@@ -34,40 +36,48 @@ function OrderCard({
   getStatusIcon: (s: string) => React.ReactNode;
   getStatusLabel: (s: string) => string;
 }) {
+  const image = order.items?.find(item => item.image)?.image || order.listing?.image;
+  const extraItems = (order.items?.length ?? 1) - 1;
+
   return (
     <div className="bg-white rounded-2xl border border-stone-200 shadow-sm overflow-hidden hover:border-teal-300 hover:shadow-md transition-all animate-fadeUp">
       <Link href={`/account/orders/${order.id}`}>
-        <div className="cursor-pointer">
-          {/* HEADER */}
-          <div className="bg-stone-50 p-4 border-b border-stone-100">
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="font-semibold text-stone-800 text-sm">#{order.reference}</p>
-                <p className="text-xs text-stone-500 mt-0.5">
-                  {new Date(order.created_at).toLocaleDateString("en-NG", {
-                    day: "numeric", month: "short", year: "numeric"
-                  })}
-                </p>
+        <div className="cursor-pointer p-4 flex gap-3">
+          <div className="w-16 h-16 rounded-xl overflow-hidden flex-shrink-0 bg-stone-100">
+            {image ? (
+              <img src={image} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                <Package className="w-6 h-6 text-stone-300" />
               </div>
-              <div className={`px-3 py-1.5 rounded-full font-semibold text-xs flex items-center gap-1.5 ${getStatusColor(order.status)}`}>
+            )}
+          </div>
+
+          <div className="min-w-0 flex-1">
+            <div className="flex justify-between items-start gap-2">
+              <p className="font-semibold text-stone-800 text-sm truncate">
+                {order.listing?.title || "Order"}
+                {extraItems > 0 && <span className="text-stone-400 font-normal"> +{extraItems} more</span>}
+              </p>
+              <ChevronLeft className="w-4 h-4 text-stone-300 rotate-180 flex-shrink-0" />
+            </div>
+            <p className="text-xs text-stone-400 mt-0.5">#{order.reference}</p>
+            <p className="text-xs text-stone-400">{order.listing?.vendor?.username}</p>
+
+            <div className="flex items-center justify-between mt-2">
+              <div className={`px-2.5 py-1 rounded-full font-semibold text-xs flex items-center gap-1.5 ${getStatusColor(order.status)}`}>
                 {getStatusIcon(order.status)}
                 <span>{getStatusLabel(order.status)}</span>
               </div>
+              <p className="font-bold text-teal-700 text-sm">
+                ₦{parseFloat(String(order.amount)).toLocaleString("en-NG", { minimumFractionDigits: 2 })}
+              </p>
             </div>
-          </div>
-
-          {/* ORDER INFO */}
-          <div className="p-4">
-            <p className="font-semibold text-stone-800">{order.listing?.title || "Order"}</p>
-            <p className="text-sm text-stone-500 mt-0.5">{order.listing?.vendor?.username}</p>
-          </div>
-
-          {/* AMOUNT */}
-          <div className="bg-stone-50 px-4 py-3 border-t border-stone-100 flex items-center justify-between">
-            <p className="font-bold text-xl text-teal-700">
-              ₦{parseFloat(String(order.amount)).toLocaleString("en-NG", { minimumFractionDigits: 2 })}
+            <p className="text-xs text-stone-400 mt-1">
+              {new Date(order.created_at).toLocaleDateString("en-NG", {
+                day: "numeric", month: "short", year: "numeric"
+              })}
             </p>
-            <ChevronLeft className="w-5 h-5 text-stone-400 rotate-180" />
           </div>
         </div>
       </Link>
