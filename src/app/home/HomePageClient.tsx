@@ -426,9 +426,22 @@ export default function HomePageClient({ initialVendors, initialListings, initia
   const marketplaceVendors = vendors.filter(v => !v.is_menu_vendor);
 
   const filteredListings = applyPriceFilter(nonDealListings.filter(l => catSlug(l) === activeFilter));
+
+  // "New Arrivals" must actually mean new: a brand-new listing has
+  // weekly_order_count=0, so ranking by popularity-then-recency buried it
+  // below every listing with even a single order this week, no matter how
+  // old — it could vanish past the fetched page entirely. Listings under
+  // 48h old float to the top (newest first among themselves); everything
+  // else keeps the existing popularity-then-recency order.
+  const NEW_ARRIVAL_WINDOW_MS = 48 * 60 * 60 * 1000;
+  const isNewArrival = (l: any) => Date.now() - new Date(l.created_at).getTime() < NEW_ARRIVAL_WINDOW_MS;
+
   const rankedListings   = applyPriceFilter(
     [...nonDealListings].sort((a, b) => {
       if (a.is_available !== b.is_available) return a.is_available ? -1 : 1;
+      const aNew = isNewArrival(a), bNew = isNewArrival(b);
+      if (aNew !== bNew) return aNew ? -1 : 1;
+      if (aNew && bNew) return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       const wca = a.weekly_order_count || 0;
       const wcb = b.weekly_order_count || 0;
       if (wcb !== wca) return wcb - wca;
