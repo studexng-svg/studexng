@@ -5,7 +5,7 @@ import {
   Store, Clock, Banknote, LayoutDashboard,
   Calendar, Gift, Bell, X, CheckCheck, ExternalLink, Camera,
   Trash2, ZoomIn, Move, MessageCircle, ArrowUpRight, Pencil,
-  ShieldCheck, KeyRound, Truck,
+  ShieldCheck, KeyRound, Truck, AlertCircle,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -529,6 +529,7 @@ export default function AccountPage() {
             <Row href="/chat"                   icon={MessageCircle} iconColor="#0d9488" label="Messages"        badge={unreadMessages} />
             <Row href="/account/notifications"  icon={Bell}          iconColor="#f59e0b" label="Notifications"   badge={unreadNotifications} />
             <Row href="/account/loyalty"        icon={Gift}          iconColor="#10b981" label="Loyalty Rewards" />
+            <Row href="/account/disputes"       icon={AlertCircle}   iconColor="#ef4444" label="Disputes" />
             <Row href="/wishlist"               icon={Heart}         iconColor="#ec4899" label="Wishlist"        last />
           </div>
 
