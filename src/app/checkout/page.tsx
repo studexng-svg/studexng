@@ -629,7 +629,7 @@ export default function CheckoutPage() {
             )}
             <div className="border-t border-stone-100 pt-3 flex justify-between items-center">
               <span className="font-bold text-stone-900" style={JAKARTA}>Total</span>
-              <span className="text-2xl font-bold" style={{ color: TEAL }}>
+              <span className="text-2xl font-bold text-stone-900">
                 ₦{finalTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>

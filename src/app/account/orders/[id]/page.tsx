@@ -477,14 +477,14 @@ export default function OrderDetailPage() {
             <div className="p-5">
               <div className="flex items-center justify-between mb-2">
                 <p className="text-xs font-semibold text-stone-700">🎁 Loyalty Rewards</p>
-                <p className="text-xs text-teal-600 font-bold">
+                <p className="text-xs font-bold" style={{ color: PURPLE }}>
                   {loyalty.total_completed_orders % 10}/10 orders
                 </p>
               </div>
               <div className="w-full bg-stone-100 rounded-full h-2 mb-2">
                 <div
                   className="h-2 rounded-full transition-all duration-500"
-                  style={{ width: `${((loyalty.total_completed_orders % 10) / 10) * 100}%`, background: "linear-gradient(90deg,#0d9488,#7c3aed)" }}
+                  style={{ width: `${((loyalty.total_completed_orders % 10) / 10) * 100}%`, background: PURPLE }}
                 />
               </div>
               <p className="text-xs text-stone-400">

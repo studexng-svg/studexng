@@ -9,7 +9,7 @@ import { useRouter } from "next/navigation";
 import { useCartStore } from "@/lib/cartStore";
 import { useAuth } from "@/lib/authStore";
 import { useEffect, useState, useMemo } from "react";
-import { GRAD, GRAD_TEXT, TEAL } from "@/lib/tokens";
+import { TEAL } from "@/lib/tokens";
 
 const JAKARTA = { fontFamily: "'Plus Jakarta Sans', sans-serif" };
 import { api } from "@/lib/api";
@@ -239,7 +239,7 @@ export default function CartPage() {
                   <p className="text-red-500 text-xs font-medium mt-1">No longer available</p>
                 ) : (
                   <>
-                    <p className="text-lg font-bold mt-1" style={GRAD_TEXT}>
+                    <p className="text-lg font-bold text-stone-900 mt-1">
                       ₦{(item.price * item.quantity).toLocaleString()}
                     </p>
                     {stockLimits[item.id] && (
@@ -297,7 +297,7 @@ export default function CartPage() {
                   </div>
                   <div className="border-t border-stone-100 mt-3 pt-3 flex justify-between items-center">
                     <span className="font-bold text-stone-900" style={JAKARTA}>Total</span>
-                    <span className="text-2xl font-bold" style={GRAD_TEXT}>₦{total.toLocaleString()}</span>
+                    <span className="text-2xl font-bold text-stone-900">₦{total.toLocaleString()}</span>
                   </div>
                   {hasUnavailable && (
                     <p className="text-amber-500 text-xs mt-1">Unavailable items excluded from total</p>
@@ -331,7 +331,7 @@ export default function CartPage() {
                     </div>
                     <div className="border-t border-stone-100 pt-2 flex justify-between items-center">
                       <span className="font-semibold text-stone-900 text-sm">Subtotal</span>
-                      <span className="text-lg font-bold" style={GRAD_TEXT}>₦{group.subtotal.toLocaleString()}</span>
+                      <span className="text-lg font-bold text-stone-900">₦{group.subtotal.toLocaleString()}</span>
                     </div>
                     <Link href={`/checkout?vendor=${group.vendorId}`}>
                       <button className="w-full py-3 font-semibold text-sm rounded-full text-white flex items-center justify-center gap-2 transition-all tap-scale"
