@@ -9,7 +9,7 @@ import { TEAL } from "@/lib/tokens";
 import TopNav from "@/components/layout/TopNav";
 import {
   Package, CheckCircle, Truck, Clock, Camera, X, AlertCircle,
-  TrendingUp, CalendarCheck, ListChecks, Activity,
+  TrendingUp, CalendarCheck, ListChecks, Activity, Phone,
 } from "lucide-react";
 import { BarChart, Bar, ResponsiveContainer, Tooltip, XAxis } from "recharts";
 
@@ -21,6 +21,7 @@ interface Assignment {
   listing_title: string;
   vendor_username: string;
   buyer_username: string;
+  buyer_phone: string | null;
   pickup_point_name: string | null;
   pickup_point_campus: string | null;
   delivery_location: string | null;
@@ -253,9 +254,21 @@ function AssignmentCard({
               <p className="text-[10px] uppercase tracking-wide text-stone-400 font-bold">Pickup</p>
               <p className="text-sm text-stone-800 font-semibold truncate">@{a.vendor_username}</p>
             </div>
-            <div>
-              <p className="text-[10px] uppercase tracking-wide text-stone-400 font-bold">Drop-off</p>
-              <p className="text-sm text-stone-800 font-semibold truncate">{dropoffLabel}</p>
+            <div className="flex items-end justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-[10px] uppercase tracking-wide text-stone-400 font-bold">Drop-off</p>
+                <p className="text-sm text-stone-800 font-semibold truncate">{dropoffLabel}</p>
+                <p className="text-xs text-stone-400 truncate">@{a.buyer_username}</p>
+              </div>
+              {a.buyer_phone ? (
+                <a href={`tel:${a.buyer_phone}`}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-white flex-shrink-0"
+                  style={{ background: TEAL }}>
+                  <Phone className="w-3.5 h-3.5" /> Call
+                </a>
+              ) : (
+                <span className="text-[11px] text-stone-400 flex-shrink-0">No phone on file</span>
+              )}
             </div>
           </div>
         </div>

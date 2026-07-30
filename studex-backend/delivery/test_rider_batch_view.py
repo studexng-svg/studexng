@@ -28,7 +28,9 @@ class RiderBatchListViewTests(TestCase):
         Vendor.objects.create(user=self.vendor, vendor_type=self.food)
         self.rider = User.objects.create_user(username='rb_rider', email='rb_rider@pau.edu.ng', password='pass123', user_type='rider')
         self.other_rider = User.objects.create_user(username='rb_rider2', email='rb_rider2@pau.edu.ng', password='pass123', user_type='rider')
-        self.buyer = User.objects.create_user(username='rb_buyer', email='rb_buyer@pau.edu.ng', password='pass123')
+        self.buyer = User.objects.create_user(
+            username='rb_buyer', email='rb_buyer@pau.edu.ng', password='pass123', phone='08012345678',
+        )
         self.category = Category.objects.create(title='FoodRB', slug='food-rb')
         self.point = CampusPickupPoint.objects.create(name='Hostel A', campus='pau')
         self.listing = Listing.objects.create(
@@ -65,7 +67,25 @@ class RiderBatchListViewTests(TestCase):
         self.assertEqual(group['batch_id'], self.slot.id)
         self.assertEqual(group['display_name'], 'Lunch Batch')
         self.assertEqual(len(group['assignments']), 1)
+        self.assertEqual(group['assignments'][0]['buyer_phone'], '08012345678')
         self.assertEqual(response.data['unbatched'], [])
+
+    def test_buyer_phone_null_when_not_on_file(self):
+        """Regression: a buyer with no phone set must serialize as null, not crash the endpoint."""
+        no_phone_buyer = User.objects.create_user(
+            username='rb_buyer_nophone', email='rb_buyer_nophone@pau.edu.ng', password='pass123',
+        )
+        order = Order.objects.create(
+            buyer=no_phone_buyer, listing=self.listing, amount=Decimal('1500'),
+            reference='STX-RB-NOPHONE', status='paid', quantity=1,
+        )
+        DeliveryAssignment.objects.create(order=order, rider=self.rider, pickup_point=self.point, delivery_slot=self.slot)
+
+        self.client.force_authenticate(user=self.rider)
+        response = self.client.get('/api/delivery/my-batches/')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(response.data['batches'][0]['assignments'][0]['buyer_phone'])
 
     def test_multiple_assignments_same_slot_grouped_together(self):
         order1 = self._make_order('STX-RB-0002')

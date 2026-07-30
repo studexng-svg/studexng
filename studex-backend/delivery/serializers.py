@@ -19,6 +19,10 @@ class DeliveryAssignmentSerializer(serializers.ModelSerializer):
     # (delivery.assignment.auto_assign_rider) never sets a pickup_point.
     delivery_location = serializers.CharField(source='order.delivery_location', read_only=True)
     buyer_username = serializers.CharField(source='order.buyer.username', read_only=True)
+    # So the rider can actually reach the buyer to locate them at drop-off —
+    # blank/None for any buyer who never set a phone number (User.phone is
+    # optional), the frontend handles that case rather than hiding the field.
+    buyer_phone = serializers.CharField(source='order.buyer.phone', read_only=True)
     listing_title = serializers.CharField(source='order.listing.title', read_only=True)
     vendor_username = serializers.CharField(source='order.listing.vendor.username', read_only=True)
     order_status = serializers.CharField(source='order.status', read_only=True)
@@ -37,7 +41,7 @@ class DeliveryAssignmentSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'order_id', 'order_reference', 'order_status',
             'rider_username', 'pickup_point_name', 'pickup_point_campus', 'delivery_location',
-            'buyer_username', 'listing_title', 'vendor_username',
+            'buyer_username', 'buyer_phone', 'listing_title', 'vendor_username',
             'status', 'assigned_at', 'picked_up_at', 'at_pickup_point_at', 'completed_at',
             'pickup_proof_image', 'completion_proof_image',
             'responsibility', 'responsibility_transferred_at', 'code_locked',
