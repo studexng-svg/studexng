@@ -459,7 +459,7 @@ export default function RiderDashboard() {
   const greeting = user?.username ? `Hello, ${user.username}!` : "Rider Dashboard";
 
   return (
-    <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+    <div className="h-screen overflow-y-auto hide-scrollbar bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       <TopNav showBack />
 
       <div className="px-4 pt-4 pb-28 max-w-2xl mx-auto space-y-5">
