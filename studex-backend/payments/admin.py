@@ -73,7 +73,7 @@ class PaymentTransactionAdmin(admin.ModelAdmin):
     list_display = [
         'reference', 'buyer', 'seller', 'amount_display',
         'seller_amount_display', 'platform_amount_display', 'net_platform_display',
-        'order_type', 'colored_status', 'transfer_status', 'transfer_reference', 'created_at'
+        'order_type', 'colored_status', 'payout_status_display', 'transfer_reference', 'created_at'
     ]
     list_filter = ['status', 'transfer_status', 'order_type', 'created_at']
     search_fields = ['reference', 'buyer__username', 'seller__username', 'buyer_email', 'transfer_reference']
@@ -115,6 +115,25 @@ class PaymentTransactionAdmin(admin.ModelAdmin):
             obj.status.upper()
         )
     colored_status.short_description = 'Status'
+
+    def payout_status_display(self, obj):
+        # Vendor payouts fail silently (trigger_vendor_payout never raises —
+        # webhooks must always return 200), so this is the one place an admin
+        # can see it without reading Render logs. Blank means no payout has
+        # been attempted yet (payment not settled, or vendor has no bank
+        # account on file) — not the same thing as a failed one.
+        if obj.transfer_status == 'failed':
+            return format_html('<span style="color:white;background:#DC2626;font-weight:bold;padding:2px 8px;border-radius:10px;">⚠ PAYOUT FAILED</span>')
+        if obj.transfer_status == 'success':
+            return format_html('<span style="color:green;font-weight:bold;">✓ Paid</span>')
+        if obj.transfer_status == 'offset_by_debt':
+            return format_html('<span style="color:#7C3AED;font-weight:bold;">Debt Offset</span>')
+        if obj.transfer_status == 'reversed':
+            return format_html('<span style="color:white;background:#EA580C;font-weight:bold;padding:2px 8px;border-radius:10px;">⚠ REVERSED</span>')
+        if obj.transfer_status == 'pending':
+            return format_html('<span style="color:orange;font-weight:bold;">Pending</span>')
+        return format_html('<span style="color:gray;">—</span>')
+    payout_status_display.short_description = 'Payout'
 
     def changelist_view(self, request, extra_context=None):
         successful = PaymentTransaction.objects.filter(status='success')

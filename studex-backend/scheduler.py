@@ -383,7 +383,8 @@ def retry_failed_transfers():
 
         except Exception as e:
             txn.transfer_retry_count += 1
-            txn.save(update_fields=['transfer_retry_count'])
+            txn.transfer_status = 'failed'
+            txn.save(update_fields=['transfer_retry_count', 'transfer_status'])
             logger.error(
                 f"retry_failed_transfers: exception on retry #{retry_n} for txn {txn.reference}: {e}",
                 exc_info=True,

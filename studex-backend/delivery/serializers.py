@@ -59,6 +59,7 @@ class DeliveryAssignmentSerializer(serializers.ModelSerializer):
         if order_items:
             return [
                 {
+                    'id': item.id,
                     'listing_title': item.listing.title,
                     'image': item.listing.image,
                     'quantity': item.quantity,

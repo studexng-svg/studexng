@@ -136,7 +136,7 @@ export default function OrderConfirmationPage() {
     <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       <TopNav showBack backHref="/home" />
 
-      <div className="px-4 pt-6 pb-56 md:pb-16 max-w-2xl mx-auto space-y-5">
+      <div className="px-4 pt-6 pb-56 max-w-2xl mx-auto space-y-5">
 
         {/* SUCCESS ICON */}
         <div className="flex justify-center pt-2 animate-fadeUp">

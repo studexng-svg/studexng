@@ -33,7 +33,7 @@ interface Assignment {
   completion_proof_image?: string | null;
   batch_id?: number | null;
   batch_display_name?: string | null;
-  items?: { listing_title: string; image: string | null; quantity: number; addons: { name: string }[] }[];
+  items?: { id: number; listing_title: string; image: string | null; quantity: number; status: string; addons: { name: string }[] }[];
 }
 
 interface BatchGroup {
@@ -193,12 +193,14 @@ function ProofModal({
 }
 
 function AssignmentCard({
-  a, updating, onUpdate, error,
+  a, updating, onUpdate, error, onMarkUnavailable, markingItem,
 }: {
   a: Assignment;
   updating: number | null;
   onUpdate: (a: Assignment) => void;
   error?: string;
+  onMarkUnavailable: (a: Assignment, itemId: number) => void;
+  markingItem: number | null;
 }) {
   const heroImage = a.items?.find(item => item.image)?.image;
   const dropoffLabel = a.pickup_point_name
@@ -257,6 +259,33 @@ function AssignmentCard({
             </div>
           </div>
         </div>
+
+        {/* Item availability — only actionable before pickup verification;
+            the backend rejects this once responsibility has transferred. */}
+        {a.status === "assigned" && !!a.items?.length && (
+          <div className="space-y-1.5">
+            {a.items.map(item => (
+              <div key={item.id} className="flex items-center justify-between gap-2 bg-stone-50 rounded-xl px-3 py-2">
+                <div className="min-w-0">
+                  <p className={`text-xs font-medium ${item.status === "unavailable" ? "text-stone-400 line-through" : "text-stone-700"}`}>
+                    {item.quantity}x {item.listing_title}
+                  </p>
+                </div>
+                {item.status === "unavailable" ? (
+                  <span className="text-[11px] font-semibold text-red-500 flex-shrink-0">Refunded</span>
+                ) : (
+                  <button
+                    onClick={() => onMarkUnavailable(a, item.id)}
+                    disabled={markingItem === item.id}
+                    className="text-[11px] font-semibold text-red-500 bg-red-50 px-2.5 py-1 rounded-full flex-shrink-0 disabled:opacity-50 hover:bg-red-100 transition"
+                  >
+                    {markingItem === item.id ? "…" : "Mark Unavailable"}
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Meta */}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-stone-400">
@@ -338,6 +367,7 @@ export default function RiderDashboard() {
   const [errors, setErrors] = useState<Record<number, string>>({});
   const [proofModal, setProofModal] = useState<{ assignment: Assignment; nextStatus: string } | null>(null);
   const [modalError, setModalError] = useState("");
+  const [markingItem, setMarkingItem] = useState<number | null>(null);
 
   const loadActive = () => {
     Promise.all([
@@ -406,6 +436,24 @@ export default function RiderDashboard() {
       return;
     }
     submitStatus(assignment, next);
+  };
+
+  const markItemUnavailable = async (assignment: Assignment, itemId: number) => {
+    if (!confirm("Mark this item unavailable? The buyer will be refunded for it automatically.")) return;
+    setMarkingItem(itemId);
+    setErrors(prev => { const p = { ...prev }; delete p[assignment.id]; return p; });
+    try {
+      const res = await api.orders.markItemUnavailable(assignment.order_id, itemId);
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        loadActive();
+      } else {
+        setErrors(prev => ({ ...prev, [assignment.id]: data.detail || "Could not mark item unavailable." }));
+      }
+    } catch {
+      setErrors(prev => ({ ...prev, [assignment.id]: "Network error. Please try again." }));
+    }
+    setMarkingItem(null);
   };
 
   const greeting = user?.username ? `Hello, ${user.username}!` : "Rider Dashboard";
@@ -531,7 +579,7 @@ export default function RiderDashboard() {
                     </span>
                   </div>
                   {batch.assignments.map(a => (
-                    <AssignmentCard key={a.id} a={a} updating={updating} onUpdate={updateStatus} error={errors[a.id]} />
+                    <AssignmentCard key={a.id} a={a} updating={updating} onUpdate={updateStatus} error={errors[a.id]} onMarkUnavailable={markItemUnavailable} markingItem={markingItem} />
                   ))}
                 </div>
               ))}
@@ -540,7 +588,7 @@ export default function RiderDashboard() {
                 <div className="space-y-2.5">
                   {batches.length > 0 && <p className="text-xs font-bold text-stone-400 uppercase tracking-wide px-1">Other Deliveries</p>}
                   {unbatched.map(a => (
-                    <AssignmentCard key={a.id} a={a} updating={updating} onUpdate={updateStatus} error={errors[a.id]} />
+                    <AssignmentCard key={a.id} a={a} updating={updating} onUpdate={updateStatus} error={errors[a.id]} onMarkUnavailable={markItemUnavailable} markingItem={markingItem} />
                   ))}
                 </div>
               )}

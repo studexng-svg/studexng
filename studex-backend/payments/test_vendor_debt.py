@@ -378,6 +378,27 @@ class RetryFailedTransfersDebtTests(TestCase):
         txn.refresh_from_db()
         self.assertEqual(txn.transfer_status, "offset_by_debt")
 
+    @override_settings(PAYSTACK_SECRET_KEY="sk_test_x")
+    def test_retry_marks_transfer_status_failed_on_exception(self):
+        """
+        Regression: an exception during a retry attempt (network error,
+        Paystack timeout) used to bump transfer_retry_count without ever
+        setting transfer_status back to "failed", leaving a stale prior
+        value (or blank) on the transaction admins rely on to see this.
+        """
+        from scheduler import retry_failed_transfers
+
+        txn = make_txn(
+            seller=self.seller, seller_amount=Decimal("950.00"), transfer_reference="",
+        )
+
+        with patch("requests.post", side_effect=Exception("connection timeout")):
+            retry_failed_transfers()
+
+        txn.refresh_from_db()
+        self.assertEqual(txn.transfer_status, "failed")
+        self.assertEqual(txn.transfer_retry_count, 1)
+
 
 class VendorDebtAdminTests(TestCase):
     def setUp(self):

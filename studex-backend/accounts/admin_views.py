@@ -859,6 +859,33 @@ try:
                     except Exception:
                         pass
 
+                def _cancel_active_delivery(reason):
+                    # A dispute can resolve while a rider is still mid-delivery
+                    # (assigned/picked_up/at_pickup_point) — without this, the
+                    # rider's dashboard kept showing "Mark as Picked Up" for an
+                    # order that's already been refunded/closed out, since
+                    # RiderUpdateStatusView's state machine has no idea a
+                    # dispute happened. Never touches an already-completed
+                    # delivery (the buyer already has their item in hand).
+                    try:
+                        from delivery.models import DeliveryAssignment
+                        assignment = DeliveryAssignment.objects.select_related('rider').filter(
+                            order=order,
+                        ).exclude(status__in=['completed', 'cancelled']).first()
+                        if assignment:
+                            assignment.status = 'cancelled'
+                            assignment.save(update_fields=['status'])
+                            if assignment.rider:
+                                _dn(assignment.rider, 'order_update',
+                                    'Delivery Cancelled',
+                                    f'Order #{order.reference} ({order.listing.title}) was cancelled — {reason}. '
+                                    f'No pickup or delivery is needed for this order.',
+                                    '/rider')
+                    except Exception as de:
+                        import logging as _log
+                        _log.getLogger(__name__).warning(
+                            f"Dispute resolution: failed to cancel delivery assignment for order {order.id}: {de}")
+
                 if new_status == 'under_review':
                     listing_title = order.listing.title if order and order.listing else 'your order'
                     _dn(order.buyer, 'order_update',
@@ -890,6 +917,7 @@ try:
                                 f"Dispute payout failed for order {order.id}: {pe}")
                         order.status = 'completed'
                         order.save()
+                        _cancel_active_delivery('this dispute was resolved and the order marked complete')
                         _dn(order.listing.vendor, 'order_confirmed',
                             f'✅ Dispute Resolved — {order.listing.title}',
                             f'The dispute for "{order.listing.title}" was resolved in your favour. Your payment is being processed.',
@@ -953,6 +981,7 @@ try:
 
                             order.status = 'cancelled'
                             order.save()
+                            _cancel_active_delivery('the buyer was refunded')
 
                             # Notify only after a confirmed successful outcome.
                             if credits_only:

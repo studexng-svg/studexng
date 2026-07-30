@@ -132,6 +132,25 @@ class TransferToVendorAuditTests(PayoutAuditRecordBase):
         self.assertEqual(audit.transfer_status, "failed")
 
     @override_settings(PAYSTACK_SECRET_KEY="sk_test_x")
+    def test_txn_transfer_status_marked_failed_on_rejected_transfer(self):
+        """
+        Regression: a Paystack 400 rejection (e.g. the ₦50 minimum-transfer
+        validation error) used to only update PayoutAuditRecord, leaving
+        PaymentTransaction.transfer_status blank — indistinguishable from
+        "payout never attempted" in the admin list_display/list_filter.
+        """
+        txn = make_txn(seller=self.seller, seller_amount=Decimal("30.00"))
+        with patch("payments.views.requests.post") as mock_post:
+            mock_post.return_value = MagicMock(
+                status_code=400,
+                json=lambda: {"status": False, "message": "The minimum amount you may send in a single transfer at this time is: 50.00 NGN."},
+            )
+            trigger_vendor_payout(txn, "Test Listing")
+
+        txn.refresh_from_db()
+        self.assertEqual(txn.transfer_status, "failed")
+
+    @override_settings(PAYSTACK_SECRET_KEY="sk_test_x")
     def test_audit_record_created_on_transfer_exception(self):
         txn = make_txn(seller=self.seller, seller_amount=Decimal("950.00"))
         with patch("payments.views.requests.post", side_effect=Exception("timeout")):
@@ -140,6 +159,15 @@ class TransferToVendorAuditTests(PayoutAuditRecordBase):
         audit = PayoutAuditRecord.objects.get(transaction=txn)
         self.assertEqual(audit.transfer_status, "failed")
         self.assertEqual(audit.amount_released, Decimal("0"))
+
+    @override_settings(PAYSTACK_SECRET_KEY="sk_test_x")
+    def test_txn_transfer_status_marked_failed_on_transfer_exception(self):
+        txn = make_txn(seller=self.seller, seller_amount=Decimal("950.00"))
+        with patch("payments.views.requests.post", side_effect=Exception("timeout")):
+            trigger_vendor_payout(txn, "Test Listing")
+
+        txn.refresh_from_db()
+        self.assertEqual(txn.transfer_status, "failed")
 
     def test_audit_recording_never_raises_even_if_lookup_fails(self):
         """record_payout_audit must never blow up the payout flow itself."""

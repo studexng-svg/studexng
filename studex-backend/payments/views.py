@@ -2242,9 +2242,13 @@ def trigger_vendor_payout(txn, listing_title):
                 f"Transfer failed for order {txn.order_id} (seller: {seller.username}): "
                 f"{res.status_code} — {res_json}"
             )
+            txn.transfer_status = "failed"
+            txn.save(update_fields=["transfer_status"])
             record_payout_audit(txn, Decimal("0"), transfer_status="failed", transfer_reference="")
     except Exception as e:
         logger.error(f"Transfer exception for order {txn.order_id}: {e}", exc_info=True)
+        txn.transfer_status = "failed"
+        txn.save(update_fields=["transfer_status"])
         record_payout_audit(txn, Decimal("0"), transfer_status="failed", transfer_reference="")
 
 

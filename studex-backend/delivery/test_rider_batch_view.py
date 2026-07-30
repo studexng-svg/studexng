@@ -129,6 +129,7 @@ class RiderBatchListViewTests(TestCase):
 
         items = response.data['batches'][0]['assignments'][0]['items']
         self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]['id'], order_item.id)
         self.assertEqual(items[0]['listing_title'], 'Jollof Rice')
         self.assertEqual(items[0]['image'], 'https://cdn.example.com/jollof.jpg')
         self.assertEqual(items[0]['quantity'], 2)

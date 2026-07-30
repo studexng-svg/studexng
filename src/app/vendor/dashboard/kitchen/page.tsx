@@ -18,11 +18,12 @@ interface MenuItem {
   availability_window_start: string | null; availability_window_end: string | null;
   addon_groups: AddonGroup[];
 }
-interface Listing { id: number; title: string; price: string; is_available: boolean; image?: string | null; }
+interface Listing { id: number; title: string; price: string; payout_amount?: string | null; is_available: boolean; image?: string | null; }
 
 const emptyItemForm = { title: "", description: "", price: "", image: null as File | null, imagePreview: null as string | null };
 const emptyCategoryForm = { name: "", display_order: 0, is_active: true };
 const emptyItemDetailsForm = {
+  price: "",
   menu_category: "" as number | "", prep_time_minutes: "", allergens: "", ingredients: "",
   is_seasonal: false, availability_window_start: "", availability_window_end: "",
 };
@@ -69,7 +70,7 @@ export default function VendorMenuPage() {
       const [catRes, itemRes, listRes, marketplaceCatRes] = await Promise.all([
         api.services.menuCategories(),
         api.services.menuItems(),
-        api.services.listingsAuth({ page_size: "500" }),
+        api.services.listingsAuth({ vendor_username: user?.username || "", page_size: "500" }),
         api.services.categoriesAuth(), // authenticated — resolves the vendor's own campus, not a default
       ]);
       if (catRes.status === 403 || itemRes.status === 403) { setNotEnabled(true); return; }
@@ -95,7 +96,7 @@ export default function VendorMenuPage() {
     }
   };
 
-  useEffect(() => { loadAll(); }, []);
+  useEffect(() => { if (user?.username) loadAll(); }, [user?.username]);
 
   // ── Add Menu Item — creates the Listing and its MenuItem together in one step ──
   const pickItemImage = async (file?: File) => {
@@ -138,9 +139,11 @@ export default function VendorMenuPage() {
     finally { setSaving(false); }
   };
 
-  // ── Item details (category, prep time, allergens, etc.) ──────────────────
+  // ── Item details (price, category, prep time, allergens, etc.) ───────────
   const openDetails = (item: MenuItem) => {
+    const listing = listings.find(l => l.id === item.listing);
     setDetailsForm({
+      price: (listing?.payout_amount ?? listing?.price ?? item.listing_price ?? "").toString(),
       menu_category: item.menu_category ?? "",
       prep_time_minutes: item.prep_time_minutes?.toString() ?? "",
       allergens: (item.allergens || []).join(", "),
@@ -154,19 +157,30 @@ export default function VendorMenuPage() {
 
   const saveDetails = async () => {
     if (!detailsModal) return;
+    if (!detailsForm.price || Number(detailsForm.price) <= 0) { setError("Price must be greater than zero."); return; }
     setSaving(true); setError("");
     try {
-      const res = await api.services.updateMenuItem(detailsModal.id, {
-        menu_category: detailsForm.menu_category || null,
-        prep_time_minutes: detailsForm.prep_time_minutes ? Number(detailsForm.prep_time_minutes) : null,
-        allergens: detailsForm.allergens.split(",").map(a => a.trim()).filter(Boolean),
-        ingredients: detailsForm.ingredients,
-        is_seasonal: detailsForm.is_seasonal,
-        availability_window_start: detailsForm.availability_window_start || null,
-        availability_window_end: detailsForm.availability_window_end || null,
-      });
-      if (!res.ok) { const d = await res.json(); setError(Object.values(d)[0]?.toString() || "Could not save."); return; }
+      // Price lives on the underlying Listing (payout_amount), not the MenuItem —
+      // this is the only place a menu vendor can edit an item after creation, so
+      // both writes need to succeed together.
+      const priceFd = new FormData();
+      priceFd.append("payout_amount", detailsForm.price);
+      const [listingRes, itemRes] = await Promise.all([
+        api.services.updateListing(detailsModal.listing, priceFd),
+        api.services.updateMenuItem(detailsModal.id, {
+          menu_category: detailsForm.menu_category || null,
+          prep_time_minutes: detailsForm.prep_time_minutes ? Number(detailsForm.prep_time_minutes) : null,
+          allergens: detailsForm.allergens.split(",").map(a => a.trim()).filter(Boolean),
+          ingredients: detailsForm.ingredients,
+          is_seasonal: detailsForm.is_seasonal,
+          availability_window_start: detailsForm.availability_window_start || null,
+          availability_window_end: detailsForm.availability_window_end || null,
+        }),
+      ]);
+      if (!listingRes.ok) { const d = await listingRes.json(); setError(Object.values(d)[0]?.toString() || "Could not save price."); return; }
+      if (!itemRes.ok) { const d = await itemRes.json(); setError(Object.values(d)[0]?.toString() || "Could not save."); return; }
       setDetailsModal(null);
+      flash("Saved!");
       await loadAll();
     } catch { setError("Network error."); }
     finally { setSaving(false); }
@@ -433,6 +447,9 @@ export default function VendorMenuPage() {
       {/* ── Item details modal (category, prep time, allergens) ── */}
       {detailsModal && (
         <Modal title={`${catalogItemLabel} Details`} onClose={() => setDetailsModal(null)}>
+          <Field label="Price (₦)">
+            <input type="number" value={detailsForm.price} onChange={e => setDetailsForm(f => ({ ...f, price: e.target.value }))} className={inputCls} placeholder="e.g. 2160" />
+          </Field>
           <Field label="Category">
             <select value={detailsForm.menu_category} onChange={e => setDetailsForm(f => ({ ...f, menu_category: e.target.value ? Number(e.target.value) : "" }))} className={inputCls}>
               <option value="">Uncategorized</option>

@@ -295,7 +295,7 @@ class RiderAssignmentListView(APIView):
             return Response({'error': 'Not a rider'}, status=status.HTTP_403_FORBIDDEN)
         qs = DeliveryAssignment.objects.filter(rider=request.user).select_related(
             'order__buyer', 'order__listing__vendor', 'pickup_point',
-        ).exclude(status='completed')
+        ).exclude(status__in=['completed', 'cancelled'])
         return Response(DeliveryAssignmentSerializer(qs, many=True).data)
 
 
@@ -387,7 +387,7 @@ class RiderBatchListView(APIView):
 
         assignments = DeliveryAssignment.objects.filter(
             rider=request.user,
-        ).exclude(status='completed').select_related(
+        ).exclude(status__in=['completed', 'cancelled']).select_related(
             'order__buyer', 'order__listing__vendor', 'pickup_point', 'delivery_slot__vendor',
         ).prefetch_related('order__items__selected_addons').order_by(
             'delivery_slot__delivery_time', '-assigned_at',

@@ -517,9 +517,14 @@ export default function CheckoutPage() {
                       hour: "numeric", minute: "2-digit", timeZone: "Africa/Lagos",
                     });
                     const msLeft = Math.max(0, new Date(b.cutoff_time).getTime() - nowTick);
-                    const minsLeft = Math.floor(msLeft / 60000);
-                    const secsLeft = Math.floor((msLeft % 60000) / 1000);
+                    const totalSecs = Math.floor(msLeft / 1000);
+                    const hoursLeft = Math.floor(totalSecs / 3600);
+                    const minsLeft = Math.floor((totalSecs % 3600) / 60);
+                    const secsLeft = totalSecs % 60;
                     const closingSoon = msLeft < 5 * 60000;
+                    const countdownLabel = hoursLeft > 0
+                      ? `${hoursLeft}h ${minsLeft.toString().padStart(2, "0")}m`
+                      : `${minsLeft}:${secsLeft.toString().padStart(2, "0")}`;
                     return (
                       <button key={b.id} type="button" onClick={() => setSelectedBatchId(b.id)}
                         className={`w-full flex items-center justify-between rounded-xl border px-4 py-3 text-left transition ${
@@ -528,7 +533,7 @@ export default function CheckoutPage() {
                         <div>
                           <span className="text-sm font-semibold text-stone-900 block">{b.display_name} — {timeLabel}</span>
                           <span className={`text-xs ${closingSoon ? "text-red-500 font-semibold" : "text-stone-400"}`}>
-                            Ordering closes in {minsLeft}:{secsLeft.toString().padStart(2, "0")}
+                            Ordering closes in {countdownLabel}
                           </span>
                         </div>
                         <span className="text-xs text-stone-500 flex-shrink-0">{b.remaining_slots} slot{b.remaining_slots !== 1 ? "s" : ""} left</span>

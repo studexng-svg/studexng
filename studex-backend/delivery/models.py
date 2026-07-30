@@ -86,6 +86,13 @@ class DeliveryAssignment(models.Model):
         ('picked_up', 'Picked Up from Vendor'),
         ('at_pickup_point', 'At Pickup Point'),
         ('completed', 'Collected by Buyer'),
+        # Set when the underlying Order is resolved out from under an
+        # in-progress delivery (a dispute resolved with a refund/release
+        # before the rider finished) — never reachable through the normal
+        # assigned -> picked_up -> at_pickup_point -> completed state
+        # machine RiderUpdateStatusView drives. See
+        # AdminDisputeDetailView.patch (accounts/admin_views.py).
+        ('cancelled', 'Cancelled'),
     )
 
     order = models.OneToOneField(
