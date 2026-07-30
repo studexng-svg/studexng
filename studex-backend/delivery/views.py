@@ -64,11 +64,15 @@ class VendorEligibleBatchesView(APIView):
 
         from datetime import datetime
         from delivery.capacity import LAGOS, _cutoff_datetime
+        from delivery.fees import get_delivery_fee_quote
         campus = (getattr(vendor, 'school', '') or '').lower()
         today = timezone.now().astimezone(LAGOS).date()
         eligible = list_eligible_slots(vendor, campus)
+        delivery_fee, delivery_fee_waived = get_delivery_fee_quote(vendor)
         return Response({
             'uses_batched_delivery': True,
+            'delivery_fee': float(delivery_fee),
+            'delivery_fee_waived': delivery_fee_waived,
             'batches': [
                 {
                     'id': entry['slot'].id,

@@ -1,4 +1,6 @@
 # accounts/models.py
+from decimal import Decimal
+
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.db.models.signals import post_save, pre_save
@@ -322,6 +324,24 @@ class Vendor(models.Model):
         related_name='vendors_unverified',
     )
     unverification_reason = models.TextField(blank=True, null=True)
+
+    # ── Delivery fee (per-vendor, admin-set) ─────────────────────────────────
+    # ₦0 (default) means no delivery fee is charged — existing behavior for
+    # every vendor until an admin explicitly sets one. Only ever consulted
+    # for vendors using batched delivery (delivery.capacity.
+    # vendor_uses_batched_delivery) — a vendor with no delivery slots has no
+    # concept of a delivery fee regardless of this field's value.
+    delivery_fee = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
+    # First N delivery orders for this vendor are free (any buyer, running
+    # count — not per-buyer). Null (default) means the fee above always
+    # applies with no promo. Deliberately no denormalized "used" counter —
+    # delivery.fees.get_delivery_fee_quote counts live from real Order rows,
+    # same convention as delivery.capacity's slot-capacity counting, so a
+    # cancelled/refunded early order doesn't permanently burn a promo slot.
+    free_delivery_quota = models.PositiveIntegerField(
+        null=True, blank=True, default=None,
+        help_text="First N delivery orders are free. Leave blank to always charge the fee above.",
+    )
 
     created_at = models.DateTimeField(auto_now_add=True)
 

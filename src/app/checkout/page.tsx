@@ -76,6 +76,8 @@ export default function CheckoutPage() {
   const [useCredits, setUseCredits] = useState(false);
   const [batchInfo, setBatchInfo] = useState<{
     uses_batched_delivery: boolean;
+    delivery_fee?: number;
+    delivery_fee_waived?: boolean;
     batches: { id: number; display_name: string; delivery_time: string; cutoff_time: string; remaining_slots: number }[];
   } | null>(null);
   const [selectedBatchId, setSelectedBatchId] = useState<number | null>(null);
@@ -91,7 +93,15 @@ export default function CheckoutPage() {
   const creditsToApply = useCredits ? Math.min(loyaltyBalance, fullCheckoutAmount) : 0;
   const isFullyCoveredByCredits = useCredits && creditsToApply >= fullCheckoutAmount && fullCheckoutAmount > 0;
   const baseAfterCredits = isFullyCoveredByCredits ? 0 : Math.max(discountedBase - creditsToApply, 0);
-  const finalTotal = baseAfterCredits;
+  // Only ever non-zero for the vendor-scoped menu checkout — credits and the
+  // profile-completion discount don't apply there (Step 3's scope decision),
+  // so this is always added straight onto baseAfterCredits, never reduced by
+  // either. The backend derives/charges this same amount independently at
+  // initialize/verify time (see delivery.fees.get_delivery_fee_quote) — this
+  // is purely the checkout-page preview so the buyer sees it before paying.
+  const deliveryFee = usesMenuCheckout ? (batchInfo?.delivery_fee ?? 0) : 0;
+  const deliveryFeeWaived = usesMenuCheckout && !!batchInfo?.delivery_fee_waived;
+  const finalTotal = baseAfterCredits + deliveryFee;
 
   useEffect(() => {
     if (!isLoggedIn || !isHydrated || baseTotal <= 0) return;
@@ -555,16 +565,23 @@ export default function CheckoutPage() {
               <>
                 {/* Vendor-scoped cart checkout: backend price is already
                     all-inclusive (platform fee baked into each item's
-                    price) — never shown as a separate line. No delivery
-                    fee is configured anywhere yet, so delivery is always
-                    "Free" here. */}
+                    price) — never shown as a separate line. Delivery is a
+                    separate per-vendor fee (admin-set, defaults to none)
+                    with an optional "first N free" promo — see
+                    delivery.fees.get_delivery_fee_quote. */}
                 <div className="flex justify-between items-center text-sm">
                   <span className="text-stone-500">Product Total</span>
                   <span className="font-medium text-stone-700">₦{baseTotal.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between items-center text-sm">
                   <span className="text-stone-500">Delivery</span>
-                  <span className="font-semibold text-emerald-600">Free</span>
+                  {deliveryFee > 0 ? (
+                    <span className="font-medium text-stone-700">₦{deliveryFee.toLocaleString()}</span>
+                  ) : deliveryFeeWaived ? (
+                    <span className="font-semibold text-emerald-600">Free (Promo)</span>
+                  ) : (
+                    <span className="font-semibold text-emerald-600">Free</span>
+                  )}
                 </div>
               </>
             ) : (

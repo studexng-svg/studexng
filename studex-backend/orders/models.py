@@ -1,4 +1,6 @@
 # orders/models.py
+from decimal import Decimal
+
 from django.db import models
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -53,6 +55,18 @@ class Order(models.Model):
         'delivery.DeliverySlot', on_delete=models.SET_NULL, null=True, blank=True,
         related_name='orders',
     )
+    # ₦0 for every order from a vendor with no delivery fee configured, or
+    # from a non-batching vendor (delivery fee only ever applies alongside
+    # delivery_slot). Stamped once at checkout from the frozen amount
+    # actually charged (see payments.views.verify_cart_payment) — never
+    # re-derived after the fact. Already included in `amount` above; kept
+    # here separately for receipt/itemization display and for
+    # delivery.fees.get_delivery_fee_quote's live count of past orders.
+    delivery_fee = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
+    # True only when delivery_fee is ₦0 because the vendor's free-delivery
+    # promo quota covered this order — distinct from delivery_fee being ₦0
+    # because the vendor simply has no fee configured at all.
+    delivery_fee_waived = models.BooleanField(default=False)
 
     def __str__(self):
         return f"Order {self.reference} - {self.buyer.username}"

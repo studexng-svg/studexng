@@ -643,6 +643,10 @@ def initialize_cart_payment(request):
     if vendor_uses_batched_delivery(anchor_listing.vendor) and not has_eligible_slot(anchor_listing.vendor, anchor_listing.campus):
         return Response({"error": "No delivery slots are currently available for this vendor. Please try again later."}, status=400)
 
+    from delivery.fees import get_delivery_fee_quote
+    delivery_fee, delivery_fee_waived = get_delivery_fee_quote(anchor_listing.vendor)
+    total_amount += delivery_fee
+
     total_amount_kobo = int(total_amount * 100)
     if total_amount_kobo < 10000:  # Paystack minimum is ₦100 (10000 kobo)
         return Response({"error": "Amount is below the minimum transaction value."}, status=400)
@@ -660,6 +664,8 @@ def initialize_cart_payment(request):
     cache.set(f'pay_init:{reference}', {
         'min_kobo': total_amount_kobo,
         'max_kobo': _gross_kobo + 50,
+        'delivery_fee': str(delivery_fee),
+        'delivery_fee_waived': delivery_fee_waived,
     }, 3600)
 
     delivery_location = request.data.get("delivery_location", "")
@@ -717,6 +723,8 @@ def initialize_cart_payment(request):
         "amount_kobo": total_amount_kobo,
         "vendor_id": vendor_id,
         "item_count": len(priced_lines),
+        "delivery_fee": float(delivery_fee),
+        "delivery_fee_waived": delivery_fee_waived,
     })
 
 
@@ -790,6 +798,20 @@ def verify_cart_payment(request):
     min_kobo = pay_init.get('min_kobo') if isinstance(pay_init, dict) else None
     max_kobo = pay_init.get('max_kobo') if isinstance(pay_init, dict) else None
 
+    # Delivery fee decision was frozen at initialize time (same cache entry
+    # as min_kobo/max_kobo) — reused as-is here rather than re-derived, so
+    # the amount actually charged always matches what this function expects.
+    # Falls back to a fresh quote only if the cache entry expired/missed,
+    # same fallback convention as min_kobo/max_kobo below.
+    anchor_listing = priced_lines[0]['listing']
+    if isinstance(pay_init, dict) and 'delivery_fee' in pay_init:
+        delivery_fee = Decimal(pay_init['delivery_fee'])
+        delivery_fee_waived = bool(pay_init.get('delivery_fee_waived', False))
+    else:
+        from delivery.fees import get_delivery_fee_quote
+        delivery_fee, delivery_fee_waived = get_delivery_fee_quote(anchor_listing.vendor)
+    total_amount += delivery_fee
+
     if min_kobo is None:
         min_kobo = int(total_amount * 100)
     if max_kobo is None:
@@ -836,6 +858,7 @@ def verify_cart_payment(request):
         order, total_payout_amount = create_order_from_priced_lines(
             buyer=request.user, priced_lines=priced_lines, reference=reference,
             amount_paid=amount_paid, delivery_location=delivery_location, batch_id=batch_id,
+            delivery_fee=delivery_fee, delivery_fee_waived=delivery_fee_waived,
         )
     except NoDeliverySlotCapacityError as e:
         logger.warning(f"verify_cart_payment: no delivery slot capacity for {reference}: {e.detail}")

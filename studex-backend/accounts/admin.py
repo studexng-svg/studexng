@@ -402,17 +402,41 @@ class VendorTypeAdmin(admin.ModelAdmin):
 
 @admin.register(Vendor)
 class VendorAdmin(admin.ModelAdmin):
-    list_display = ['user', 'vendor_type', 'is_verified', 'verified_at', 'verified_by', 'unverified_at', 'unverified_by']
+    list_display = ['user', 'vendor_type', 'is_verified', 'delivery_fee', 'free_delivery_quota', 'free_deliveries_used_display', 'verified_at', 'verified_by', 'unverified_at', 'unverified_by']
     list_filter = ['is_verified', 'vendor_type']
     search_fields = ['user__username', 'user__email', 'user__business_name']
-    readonly_fields = ['created_at', 'verified_at', 'unverified_at']
+    readonly_fields = ['created_at', 'verified_at', 'unverified_at', 'free_deliveries_used_display']
     ordering = ['-created_at']
 
     fieldsets = (
         ('Vendor', {'fields': ('user', 'vendor_type', 'is_verified', 'created_at')}),
+        ('Delivery Fee', {
+            'fields': ('delivery_fee', 'free_delivery_quota', 'free_deliveries_used_display'),
+            'description': (
+                'Only takes effect for a vendor using batched delivery (an admin-created '
+                'DeliverySlot must already exist). ₦0 delivery_fee (default) means no '
+                'delivery fee is charged at all — nothing else here matters. To always '
+                'charge the fee with no free-delivery promo, leave "Free delivery quota" '
+                'blank. To disable the fee entirely, set delivery_fee back to 0 — everyone '
+                'then pays nothing regardless of quota.'
+            ),
+        }),
         ('Verification', {'fields': ('verified_at', 'verified_by')}),
         ('Unverification', {'fields': ('unverified_at', 'unverified_by', 'unverification_reason')}),
     )
+
+    def free_deliveries_used_display(self, obj):
+        # Live-counted, not a stored counter (see delivery.fees module docstring)
+        # — always reflects real Order rows, never drifts out of sync.
+        if obj.free_delivery_quota is None:
+            return "No quota set — fee always applies"
+        from orders.models import Order
+        used = Order.objects.filter(
+            listing__vendor=obj.user, delivery_slot__isnull=False,
+        ).exclude(status='cancelled').count()
+        remaining = max(obj.free_delivery_quota - used, 0)
+        return f"{used} used / {remaining} free deliveries remaining"
+    free_deliveries_used_display.short_description = "Free deliveries used so far"
 
     actions = ['verify_vendors', 'unverify_vendors', 'backfill_vendor_records']
 

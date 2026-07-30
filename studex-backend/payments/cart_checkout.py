@@ -126,7 +126,10 @@ def price_vendor_cart(buyer, vendor_id):
     return priced_lines, total_amount, vendor_type
 
 
-def create_order_from_priced_lines(buyer, priced_lines, reference, amount_paid, delivery_location="", batch_id=None):
+def create_order_from_priced_lines(
+    buyer, priced_lines, reference, amount_paid, delivery_location="", batch_id=None,
+    delivery_fee=None, delivery_fee_waived=False,
+):
     """
     Creates one Order (anchor = the first priced line's listing — every
     line in `priced_lines` is already guaranteed to share one vendor by
@@ -145,6 +148,14 @@ def create_order_from_priced_lines(buyer, priced_lines, reference, amount_paid, 
     leaving the caller (payments.views.verify_cart_payment) to refund the
     buyer. Every non-slotted vendor's order is completely unaffected:
     delivery_slot stays None.
+
+    delivery_fee/delivery_fee_waived are the frozen decision from
+    payments.views (see delivery.fees.get_delivery_fee_quote) — already
+    baked into amount_paid, stored on the order separately only for
+    itemization/receipt display and for future get_delivery_fee_quote calls
+    to count live. Deliberately excluded from total_payout_amount (the
+    vendor's payout basis) below — the fee, when charged, lands entirely in
+    platform_amount via payments.pricing.split_settlement, never the vendor.
     """
     from orders.models import Order, OrderItem, OrderItemAddon
     from delivery.capacity import vendor_uses_batched_delivery, reserve_delivery_slot
@@ -162,6 +173,8 @@ def create_order_from_priced_lines(buyer, priced_lines, reference, amount_paid, 
             status="paid",
             paid_at=timezone.now(),
             delivery_location=delivery_location or "",
+            delivery_fee=delivery_fee or Decimal("0"),
+            delivery_fee_waived=delivery_fee_waived,
         )
 
         if vendor_uses_batched_delivery(vendor):
