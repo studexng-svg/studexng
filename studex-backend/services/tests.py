@@ -513,6 +513,67 @@ class ListingAPITests(APITestCase):
         # 8% of 1500 = 120 (above the ₦100 floor) → price = 1620.
         self.assertEqual(Decimal(str(response.data['price'])), Decimal('1620.00'))
 
+    def test_delete_listing_as_owner(self):
+        self.client.force_authenticate(user=self.vendor)
+        response = self.client.delete(f'{self.listing_url}{self.listing.id}/')
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(Listing.objects.filter(id=self.listing.id).exists())
+
+    def test_delete_listing_rejected_for_non_owner_vendor(self):
+        """
+        Regression: destroy() had no ownership check at all (unlike update(),
+        which explicitly checks instance.vendor != request.user) — any
+        authenticated vendor could delete any other vendor's listing by ID.
+        """
+        other_vendor = User.objects.create_user(
+            username='other_vendor', email='other_vendor@pau.edu.ng', password='pass123',
+            user_type='vendor', is_verified_vendor=True,
+        )
+        self.client.force_authenticate(user=other_vendor)
+        response = self.client.delete(f'{self.listing_url}{self.listing.id}/')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertTrue(Listing.objects.filter(id=self.listing.id).exists())
+
+    def test_delete_listing_rejected_for_unauthenticated(self):
+        response = self.client.delete(f'{self.listing_url}{self.listing.id}/')
+        self.assertIn(response.status_code, [status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN])
+        self.assertTrue(Listing.objects.filter(id=self.listing.id).exists())
+
+    def test_delete_listing_allowed_for_staff_non_owner(self):
+        admin = User.objects.create_user(
+            username='del_admin', email='del_admin@pau.edu.ng', password='pass123', is_staff=True,
+        )
+        self.client.force_authenticate(user=admin)
+        response = self.client.delete(f'{self.listing_url}{self.listing.id}/')
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+
+    def test_delete_listing_with_existing_order_is_blocked(self):
+        """
+        Regression / data-integrity guard: OrderItem.listing is on_delete=
+        PROTECT, but that raised an unhandled 500 (ProtectedError) rather
+        than a clean response. Order.listing itself is CASCADE — hard-
+        deleting a listing with real order history would otherwise silently
+        destroy those Order rows. Must be blocked with a clear message
+        pointing to archive/hide instead, not a 500.
+        """
+        from orders.models import Order, OrderItem
+        order = Order.objects.create(
+            buyer=self.buyer, listing=self.listing, amount=Decimal('1000.00'),
+            reference='DEL-GUARD-1', status='paid',
+        )
+        OrderItem.objects.create(
+            order=order, listing=self.listing, quantity=1,
+            unit_price_at_order_time=Decimal('1000.00'), line_total=Decimal('1000.00'),
+        )
+        self.client.force_authenticate(user=self.vendor)
+
+        response = self.client.delete(f'{self.listing_url}{self.listing.id}/')
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('archive', response.data['error'].lower())
+        self.assertTrue(Listing.objects.filter(id=self.listing.id).exists())
+        self.assertTrue(Order.objects.filter(id=order.id).exists())
+
     def test_filter_listings_by_category(self):
         """Test filtering listings by category"""
         response = self.client.get(f'{self.listing_url}?category=food')

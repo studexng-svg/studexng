@@ -4,7 +4,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
 from rest_framework.pagination import PageNumberPagination
-from django.db.models import Q
+from django.db.models import Q, ProtectedError
 from django.core.cache import cache
 from .models import Category, Listing, Transaction, VendorOfTheMonth, SearchQuery
 from .serializers import CategorySerializer, ListingSerializer, TransactionSerializer
@@ -318,6 +318,28 @@ class ListingViewSet(viewsets.ModelViewSet):
             notify_admin_new_listing(listing)
         except Exception:
             pass
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if instance.vendor != request.user and not request.user.is_staff:
+            return Response({"error": "You do not have permission to delete this listing."}, status=403)
+        try:
+            return super().destroy(request, *args, **kwargs)
+        except ProtectedError:
+            # OrderItem.listing is on_delete=PROTECT (orders/models.py) — any
+            # listing with real order history (every menu/cart-checkout item
+            # that's ever sold) can't be hard-deleted, since Order.listing
+            # itself is CASCADE and would silently wipe that order history
+            # out from under the buyer/vendor/admin. Direct the vendor to the
+            # existing non-destructive alternative instead (MenuItem.is_hidden
+            # /is_archived for a menu item, is_available toggle for others).
+            return Response({
+                "error": (
+                    "This item has existing orders and can't be deleted — "
+                    "hide or archive it instead so buyers stop seeing it, "
+                    "without losing your order history."
+                )
+            }, status=400)
 
     def perform_destroy(self, instance):
         campus = instance.campus

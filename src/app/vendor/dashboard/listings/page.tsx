@@ -130,7 +130,12 @@ export default function ListingsPage() {
     try {
       const res = await api.services.deleteListing(id);
       if (res.ok || res.status === 204) { showToast("Listing deleted."); queryClient.invalidateQueries({ queryKey: ["vendor-listings"] }); }
-      else showToast("Could not delete. Try again.");
+      else {
+        // Backend refuses with a 400 if this listing already has real orders
+        // against it (data-loss guard) — surface that message directly.
+        const d = await res.json().catch(() => ({}));
+        showToast(d.error || "Could not delete. Try again.");
+      }
     } catch { showToast("Error deleting listing."); }
     finally { setDeleting(false); setConfirmDeleteId(null); }
   };

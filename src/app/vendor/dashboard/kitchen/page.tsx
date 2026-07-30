@@ -197,6 +197,23 @@ export default function VendorMenuPage() {
     await loadAll();
   };
 
+  const deleteItem = async (item: MenuItem) => {
+    if (!confirm(`Delete "${item.listing_title}" permanently? This cannot be undone.`)) return;
+    setError("");
+    try {
+      const res = await api.services.deleteListing(item.listing);
+      if (res.ok || res.status === 204) { flash("Deleted."); await loadAll(); }
+      else {
+        // Backend refuses with a 400 if this item already has real orders
+        // against it (data-loss guard) — surface that message directly
+        // instead of a generic failure, so the vendor knows to Archive
+        // instead.
+        const d = await res.json().catch(() => ({}));
+        setError(d.error || `Could not delete ${catalogItemLabel.toLowerCase()}.`);
+      }
+    } catch { setError("Network error."); }
+  };
+
   // ── Menu categories (e.g. "Rice Dishes") ──────────────────────────────────
   const openCategoryCreate = () => { setCatForm(emptyCategoryForm); setEditingCat(null); setShowCatModal(true); };
   const openCategoryEdit = (c: MenuCategory) => { setCatForm({ name: c.name, display_order: c.display_order, is_active: c.is_active }); setEditingCat(c); setShowCatModal(true); };
@@ -343,6 +360,10 @@ export default function VendorMenuPage() {
                       <button onClick={() => toggleArchived(item)}
                         className={`flex-1 py-2 rounded-xl text-xs font-semibold transition ${item.is_archived ? "bg-stone-200 text-stone-600" : "bg-red-50 text-red-600"}`}>
                         {item.is_archived ? "Restore" : "Archive"}
+                      </button>
+                      <button onClick={() => deleteItem(item)}
+                        className="p-2 rounded-xl bg-red-50 text-red-600 hover:bg-red-100 transition flex-shrink-0" title="Delete permanently">
+                        <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
 
