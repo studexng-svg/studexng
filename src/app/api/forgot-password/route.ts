@@ -1,9 +1,20 @@
 import { Resend } from "resend";
 import { NextRequest, NextResponse } from "next/server";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
 const DJANGO_API = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 const APP_URL = process.env.APP_URL || "https://studex.com.ng";
+
+// Lazily constructed, not at module load — `new Resend(undefined)` throws
+// synchronously, and Next.js's build-time page-data collection imports and
+// evaluates this module without any request context (no env guaranteed),
+// which crashed `npm run build` outright whenever RESEND_API_KEY wasn't set.
+// Constructing it here means a missing key only ever affects an actual
+// request (caught by the try/catch in POST below), never the build itself.
+function getResendClient(): Resend | null {
+  const key = process.env.RESEND_API_KEY;
+  if (!key) return null;
+  return new Resend(key);
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -63,16 +74,21 @@ export async function POST(req: NextRequest) {
     }
 
     // Send the email via Resend
-    const { error } = await resend.emails.send({
-      from: "StudEx <noreply@studex.com.ng>",
-      to: email,
-      subject: "Reset your StudEx password",
-      html: buildEmailHtml(resetUrl),
-    });
+    const resend = getResendClient();
+    if (!resend) {
+      console.error("forgot-password: RESEND_API_KEY not configured — email not sent, token still valid");
+    } else {
+      const { error } = await resend.emails.send({
+        from: "StudEx <noreply@studex.com.ng>",
+        to: email,
+        subject: "Reset your StudEx password",
+        html: buildEmailHtml(resetUrl),
+      });
 
-    if (error) {
-      console.error("Resend error:", error);
-      // Don't expose internal errors — the token is still valid
+      if (error) {
+        console.error("Resend error:", error);
+        // Don't expose internal errors — the token is still valid
+      }
     }
 
     return NextResponse.json({ detail: "If that email is registered, a reset link is on its way." });

@@ -107,6 +107,18 @@ jobs:
   frontend:
     runs-on: ubuntu-latest
 
+    # RESEND_API_KEY: the forgot-password route (src/app/api/forgot-password/
+    # route.ts) needs a real key to actually send password-reset emails in
+    # production, so this is required regardless — even though the route
+    # itself no longer crashes the build without one (Resend is now
+    # constructed lazily inside the request handler, not at module load).
+    # This is a separate secret store from Vercel's own project environment
+    # variables — Vercel's git integration builds independently of this
+    # workflow, so RESEND_API_KEY must also be set in Vercel's dashboard
+    # (Settings → Environment Variables) for production emails to send.
+    env:
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
