@@ -407,6 +407,12 @@ export const api = {
 
     verifyCart: (body: Record<string, unknown>) =>
       fetchWithAuth(u("/api/payments/verify-cart/"), { method: "POST", body: s(body) }),
+
+    // ── Temporary manual bank-transfer settlement (menu vendors only) ──
+    bankTransferDetails: () => fetchWithAuth(u("/api/payments/bank-transfer-details/")),
+
+    bankTransferCart: (body: Record<string, unknown>) =>
+      fetchWithAuth(u("/api/payments/bank-transfer-cart/"), { method: "POST", body: s(body) }),
   },
 
   // ─── Cart ─────────────────────────────────────────────────────────────────

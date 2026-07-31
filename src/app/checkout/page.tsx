@@ -82,6 +82,17 @@ export default function CheckoutPage() {
   } | null>(null);
   const [selectedBatchId, setSelectedBatchId] = useState<number | null>(null);
   const [nowTick, setNowTick] = useState(() => Date.now());
+  // Temporary manual-settlement path (Paystack Payout on Demand isn't
+  // approved yet) — see payments.models.BankTransferSettings. enabled=false
+  // (the default until an admin turns it on) means checkout behaves exactly
+  // as before, Paystack popup and all.
+  const [bankTransferInfo, setBankTransferInfo] = useState<{
+    enabled: boolean;
+    account_name: string;
+    account_number: string;
+    bank_name: string;
+  } | null>(null);
+  const [bankTransferConfirmed, setBankTransferConfirmed] = useState(false);
 
   // discountedBase is already all-inclusive (vendor payout + platform fee baked in
   // at listing-creation time) — no separate fee gets added at checkout anymore.
@@ -102,6 +113,7 @@ export default function CheckoutPage() {
   const deliveryFee = usesMenuCheckout ? (batchInfo?.delivery_fee ?? 0) : 0;
   const deliveryFeeWaived = usesMenuCheckout && !!batchInfo?.delivery_fee_waived;
   const finalTotal = baseAfterCredits + deliveryFee;
+  const useBankTransfer = usesMenuCheckout && !!bankTransferInfo?.enabled;
 
   useEffect(() => {
     if (!isLoggedIn || !isHydrated || baseTotal <= 0) return;
@@ -126,6 +138,16 @@ export default function CheckoutPage() {
       .then(d => { if (d) setLoyaltyBalance(parseFloat(d.credit_balance) || 0); })
       .catch(() => {});
   }, [isLoggedIn]);
+
+  // Temporary manual-settlement path — only relevant for menu-vendor
+  // checkout, and only shown at all if an admin has turned it on.
+  useEffect(() => {
+    if (!isLoggedIn || !usesMenuCheckout) { setBankTransferInfo(null); return; }
+    api.payments.bankTransferDetails()
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) setBankTransferInfo(d); })
+      .catch(() => {});
+  }, [isLoggedIn, usesMenuCheckout]);
 
   // Preview which delivery batch (and how many slots are left) this order
   // will land in — before paying, not just from a post-payment refund if
@@ -233,6 +255,38 @@ export default function CheckoutPage() {
     if (!res.ok) throw new Error(data.error || "Order creation failed");
     return data.order_id;
   };
+
+  // Temporary manual-settlement path — no Paystack round-trip at all. The
+  // order is created immediately in 'pending_bank_transfer' status; an
+  // admin manually confirms the transfer arrived before the vendor is
+  // notified or a rider assigned (see accounts.admin_views.
+  // AdminOrderDetailView.patch).
+  const handleBankTransferSubmit = useCallback(async () => {
+    setPaymentError("");
+    if (!bankTransferConfirmed) { setPaymentError("Please confirm you've sent the transfer before submitting."); return; }
+    if (!deliveryLocation.trim()) { setPaymentError("Please enter your campus delivery location."); return; }
+    if (vendorId == null) { setPaymentError("Could not determine vendor. Please go back and try again."); return; }
+
+    setIsProcessing(true);
+    try {
+      const res = await api.payments.bankTransferCart({
+        vendor_id: vendorId,
+        cart_amount: foodTotal,
+        delivery_location: deliveryLocation.trim(),
+        ...(selectedBatchId != null ? { batch_id: selectedBatchId } : {}),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not submit your order");
+      // Same vendor-scoped cleanup handlePayment uses below — refetch rather
+      // than wipe the whole multi-vendor cart, since only this vendor's
+      // lines were just purchased.
+      fetchCart();
+      router.push(`/order-confirmation/${data.order_id}`);
+    } catch (err: any) {
+      setPaymentError(err.message || "Something went wrong. Please try again.");
+      setIsProcessing(false);
+    }
+  }, [bankTransferConfirmed, deliveryLocation, vendorId, foodTotal, selectedBatchId, fetchCart, router]);
 
   const handlePayment = useCallback(async () => {
     const paystackKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || "";
@@ -658,6 +712,41 @@ export default function CheckoutPage() {
           </div>
         </motion.div>
 
+        {/* ── BANK TRANSFER (temporary — menu vendors only, while Payout on
+             Demand isn't approved) ── */}
+        {useBankTransfer && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 }}
+            className="bg-amber-50 border border-amber-200 rounded-2xl p-5 shadow-sm space-y-3">
+            <p className="font-bold text-amber-900 text-sm">Pay by Bank Transfer</p>
+            <p className="text-xs text-amber-700 leading-relaxed">
+              Transfer <strong>₦{finalTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong> to
+              the account below. Your order will be confirmed once we verify the transfer — usually within a few minutes.
+            </p>
+            <div className="bg-white border border-amber-200 rounded-xl p-4 space-y-1.5">
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-stone-500">Account Name</span>
+                <span className="font-semibold text-stone-900">{bankTransferInfo?.account_name}</span>
+              </div>
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-stone-500">Account Number</span>
+                <span className="font-bold text-stone-900 tracking-wide">{bankTransferInfo?.account_number}</span>
+              </div>
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-stone-500">Bank</span>
+                <span className="font-semibold text-stone-900">{bankTransferInfo?.bank_name}</span>
+              </div>
+            </div>
+            <label className="flex items-start gap-2.5 cursor-pointer pt-1">
+              <input type="checkbox" checked={bankTransferConfirmed}
+                onChange={e => setBankTransferConfirmed(e.target.checked)}
+                className="w-5 h-5 text-amber-600 rounded mt-0.5 focus:ring-0 flex-shrink-0" />
+              <span className="text-xs text-amber-800 leading-relaxed">
+                I've sent ₦{finalTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} to the account above.
+              </span>
+            </label>
+          </motion.div>
+        )}
+
         {/* ── SECURITY BADGES ── */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
           className="bg-white border border-stone-200 rounded-2xl p-4 shadow-sm">
@@ -721,16 +810,22 @@ export default function CheckoutPage() {
 
         {/* ── PAY BUTTON ── */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>
-          <form onSubmit={e => { e.preventDefault(); handlePayment(); }}>
+          <form onSubmit={e => { e.preventDefault(); useBankTransfer ? handleBankTransferSubmit() : handlePayment(); }}>
             <motion.button
               type="submit"
               whileHover={{ scale: isProcessing ? 1 : 1.02 }}
               whileTap={{ scale: isProcessing ? 1 : 0.97 }}
-              disabled={isProcessing || !isLoggedIn || !paystackLoaded || (usesMenuCheckout && !!batchInfo?.uses_batched_delivery && visibleBatches.length === 0)}
+              disabled={
+                isProcessing || !isLoggedIn
+                || (usesMenuCheckout && !!batchInfo?.uses_batched_delivery && visibleBatches.length === 0)
+                || (useBankTransfer ? !bankTransferConfirmed : !paystackLoaded)
+              }
               className="w-full py-4 rounded-full font-semibold text-white text-base shadow-lg shadow-teal-200/60 flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{ background: TEAL }}>
+              style={{ background: useBankTransfer ? "#D97706" : TEAL }}>
               {isProcessing ? (
-                <><Loader className="w-5 h-5 animate-spin" /> Processing...</>
+                <><Loader className="w-5 h-5 animate-spin" /> {useBankTransfer ? "Submitting..." : "Processing..."}</>
+              ) : useBankTransfer ? (
+                <><CreditCard className="w-5 h-5" /> I've Sent The Money</>
               ) : isFullyCoveredByCredits ? (
                 <><span className="text-lg">🎁</span> Redeem Credits & Place Order</>
               ) : (

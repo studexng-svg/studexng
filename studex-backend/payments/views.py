@@ -971,6 +971,168 @@ def verify_cart_payment(request):
 
 
 # ─────────────────────────────────────────
+# BANK TRANSFER CHECKOUT (temporary manual-settlement path)
+#
+# Paystack's Transfer API needs "Payout on Demand" for a fast/full vendor
+# payout; until that's approved, BankTransferSettings.is_enabled routes
+# menu-vendor checkout to a direct bank transfer into the platform's own
+# account instead of Paystack, with an admin manually confirming receipt.
+# See payments.models.BankTransferSettings and delivery.fees for the same
+# convention used elsewhere in this file.
+# ─────────────────────────────────────────
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def bank_transfer_details(request):
+    """
+    GET /api/payments/bank-transfer-details/
+    Read-only preview the checkout page fetches before showing the manual
+    bank-transfer UI. enabled=False means the frontend should show the
+    normal Paystack checkout instead — never trusted for anything security-
+    sensitive, purely display.
+    """
+    from .models import BankTransferSettings
+    s = BankTransferSettings.get()
+    return Response({
+        "enabled": s.is_enabled,
+        "account_name": s.account_name,
+        "account_number": s.account_number,
+        "bank_name": s.bank_name,
+    })
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def initiate_bank_transfer_cart(request):
+    """
+    POST /api/payments/bank-transfer-cart/
+    Body: { vendor_id, delivery_location?, batch_id?, cart_amount? }
+
+    Creates the Order immediately (same pricing/delivery-slot/delivery-fee
+    logic as initialize_cart_payment + verify_cart_payment combined — there's
+    no Paystack round-trip to split across two requests) but in
+    'pending_bank_transfer' status: no rider is assigned and the vendor is
+    NOT notified yet, since nothing has actually been confirmed as paid.
+    An admin manually confirms the transfer arrived in the platform's own
+    bank account (accounts.admin_views.AdminOrderDetailView.patch), which is
+    what flips this to 'paid' and runs the same post-payment side effects
+    verify_cart_payment runs for a Paystack order.
+
+    Only reachable while BankTransferSettings.is_enabled is True AND the
+    vendor is a menu-ordering vendor — this is not a general-purpose
+    "skip payment" endpoint.
+    """
+    from .models import BankTransferSettings
+    settings_obj = BankTransferSettings.get()
+    if not settings_obj.is_enabled:
+        return Response({"error": "Bank transfer checkout is not currently enabled."}, status=400)
+
+    vendor_id = request.data.get("vendor_id")
+    if not vendor_id:
+        return Response({"error": "vendor_id is required."}, status=400)
+
+    from payments.cart_checkout import price_vendor_cart, CartCheckoutError, create_order_from_priced_lines
+    try:
+        priced_lines, total_amount, vendor_type = price_vendor_cart(request.user, vendor_id)
+    except CartCheckoutError as e:
+        return Response({"error": e.detail}, status=400)
+
+    if not (vendor_type and vendor_type.supports_menu_ordering):
+        return Response({"error": "Bank transfer checkout is only available for menu vendors."}, status=400)
+
+    cart_amount_raw = request.data.get("cart_amount")
+    if cart_amount_raw:
+        try:
+            client_amount = Decimal(str(cart_amount_raw))
+        except Exception:
+            client_amount = None
+        if client_amount is not None and abs(client_amount - total_amount) > Decimal("0.01"):
+            return Response(
+                {"error": "Cart total does not match. Please refresh your cart and try again."},
+                status=400,
+            )
+
+    anchor_listing = priced_lines[0]['listing']
+    from delivery.capacity import vendor_uses_batched_delivery, has_eligible_slot
+    if vendor_uses_batched_delivery(anchor_listing.vendor) and not has_eligible_slot(anchor_listing.vendor, anchor_listing.campus):
+        return Response({"error": "No delivery slots are currently available for this vendor. Please try again later."}, status=400)
+
+    from delivery.fees import get_delivery_fee_quote
+    delivery_fee, delivery_fee_waived = get_delivery_fee_quote(anchor_listing.vendor)
+    total_amount += delivery_fee
+
+    batch_id = request.data.get("batch_id")
+    delivery_location = request.data.get("delivery_location", "")
+    reference = f"STX-BANKXFER-{uuid.uuid4().hex[:14].upper()}"
+
+    from delivery.capacity import NoDeliverySlotCapacityError
+    try:
+        order, total_payout_amount = create_order_from_priced_lines(
+            buyer=request.user, priced_lines=priced_lines, reference=reference,
+            amount_paid=total_amount, delivery_location=delivery_location, batch_id=batch_id,
+            delivery_fee=delivery_fee, delivery_fee_waived=delivery_fee_waived,
+            status="pending_bank_transfer",
+        )
+    except NoDeliverySlotCapacityError as e:
+        return Response({"error": e.detail}, status=400)
+
+    seller = anchor_listing.vendor
+    vendor_amount, platform_amount = split_settlement(total_amount, total_payout_amount)
+    PaymentTransaction.objects.update_or_create(
+        reference=reference,
+        defaults=dict(
+            buyer=request.user,
+            seller=seller,
+            amount=total_amount,
+            seller_amount=vendor_amount,
+            platform_amount=platform_amount,
+            service_charge=platform_amount,
+            status="pending",
+            order_type="product",
+            buyer_email=request.user.email,
+            buyer_name=request.user.get_full_name() or request.user.username,
+            order_id=order.id,
+        ),
+    )
+
+    try:
+        from accounts.utils import send_notification
+        send_notification(
+            recipient=request.user, notification_type='order_update',
+            title='Order Received — Awaiting Payment Confirmation',
+            message=(
+                f"We've received your order for ₦{total_amount:,.0f}. Once we confirm your "
+                f"bank transfer, the vendor will be notified and your order will proceed."
+            ),
+            action_url=f'/order-confirmation/{order.id}',
+        )
+    except Exception as ne:
+        logger.warning(f"initiate_bank_transfer_cart: buyer notification failed: {ne}")
+
+    try:
+        from accounts.utils import send_notification
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        item_count = order.items.count()
+        for admin in User.objects.filter(is_staff=True):
+            send_notification(
+                recipient=admin, notification_type='admin_new_order',
+                title=f'⏳ Bank Transfer Awaiting Confirmation — ₦{total_amount:,.0f}',
+                message=(
+                    f'{request.user.username} placed an order for {item_count} item(s) from '
+                    f'"{seller.username}" via bank transfer (₦{total_amount:,.0f}). Check your '
+                    f'account and confirm or reject it in admin.'
+                ),
+                action_url=f'/admin/orders/{order.id}',
+                send_email=False,
+            )
+    except Exception as ne:
+        logger.warning(f"initiate_bank_transfer_cart: admin notification failed: {ne}")
+
+    return Response({"order_id": order.id, "message": "Order received. Awaiting payment confirmation."})
+
+
+# ─────────────────────────────────────────
 # VERIFY PAYMENT
 # ─────────────────────────────────────────
 

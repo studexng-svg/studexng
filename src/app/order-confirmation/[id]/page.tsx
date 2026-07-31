@@ -131,6 +131,9 @@ export default function OrderConfirmationPage() {
   }
 
   const vendorName = order.listing.vendor.business_name || order.listing.vendor.username;
+  // Temporary manual-settlement path (payments.models.BankTransferSettings)
+  // — nothing has actually been confirmed as paid yet at this point.
+  const isPendingBankTransfer = order.status === "pending_bank_transfer";
 
   return (
     <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
@@ -142,21 +145,25 @@ export default function OrderConfirmationPage() {
         <div className="flex justify-center pt-2 animate-fadeUp">
           <div
             className="w-20 h-20 rounded-full flex items-center justify-center shadow-lg"
-            style={{ background: TEAL }}
+            style={{ background: isPendingBankTransfer ? "#D97706" : TEAL }}
           >
-            <CheckCircle className="w-10 h-10 text-white" />
+            {isPendingBankTransfer ? <Clock className="w-10 h-10 text-white" /> : <CheckCircle className="w-10 h-10 text-white" />}
           </div>
         </div>
 
         {/* HEADING */}
         <div className="text-center animate-fadeUp">
-          <p className="text-teal-600 text-xs tracking-[0.25em] uppercase font-semibold">Payment Successful</p>
+          <p className={`text-xs tracking-[0.25em] uppercase font-semibold ${isPendingBankTransfer ? "text-amber-600" : "text-teal-600"}`}>
+            {isPendingBankTransfer ? "Awaiting Confirmation" : "Payment Successful"}
+          </p>
           <h2 className="text-2xl font-bold text-stone-900 mt-0.5"
             style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-            Order Confirmed!
+            {isPendingBankTransfer ? "Order Received!" : "Order Confirmed!"}
           </h2>
           <p className="text-sm text-stone-400 mt-1">
-            Payment was successful and the seller has been notified.
+            {isPendingBankTransfer
+              ? "We're confirming your bank transfer — this usually takes a few minutes."
+              : "Payment was successful and the seller has been notified."}
           </p>
         </div>
 
@@ -213,18 +220,32 @@ export default function OrderConfirmationPage() {
           </div>
         </div>
 
-        {/* PAYMENT SECURED */}
-        <div className="bg-teal-50 border border-teal-100 rounded-2xl p-4 flex items-start gap-3 animate-fadeUp">
-          <div className="w-9 h-9 bg-teal-600 rounded-full flex items-center justify-center flex-shrink-0">
-            <Shield className="w-4 h-4 text-white" />
+        {/* PAYMENT SECURED / AWAITING CONFIRMATION */}
+        {isPendingBankTransfer ? (
+          <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 flex items-start gap-3 animate-fadeUp">
+            <div className="w-9 h-9 bg-amber-600 rounded-full flex items-center justify-center flex-shrink-0">
+              <Clock className="w-4 h-4 text-white" />
+            </div>
+            <div>
+              <p className="font-semibold text-amber-900 text-sm">Confirming Your Transfer</p>
+              <p className="text-xs text-amber-700 mt-0.5 leading-relaxed">
+                The vendor won't be notified and no rider will be assigned until we confirm your transfer arrived. You'll get a notification the moment it's confirmed.
+              </p>
+            </div>
           </div>
-          <div>
-            <p className="font-semibold text-teal-900 text-sm">Payment Secured by Paystack</p>
-            <p className="text-xs text-teal-700 mt-0.5 leading-relaxed">
-              Your payment was processed securely. The vendor has been notified and will reach out to confirm your order.
-            </p>
+        ) : (
+          <div className="bg-teal-50 border border-teal-100 rounded-2xl p-4 flex items-start gap-3 animate-fadeUp">
+            <div className="w-9 h-9 bg-teal-600 rounded-full flex items-center justify-center flex-shrink-0">
+              <Shield className="w-4 h-4 text-white" />
+            </div>
+            <div>
+              <p className="font-semibold text-teal-900 text-sm">Payment Secured by Paystack</p>
+              <p className="text-xs text-teal-700 mt-0.5 leading-relaxed">
+                Your payment was processed securely. The vendor has been notified and will reach out to confirm your order.
+              </p>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* ACTION BUTTONS */}
         <div className="grid grid-cols-2 gap-3 animate-fadeUp">

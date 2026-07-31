@@ -9,12 +9,13 @@ import { api } from "@/lib/api";
 import { GRAD } from "@/lib/tokens";
 
 const STATUS_STYLE: Record<string, string> = {
-  pending:          "bg-amber-100 text-amber-700",
-  paid:             "bg-amber-100 text-amber-700",
-  seller_completed: "bg-blue-100 text-blue-700",
-  completed:        "bg-teal-100 text-teal-700",
-  cancelled:        "bg-stone-100 text-stone-500",
-  disputed:         "bg-red-100 text-red-700",
+  pending:                "bg-amber-100 text-amber-700",
+  pending_bank_transfer:  "bg-orange-100 text-orange-700",
+  paid:                   "bg-amber-100 text-amber-700",
+  seller_completed:       "bg-blue-100 text-blue-700",
+  completed:              "bg-teal-100 text-teal-700",
+  cancelled:              "bg-stone-100 text-stone-500",
+  disputed:               "bg-red-100 text-red-700",
 };
 
 
@@ -247,6 +248,29 @@ export default function AdminOrderDetail() {
             </div>
           )}
         </div>
+
+        {/* Bank Transfer Confirmation (temporary manual-settlement path) */}
+        {order.status === "pending_bank_transfer" && (
+          <div className="bg-white border border-orange-200 rounded-2xl p-4 shadow-sm space-y-2">
+            <p className="text-orange-600 text-xs tracking-[0.2em] uppercase font-semibold mb-1">Bank Transfer Confirmation</p>
+            <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 mb-2">
+              <p className="text-orange-700 text-xs font-medium leading-relaxed">
+                Buyer says they've transferred <strong>₦{order.amount ? Number(order.amount).toLocaleString() : "?"}</strong> to
+                your bank account. Check your account, then confirm or reject below — the vendor is
+                only notified and a rider only assigned once you confirm.
+              </p>
+            </div>
+            <button onClick={() => updateStatus("paid")} disabled={updating}
+              className="w-full py-3 text-white font-semibold rounded-xl text-sm disabled:opacity-50 transition"
+              style={{ background: GRAD }}>
+              {updating ? "Confirming…" : "Confirm Payment Received"}
+            </button>
+            <button onClick={() => updateStatus("cancelled")} disabled={updating}
+              className="w-full py-3 bg-red-100 text-red-700 font-semibold rounded-xl text-sm disabled:opacity-50 transition hover:bg-red-200">
+              {updating ? "Updating…" : "Reject — Transfer Not Received"}
+            </button>
+          </div>
+        )}
 
         {/* Admin Actions */}
         {(order.status === "pending" || order.status === "paid" || order.status === "seller_completed") && (

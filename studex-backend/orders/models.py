@@ -13,6 +13,16 @@ User = get_user_model()
 class Order(models.Model):
     STATUS_CHOICES = (
         ('pending', 'Pending Payment'),
+        # Temporary manual-settlement path (payments.views.
+        # initiate_bank_transfer_cart) — buyer says they've sent money
+        # directly to the platform's own bank account instead of paying via
+        # Paystack, and an admin must manually confirm the transfer actually
+        # arrived (accounts.admin_views.AdminOrderDetailView.patch) before
+        # this becomes a normal 'paid' order. Deliberately NOT 'pending' —
+        # scheduler.auto_cancel_pending_orders only targets status='pending'
+        # and would otherwise auto-cancel these before an admin ever gets to
+        # confirm them.
+        ('pending_bank_transfer', 'Awaiting Bank Transfer Confirmation'),
         ('paid', 'Paid'),                                    # ← was "Paid - In Escrow"
         ('seller_completed', 'Seller Marked Complete'),
         ('completed', 'Buyer Confirmed - Complete'),         # ← was "Buyer Confirmed - Released"

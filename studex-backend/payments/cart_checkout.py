@@ -128,7 +128,7 @@ def price_vendor_cart(buyer, vendor_id):
 
 def create_order_from_priced_lines(
     buyer, priced_lines, reference, amount_paid, delivery_location="", batch_id=None,
-    delivery_fee=None, delivery_fee_waived=False,
+    delivery_fee=None, delivery_fee_waived=False, status="paid",
 ):
     """
     Creates one Order (anchor = the first priced line's listing — every
@@ -156,6 +156,13 @@ def create_order_from_priced_lines(
     to count live. Deliberately excluded from total_payout_amount (the
     vendor's payout basis) below — the fee, when charged, lands entirely in
     platform_amount via payments.pricing.split_settlement, never the vendor.
+
+    status defaults to "paid" (the Paystack path — payment is already
+    verified by the time this is called). The manual bank-transfer path
+    (payments.views.initiate_bank_transfer_cart) passes
+    "pending_bank_transfer" instead, since nothing has actually been
+    confirmed received yet — paid_at is only stamped for an immediately-paid
+    order; the bank-transfer path sets it later, at admin confirmation.
     """
     from orders.models import Order, OrderItem, OrderItemAddon
     from delivery.capacity import vendor_uses_batched_delivery, reserve_delivery_slot
@@ -170,8 +177,8 @@ def create_order_from_priced_lines(
             amount=amount_paid,
             quantity=sum(line['quantity'] for line in priced_lines),
             reference=reference,
-            status="paid",
-            paid_at=timezone.now(),
+            status=status,
+            paid_at=timezone.now() if status == "paid" else None,
             delivery_location=delivery_location or "",
             delivery_fee=delivery_fee or Decimal("0"),
             delivery_fee_waived=delivery_fee_waived,

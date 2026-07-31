@@ -621,10 +621,14 @@ try:
                 order = Order.objects.get(id=order_id)
                 new_status = request.data.get('status')
                 if new_status:
+                    old_status = order.status
                     order.status = new_status
                     if new_status == 'completed':
                         from django.utils import timezone as _tz
                         order.buyer_confirmed_at = _tz.now()
+                    if old_status == 'pending_bank_transfer' and new_status == 'paid':
+                        from django.utils import timezone as _tz
+                        order.paid_at = _tz.now()
                     order.save()
 
                     if new_status == 'completed':
@@ -655,6 +659,85 @@ try:
                                 ),
                                 action_url='/vendor/dashboard',
                                 send_email=False,
+                            )
+                        except Exception:
+                            pass
+
+                    # Manual bank-transfer settlement (temporary path while
+                    # Payout on Demand isn't approved — see payments.models.
+                    # BankTransferSettings). Admin has personally checked
+                    # their bank account and is confirming the buyer's
+                    # transfer actually arrived, or that it never did.
+                    if old_status == 'pending_bank_transfer' and new_status == 'paid':
+                        import logging as _log
+                        try:
+                            from payments.models import PaymentTransaction
+                            PaymentTransaction.objects.filter(reference=order.reference).update(status='success')
+                        except Exception as pe:
+                            _log.getLogger(__name__).warning(
+                                f"Bank transfer confirm: txn update failed for order {order.id}: {pe}")
+
+                        if order.delivery_slot_id:
+                            try:
+                                from delivery.assignment import auto_assign_rider
+                                auto_assign_rider(order)
+                            except Exception as e:
+                                _log.getLogger(__name__).warning(
+                                    f"Bank transfer confirm: auto_assign_rider failed for order {order.id}: {e}")
+
+                        try:
+                            from accounts.utils import send_notification
+                            from payments.models import PaymentTransaction
+                            txn = PaymentTransaction.objects.filter(reference=order.reference).first()
+                            payout_note = (
+                                f'Your payout of ₦{txn.seller_amount:,.0f} will be paid to you manually — '
+                                f'Paystack Payout on Demand isn\'t enabled yet.'
+                                if txn else 'Please prepare the order.'
+                            )
+                            send_notification(
+                                recipient=order.listing.vendor, notification_type='new_order',
+                                title=f'New Order — {order.items.count()} item(s)',
+                                message=f"{order.buyer.username}'s payment has been confirmed. {payout_note}",
+                                action_url='/vendor/dashboard', send_email=False,
+                            )
+                            send_notification(
+                                recipient=order.buyer, notification_type='order_update',
+                                title='Payment Confirmed',
+                                message=(
+                                    f'Your bank transfer for order #{order.reference} has been confirmed. '
+                                    f'The vendor has been notified and is preparing your order.'
+                                ),
+                                action_url=f'/account/orders/{order.id}',
+                            )
+                        except Exception:
+                            pass
+
+                    elif old_status == 'pending_bank_transfer' and new_status == 'cancelled':
+                        import logging as _log
+                        try:
+                            for item in order.items.select_related('listing').all():
+                                item.listing.restock(item.quantity)
+                        except Exception as pe:
+                            _log.getLogger(__name__).warning(
+                                f"Bank transfer reject: restock failed for order {order.id}: {pe}")
+
+                        try:
+                            from payments.models import PaymentTransaction
+                            PaymentTransaction.objects.filter(reference=order.reference).update(status='failed')
+                        except Exception:
+                            pass
+
+                        try:
+                            from accounts.utils import send_notification
+                            send_notification(
+                                recipient=order.buyer, notification_type='order_update',
+                                title='Order Cancelled — Transfer Not Received',
+                                message=(
+                                    f"We didn't receive your bank transfer for order #{order.reference}, so "
+                                    f"it has been cancelled. If you did send the money, please contact "
+                                    f"support with your proof of payment."
+                                ),
+                                action_url='/account/orders',
                             )
                         except Exception:
                             pass

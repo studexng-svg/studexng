@@ -8,6 +8,7 @@ import csv
 from .models import (
     SellerBankAccount, PaymentTransaction, PricingSettings,
     EscrowReconciliationLog, VendorDebt, PayoutAuditRecord, CampusPricingSettings,
+    BankTransferSettings,
 )
 from .views import trigger_vendor_payout
 from .reconciliation import run_reconciliation
@@ -25,6 +26,23 @@ class PricingSettingsAdmin(admin.ModelAdmin):
 
     def has_add_permission(self, request):
         return not PricingSettings.objects.exists()
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(BankTransferSettings)
+class BankTransferSettingsAdmin(admin.ModelAdmin):
+    """
+    Singleton — temporary switch for menu-vendor checkout to bypass Paystack
+    while Payout on Demand isn't yet approved. Flip is_enabled off to revert
+    every menu vendor to normal Paystack checkout, no other change needed.
+    """
+    list_display = ['is_enabled', 'account_name', 'account_number', 'bank_name', 'updated_at']
+    readonly_fields = ['updated_at']
+
+    def has_add_permission(self, request):
+        return not BankTransferSettings.objects.exists()
 
     def has_delete_permission(self, request, obj=None):
         return False

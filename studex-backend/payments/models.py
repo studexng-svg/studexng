@@ -26,6 +26,38 @@ class PricingSettings(models.Model):
         return f"Pricing Settings (fee: {self.service_fee_percent}%)"
 
 
+class BankTransferSettings(models.Model):
+    """
+    Singleton (same pattern as PricingSettings) — temporary manual-settlement
+    switch for menu/food-vendor checkout. Paystack's Transfer API needs
+    "Payout on Demand" for a fast/full vendor payout; until that's approved,
+    is_enabled=True routes menu-vendor checkout to a direct bank transfer
+    into the platform's own account instead of Paystack, with an admin
+    manually confirming receipt and manually paying vendors out afterward
+    (see payments.views.initiate_bank_transfer_cart and
+    accounts.admin_views.AdminOrderDetailView.patch). Flipping is_enabled
+    back to False reverts every menu vendor to normal Paystack checkout with
+    no other code change needed.
+    """
+    is_enabled = models.BooleanField(default=False)
+    account_name = models.CharField(max_length=150, blank=True)
+    account_number = models.CharField(max_length=20, blank=True)
+    bank_name = models.CharField(max_length=100, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    @classmethod
+    def get(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"Bank Transfer Settings ({'enabled' if self.is_enabled else 'disabled'})"
+
+
 class CampusPricingSettings(models.Model):
     """
     Fee override, resolved in three levels (Blocker 6 — Campus Pricing;

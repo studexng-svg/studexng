@@ -7,6 +7,9 @@ urlpatterns = [
     # Phase 1 — Food Commerce Engine, Step 3: vendor-scoped multi-item cart checkout.
     path("initialize-cart/", views.initialize_cart_payment, name="initialize-cart-payment"),
     path("verify-cart/", views.verify_cart_payment, name="verify-cart-payment"),
+    # Temporary manual-settlement path — see payments.models.BankTransferSettings
+    path("bank-transfer-details/", views.bank_transfer_details, name="bank-transfer-details"),
+    path("bank-transfer-cart/", views.initiate_bank_transfer_cart, name="bank-transfer-cart"),
     path("seller/transactions/", views.seller_transactions, name="seller-transactions"),
     path("seller/bank-account/", views.seller_bank_account, name="seller-bank-account"),
     path("verify-bank-account/", views.verify_bank_account, name="verify-bank-account"),
