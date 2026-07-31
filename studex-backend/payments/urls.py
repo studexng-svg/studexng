@@ -10,6 +10,7 @@ urlpatterns = [
     # Temporary manual-settlement path — see payments.models.BankTransferSettings
     path("bank-transfer-details/", views.bank_transfer_details, name="bank-transfer-details"),
     path("bank-transfer-cart/", views.initiate_bank_transfer_cart, name="bank-transfer-cart"),
+    path("manual-refunds/<int:refund_id>/", views.manual_refund_detail, name="manual-refund-detail"),
     path("seller/transactions/", views.seller_transactions, name="seller-transactions"),
     path("seller/bank-account/", views.seller_bank_account, name="seller-bank-account"),
     path("verify-bank-account/", views.verify_bank_account, name="verify-bank-account"),

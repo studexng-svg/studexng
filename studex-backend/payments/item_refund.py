@@ -53,6 +53,16 @@ def mark_order_item_unavailable(order_item_id):
     Raises ItemRefundError (buyer-facing `.detail`) if the item was already
     unavailable, no successful PaymentTransaction exists for its order, or
     the Paystack refund call itself fails.
+
+    For a bank-transfer order (PaymentTransaction.is_bank_transfer — the
+    temporary manual-settlement path, see payments.models.
+    BankTransferSettings) there is no real Paystack transaction to refund
+    at all — calling refund_paystack_transaction against a reference
+    Paystack has never seen just fails every time. That branch instead
+    creates a ManualRefund record (the buyer submits their own bank details,
+    an admin sends the money back and marks it settled) and never raises —
+    marking the item unavailable succeeds immediately from the caller's
+    perspective; the refund itself becomes an async, admin-driven step.
     """
     from payments.views import refund_paystack_transaction
 
@@ -77,11 +87,62 @@ def mark_order_item_unavailable(order_item_id):
         vendor_share = (txn.seller_amount * item_share).quantize(Decimal("0.01"))
         platform_share = refund_amount - vendor_share  # whatever's left — avoids a rounding gap
         already_paid_out = bool(txn.transfer_reference)
+        is_bank_transfer = txn.is_bank_transfer
 
         # The claim — visible to a concurrent call on this same item
         # immediately, before the slow external call below.
         item.status = 'unavailable'
         item.save(update_fields=['status'])
+
+    if is_bank_transfer:
+        # Bookkeeping still adjusts down (same as the normal path below) so
+        # whatever the vendor is manually paid out of pocket reflects this
+        # item no longer being part of the order — just no Paystack call
+        # and no VendorDebt (the vendor was never auto-paid via Transfer
+        # API for a bank-transfer order in the first place).
+        with db_transaction.atomic():
+            txn = PaymentTransaction.objects.select_for_update().get(pk=txn.pk)
+            txn.seller_amount = txn.seller_amount - vendor_share
+            txn.platform_amount = txn.platform_amount - platform_share
+            txn.save(update_fields=['seller_amount', 'platform_amount'])
+
+        from payments.models import ManualRefund
+        manual_refund = ManualRefund.objects.create(
+            order=order, order_item=item, buyer=order.buyer, amount=refund_amount,
+            reason=f'Item "{item.listing.title}" marked unavailable on order #{order.id}',
+        )
+        try:
+            from accounts.utils import send_notification
+            send_notification(
+                recipient=order.buyer, notification_type='order_update',
+                title='Item Unavailable — Refund Owed',
+                message=(
+                    f'"{item.listing.title}" from your order is unavailable. You are owed '
+                    f'₦{refund_amount:,.2f} back. Since you paid by bank transfer, please submit your '
+                    f'own bank account details so we can send your refund directly.'
+                ),
+                action_url=f'/account/refunds/{manual_refund.id}',
+            )
+        except Exception:
+            pass
+        try:
+            from accounts.utils import send_notification
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            for admin in User.objects.filter(is_staff=True):
+                send_notification(
+                    recipient=admin, notification_type='admin_message',
+                    title=f'Manual Refund Needed — ₦{refund_amount:,.2f}',
+                    message=(
+                        f'{order.buyer.username} is owed ₦{refund_amount:,.2f} for order #{order.id} '
+                        f'(item marked unavailable, paid by bank transfer). Waiting on their bank details.'
+                    ),
+                    action_url='/studex-portal-9f3a2/payments/manualrefund/',
+                    send_email=False,
+                )
+        except Exception:
+            pass
+        return refund_amount, None
 
     ok = refund_paystack_transaction(order.reference, int(refund_amount * 100))
 

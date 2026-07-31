@@ -1089,6 +1089,7 @@ def initiate_bank_transfer_cart(request):
             service_charge=platform_amount,
             status="pending",
             order_type="product",
+            is_bank_transfer=True,
             buyer_email=request.user.email,
             buyer_name=request.user.get_full_name() or request.user.username,
             order_id=order.id,
@@ -1130,6 +1131,79 @@ def initiate_bank_transfer_cart(request):
         logger.warning(f"initiate_bank_transfer_cart: admin notification failed: {ne}")
 
     return Response({"order_id": order.id, "message": "Order received. Awaiting payment confirmation."})
+
+
+@api_view(["GET", "POST"])
+@permission_classes([IsAuthenticated])
+def manual_refund_detail(request, refund_id):
+    """
+    GET  /api/payments/manual-refunds/{id}/ — buyer views their own refund.
+    POST /api/payments/manual-refunds/{id}/ — buyer submits bank details,
+    once, while status is still 'awaiting_bank_details'.
+
+    Only exists because a bank-transfer order (see payments.models.
+    PaymentTransaction.is_bank_transfer) has no real Paystack transaction to
+    refund — an admin has to send the money back manually, and needs the
+    buyer's own account details to do it. See payments.item_refund.
+    mark_order_item_unavailable, which is what creates these.
+    """
+    from .models import ManualRefund
+    try:
+        refund = ManualRefund.objects.select_related('order', 'order_item__listing').get(id=refund_id)
+    except ManualRefund.DoesNotExist:
+        return Response({"error": "Refund not found."}, status=404)
+
+    if refund.buyer_id != request.user.id:
+        return Response({"error": "You do not have permission to view this refund."}, status=403)
+
+    if request.method == "GET":
+        return Response({
+            "id": refund.id,
+            "amount": float(refund.amount),
+            "reason": refund.reason,
+            "status": refund.status,
+            "order_reference": refund.order.reference,
+            "item_title": refund.order_item.listing.title if refund.order_item_id else None,
+            "buyer_account_name": refund.buyer_account_name,
+            "buyer_account_number": refund.buyer_account_number,
+            "buyer_bank_name": refund.buyer_bank_name,
+        })
+
+    if refund.status != "awaiting_bank_details":
+        return Response({"error": "Bank details have already been submitted for this refund."}, status=400)
+
+    account_name = (request.data.get("account_name") or "").strip()
+    account_number = (request.data.get("account_number") or "").strip()
+    bank_name = (request.data.get("bank_name") or "").strip()
+    if not account_name or not account_number or not bank_name:
+        return Response({"error": "Account name, account number, and bank name are all required."}, status=400)
+
+    refund.buyer_account_name = account_name
+    refund.buyer_account_number = account_number
+    refund.buyer_bank_name = bank_name
+    refund.status = "awaiting_admin_action"
+    refund.save(update_fields=["buyer_account_name", "buyer_account_number", "buyer_bank_name", "status"])
+
+    try:
+        from accounts.utils import send_notification
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        for admin in User.objects.filter(is_staff=True):
+            send_notification(
+                recipient=admin, notification_type='admin_message',
+                title=f'Ready to Refund — ₦{refund.amount:,.2f}',
+                message=(
+                    f'{request.user.username} submitted their bank details for the '
+                    f'₦{refund.amount:,.2f} refund on order #{refund.order_id}. Send the money and '
+                    f'mark it refunded in admin.'
+                ),
+                action_url='/studex-portal-9f3a2/payments/manualrefund/',
+                send_email=False,
+            )
+    except Exception as ne:
+        logger.warning(f"manual_refund_detail: admin notification failed: {ne}")
+
+    return Response({"message": "Bank details submitted. We'll send your refund shortly."})
 
 
 # ─────────────────────────────────────────

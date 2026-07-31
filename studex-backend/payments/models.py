@@ -183,6 +183,13 @@ class PaymentTransaction(models.Model):
     )
     reference = models.CharField(max_length=200, unique=True)
 
+    # True only for the temporary manual bank-transfer checkout path (see
+    # payments.views.initiate_bank_transfer_cart) — this reference was never
+    # sent to Paystack at all, so refund_paystack_transaction/
+    # trigger_vendor_payout must never be called against it. Any refund
+    # owed on one of these goes through ManualRefund instead.
+    is_bank_transfer = models.BooleanField(default=False)
+
     # Paystack transaction ID — used for refunds
     paystack_transaction_id = models.BigIntegerField(null=True, blank=True)
 
@@ -325,6 +332,57 @@ class VendorDebt(models.Model):
 
     def __str__(self):
         return f"Debt for {self.vendor.username}: ₦{self.outstanding_amount} outstanding ({self.status})"
+
+
+class ManualRefund(models.Model):
+    """
+    A refund owed to a buyer that can't go through Paystack's Refund API —
+    exclusively for the temporary manual bank-transfer checkout path (see
+    payments.models.PaymentTransaction.is_bank_transfer / payments.views.
+    initiate_bank_transfer_cart): the buyer never paid through Paystack, so
+    there's no Paystack transaction to refund. The platform's own admin has
+    to send the money back manually instead — this is the paper trail for
+    that: the buyer submits their own bank details once notified, and an
+    admin marks it settled once they've actually sent the money.
+
+    Created from payments.item_refund.mark_order_item_unavailable's
+    bank-transfer branch today; the same pattern applies to any other
+    future refund path that also needs to handle a bank-transfer order
+    (e.g. a dispute resolved in the buyer's favor).
+    """
+    STATUS_CHOICES = [
+        ("awaiting_bank_details", "Awaiting Buyer's Bank Details"),
+        ("awaiting_admin_action", "Awaiting Admin Payout"),
+        ("completed", "Refunded"),
+    ]
+
+    order = models.ForeignKey('orders.Order', on_delete=models.CASCADE, related_name='manual_refunds')
+    order_item = models.ForeignKey(
+        'orders.OrderItem', on_delete=models.SET_NULL, null=True, blank=True, related_name='manual_refunds',
+    )
+    buyer = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='manual_refunds')
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    reason = models.CharField(max_length=255, blank=True, default="")
+    status = models.CharField(max_length=30, choices=STATUS_CHOICES, default="awaiting_bank_details")
+
+    buyer_account_name = models.CharField(max_length=150, blank=True)
+    buyer_account_number = models.CharField(max_length=20, blank=True)
+    buyer_bank_name = models.CharField(max_length=100, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    resolved_at = models.DateTimeField(null=True, blank=True)
+    resolved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='manual_refunds_resolved',
+    )
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = "Manual Refund"
+        verbose_name_plural = "Manual Refunds"
+
+    def __str__(self):
+        return f"₦{self.amount} owed to {self.buyer.username} for order #{self.order_id} ({self.status})"
 
 
 class PayoutAuditRecord(models.Model):

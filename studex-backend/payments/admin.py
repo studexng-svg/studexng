@@ -8,7 +8,7 @@ import csv
 from .models import (
     SellerBankAccount, PaymentTransaction, PricingSettings,
     EscrowReconciliationLog, VendorDebt, PayoutAuditRecord, CampusPricingSettings,
-    BankTransferSettings,
+    BankTransferSettings, ManualRefund,
 )
 from .views import trigger_vendor_payout
 from .reconciliation import run_reconciliation
@@ -342,6 +342,81 @@ class VendorDebtAdmin(admin.ModelAdmin):
         )
         self.message_user(request, f"{updated} debt(s) written off.")
     write_off.short_description = "Write off selected debts (vendor will not be charged)"
+
+
+@admin.register(ManualRefund)
+class ManualRefundAdmin(admin.ModelAdmin):
+    """
+    Paper trail for refunds that can't go through Paystack — the temporary
+    bank-transfer checkout path (payments.models.BankTransferSettings) has
+    no real Paystack transaction to refund, so a buyer submits their own
+    bank details here and an admin sends the money back manually, then
+    marks it refunded with the action below.
+    """
+    list_display = [
+        'id', 'buyer', 'amount_display', 'order_link', 'status_badge',
+        'buyer_account_name', 'buyer_account_number', 'buyer_bank_name', 'created_at',
+    ]
+    list_filter = ['status', 'created_at']
+    search_fields = ['buyer__username', 'buyer__email', 'order__reference', 'buyer_account_number']
+    readonly_fields = [
+        'order', 'order_item', 'buyer', 'amount', 'reason', 'created_at',
+        'buyer_account_name', 'buyer_account_number', 'buyer_bank_name',
+        'resolved_at', 'resolved_by',
+    ]
+    ordering = ['-created_at']
+    actions = ['mark_refunded']
+
+    def has_add_permission(self, request):
+        # Only ever created automatically by payments.item_refund.
+        # mark_order_item_unavailable — a manually-added row wouldn't
+        # correspond to a real refund owed.
+        return False
+
+    def amount_display(self, obj):
+        return format_html('<strong>₦{}</strong>', f'{obj.amount:,.2f}')
+    amount_display.short_description = 'Amount'
+
+    def order_link(self, obj):
+        return obj.order.reference
+    order_link.short_description = 'Order'
+
+    def status_badge(self, obj):
+        colors = {'awaiting_bank_details': 'orange', 'awaiting_admin_action': 'purple', 'completed': 'green'}
+        return format_html(
+            '<span style="color:{};font-weight:bold;">{}</span>',
+            colors.get(obj.status, 'black'), obj.get_status_display(),
+        )
+    status_badge.short_description = 'Status'
+
+    def mark_refunded(self, request, queryset):
+        pending = queryset.filter(status='awaiting_admin_action')
+        count = 0
+        for refund in pending:
+            refund.status = 'completed'
+            refund.resolved_at = timezone.now()
+            refund.resolved_by = request.user
+            refund.save(update_fields=['status', 'resolved_at', 'resolved_by'])
+            try:
+                from accounts.utils import send_notification
+                send_notification(
+                    recipient=refund.buyer, notification_type='order_update',
+                    title='Refund Sent',
+                    message=(
+                        f'₦{refund.amount:,.2f} has been sent to {refund.buyer_account_name} '
+                        f'({refund.buyer_bank_name}).'
+                    ),
+                    action_url=f'/account/refunds/{refund.id}',
+                )
+            except Exception:
+                pass
+            count += 1
+        skipped = queryset.count() - count
+        msg = f"{count} refund(s) marked as sent."
+        if skipped:
+            msg += f" {skipped} skipped (not yet awaiting admin action)."
+        self.message_user(request, msg)
+    mark_refunded.short_description = "Mark selected as refunded (money already sent manually)"
 
 
 @admin.register(PayoutAuditRecord)

@@ -124,3 +124,174 @@ class MarkOrderItemUnavailableTests(TestCase):
 
         self.txn.refresh_from_db()
         self.assertEqual(self.txn.seller_amount, Decimal('5000'))  # unchanged — vendor already has the money
+
+
+class MarkOrderItemUnavailableBankTransferTests(TestCase):
+    """
+    A bank-transfer order (payments.models.PaymentTransaction.is_bank_transfer)
+    has no real Paystack transaction — refund_paystack_transaction must never
+    be called against it. Instead a ManualRefund record is created so the
+    buyer can submit their own bank details and an admin can send the money
+    back manually.
+    """
+    def setUp(self):
+        self.buyer = User.objects.create_user(username='irbt_buyer', email='irbt_buyer@pau.edu.ng', password='pass123')
+        self.vendor = User.objects.create_user(username='irbt_vendor', email='irbt_vendor@pau.edu.ng', password='pass123')
+        self.admin = User.objects.create_user(
+            username='irbt_admin', email='irbt_admin@pau.edu.ng', password='pass123', is_staff=True,
+        )
+        self.category = Category.objects.create(title='FoodIRBT', slug='food-irbt')
+        self.listing = Listing.objects.create(
+            title='Jollof Rice', description='x', payout_amount=Decimal('3000'), price=Decimal('3240'),
+            vendor=self.vendor, category=self.category, is_available=True,
+        )
+        self.order = Order.objects.create(
+            buyer=self.buyer, listing=self.listing, amount=Decimal('3240'),
+            reference='STX-BANKXFER-IRBT0001', status='paid',
+        )
+        self.item = OrderItem.objects.create(
+            order=self.order, listing=self.listing, quantity=1,
+            unit_price_at_order_time=Decimal('3240'), line_total=Decimal('3240'),
+        )
+        self.txn = PaymentTransaction.objects.create(
+            buyer=self.buyer, seller=self.vendor, reference='STX-BANKXFER-IRBT0001',
+            amount=Decimal('3240'), seller_amount=Decimal('3000'), platform_amount=Decimal('240'),
+            status='success', is_bank_transfer=True, buyer_email=self.buyer.email, order_id=self.order.id,
+        )
+
+    @patch('payments.views.refund_paystack_transaction')
+    def test_never_calls_paystack_refund(self, mock_refund):
+        mark_order_item_unavailable(self.item.id)
+        mock_refund.assert_not_called()
+
+    @patch('payments.views.refund_paystack_transaction')
+    def test_succeeds_and_marks_item_unavailable_with_no_error(self, mock_refund):
+        refund_amount, vendor_debt = mark_order_item_unavailable(self.item.id)
+        self.assertEqual(refund_amount, Decimal('3240'))
+        self.assertIsNone(vendor_debt)
+        self.item.refresh_from_db()
+        self.assertEqual(self.item.status, 'unavailable')
+
+    @patch('payments.views.refund_paystack_transaction')
+    def test_creates_manual_refund_record(self, mock_refund):
+        from payments.models import ManualRefund
+        mark_order_item_unavailable(self.item.id)
+        refund = ManualRefund.objects.get(order=self.order)
+        self.assertEqual(refund.buyer, self.buyer)
+        self.assertEqual(refund.amount, Decimal('3240'))
+        self.assertEqual(refund.status, 'awaiting_bank_details')
+        self.assertEqual(refund.order_item_id, self.item.id)
+
+    @patch('payments.views.refund_paystack_transaction')
+    def test_seller_amount_still_reduced_for_bookkeeping(self, mock_refund):
+        mark_order_item_unavailable(self.item.id)
+        self.txn.refresh_from_db()
+        self.assertEqual(self.txn.seller_amount, Decimal('0.00'))
+        self.assertEqual(self.txn.platform_amount, Decimal('0.00'))
+
+    @patch('payments.views.refund_paystack_transaction')
+    def test_notifies_buyer_and_admin(self, mock_refund):
+        from notifications.models import Notification
+        mark_order_item_unavailable(self.item.id)
+        self.assertTrue(Notification.objects.filter(recipient=self.buyer, title__icontains='Refund Owed').exists())
+        self.assertTrue(Notification.objects.filter(recipient=self.admin, title__icontains='Manual Refund Needed').exists())
+
+
+class ManualRefundSubmitAndResolveTests(TestCase):
+    def setUp(self):
+        self.buyer = User.objects.create_user(username='mr_buyer', email='mr_buyer@pau.edu.ng', password='pass123')
+        self.other_buyer = User.objects.create_user(username='mr_other', email='mr_other@pau.edu.ng', password='pass123')
+        self.vendor = User.objects.create_user(username='mr_vendor', email='mr_vendor@pau.edu.ng', password='pass123')
+        self.admin = User.objects.create_user(
+            username='mr_admin', email='mr_admin@pau.edu.ng', password='pass123', is_staff=True,
+        )
+        self.category = Category.objects.create(title='FoodMR', slug='food-mr')
+        self.listing = Listing.objects.create(
+            title='Jollof Rice', description='x', payout_amount=Decimal('3000'), price=Decimal('3240'),
+            vendor=self.vendor, category=self.category, is_available=True,
+        )
+        self.order = Order.objects.create(
+            buyer=self.buyer, listing=self.listing, amount=Decimal('3240'),
+            reference='STX-BANKXFER-MR0001', status='paid',
+        )
+        from payments.models import ManualRefund
+        self.refund = ManualRefund.objects.create(
+            order=self.order, buyer=self.buyer, amount=Decimal('3240'), reason='Item unavailable',
+        )
+
+    def test_buyer_can_view_own_refund(self):
+        from rest_framework.test import APIClient
+        client = APIClient()
+        client.force_authenticate(user=self.buyer)
+        res = client.get(f'/api/payments/manual-refunds/{self.refund.id}/')
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.data['status'], 'awaiting_bank_details')
+
+    def test_other_user_cannot_view_refund(self):
+        from rest_framework.test import APIClient
+        client = APIClient()
+        client.force_authenticate(user=self.other_buyer)
+        res = client.get(f'/api/payments/manual-refunds/{self.refund.id}/')
+        self.assertEqual(res.status_code, 403)
+
+    def test_buyer_submits_bank_details(self):
+        from rest_framework.test import APIClient
+        from notifications.models import Notification
+        client = APIClient()
+        client.force_authenticate(user=self.buyer)
+        res = client.post(f'/api/payments/manual-refunds/{self.refund.id}/', {
+            'account_name': 'Test Buyer', 'account_number': '0123456789', 'bank_name': 'Kuda',
+        }, format='json')
+        self.assertEqual(res.status_code, 200)
+
+        self.refund.refresh_from_db()
+        self.assertEqual(self.refund.status, 'awaiting_admin_action')
+        self.assertEqual(self.refund.buyer_account_number, '0123456789')
+        self.assertTrue(Notification.objects.filter(recipient=self.admin, title__icontains='Ready to Refund').exists())
+
+    def test_cannot_resubmit_bank_details_twice(self):
+        from rest_framework.test import APIClient
+        client = APIClient()
+        client.force_authenticate(user=self.buyer)
+        client.post(f'/api/payments/manual-refunds/{self.refund.id}/', {
+            'account_name': 'Test Buyer', 'account_number': '0123456789', 'bank_name': 'Kuda',
+        }, format='json')
+        res = client.post(f'/api/payments/manual-refunds/{self.refund.id}/', {
+            'account_name': 'Someone Else', 'account_number': '9999999999', 'bank_name': 'GTBank',
+        }, format='json')
+        self.assertEqual(res.status_code, 400)
+        self.refund.refresh_from_db()
+        self.assertEqual(self.refund.buyer_account_number, '0123456789')  # untouched
+
+    def test_admin_mark_refunded_action_notifies_buyer(self):
+        from django.contrib.auth import get_user_model
+        from notifications.models import Notification
+        self.refund.buyer_account_name = 'Test Buyer'
+        self.refund.buyer_account_number = '0123456789'
+        self.refund.buyer_bank_name = 'Kuda'
+        self.refund.status = 'awaiting_admin_action'
+        self.refund.save()
+
+        from payments.admin import ManualRefundAdmin
+        from payments.models import ManualRefund
+        from django.test import RequestFactory
+        factory = RequestFactory()
+        request = factory.post('/studex-portal-9f3a2/payments/manualrefund/')
+        request.user = self.admin
+        request._messages = _FakeMessages()
+
+        admin_instance = ManualRefundAdmin(ManualRefund, None)
+        admin_instance.mark_refunded(request, ManualRefund.objects.filter(id=self.refund.id))
+
+        self.refund.refresh_from_db()
+        self.assertEqual(self.refund.status, 'completed')
+        self.assertEqual(self.refund.resolved_by, self.admin)
+        self.assertIsNotNone(self.refund.resolved_at)
+        self.assertTrue(Notification.objects.filter(recipient=self.buyer, title__icontains='Refund Sent').exists())
+
+
+class _FakeMessages:
+    """Minimal stand-in for Django admin's request._messages, used only so
+    ModelAdmin.message_user() doesn't crash when called outside a real request."""
+    def add(self, *args, **kwargs):
+        pass

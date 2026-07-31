@@ -413,6 +413,11 @@ export const api = {
 
     bankTransferCart: (body: Record<string, unknown>) =>
       fetchWithAuth(u("/api/payments/bank-transfer-cart/"), { method: "POST", body: s(body) }),
+
+    manualRefund: (id: number | string) => fetchWithAuth(u(`/api/payments/manual-refunds/${id}/`)),
+
+    submitManualRefundBankDetails: (id: number | string, body: Record<string, unknown>) =>
+      fetchWithAuth(u(`/api/payments/manual-refunds/${id}/`), { method: "POST", body: s(body) }),
   },
 
   // ─── Cart ─────────────────────────────────────────────────────────────────
