@@ -610,6 +610,12 @@ export const api = {
     updateOrder: (id: number | string, body: Record<string, unknown>) =>
       fetchWithAuth(u(`/api/admin/orders/${id}/`), { method: "PATCH", body: s(body) }),
 
+    // Manual refunds (temporary bank-transfer settlement path)
+    manualRefund: (id: number | string) => fetchWithAuth(u(`/api/admin/manual-refunds/${id}/`)),
+
+    updateManualRefund: (id: number | string, body: Record<string, unknown>) =>
+      fetchWithAuth(u(`/api/admin/manual-refunds/${id}/`), { method: "PATCH", body: s(body) }),
+
     // Payments & transactions
     payment: (id: number | string) => fetchWithAuth(u(`/api/admin/payments/${id}/`)),
 

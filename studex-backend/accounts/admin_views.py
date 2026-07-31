@@ -752,6 +752,100 @@ except ImportError:
     AdminOrderDetailView = None
 
 
+# ============================================
+# MANUAL REFUNDS (temporary bank-transfer settlement path — see
+# payments.models.BankTransferSettings / ManualRefund). Powers the Next.js
+# admin dashboard directly — in-app notifications for these link here
+# (/admin/manual-refunds/{id}), not to Django Admin, since a client-side
+# Next.js route push can't navigate into a different app (Django Admin is
+# a separate origin/session entirely) — that mismatch is exactly what was
+# 404ing before this existed.
+# ============================================
+
+def _serialize_manual_refund(r):
+    return {
+        'id': r.id,
+        'order_id': r.order_id,
+        'order_reference': r.order.reference,
+        'buyer_username': r.buyer.username,
+        'amount': str(r.amount),
+        'reason': r.reason,
+        'status': r.status,
+        'item_title': r.order_item.listing.title if r.order_item_id else None,
+        'buyer_account_name': r.buyer_account_name,
+        'buyer_account_number': r.buyer_account_number,
+        'buyer_bank_name': r.buyer_bank_name,
+        'created_at': r.created_at.isoformat(),
+        'resolved_at': r.resolved_at.isoformat() if r.resolved_at else None,
+    }
+
+
+class AdminManualRefundListView(generics.ListAPIView):
+    """GET /api/admin/manual-refunds/ — newest first, optional ?status= filter."""
+    permission_classes = [IsAdminUser]
+    pagination_class = AdminPagination
+
+    def get_queryset(self):
+        from payments.models import ManualRefund
+        qs = ManualRefund.objects.select_related('order', 'buyer', 'order_item__listing').order_by('-created_at')
+        status_param = self.request.query_params.get('status')
+        if status_param:
+            qs = qs.filter(status=status_param)
+        return qs
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        data = [_serialize_manual_refund(r) for r in (page if page is not None else queryset)]
+        if page is not None:
+            return self.get_paginated_response(data)
+        return Response(data)
+
+
+class AdminManualRefundDetailView(APIView):
+    """
+    GET   /api/admin/manual-refunds/{id}/
+    PATCH /api/admin/manual-refunds/{id}/ — body: {"status": "completed"}
+    marks it refunded (money already sent manually) and notifies the buyer.
+    """
+    permission_classes = [IsAdminUser]
+
+    def get(self, request, refund_id):
+        from payments.models import ManualRefund
+        try:
+            r = ManualRefund.objects.select_related('order', 'buyer', 'order_item__listing').get(id=refund_id)
+        except ManualRefund.DoesNotExist:
+            return Response({'error': 'Refund not found'}, status=status.HTTP_404_NOT_FOUND)
+        return Response(_serialize_manual_refund(r))
+
+    def patch(self, request, refund_id):
+        from payments.models import ManualRefund
+        try:
+            r = ManualRefund.objects.select_related('order', 'buyer', 'order_item__listing').get(id=refund_id)
+        except ManualRefund.DoesNotExist:
+            return Response({'error': 'Refund not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        new_status = request.data.get('status')
+        if new_status == 'completed' and r.status != 'completed':
+            from django.utils import timezone as _tz
+            r.status = 'completed'
+            r.resolved_at = _tz.now()
+            r.resolved_by = request.user
+            r.save(update_fields=['status', 'resolved_at', 'resolved_by'])
+            try:
+                from accounts.utils import send_notification
+                send_notification(
+                    recipient=r.buyer, notification_type='order_update',
+                    title='Refund Sent',
+                    message=f'₦{r.amount:,.2f} has been sent to {r.buyer_account_name} ({r.buyer_bank_name}).',
+                    action_url=f'/account/refunds/{r.id}',
+                )
+            except Exception:
+                pass
+
+        return Response(_serialize_manual_refund(r))
+
+
 class AdminNotifyUserView(APIView):
     """POST /api/admin/users/<user_id>/notify/ — send a notification to any user."""
     permission_classes = [IsAdminUser]

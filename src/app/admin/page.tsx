@@ -5,7 +5,7 @@ import {
   Users, Package, DollarSign, Store, FileText, Tag, TrendingUp,
   ChevronRight, AlertCircle, CheckCircle,
   CreditCard, Star, AlertTriangle, ArrowUpRight,
-  ShoppingCart, MessageCircle, Send, Bot, RefreshCw, Percent,
+  ShoppingCart, MessageCircle, Send, Bot, RefreshCw, Percent, Banknote,
 } from "lucide-react";
 import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -71,6 +71,7 @@ const QUICK_LINKS = [
   { label: "Vendors",             href: "/admin/sellers",          icon: Store,        desc: "View verified vendors" },
   { label: "Listings",            href: "/admin/listings",         icon: Package,      desc: "Approve & manage listings" },
   { label: "Orders",              href: "/admin/orders",           icon: Package,      desc: "Monitor all orders" },
+  { label: "Manual Refunds",      href: "/admin/manual-refunds",   icon: Banknote,     desc: "Bank-transfer refunds awaiting your action" },
   { label: "Disputes",            href: "/admin/disputes",         icon: AlertTriangle,desc: "Resolve buyer/seller disputes" },
   { label: "Payouts",             href: "/admin/payouts",          icon: DollarSign,   desc: "Payments, bank accounts, escrow" },
   { label: "Bank Accounts",      href: "/admin/bank-accounts",    icon: CreditCard,   desc: "Vendor bank accounts & payout setup" },

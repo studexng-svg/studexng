@@ -15,6 +15,8 @@ from accounts.admin_views import (
     AdminListingBulkUpdateCategoryView,
     AdminOrderListView,
     AdminOrderDetailView,
+    AdminManualRefundListView,
+    AdminManualRefundDetailView,
     AdminDisputeListView,
     AdminDisputeDetailView,
     AdminPaymentListView,
@@ -77,6 +79,11 @@ if AdminOrderListView is not None:
         path('orders/', AdminOrderListView.as_view(), name='order-list'),
         path('orders/<int:order_id>/', AdminOrderDetailView.as_view(), name='order-detail'),
     ]
+
+urlpatterns += [
+    path('manual-refunds/', AdminManualRefundListView.as_view(), name='manual-refund-list'),
+    path('manual-refunds/<int:refund_id>/', AdminManualRefundDetailView.as_view(), name='manual-refund-detail'),
+]
 
 if AdminDisputeListView is not None:
     urlpatterns += [

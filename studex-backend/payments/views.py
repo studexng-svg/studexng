@@ -1197,7 +1197,7 @@ def manual_refund_detail(request, refund_id):
                     f'₦{refund.amount:,.2f} refund on order #{refund.order_id}. Send the money and '
                     f'mark it refunded in admin.'
                 ),
-                action_url='/studex-portal-9f3a2/payments/manualrefund/',
+                action_url=f'/admin/manual-refunds/{refund.id}',
                 send_email=False,
             )
     except Exception as ne:

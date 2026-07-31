@@ -137,7 +137,7 @@ def mark_order_item_unavailable(order_item_id):
                         f'{order.buyer.username} is owed ₦{refund_amount:,.2f} for order #{order.id} '
                         f'(item marked unavailable, paid by bank transfer). Waiting on their bank details.'
                     ),
-                    action_url='/studex-portal-9f3a2/payments/manualrefund/',
+                    action_url=f'/admin/manual-refunds/{manual_refund.id}',
                     send_email=False,
                 )
         except Exception:
