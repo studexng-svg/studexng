@@ -716,13 +716,13 @@ export default function CheckoutPage() {
              Demand isn't approved) ── */}
         {useBankTransfer && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 }}
-            className="bg-amber-50 border border-amber-200 rounded-2xl p-5 shadow-sm space-y-3">
-            <p className="font-bold text-amber-900 text-sm">Pay by Bank Transfer</p>
-            <p className="text-xs text-amber-700 leading-relaxed">
+            className="bg-purple-50 border border-purple-200 rounded-2xl p-5 shadow-sm space-y-3">
+            <p className="font-bold text-purple-900 text-sm">Pay by Bank Transfer</p>
+            <p className="text-xs text-purple-700 leading-relaxed">
               Transfer <strong>₦{finalTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong> to
               the account below. Your order will be confirmed once we verify the transfer — usually within a few minutes.
             </p>
-            <div className="bg-white border border-amber-200 rounded-xl p-4 space-y-1.5">
+            <div className="bg-white border border-purple-200 rounded-xl p-4 space-y-1.5">
               <div className="flex justify-between items-center text-sm">
                 <span className="text-stone-500">Account Name</span>
                 <span className="font-semibold text-stone-900">{bankTransferInfo?.account_name}</span>
@@ -739,8 +739,8 @@ export default function CheckoutPage() {
             <label className="flex items-start gap-2.5 cursor-pointer pt-1">
               <input type="checkbox" checked={bankTransferConfirmed}
                 onChange={e => setBankTransferConfirmed(e.target.checked)}
-                className="w-5 h-5 text-amber-600 rounded mt-0.5 focus:ring-0 flex-shrink-0" />
-              <span className="text-xs text-amber-800 leading-relaxed">
+                className="w-5 h-5 text-purple-600 rounded mt-0.5 focus:ring-0 flex-shrink-0" />
+              <span className="text-xs text-purple-800 leading-relaxed">
                 I've sent ₦{finalTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} to the account above.
               </span>
             </label>
@@ -821,7 +821,7 @@ export default function CheckoutPage() {
                 || (useBankTransfer ? !bankTransferConfirmed : !paystackLoaded)
               }
               className="w-full py-4 rounded-full font-semibold text-white text-base shadow-lg shadow-teal-200/60 flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{ background: useBankTransfer ? "#D97706" : TEAL }}>
+              style={{ background: useBankTransfer ? PURPLE : TEAL }}>
               {isProcessing ? (
                 <><Loader className="w-5 h-5 animate-spin" /> {useBankTransfer ? "Submitting..." : "Processing..."}</>
               ) : useBankTransfer ? (

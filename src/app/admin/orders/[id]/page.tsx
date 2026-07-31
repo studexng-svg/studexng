@@ -10,7 +10,7 @@ import { GRAD } from "@/lib/tokens";
 
 const STATUS_STYLE: Record<string, string> = {
   pending:                "bg-amber-100 text-amber-700",
-  pending_bank_transfer:  "bg-orange-100 text-orange-700",
+  pending_bank_transfer:  "bg-purple-100 text-purple-700",
   paid:                   "bg-amber-100 text-amber-700",
   seller_completed:       "bg-blue-100 text-blue-700",
   completed:              "bg-teal-100 text-teal-700",
@@ -251,10 +251,10 @@ export default function AdminOrderDetail() {
 
         {/* Bank Transfer Confirmation (temporary manual-settlement path) */}
         {order.status === "pending_bank_transfer" && (
-          <div className="bg-white border border-orange-200 rounded-2xl p-4 shadow-sm space-y-2">
-            <p className="text-orange-600 text-xs tracking-[0.2em] uppercase font-semibold mb-1">Bank Transfer Confirmation</p>
-            <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 mb-2">
-              <p className="text-orange-700 text-xs font-medium leading-relaxed">
+          <div className="bg-white border border-purple-200 rounded-2xl p-4 shadow-sm space-y-2">
+            <p className="text-purple-600 text-xs tracking-[0.2em] uppercase font-semibold mb-1">Bank Transfer Confirmation</p>
+            <div className="bg-purple-50 border border-purple-200 rounded-xl p-3 mb-2">
+              <p className="text-purple-700 text-xs font-medium leading-relaxed">
                 Buyer says they've transferred <strong>₦{order.amount ? Number(order.amount).toLocaleString() : "?"}</strong> to
                 your bank account. Check your account, then confirm or reject below — the vendor is
                 only notified and a rider only assigned once you confirm.

@@ -145,7 +145,7 @@ export default function OrderConfirmationPage() {
         <div className="flex justify-center pt-2 animate-fadeUp">
           <div
             className="w-20 h-20 rounded-full flex items-center justify-center shadow-lg"
-            style={{ background: isPendingBankTransfer ? "#D97706" : TEAL }}
+            style={{ background: isPendingBankTransfer ? PURPLE : TEAL }}
           >
             {isPendingBankTransfer ? <Clock className="w-10 h-10 text-white" /> : <CheckCircle className="w-10 h-10 text-white" />}
           </div>
@@ -153,7 +153,7 @@ export default function OrderConfirmationPage() {
 
         {/* HEADING */}
         <div className="text-center animate-fadeUp">
-          <p className={`text-xs tracking-[0.25em] uppercase font-semibold ${isPendingBankTransfer ? "text-amber-600" : "text-teal-600"}`}>
+          <p className={`text-xs tracking-[0.25em] uppercase font-semibold ${isPendingBankTransfer ? "text-purple-600" : "text-teal-600"}`}>
             {isPendingBankTransfer ? "Awaiting Confirmation" : "Payment Successful"}
           </p>
           <h2 className="text-2xl font-bold text-stone-900 mt-0.5"
@@ -222,13 +222,13 @@ export default function OrderConfirmationPage() {
 
         {/* PAYMENT SECURED / AWAITING CONFIRMATION */}
         {isPendingBankTransfer ? (
-          <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 flex items-start gap-3 animate-fadeUp">
-            <div className="w-9 h-9 bg-amber-600 rounded-full flex items-center justify-center flex-shrink-0">
+          <div className="bg-purple-50 border border-purple-100 rounded-2xl p-4 flex items-start gap-3 animate-fadeUp">
+            <div className="w-9 h-9 bg-purple-600 rounded-full flex items-center justify-center flex-shrink-0">
               <Clock className="w-4 h-4 text-white" />
             </div>
             <div>
-              <p className="font-semibold text-amber-900 text-sm">Confirming Your Transfer</p>
-              <p className="text-xs text-amber-700 mt-0.5 leading-relaxed">
+              <p className="font-semibold text-purple-900 text-sm">Confirming Your Transfer</p>
+              <p className="text-xs text-purple-700 mt-0.5 leading-relaxed">
                 The vendor won't be notified and no rider will be assigned until we confirm your transfer arrived. You'll get a notification the moment it's confirmed.
               </p>
             </div>
