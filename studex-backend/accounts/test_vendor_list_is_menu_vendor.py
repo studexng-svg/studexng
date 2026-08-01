@@ -5,10 +5,13 @@ Food/Marketplace separation). This field is what src/app/home/HomePageClient.tsx
 uses to split vendors into the "Restaurants" strip vs the general Vendors tab,
 so a wrong value here silently breaks that whole UI split.
 """
+from decimal import Decimal
+
 from django.test import TestCase
 
 from accounts.models import User, Vendor, VendorType
 from accounts.serializers import VendorListSerializer
+from services.models import Category, Listing, MenuItem
 
 
 class IsMenuVendorFieldTests(TestCase):
@@ -101,3 +104,75 @@ class HasVendorTypeFieldTests(TestCase):
         )
         data = VendorListSerializer(user).data
         self.assertFalse(data['has_vendor_type'])
+
+
+class TotalListingsFieldTests(TestCase):
+    """
+    Regression: VendorListSerializer.total_listings only checked
+    Listing.is_available — a menu vendor's "Hide from buyers"/"Archive"
+    toggle on the Kitchen page sets MenuItem.is_hidden/is_archived instead,
+    never touching is_available. A vendor who hid every dish still showed
+    their old listing count on the home page (both the Stores strip and
+    the marketplace Vendors tab, which share this same field) while the
+    actual store page correctly showed zero items.
+    """
+    def setUp(self):
+        self.food_type = VendorType.objects.create(
+            name='food-total-listings', display_name='Food (test)', supports_menu_ordering=True,
+        )
+        self.category = Category.objects.create(title='FoodTL', slug='food-tl')
+
+    def _make_menu_vendor(self, username):
+        user = User.objects.create_user(
+            username=username, email=f'{username}@pau.edu.ng', password='pass12345',
+            user_type='vendor', business_name=username, is_verified_vendor=True,
+        )
+        Vendor.objects.create(user=user, vendor_type=self.food_type)
+        return user
+
+    def _make_dish(self, vendor, title, is_hidden=False, is_archived=False):
+        listing = Listing.objects.create(
+            title=title, description='x', price=Decimal('1500.00'),
+            vendor=vendor, category=self.category, is_available=True,
+        )
+        MenuItem.objects.create(listing=listing, is_hidden=is_hidden, is_archived=is_archived)
+        return listing
+
+    def test_hidden_menu_items_excluded_from_count(self):
+        vendor = self._make_menu_vendor('tl_hidden')
+        self._make_dish(vendor, 'Visible Dish')
+        self._make_dish(vendor, 'Hidden Dish', is_hidden=True)
+        data = VendorListSerializer(vendor).data
+        self.assertEqual(data['total_listings'], 1)
+
+    def test_archived_menu_items_excluded_from_count(self):
+        vendor = self._make_menu_vendor('tl_archived')
+        self._make_dish(vendor, 'Visible Dish')
+        self._make_dish(vendor, 'Archived Dish', is_archived=True)
+        data = VendorListSerializer(vendor).data
+        self.assertEqual(data['total_listings'], 1)
+
+    def test_all_items_hidden_shows_zero_not_stale_count(self):
+        """The exact bug report: vendor hides everything, count must read 0, not the old total."""
+        vendor = self._make_menu_vendor('tl_allhidden')
+        for i in range(6):
+            self._make_dish(vendor, f'Dish {i}', is_hidden=True)
+        data = VendorListSerializer(vendor).data
+        self.assertEqual(data['total_listings'], 0)
+
+    def test_plain_marketplace_listing_with_no_menu_item_still_counted(self):
+        """A non-menu-vendor listing (no MenuItem row at all) is unaffected."""
+        retail_type = VendorType.objects.create(
+            name='retail-total-listings', display_name='Retail (test)', supports_menu_ordering=False,
+        )
+        vendor = User.objects.create_user(
+            username='tl_retail', email='tl_retail@pau.edu.ng', password='pass12345',
+            user_type='vendor', business_name='tl_retail', is_verified_vendor=True,
+        )
+        Vendor.objects.create(user=vendor, vendor_type=retail_type)
+        Listing.objects.create(
+            title='Shoes', description='x', price=Decimal('5000.00'),
+            vendor=vendor, category=self.category, is_available=True,
+        )
+        data = VendorListSerializer(vendor).data
+        self.assertEqual(data['total_listings'], 1)

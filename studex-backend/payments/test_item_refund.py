@@ -73,6 +73,35 @@ class MarkOrderItemUnavailableTests(TestCase):
         self.assertEqual(self.item_b.status, 'fulfilled')
 
     @patch('payments.views.refund_paystack_transaction', return_value=True)
+    def test_order_stays_in_progress_while_a_sibling_item_is_still_fulfilled(self, mock_refund):
+        mark_order_item_unavailable(self.item_a.id)
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.status, 'paid')
+
+    @patch('payments.views.refund_paystack_transaction', return_value=True)
+    def test_order_cancelled_once_every_item_is_unavailable(self, mock_refund):
+        """
+        Regression: marking the last remaining item unavailable left the
+        order itself stuck at 'paid' ("in progress" to the buyer) forever —
+        nothing updated Order.status once there was nothing left to fulfill.
+        """
+        mark_order_item_unavailable(self.item_a.id)
+        mark_order_item_unavailable(self.item_b.id)
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.status, 'cancelled')
+
+    @patch('payments.views.refund_paystack_transaction', return_value=False)
+    def test_paystack_failure_reverts_order_cancellation_too(self, mock_refund):
+        """If this was the order's only fulfilled item and the refund call then
+        fails, the order-level cancellation must revert alongside the item."""
+        # Make item_a the only item so marking it unavailable would cancel the order.
+        self.item_b.delete()
+        with self.assertRaises(ItemRefundError):
+            mark_order_item_unavailable(self.item_a.id)
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.status, 'paid')  # not left stuck as 'cancelled'
+
+    @patch('payments.views.refund_paystack_transaction', return_value=True)
     def test_seller_and_platform_amounts_reduced_proportionally_and_sum_to_refund(self, mock_refund):
         mark_order_item_unavailable(self.item_a.id)
         self.txn.refresh_from_db()
@@ -163,6 +192,17 @@ class MarkOrderItemUnavailableBankTransferTests(TestCase):
     def test_never_calls_paystack_refund(self, mock_refund):
         mark_order_item_unavailable(self.item.id)
         mock_refund.assert_not_called()
+
+    @patch('payments.views.refund_paystack_transaction')
+    def test_order_cancelled_when_its_only_item_marked_unavailable(self, mock_refund):
+        """
+        The exact bug report: a rider marks a single-item bank-transfer
+        order's only item unavailable — the buyer's order list kept showing
+        it "in progress" forever instead of cancelled.
+        """
+        mark_order_item_unavailable(self.item.id)
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.status, 'cancelled')
 
     @patch('payments.views.refund_paystack_transaction')
     def test_succeeds_and_marks_item_unavailable_with_no_error(self, mock_refund):

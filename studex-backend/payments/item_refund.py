@@ -29,7 +29,7 @@ second fast atomic transaction.
 from decimal import Decimal
 from django.db import transaction as db_transaction
 
-from orders.models import OrderItem
+from orders.models import Order, OrderItem
 from payments.models import PaymentTransaction, VendorDebt
 
 
@@ -88,11 +88,26 @@ def mark_order_item_unavailable(order_item_id):
         platform_share = refund_amount - vendor_share  # whatever's left — avoids a rounding gap
         already_paid_out = bool(txn.transfer_reference)
         is_bank_transfer = txn.is_bank_transfer
+        previous_order_status = order.status
 
         # The claim — visible to a concurrent call on this same item
         # immediately, before the slow external call below.
         item.status = 'unavailable'
         item.save(update_fields=['status'])
+
+        # If every item in the order is now unavailable, there's nothing
+        # left to fulfill — the order itself must read as cancelled to the
+        # buyer, not stay stuck at "in progress" indefinitely (the common
+        # case in practice: a single-item order where that one item was
+        # marked unavailable). A multi-item order with other items still
+        # fulfilled is untouched — order.items here already reflects this
+        # transaction's own write, same connection. Reverted below alongside
+        # the item's own claim if the Paystack refund call then fails.
+        order_was_cancelled_here = False
+        if not order.items.exclude(status='unavailable').exists():
+            order.status = 'cancelled'
+            order.save(update_fields=['status'])
+            order_was_cancelled_here = True
 
     if is_bank_transfer:
         # Bookkeeping still adjusts down (same as the normal path below) so
@@ -149,8 +164,12 @@ def mark_order_item_unavailable(order_item_id):
     if not ok:
         # Release the claim — same "revert on failure" discipline as
         # refund_payment(). The item is fulfilled again as far as the
-        # system knows; the caller can retry.
+        # system knows; the caller can retry. Also reverts the order-level
+        # cancellation above if this was the item that triggered it — the
+        # order is genuinely still in progress since the item is back.
         OrderItem.objects.filter(id=order_item_id).update(status='fulfilled')
+        if order_was_cancelled_here:
+            Order.objects.filter(id=order.id).update(status=previous_order_status)
         raise ItemRefundError("Refund could not be processed. Please contact support.")
 
     vendor_debt = None

@@ -703,7 +703,17 @@ class VendorListSerializer(serializers.ModelSerializer):
             return 0.0
 
     def get_total_listings(self, obj):
-        return obj.listings.filter(is_available=True).count()
+        # is_available alone isn't enough for a menu vendor: "Hide from
+        # buyers" on the Kitchen/Menu page sets MenuItem.is_hidden (and
+        # "Archive" sets MenuItem.is_archived), never Listing.is_available —
+        # so a vendor who hid every dish still showed their old count here
+        # while the actual store page correctly showed zero. A plain
+        # marketplace listing has no linked MenuItem at all, so it's
+        # unaffected either way.
+        from django.db.models import Q
+        return obj.listings.filter(is_available=True).filter(
+            Q(menu_item__isnull=True) | Q(menu_item__is_hidden=False, menu_item__is_archived=False)
+        ).count()
 
     avg_response_minutes = serializers.SerializerMethodField()
 
