@@ -18,7 +18,7 @@ from django.db import IntegrityError
 from rest_framework.test import APIClient
 
 from accounts.models import User
-from services.models import Category, Listing, MenuItem, AddonGroup, Addon
+from services.models import Category, Listing, MenuItem, AddonGroup, Addon, Deal
 from cart.models import CartItem, CartItemAddon, compute_addon_signature
 
 
@@ -481,3 +481,76 @@ class CartItemSerializerVendorFieldsTests(TestCase):
         self.assertEqual(vendor_ids, {self.vendor_a.id, self.vendor_b.id})
         usernames = {row['vendor_username'] for row in response.data}
         self.assertEqual(usernames, {'ser_vendor_a', 'ser_vendor_b'})
+
+
+class CartEffectivePriceDiscountTests(TestCase):
+    """
+    Regression: CartItemSerializer.effective_price only ever checked
+    Listing.deal (a separate, admin-only model) — a vendor's own
+    self-service discount (Listing.discount_percent, exposed elsewhere as
+    ListingSerializer.sale_price) was silently ignored, so a listing with
+    only a vendor-set discount showed full price in the cart even though
+    the listing/home page correctly displayed the sale price. The actual
+    checkout charge (payments.views.initialize_payment) already handled
+    both mechanisms correctly — this was a cart-display-only bug.
+    """
+    def setUp(self):
+        self.client = APIClient()
+        self.buyer = User.objects.create_user(username='disc_buyer', email='disc_buyer@pau.edu.ng', password='pass123')
+        self.vendor = User.objects.create_user(username='disc_vendor', email='disc_vendor@pau.edu.ng', password='pass123')
+        self.category = Category.objects.create(title='FoodDisc', slug='food-disc')
+        self.client.force_authenticate(user=self.buyer)
+
+    def test_vendor_discount_percent_applied_to_cart_price(self):
+        listing = Listing.objects.create(
+            title='Shoes', description='x', price=Decimal('2000.00'), discount_percent=20,
+            vendor=self.vendor, category=self.category, is_available=True,
+        )
+        self.client.post('/api/cart/add/', {'listing_id': listing.id, 'quantity': 1})
+        response = self.client.get('/api/cart/')
+        row = response.data[0]
+
+        self.assertEqual(Decimal(str(row['effective_price'])), Decimal('1600.00'))  # 2000 - 20%
+        self.assertEqual(row['deal_discount_percent'], 20)
+        self.assertNotEqual(Decimal(str(row['effective_price'])), Decimal(str(row['price'])))
+
+    def test_no_discount_at_all_shows_bare_price(self):
+        listing = Listing.objects.create(
+            title='Bag', description='x', price=Decimal('3000.00'),
+            vendor=self.vendor, category=self.category, is_available=True,
+        )
+        self.client.post('/api/cart/add/', {'listing_id': listing.id, 'quantity': 1})
+        response = self.client.get('/api/cart/')
+        row = response.data[0]
+
+        self.assertEqual(Decimal(str(row['effective_price'])), Decimal('3000.00'))
+        self.assertEqual(row['deal_discount_percent'], 0)
+
+    def test_admin_deal_takes_priority_over_vendor_discount_percent(self):
+        """Both mechanisms active at once (unusual) — the admin Deal wins."""
+        listing = Listing.objects.create(
+            title='Watch', description='x', price=Decimal('1000.00'), discount_percent=10,
+            vendor=self.vendor, category=self.category, is_available=True,
+        )
+        Deal.objects.create(listing=listing, discount_percent=50, is_active=True)
+
+        self.client.post('/api/cart/add/', {'listing_id': listing.id, 'quantity': 1})
+        response = self.client.get('/api/cart/')
+        row = response.data[0]
+
+        self.assertEqual(Decimal(str(row['effective_price'])), Decimal('500.00'))  # 1000 - 50%, not 10%
+        self.assertEqual(row['deal_discount_percent'], 50)
+
+    def test_inactive_deal_falls_back_to_vendor_discount_percent(self):
+        listing = Listing.objects.create(
+            title='Bag 2', description='x', price=Decimal('1000.00'), discount_percent=15,
+            vendor=self.vendor, category=self.category, is_available=True,
+        )
+        Deal.objects.create(listing=listing, discount_percent=50, is_active=False)
+
+        self.client.post('/api/cart/add/', {'listing_id': listing.id, 'quantity': 1})
+        response = self.client.get('/api/cart/')
+        row = response.data[0]
+
+        self.assertEqual(Decimal(str(row['effective_price'])), Decimal('850.00'))  # 1000 - 15%
+        self.assertEqual(row['deal_discount_percent'], 15)

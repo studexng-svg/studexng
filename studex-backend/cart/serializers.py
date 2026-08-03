@@ -65,6 +65,15 @@ class CartItemSerializer(serializers.ModelSerializer):
                 return deal.discount_percent
         except Exception:
             pass
+        # No admin Deal row — fall back to the vendor's own self-service
+        # discount (services.models.Listing.discount_percent, exposed
+        # elsewhere as ListingSerializer.sale_price). These are two
+        # independent discount mechanisms; the cart previously only ever
+        # checked Deal, so a vendor's own discounted listing silently
+        # showed full price in the cart even though the listing/home page
+        # displayed the sale price correctly via sale_price.
+        if obj.listing.discount_percent and obj.listing.discount_percent > 0:
+            return obj.listing.discount_percent
         return 0
 
     def get_effective_price(self, obj):
@@ -93,4 +102,11 @@ class CartItemSerializer(serializers.ModelSerializer):
                 return float(deal.discounted_price)
         except Exception:
             pass
+        # No admin Deal — same fallback as get_deal_discount_percent above.
+        # Matches ListingSerializer.get_sale_price's exact formula so the
+        # cart's price always agrees with what the listing/home page shows.
+        if obj.listing.discount_percent and obj.listing.discount_percent > 0:
+            from decimal import Decimal
+            price = obj.listing.price
+            return float(price - price * Decimal(obj.listing.discount_percent) / 100)
         return float(obj.listing.price)
