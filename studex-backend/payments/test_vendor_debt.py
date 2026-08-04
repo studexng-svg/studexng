@@ -338,6 +338,28 @@ class RetryFailedTransfersDebtTests(TestCase):
         )
 
     @override_settings(PAYSTACK_SECRET_KEY="sk_test_x")
+    def test_retry_never_attempts_bank_transfer_transaction(self):
+        """
+        Regression: a bank-transfer transaction's transfer_reference is
+        permanently blank by design (no automated transfer was ever
+        attempted for it) — it would otherwise match this job's candidate
+        query every single hour forever and trigger a real Paystack
+        transfer, double-paying the vendor on top of whatever the admin
+        already sent them manually.
+        """
+        from scheduler import retry_failed_transfers
+
+        txn = make_txn(
+            seller=self.seller, seller_amount=Decimal("950.00"), transfer_reference="",
+            is_bank_transfer=True,
+        )
+        with patch("requests.post") as mock_post:
+            retry_failed_transfers()
+            mock_post.assert_not_called()
+        txn.refresh_from_db()
+        self.assertEqual(txn.transfer_reference, "")
+
+    @override_settings(PAYSTACK_SECRET_KEY="sk_test_x")
     def test_retry_deducts_outstanding_debt_before_sending(self):
         from scheduler import retry_failed_transfers
 

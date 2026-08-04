@@ -280,10 +280,16 @@ def retry_failed_transfers():
     }
     paystack_base = 'https://api.paystack.co'
 
-    # Candidates: success payment, no confirmed payout, retries still available
+    # Candidates: success payment, no confirmed payout, retries still available.
+    # is_bank_transfer transactions never touched Paystack at all (see
+    # payments.views.trigger_vendor_payout's own guard) — their
+    # transfer_reference stays permanently blank by design, not because a
+    # transfer failed, so they'd otherwise match every hour forever with
+    # nothing to actually retry.
     candidates = PaymentTransaction.objects.filter(
         status='success',
         transfer_retry_count__lt=MAX_TRANSFER_RETRIES,
+        is_bank_transfer=False,
     ).filter(
         Q(transfer_status='failed') |
         Q(transfer_status='reversed') |

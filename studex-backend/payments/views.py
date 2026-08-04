@@ -2425,7 +2425,25 @@ def trigger_vendor_payout(txn, listing_title):
     payout on a different transaction. If the debt fully absorbs this
     payout, no Paystack transfer is sent; the transaction is marked so retry
     jobs and reconciliation don't treat it as unpaid or failed.
+
+    is_bank_transfer transactions (the temporary manual-settlement path —
+    see payments.models.BankTransferSettings) never touched Paystack at
+    all, so a Transfer API call here would pay the vendor out of Paystack
+    balance that some *other* buyer contributed — a real double-payment,
+    on top of whatever the admin already sent this vendor manually. Every
+    call site (rider pickup, admin order-complete, dispute resolution, the
+    admin "retry transfer" action, buyer confirmation, the hourly retry
+    scheduler) goes through this one function, so the guard lives here
+    once instead of needing to be repeated — and remembered — at each of
+    them.
     """
+    if getattr(txn, 'is_bank_transfer', False):
+        logger.info(
+            f"trigger_vendor_payout: skipped for txn {txn.reference} — bank-transfer order, "
+            f"vendor is paid manually, not via Paystack Transfer API."
+        )
+        return
+
     seller = txn.seller
     if not seller:
         logger.error(f"trigger_vendor_payout: no seller on txn {txn.reference}")

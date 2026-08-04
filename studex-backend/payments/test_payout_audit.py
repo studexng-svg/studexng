@@ -48,6 +48,61 @@ class PayoutAuditRecordBase(TestCase):
         )
 
 
+class TriggerVendorPayoutSkipsBankTransferTests(PayoutAuditRecordBase):
+    """
+    Regression: RiderUpdateStatusView's pickup-triggered settlement (and
+    every other trigger_vendor_payout call site — admin order-complete,
+    dispute resolution, the admin "retry transfer" action, buyer
+    confirmation, the hourly retry scheduler) called trigger_vendor_payout
+    with no awareness that the underlying order might have been paid via
+    the manual bank-transfer path, not Paystack. A bank-transfer
+    transaction's transfer_reference is always blank (no automated
+    transfer was ever attempted), which made it look exactly like a normal
+    unpaid vendor — so a real Paystack Transfer fired for it, paying the
+    vendor a second time (once by the admin manually, once from Paystack
+    balance actually contributed by some other buyer). The guard lives
+    inside trigger_vendor_payout itself so every call site is protected at
+    once, not just the ones that remember to check.
+    """
+    @override_settings(PAYSTACK_SECRET_KEY="sk_test_x")
+    def test_no_paystack_call_for_bank_transfer_transaction(self):
+        txn = make_txn(seller=self.seller, seller_amount=Decimal("950.00"), is_bank_transfer=True)
+        with patch("payments.views.requests.post") as mock_post:
+            trigger_vendor_payout(txn, "Test Listing")
+            mock_post.assert_not_called()
+
+    @override_settings(PAYSTACK_SECRET_KEY="sk_test_x")
+    def test_transfer_reference_stays_blank_for_bank_transfer_transaction(self):
+        txn = make_txn(seller=self.seller, seller_amount=Decimal("950.00"), is_bank_transfer=True)
+        with patch("payments.views.requests.post") as mock_post:
+            trigger_vendor_payout(txn, "Test Listing")
+        txn.refresh_from_db()
+        self.assertFalse(txn.transfer_reference)  # untouched — model default (None), never set to a real Paystack ref
+        self.assertNotEqual(txn.transfer_status, "success")
+
+    @override_settings(PAYSTACK_SECRET_KEY="sk_test_x")
+    def test_no_payout_audit_record_created_for_bank_transfer_transaction(self):
+        from payments.models import PayoutAuditRecord
+        txn = make_txn(seller=self.seller, seller_amount=Decimal("950.00"), is_bank_transfer=True)
+        with patch("payments.views.requests.post") as mock_post:
+            trigger_vendor_payout(txn, "Test Listing")
+        self.assertFalse(PayoutAuditRecord.objects.filter(transaction=txn).exists())
+
+    @override_settings(PAYSTACK_SECRET_KEY="sk_test_x")
+    def test_normal_paystack_transaction_still_pays_out_as_before(self):
+        """Sanity check the guard doesn't accidentally swallow the normal path."""
+        txn = make_txn(seller=self.seller, seller_amount=Decimal("950.00"), is_bank_transfer=False)
+        with patch("payments.views.requests.post") as mock_post:
+            mock_post.return_value = MagicMock(
+                status_code=200,
+                json=lambda: {"status": True, "data": {"reference": "PSTK-REF", "status": "success"}},
+            )
+            trigger_vendor_payout(txn, "Test Listing")
+            mock_post.assert_called_once()
+        txn.refresh_from_db()
+        self.assertEqual(txn.transfer_reference, "PSTK-REF")
+
+
 class TransferToVendorAuditTests(PayoutAuditRecordBase):
     @override_settings(PAYSTACK_SECRET_KEY="sk_test_x")
     def test_audit_record_created_on_successful_transfer(self):
