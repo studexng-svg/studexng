@@ -235,12 +235,44 @@ class AdminUserDetailView(APIView):
         try:
             user = User.objects.select_related('profile').get(id=user_id)
             serializer = UserSerializer(user)
-            return Response(serializer.data, status=status.HTTP_200_OK)
+            data = serializer.data
+            data['vendor'] = self._serialize_vendor(user)
+            return Response(data, status=status.HTTP_200_OK)
         except User.DoesNotExist:
             return Response(
                 {'error': 'User not found'},
                 status=status.HTTP_404_NOT_FOUND
             )
+
+    def _serialize_vendor(self, user):
+        """
+        Delivery fee / free-delivery-quota block for the admin dashboard.
+        None when the user has no accounts.models.Vendor row at all (never
+        approved as a vendor) — distinct from a Vendor row that simply has no
+        fee configured (delivery_fee=0), which returns real zeros below.
+        Read-only lookup — never creates a Vendor row as a side effect of GET.
+        """
+        from accounts.models import Vendor
+        from orders.models import Order
+        try:
+            v = user.vendor
+        except Vendor.DoesNotExist:
+            return None
+
+        used = None
+        remaining = None
+        if v.free_delivery_quota is not None:
+            used = Order.objects.filter(
+                listing__vendor=user, delivery_slot__isnull=False,
+            ).exclude(status='cancelled').count()
+            remaining = max(v.free_delivery_quota - used, 0)
+
+        return {
+            'delivery_fee': str(v.delivery_fee),
+            'free_delivery_quota': v.free_delivery_quota,
+            'free_deliveries_used': used,
+            'free_deliveries_remaining': remaining,
+        }
 
     def patch(self, request, user_id):
         """
@@ -251,6 +283,9 @@ class AdminUserDetailView(APIView):
             - is_staff: Grant/revoke admin access
             - user_type: Change user type
             - profile.is_verified_vendor: Verify vendor
+            - vendor.delivery_fee / vendor.free_delivery_quota: Delivery fee
+              and "first N deliveries free" promo quota (see delivery.fees).
+              Only meaningful for a vendor using batched delivery.
         """
         try:
             user = User.objects.get(id=user_id)
@@ -292,8 +327,55 @@ class AdminUserDetailView(APIView):
                     user.is_verified_vendor = request.data['profile']['is_verified_vendor']
                     user.save()
 
+            # Update delivery fee / free-delivery-quota (lives on the
+            # dedicated Vendor row, not User or Profile)
+            if 'vendor' in request.data:
+                from accounts.models import Vendor
+                from decimal import Decimal, InvalidOperation
+
+                vendor_data = request.data['vendor']
+
+                if 'delivery_fee' in vendor_data:
+                    try:
+                        fee = Decimal(str(vendor_data['delivery_fee']))
+                    except (InvalidOperation, TypeError):
+                        return Response(
+                            {'error': 'delivery_fee must be a number'},
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
+                    if fee < 0:
+                        return Response(
+                            {'error': 'delivery_fee cannot be negative'},
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
+
+                if 'free_delivery_quota' in vendor_data:
+                    quota = vendor_data['free_delivery_quota']
+                    if quota is not None:
+                        try:
+                            quota = int(quota)
+                        except (TypeError, ValueError):
+                            return Response(
+                                {'error': 'free_delivery_quota must be an integer or null'},
+                                status=status.HTTP_400_BAD_REQUEST
+                            )
+                        if quota < 0:
+                            return Response(
+                                {'error': 'free_delivery_quota cannot be negative'},
+                                status=status.HTTP_400_BAD_REQUEST
+                            )
+
+                v, _ = Vendor.objects.get_or_create(user=user)
+                if 'delivery_fee' in vendor_data:
+                    v.delivery_fee = fee
+                if 'free_delivery_quota' in vendor_data:
+                    v.free_delivery_quota = quota
+                v.save()
+
             serializer = UserSerializer(user)
-            return Response(serializer.data, status=status.HTTP_200_OK)
+            data = serializer.data
+            data['vendor'] = self._serialize_vendor(user)
+            return Response(data, status=status.HTTP_200_OK)
 
         except User.DoesNotExist:
             return Response(

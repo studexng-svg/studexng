@@ -4,7 +4,7 @@
 import {
   Mail, Phone, ShieldCheck, User, Ban, AlertTriangle, Users,
   Store, Hash, Home, MessageCircle, Instagram, Star,
-  ShoppingBag, Wallet, Calendar, BadgeCheck, Shield, Clock, Truck,
+  ShoppingBag, Wallet, Calendar, BadgeCheck, Shield, Clock, Truck, Bike,
 } from "lucide-react";
 import AdminTopBar from "@/components/layout/AdminTopBar";
 import { useParams, useRouter } from "next/navigation";
@@ -62,6 +62,9 @@ export default function AdminUserDetail() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState("");
+  const [deliveryFee, setDeliveryFee] = useState("0");
+  const [deliveryQuota, setDeliveryQuota] = useState("");
+  const [deliverySaving, setDeliverySaving] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -71,6 +74,16 @@ export default function AdminUserDetail() {
       .catch(() => setUser(null))
       .finally(() => setLoading(false));
   }, [id]);
+
+  // Re-sync the editable delivery fields whenever the user reloads or a
+  // save round-trips a fresh vendor block back — never fires on every
+  // keystroke since it only depends on `user`, not deliveryFee/deliveryQuota.
+  useEffect(() => {
+    setDeliveryFee(user?.vendor?.delivery_fee ?? "0");
+    setDeliveryQuota(
+      user?.vendor?.free_delivery_quota != null ? String(user.vendor.free_delivery_quota) : ""
+    );
+  }, [user]);
 
   const patch = async (body: object) => {
     setActionLoading(true);
@@ -112,6 +125,25 @@ export default function AdminUserDetail() {
   const isRider = user.user_type === "rider";
   const p = user.profile || {};
   const initials = (user.business_name || user.username || "?").slice(0, 2).toUpperCase();
+
+  const saveDeliverySettings = async () => {
+    setDeliverySaving(true);
+    setError("");
+    try {
+      const body: Record<string, unknown> = {
+        delivery_fee: deliveryFee.trim() === "" ? "0" : deliveryFee,
+        free_delivery_quota: deliveryQuota.trim() === "" ? null : Number(deliveryQuota),
+      };
+      const res = await api.admin.updateUser(id as string, { vendor: body });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed");
+      setUser(data);
+    } catch (e: any) {
+      setError(e.message || "Action failed");
+    } finally {
+      setDeliverySaving(false);
+    }
+  };
 
   const handleRiderToggle = async () => {
     setActionLoading(true);
@@ -225,6 +257,49 @@ export default function AdminUserDetail() {
             <Row icon={Users}          label="Total Reviews"    value={p.total_reviews} />
             <Row icon={Wallet}         label="On-Platform Sales" value={p.on_platform_sales ? `₦${parseFloat(p.on_platform_sales).toLocaleString()}` : null} />
             <Row icon={BadgeCheck}     label="Vendor Badge"     value={p.vendor_badge} />
+          </Section>
+        )}
+
+        {/* Delivery fee + free-delivery promo (batched-delivery vendors only) */}
+        {isVendor && (
+          <Section title="Delivery">
+            <p className="text-xs text-stone-400 mb-3">
+              Only takes effect if this vendor uses batched delivery (has an active delivery slot).
+              ₦0 fee (default) means delivery is always free — nothing else here matters. Leave the
+              quota blank to always charge the fee with no free-delivery promo.
+            </p>
+            <div className="grid grid-cols-2 gap-3 mb-1">
+              <div>
+                <label className="text-xs font-semibold text-stone-500 mb-1 block">Delivery fee (₦)</label>
+                <input
+                  type="number" min="0" value={deliveryFee}
+                  onChange={e => setDeliveryFee(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl border border-stone-200 text-sm focus:outline-none focus:border-teal-500"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-stone-500 mb-1 block">Free delivery quota</label>
+                <input
+                  type="number" min="0" placeholder="Always charge" value={deliveryQuota}
+                  onChange={e => setDeliveryQuota(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl border border-stone-200 text-sm focus:outline-none focus:border-teal-500"
+                />
+              </div>
+            </div>
+            {user.vendor?.free_delivery_quota != null && (
+              <p className="text-xs text-stone-400 mb-3">
+                {user.vendor.free_deliveries_used} used / {user.vendor.free_deliveries_remaining} free deliveries remaining
+              </p>
+            )}
+            <button
+              onClick={saveDeliverySettings}
+              disabled={deliverySaving}
+              className="w-full py-3 mt-2 font-semibold rounded-xl flex items-center justify-center gap-2 text-sm text-white transition hover:opacity-90 disabled:opacity-50"
+              style={{ background: "#0D9488" }}
+            >
+              <Bike className="w-4 h-4" />
+              {deliverySaving ? "Saving…" : "Save Delivery Settings"}
+            </button>
           </Section>
         )}
 
