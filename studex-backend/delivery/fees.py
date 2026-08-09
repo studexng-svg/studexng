@@ -16,6 +16,47 @@ there's nothing to keep in sync on a manual data fix.
 from decimal import Decimal
 
 
+def _free_deliveries_used(vendor):
+    """
+    Live count of past delivery-slot orders for this vendor — same query as
+    get_delivery_fee_quote below and accounts/admin.py's
+    free_deliveries_used_display, kept in one place so the three never drift.
+    """
+    from orders.models import Order
+    return Order.objects.filter(
+        listing__vendor=vendor, delivery_slot__isnull=False,
+    ).exclude(status='cancelled').count()
+
+
+def get_free_delivery_remaining(vendor):
+    """
+    Read-only preview of how many free-delivery promo slots this vendor has
+    left, for checkout to show "12 left" next to "Free (Promo)" — the same
+    treatment delivery.capacity gives ordinary slot capacity. Returns None
+    whenever there's no promo concept to show a count for: vendor doesn't use
+    batched delivery, has no Vendor row, has no delivery_fee configured, or
+    has no free_delivery_quota set. Returns 0, not None, once the quota is
+    exhausted — there IS a promo, it's just used up.
+    """
+    from accounts.models import Vendor
+    from delivery.capacity import vendor_uses_batched_delivery
+
+    if not vendor_uses_batched_delivery(vendor):
+        return None
+
+    try:
+        v = vendor.vendor
+    except Vendor.DoesNotExist:
+        return None
+
+    if not v.delivery_fee or v.delivery_fee <= 0:
+        return None
+    if v.free_delivery_quota is None:
+        return None
+
+    return max(v.free_delivery_quota - _free_deliveries_used(vendor), 0)
+
+
 def get_delivery_fee_quote(vendor):
     """
     Read-only preview of what a new order for this vendor would be charged
@@ -51,11 +92,7 @@ def get_delivery_fee_quote(vendor):
         return Decimal("0"), False
 
     if v.free_delivery_quota is not None:
-        from orders.models import Order
-        used = Order.objects.filter(
-            listing__vendor=vendor, delivery_slot__isnull=False,
-        ).exclude(status='cancelled').count()
-        if used < v.free_delivery_quota:
+        if _free_deliveries_used(vendor) < v.free_delivery_quota:
             return Decimal("0"), True
 
     return fee, False

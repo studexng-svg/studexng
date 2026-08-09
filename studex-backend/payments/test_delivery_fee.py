@@ -22,7 +22,7 @@ from orders.models import Order
 from payments.models import PricingSettings, PaymentTransaction
 from delivery.models import DeliverySlot
 from delivery.capacity import LAGOS
-from delivery.fees import get_delivery_fee_quote
+from delivery.fees import get_delivery_fee_quote, get_free_delivery_remaining
 
 
 class DeliveryFeeTestBase(TestCase):
@@ -112,6 +112,69 @@ class GetDeliveryFeeQuoteTests(DeliveryFeeTestBase):
         fee, waived = get_delivery_fee_quote(plain_vendor)
         self.assertEqual(fee, Decimal("0"))
         self.assertFalse(waived)
+
+
+class GetFreeDeliveryRemainingTests(DeliveryFeeTestBase):
+    """
+    checkout's "Free (Promo) — 12 left" counter (src/app/checkout/page.tsx,
+    delivery.VendorEligibleBatchesView) — distinct from get_delivery_fee_quote
+    itself (which only needs true/false, not a count).
+    """
+
+    def test_none_with_no_quota_set(self):
+        self.vendor_record.delivery_fee = Decimal("300.00")
+        self.vendor_record.save(update_fields=['delivery_fee'])
+        self.assertIsNone(get_free_delivery_remaining(self.vendor))
+
+    def test_none_with_no_delivery_fee_configured(self):
+        """₦0 fee (default) means there's nothing to run a promo against."""
+        self.vendor_record.free_delivery_quota = 15
+        self.vendor_record.save(update_fields=['free_delivery_quota'])
+        self.assertIsNone(get_free_delivery_remaining(self.vendor))
+
+    def test_none_for_non_batching_vendor(self):
+        self.slot.is_active = False
+        self.slot.save(update_fields=['is_active'])
+        self.vendor_record.delivery_fee = Decimal("300.00")
+        self.vendor_record.free_delivery_quota = 15
+        self.vendor_record.save(update_fields=['delivery_fee', 'free_delivery_quota'])
+        self.assertIsNone(get_free_delivery_remaining(self.vendor))
+
+    def test_none_with_no_vendor_record(self):
+        plain_vendor = User.objects.create_user(username='df_plain2', email='df_plain2@pau.edu.ng', password='pass123')
+        self.assertIsNone(get_free_delivery_remaining(plain_vendor))
+
+    def test_counts_down_as_slot_orders_land(self):
+        self.vendor_record.delivery_fee = Decimal("300.00")
+        self.vendor_record.free_delivery_quota = 15
+        self.vendor_record.save(update_fields=['delivery_fee', 'free_delivery_quota'])
+        for i in range(3):
+            Order.objects.create(
+                buyer=self.buyer, listing=self.listing, amount=Decimal("3240"),
+                reference=f"DF-REM-{i}", status="paid", delivery_slot=self.slot,
+            )
+        self.assertEqual(get_free_delivery_remaining(self.vendor), 12)
+
+    def test_cancelled_orders_dont_count_against_remaining(self):
+        self.vendor_record.delivery_fee = Decimal("300.00")
+        self.vendor_record.free_delivery_quota = 15
+        self.vendor_record.save(update_fields=['delivery_fee', 'free_delivery_quota'])
+        Order.objects.create(
+            buyer=self.buyer, listing=self.listing, amount=Decimal("3240"),
+            reference="DF-REM-CANCELLED", status="cancelled", delivery_slot=self.slot,
+        )
+        self.assertEqual(get_free_delivery_remaining(self.vendor), 15)
+
+    def test_zero_not_none_once_exhausted(self):
+        self.vendor_record.delivery_fee = Decimal("300.00")
+        self.vendor_record.free_delivery_quota = 2
+        self.vendor_record.save(update_fields=['delivery_fee', 'free_delivery_quota'])
+        for i in range(2):
+            Order.objects.create(
+                buyer=self.buyer, listing=self.listing, amount=Decimal("3240"),
+                reference=f"DF-REM-EX-{i}", status="paid", delivery_slot=self.slot,
+            )
+        self.assertEqual(get_free_delivery_remaining(self.vendor), 0)
 
 
 class DeliveryFeeCartCheckoutTests(DeliveryFeeTestBase):

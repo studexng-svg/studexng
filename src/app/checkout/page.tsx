@@ -78,6 +78,7 @@ export default function CheckoutPage() {
     uses_batched_delivery: boolean;
     delivery_fee?: number;
     delivery_fee_waived?: boolean;
+    free_deliveries_remaining?: number | null;
     batches: { id: number; display_name: string; delivery_time: string; cutoff_time: string; remaining_slots: number }[];
   } | null>(null);
   const [selectedBatchId, setSelectedBatchId] = useState<number | null>(null);
@@ -632,7 +633,12 @@ export default function CheckoutPage() {
                   {deliveryFee > 0 ? (
                     <span className="font-medium text-stone-700">₦{deliveryFee.toLocaleString()}</span>
                   ) : deliveryFeeWaived ? (
-                    <span className="font-semibold text-emerald-600">Free (Promo)</span>
+                    <span className="font-semibold text-emerald-600">
+                      Free (Promo)
+                      {batchInfo?.free_deliveries_remaining != null && (
+                        <span className="text-emerald-500 font-medium"> — {batchInfo.free_deliveries_remaining} left</span>
+                      )}
+                    </span>
                   ) : (
                     <span className="font-semibold text-emerald-600">Free</span>
                   )}

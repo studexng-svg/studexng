@@ -64,7 +64,7 @@ class VendorEligibleBatchesView(APIView):
 
         from datetime import datetime
         from delivery.capacity import LAGOS, _cutoff_datetime
-        from delivery.fees import get_delivery_fee_quote
+        from delivery.fees import get_delivery_fee_quote, get_free_delivery_remaining
         campus = (getattr(vendor, 'school', '') or '').lower()
         today = timezone.now().astimezone(LAGOS).date()
         eligible = list_eligible_slots(vendor, campus)
@@ -73,6 +73,9 @@ class VendorEligibleBatchesView(APIView):
             'uses_batched_delivery': True,
             'delivery_fee': float(delivery_fee),
             'delivery_fee_waived': delivery_fee_waived,
+            # None when there's no free-delivery promo running at all;
+            # otherwise a live count, 0 once it's exhausted.
+            'free_deliveries_remaining': get_free_delivery_remaining(vendor),
             'batches': [
                 {
                     'id': entry['slot'].id,

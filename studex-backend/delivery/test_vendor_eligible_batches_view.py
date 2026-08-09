@@ -97,6 +97,41 @@ class VendorEligibleBatchesViewTests(TestCase):
         # min before that (DeliverySlot's default cutoff_offset_minutes) = 14:45.
         self.assertEqual(response.data['batches'][0]['cutoff_time'], '2026-06-15T14:45:00+01:00')
 
+    def test_free_deliveries_remaining_is_none_with_no_quota_set(self):
+        response = self.client.get(f'/api/delivery/vendor-batches/{self.batching_vendor.id}/')
+        self.assertIsNone(response.data['free_deliveries_remaining'])
+
+    def test_free_deliveries_remaining_counts_down_as_slot_orders_land(self):
+        vendor_record = Vendor.objects.get(user=self.batching_vendor)
+        vendor_record.delivery_fee = Decimal('300.00')
+        vendor_record.free_delivery_quota = 15
+        vendor_record.save(update_fields=['delivery_fee', 'free_delivery_quota'])
+
+        slot = self._make_slot(self.batching_vendor, max_orders=100)
+        self._place_order(slot)
+        self._place_order(slot)
+        self._place_order(slot, status='cancelled')  # doesn't burn a promo slot
+
+        response = self.client.get(f'/api/delivery/vendor-batches/{self.batching_vendor.id}/')
+        self.assertEqual(response.data['free_deliveries_remaining'], 13)
+        self.assertTrue(response.data['delivery_fee_waived'])
+        self.assertEqual(response.data['delivery_fee'], 0.0)
+
+    def test_free_deliveries_remaining_is_zero_not_none_once_exhausted(self):
+        vendor_record = Vendor.objects.get(user=self.batching_vendor)
+        vendor_record.delivery_fee = Decimal('300.00')
+        vendor_record.free_delivery_quota = 2
+        vendor_record.save(update_fields=['delivery_fee', 'free_delivery_quota'])
+
+        slot = self._make_slot(self.batching_vendor, max_orders=100)
+        self._place_order(slot)
+        self._place_order(slot)
+
+        response = self.client.get(f'/api/delivery/vendor-batches/{self.batching_vendor.id}/')
+        self.assertEqual(response.data['free_deliveries_remaining'], 0)
+        self.assertFalse(response.data['delivery_fee_waived'])
+        self.assertEqual(response.data['delivery_fee'], 300.0)
+
     def test_non_batching_vendor_type_returns_uses_batched_delivery_false(self):
         response = self.client.get(f'/api/delivery/vendor-batches/{self.beauty_vendor.id}/')
         self.assertEqual(response.status_code, 200)
