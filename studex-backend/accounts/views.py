@@ -13,6 +13,7 @@ from django.utils.encoding import force_bytes
 from django.core.cache import cache
 from django.conf import settings
 from django.utils import timezone
+from django.db import transaction as db_transaction
 import resend
 import random
 import string
@@ -337,6 +338,134 @@ def logout_user(request):
     except Exception:
         pass
     response = Response({'message': 'Logged out successfully'}, status=status.HTTP_200_OK)
+    _clear_auth_cookies(response)
+    return response
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_account(request):
+    """
+    Self-service account deletion (NDPA right-to-erasure) — the counterpart
+    to AdminUserDetailView.delete, which only an admin can trigger.
+
+    Anonymizes PII and deactivates rather than hard-deleting the User row:
+    Order/Review/WalletTransaction history a buyer or vendor was part of
+    stays intact (financial/dispute records, referenced by other people's
+    history too) but is no longer attributable to a real person — the same
+    narrower erasure NDPA itself allows for records a controller has a
+    separate legal basis to keep. An admin can still do a true hard delete
+    via AdminUserDetailView.delete(?hard_delete=true) for the rare case that
+    needs one; this endpoint deliberately never does that itself.
+
+    Blocked (400) rather than silently orphaning something if the user has:
+      - any order (as buyer or vendor) not yet in a terminal status
+      - a non-zero wallet balance
+    Both are the user's own fault to resolve first, not this endpoint's to
+    paper over.
+    """
+    user = request.user
+    password = request.data.get('password')
+    if not password:
+        return Response({'error': 'Password is required to delete your account.'}, status=400)
+    if not user.check_password(password):
+        return Response({'error': 'Incorrect password.'}, status=400)
+
+    from django.db.models import Q
+    from orders.models import Order
+    TERMINAL_ORDER_STATUSES = ('completed', 'cancelled', 'vendor_declined')
+    has_active_order = Order.objects.filter(
+        Q(buyer=user) | Q(listing__vendor=user)
+    ).exclude(status__in=TERMINAL_ORDER_STATUSES).exists()
+    if has_active_order:
+        return Response(
+            {'error': 'You have an order in progress. Please wait for it to finish (or cancel it) before deleting your account.'},
+            status=400,
+        )
+
+    # NOT wallet.models.Wallet — that app isn't in INSTALLED_APPS, isn't
+    # routed, and the frontend never calls it (dead code). User.wallet_balance
+    # is the real, live field — the only one services.WalletBalanceView (the
+    # sole wallet endpoint actually wired up) and the frontend ever read.
+    if user.wallet_balance and user.wallet_balance > 0:
+        return Response(
+            {'error': f'Please withdraw your wallet balance (₦{user.wallet_balance}) before deleting your account.'},
+            status=400,
+        )
+
+    original_email = user.email
+
+    with db_transaction.atomic():
+        # Public listing queries don't filter on vendor__is_active anywhere
+        # (see services.views.ListingViewSet) — has to be turned off here
+        # explicitly, or a deleted vendor's storefront keeps showing up.
+        from services.models import Listing
+        Listing.objects.filter(vendor=user).update(is_available=False)
+
+        try:
+            vendor_record = user.vendor
+            vendor_record.delivery_paused = True
+            vendor_record.save(update_fields=['delivery_paused'])
+        except Vendor.DoesNotExist:
+            pass
+
+        if hasattr(user, 'profile'):
+            p = user.profile
+            p.whatsapp = None
+            p.instagram = None
+            p.date_of_birth = None
+            p.gender = ''
+            p.department = ''
+            p.level = ''
+            p.save(update_fields=['whatsapp', 'instagram', 'date_of_birth', 'gender', 'department', 'level'])
+
+        user.username = f'deleted_user_{user.id}'
+        user.email = None
+        user.phone = None
+        user.matric_number = None
+        user.nin = None
+        user.hostel = None
+        user.business_name = None
+        user.bio = None
+        user.profile_image = None
+        user.first_name = ''
+        user.last_name = ''
+        user.is_active = False
+        user.deleted_at = timezone.now()
+        user.set_unusable_password()
+        user.save()
+
+        # Blacklist every outstanding refresh token for this user, not just
+        # this session's cookie — a deleted account shouldn't stay signed in
+        # on a second device just because that device's token is still fresh.
+        from rest_framework_simplejwt.token_blacklist.models import OutstandingToken, BlacklistedToken
+        for token in OutstandingToken.objects.filter(user=user):
+            BlacklistedToken.objects.get_or_create(token=token)
+
+    if original_email:
+        try:
+            from studex.email import send_email
+            send_email(
+                to=original_email,
+                subject='Your StudEx account has been deleted',
+                html='''
+                    <div style="font-family:DM Sans,sans-serif;max-width:480px;margin:0 auto;padding:32px;">
+                        <p style="color:#0D9488;font-size:11px;font-weight:700;letter-spacing:.15em;
+                                  text-transform:uppercase;margin:0 0 6px;">StudEx</p>
+                        <h1 style="font-size:24px;color:#1C1917;margin:0 0 12px;">Your account has been deleted</h1>
+                        <p style="color:#78716C;">This confirms your StudEx account and personal data have been
+                        removed at your request. Order and transaction records tied to your account are kept in
+                        anonymized form, as required for accounting and dispute records.</p>
+                        <p style="color:#78716C;">If you didn't request this, contact us immediately at
+                        studex.ng@gmail.com.</p>
+                    </div>
+                ''',
+                _async=False,
+            )
+        except Exception as e:
+            print(f"Account-deletion email error: {e}")
+
+    response = Response({'message': 'Account deleted.'}, status=status.HTTP_200_OK)
     _clear_auth_cookies(response)
     return response
 

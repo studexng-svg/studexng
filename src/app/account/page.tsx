@@ -572,6 +572,12 @@ export default function AccountPage() {
             <Row href="/faq" icon={HelpCircle} iconColor="#14b8a6" label="FAQs & Help Center" last />
           </div>
 
+          {/* ── SECTION: Danger Zone ── */}
+          <p className="text-xs font-bold text-red-400 uppercase tracking-widest pt-5 pb-2 px-1" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Danger Zone</p>
+          <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
+            <Row href="/account/delete-account" icon={Trash2} iconColor="#dc2626" label="Delete Account" last />
+          </div>
+
           {/* ── VENDOR / PLAN CARD ── */}
           {vendorApproved ? (
             <Link href="/vendor/dashboard">

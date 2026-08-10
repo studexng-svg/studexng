@@ -15,6 +15,7 @@ urlpatterns = [
     path('register/', views.register_user, name='register'),
     path('login/', views.login_user, name='login'),
     path('logout/', views.logout_user, name='logout'),
+    path('delete-account/', views.delete_account, name='delete-account'),
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('token/cookie-refresh/', cookie_token_refresh, name='cookie_token_refresh'),
 

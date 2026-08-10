@@ -219,6 +219,9 @@ export const api = {
     changePassword: (body: Record<string, string>) =>
       fetchWithAuth(u("/api/auth/change-password/"), { method: "POST", body: s(body) }),
 
+    deleteAccount: (password: string) =>
+      fetchWithAuth(u("/api/auth/delete-account/"), { method: "DELETE", body: s({ password }) }),
+
     applyVendor: (formData: FormData) =>
       fetchWithAuth(u("/api/auth/seller/applications/"), { method: "POST", body: formData }),
 

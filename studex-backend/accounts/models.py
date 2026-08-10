@@ -80,6 +80,14 @@ class User(AbstractUser):
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    # Self-service deletion (accounts.views.delete_account) — set the moment
+    # a user erases their own account. Distinct from admin-deactivated
+    # (is_active=False with this left null): lets support tell "user asked
+    # to leave" apart from "admin suspended them" at a glance. The row
+    # itself survives (see delete_account's docstring for why) with PII
+    # anonymized, so this timestamp is also the only remaining evidence the
+    # deletion happened at all.
+    deleted_at = models.DateTimeField(null=True, blank=True)
 
     USERNAME_FIELD = 'username'
     REQUIRED_FIELDS = ['email']
