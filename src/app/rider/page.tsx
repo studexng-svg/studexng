@@ -10,6 +10,7 @@ import TopNav from "@/components/layout/TopNav";
 import {
   Package, CheckCircle, Truck, Clock, Camera, X, AlertCircle,
   TrendingUp, CalendarCheck, ListChecks, Activity, Phone,
+  ChevronRight, MapPin, RotateCcw, Receipt, Hash,
 } from "lucide-react";
 import { BarChart, Bar, ResponsiveContainer, Tooltip, XAxis } from "recharts";
 
@@ -34,7 +35,16 @@ interface Assignment {
   completion_proof_image?: string | null;
   batch_id?: number | null;
   batch_display_name?: string | null;
-  items?: { id: number; listing_title: string; image: string | null; quantity: number; status: string; addons: { name: string }[] }[];
+  // Full receipt total the buyer paid at checkout (delivery fee folded in)
+  // — frozen at checkout, so it does NOT drop if an item is later refunded;
+  // see the "Refunded" note computed client-side in OrderDetailModal instead.
+  order_amount?: string;
+  order_delivery_fee?: string;
+  items?: {
+    id: number; listing_title: string; image: string | null; quantity: number; status: string;
+    unit_price?: string; line_total?: string;
+    addons: { name: string; price_delta?: string; quantity?: number }[];
+  }[];
 }
 
 interface BatchGroup {
@@ -87,6 +97,11 @@ const REQUIRES_PROOF: Record<string, boolean> = {
   picked_up: true,
   completed: true,
 };
+
+function naira(v: string | number | undefined | null): string {
+  const n = Number(v ?? 0);
+  return `₦${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
 
 function StatCard({
   label, value, sub, icon: Icon, color, bg,
@@ -193,8 +208,161 @@ function ProofModal({
   );
 }
 
+const ORDER_STATUS_LABELS: Record<string, string> = {
+  cancelled: "Refunded",
+  completed: "Delivered",
+  seller_completed: "Delivered",
+};
+
+function OrderDetailModal({ a, onClose }: { a: Assignment; onClose: () => void }) {
+  const dropoffLabel = a.pickup_point_name
+    ? `${a.pickup_point_name} · ${a.pickup_point_campus}`
+    : (a.delivery_location || "Location not provided");
+
+  const items = a.items ?? [];
+  const itemsSubtotal = items.reduce((sum, item) => sum + Number(item.line_total ?? 0), 0);
+  const refundedAmount = items
+    .filter(item => item.status === "unavailable")
+    .reduce((sum, item) => sum + Number(item.line_total ?? 0), 0);
+
+  return (
+    <div className="fixed inset-0 z-[70] bg-black/40 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={onClose}>
+      <div
+        className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl w-full sm:max-w-md max-h-[92vh] overflow-y-auto"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="sticky top-0 bg-white border-b border-stone-100 px-5 py-4 flex items-start justify-between z-10">
+          <div>
+            <p className="text-xs text-stone-400 flex items-center gap-1"><Hash className="w-3 h-3" /> Order {a.order_reference}</p>
+            <p className="text-[11px] text-stone-300 mt-0.5">Order ID: {a.order_id}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${STATUS_COLOR[a.status] || "bg-stone-100 text-stone-500"}`}>
+              {ORDER_STATUS_LABELS[a.order_status] || STATUS_LABELS[a.status] || a.status}
+            </span>
+            <button onClick={onClose} className="p-1 text-stone-400 hover:text-stone-700">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        <div className="p-5 space-y-5">
+          {/* Route */}
+          <div className="flex gap-3 bg-stone-50 rounded-2xl p-3">
+            <div className="flex flex-col items-center pt-1">
+              <span className="w-2 h-2 rounded-full bg-stone-300 flex-shrink-0" />
+              <span className="w-px flex-1 bg-stone-200 my-1" />
+              <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: TEAL }} />
+            </div>
+            <div className="flex-1 min-w-0 space-y-3">
+              <div>
+                <p className="text-[10px] uppercase tracking-wide text-stone-400 font-bold">Pickup</p>
+                <p className="text-sm text-stone-800 font-semibold truncate">@{a.vendor_username}</p>
+              </div>
+              <div className="flex items-end justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-[10px] uppercase tracking-wide text-stone-400 font-bold flex items-center gap-1">
+                    <MapPin className="w-3 h-3" /> Drop-off
+                  </p>
+                  <p className="text-sm text-stone-800 font-semibold">{dropoffLabel}</p>
+                  <p className="text-xs text-stone-400">@{a.buyer_username}{a.buyer_phone ? ` · ${a.buyer_phone}` : ""}</p>
+                </div>
+                {a.buyer_phone && (
+                  <a href={`tel:${a.buyer_phone}`}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-white flex-shrink-0"
+                    style={{ background: TEAL }}>
+                    <Phone className="w-3.5 h-3.5" /> Call
+                  </a>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Itemized breakdown */}
+          <div>
+            <p className="text-xs font-bold text-stone-400 uppercase tracking-wide mb-2">
+              What they ordered ({items.length} item{items.length !== 1 ? "s" : ""})
+            </p>
+            <div className="space-y-2.5">
+              {items.map(item => (
+                <div key={item.id} className={`rounded-xl border px-3 py-2.5 ${item.status === "unavailable" ? "border-red-100 bg-red-50" : "border-stone-100 bg-stone-50"}`}>
+                  <div className="flex items-start justify-between gap-2">
+                    <p className={`text-sm font-bold ${item.status === "unavailable" ? "text-stone-400 line-through" : "text-stone-900"}`}>
+                      {item.quantity}x {item.listing_title}
+                    </p>
+                    <div className="text-right flex-shrink-0">
+                      <p className={`text-sm font-bold ${item.status === "unavailable" ? "text-stone-400 line-through" : "text-stone-900"}`}>
+                        {naira(item.line_total)}
+                      </p>
+                      {item.status === "unavailable" && (
+                        <span className="text-[10px] font-semibold text-red-500">Refunded</span>
+                      )}
+                    </div>
+                  </div>
+                  {!!item.unit_price && Number(item.quantity) > 1 && (
+                    <p className="text-[11px] text-stone-400 mt-0.5">{naira(item.unit_price)} each</p>
+                  )}
+                  {!!item.addons?.length && (
+                    <div className="mt-1.5 pt-1.5 border-t border-stone-200/70 space-y-0.5">
+                      {item.addons.map((ad, i) => (
+                        <div key={i} className="flex items-center justify-between text-xs text-stone-500">
+                          <span>+ {ad.quantity && ad.quantity > 1 ? `${ad.quantity}x ` : ""}{ad.name}</span>
+                          {!!ad.price_delta && Number(ad.price_delta) > 0 && (
+                            <span>{naira(Number(ad.price_delta) * (ad.quantity || 1))}</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Totals */}
+          <div className="bg-stone-50 rounded-2xl p-4 space-y-1.5">
+            <div className="flex items-center justify-between text-xs text-stone-500">
+              <span>Items subtotal</span>
+              <span>{naira(itemsSubtotal)}</span>
+            </div>
+            <div className="flex items-center justify-between text-xs text-stone-500">
+              <span>Delivery fee</span>
+              <span>{Number(a.order_delivery_fee) > 0 ? naira(a.order_delivery_fee) : "Free"}</span>
+            </div>
+            {refundedAmount > 0 && (
+              <div className="flex items-center justify-between text-xs text-red-500">
+                <span>Refunded to buyer</span>
+                <span>-{naira(refundedAmount)}</span>
+              </div>
+            )}
+            <div className="flex items-center justify-between pt-1.5 mt-1.5 border-t border-stone-200">
+              <span className="text-sm font-bold text-stone-900 flex items-center gap-1.5"><Receipt className="w-4 h-4" /> Total paid at checkout</span>
+              <span className="text-base font-black text-stone-900">{naira(a.order_amount)}</span>
+            </div>
+          </div>
+
+          {/* Timeline */}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-stone-400">
+            <div className="flex items-center gap-1.5">
+              <Clock className="w-3.5 h-3.5 flex-shrink-0" />
+              <span>Assigned {new Date(a.assigned_at).toLocaleDateString("en-NG", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
+            </div>
+            {a.picked_up_at && (
+              <span>Picked up {new Date(a.picked_up_at).toLocaleTimeString("en-NG", { hour: "2-digit", minute: "2-digit" })}</span>
+            )}
+            {a.completed_at && (
+              <span>Delivered {new Date(a.completed_at).toLocaleDateString("en-NG", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AssignmentCard({
-  a, updating, onUpdate, error, onMarkUnavailable, markingItem,
+  a, updating, onUpdate, error, onMarkUnavailable, markingItem, onViewDetails,
 }: {
   a: Assignment;
   updating: number | null;
@@ -202,6 +370,7 @@ function AssignmentCard({
   error?: string;
   onMarkUnavailable: (a: Assignment, itemId: number) => void;
   markingItem: number | null;
+  onViewDetails: (a: Assignment) => void;
 }) {
   const heroImage = a.items?.find(item => item.image)?.image;
   const dropoffLabel = a.pickup_point_name
@@ -210,7 +379,7 @@ function AssignmentCard({
 
   return (
     <div className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden">
-      <div className="p-3 flex gap-3">
+      <button onClick={() => onViewDetails(a)} className="w-full p-3 flex gap-3 text-left hover:bg-stone-50 transition">
         <div className="w-16 h-16 rounded-xl overflow-hidden flex-shrink-0 bg-stone-100">
           {heroImage ? (
             <img src={heroImage} alt="" className="w-full h-full object-cover" />
@@ -238,8 +407,11 @@ function AssignmentCard({
           {!!a.items?.[0]?.addons?.length && (
             <p className="text-xs text-stone-500 truncate">+ {a.items[0].addons.map(ad => ad.name).join(", ")}</p>
           )}
+          <p className="text-[11px] text-teal-600 font-semibold flex items-center gap-0.5 mt-1">
+            Full order details <ChevronRight className="w-3 h-3" />
+          </p>
         </div>
-      </div>
+      </button>
 
       <div className="px-4 pb-4 space-y-4">
         {/* Route timeline: vendor -> drop-off */}
@@ -343,9 +515,9 @@ function AssignmentCard({
   );
 }
 
-function HistoryCard({ a }: { a: Assignment }) {
+function HistoryCard({ a, onViewDetails }: { a: Assignment; onViewDetails: (a: Assignment) => void }) {
   return (
-    <div className="bg-white rounded-2xl border border-stone-100 shadow-sm p-4 flex gap-3">
+    <button onClick={() => onViewDetails(a)} className="w-full bg-white rounded-2xl border border-stone-100 shadow-sm p-4 flex gap-3 text-left hover:bg-stone-50 transition">
       {a.completion_proof_image ? (
         <img src={a.completion_proof_image} alt="" className="w-14 h-14 rounded-xl object-cover flex-shrink-0" />
       ) : (
@@ -362,25 +534,51 @@ function HistoryCard({ a }: { a: Assignment }) {
           </p>
         )}
       </div>
-    </div>
+      <ChevronRight className="w-4 h-4 text-stone-300 flex-shrink-0 self-center" />
+    </button>
+  );
+}
+
+function RefundedCard({ a, onViewDetails }: { a: Assignment; onViewDetails: (a: Assignment) => void }) {
+  const label = a.items?.length
+    ? `${a.items[0].quantity}x ${a.items[0].listing_title}${a.items.length > 1 ? ` +${a.items.length - 1} more` : ""}`
+    : a.listing_title;
+  return (
+    <button onClick={() => onViewDetails(a)} className="w-full bg-white rounded-2xl border border-red-100 shadow-sm p-4 flex gap-3 text-left hover:bg-red-50/40 transition">
+      <div className="w-14 h-14 rounded-xl bg-red-50 flex items-center justify-center flex-shrink-0">
+        <RotateCcw className="w-5 h-5 text-red-400" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <p className="font-bold text-stone-900 text-sm truncate">{label}</p>
+          <span className="text-[10px] font-semibold text-red-500 bg-red-100 px-2 py-0.5 rounded-full flex-shrink-0">Refunded</span>
+        </div>
+        <p className="text-xs text-stone-400 mt-0.5">Order #{a.order_reference} · @{a.vendor_username} → @{a.buyer_username}</p>
+        <p className="text-xs text-stone-400 mt-1">Buyer was refunded — no delivery needed.</p>
+      </div>
+      <ChevronRight className="w-4 h-4 text-stone-300 flex-shrink-0 self-center" />
+    </button>
   );
 }
 
 export default function RiderDashboard() {
   const { user, isLoggedIn, isHydrated } = useAuth();
   const router = useRouter();
-  const [tab, setTab] = useState<"active" | "history">("active");
+  const [tab, setTab] = useState<"active" | "refunded" | "history">("active");
   const [batches, setBatches] = useState<BatchGroup[]>([]);
   const [unbatched, setUnbatched] = useState<Assignment[]>([]);
+  const [refunded, setRefunded] = useState<Assignment[]>([]);
   const [history, setHistory] = useState<Assignment[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refundedLoading, setRefundedLoading] = useState(true);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [updating, setUpdating] = useState<number | null>(null);
   const [errors, setErrors] = useState<Record<number, string>>({});
   const [proofModal, setProofModal] = useState<{ assignment: Assignment; nextStatus: string } | null>(null);
   const [modalError, setModalError] = useState("");
   const [markingItem, setMarkingItem] = useState<number | null>(null);
+  const [detailAssignment, setDetailAssignment] = useState<Assignment | null>(null);
 
   const loadActive = () => {
     Promise.all([
@@ -391,6 +589,17 @@ export default function RiderDashboard() {
       setUnbatched(Array.isArray(batchData?.unbatched) ? batchData.unbatched : []);
       setStats(statsData);
     }).finally(() => setLoading(false));
+  };
+
+  // Fully-refunded orders (delivery.views.RiderRefundedListView) — kept out
+  // of myBatches() so a dead order stops obstructing the active list.
+  const loadRefunded = () => {
+    setRefundedLoading(true);
+    api.delivery.myRefunded()
+      .then(r => r.ok ? r.json() : [])
+      .then(data => setRefunded(Array.isArray(data) ? data : []))
+      .catch(() => {})
+      .finally(() => setRefundedLoading(false));
   };
 
   const loadHistory = () => {
@@ -411,6 +620,7 @@ export default function RiderDashboard() {
 
   useEffect(() => {
     if (tab === "history" && history.length === 0) loadHistory();
+    if (tab === "refunded" && refunded.length === 0) loadRefunded();
   }, [tab]);
 
   const assignments = [...batches.flatMap(b => b.assignments), ...unbatched];
@@ -548,6 +758,13 @@ export default function RiderDashboard() {
             Active {assignments.length > 0 && `(${assignments.length})`}
           </button>
           <button
+            onClick={() => setTab("refunded")}
+            className={`px-4 py-2 rounded-full text-sm font-semibold transition-all ${tab === "refunded" ? "text-white" : "text-stone-500 hover:bg-stone-50"}`}
+            style={tab === "refunded" ? { background: TEAL } : {}}
+          >
+            Refunded {refunded.length > 0 && `(${refunded.length})`}
+          </button>
+          <button
             onClick={() => setTab("history")}
             className={`px-4 py-2 rounded-full text-sm font-semibold transition-all ${tab === "history" ? "text-white" : "text-stone-500 hover:bg-stone-50"}`}
             style={tab === "history" ? { background: TEAL } : {}}
@@ -592,7 +809,7 @@ export default function RiderDashboard() {
                     </span>
                   </div>
                   {batch.assignments.map(a => (
-                    <AssignmentCard key={a.id} a={a} updating={updating} onUpdate={updateStatus} error={errors[a.id]} onMarkUnavailable={markItemUnavailable} markingItem={markingItem} />
+                    <AssignmentCard key={a.id} a={a} updating={updating} onUpdate={updateStatus} error={errors[a.id]} onMarkUnavailable={markItemUnavailable} markingItem={markingItem} onViewDetails={setDetailAssignment} />
                   ))}
                 </div>
               ))}
@@ -601,10 +818,36 @@ export default function RiderDashboard() {
                 <div className="space-y-2.5">
                   {batches.length > 0 && <p className="text-xs font-bold text-stone-400 uppercase tracking-wide px-1">Other Deliveries</p>}
                   {unbatched.map(a => (
-                    <AssignmentCard key={a.id} a={a} updating={updating} onUpdate={updateStatus} error={errors[a.id]} onMarkUnavailable={markItemUnavailable} markingItem={markingItem} />
+                    <AssignmentCard key={a.id} a={a} updating={updating} onUpdate={updateStatus} error={errors[a.id]} onMarkUnavailable={markItemUnavailable} markingItem={markingItem} onViewDetails={setDetailAssignment} />
                   ))}
                 </div>
               )}
+            </div>
+          )
+        )}
+
+        {/* ── REFUNDED TAB ── */}
+        {tab === "refunded" && (
+          refundedLoading ? (
+            <div className="space-y-3">
+              {[1, 2].map(i => (
+                <div key={i} className="bg-white rounded-2xl p-4 animate-pulse border border-stone-100 flex gap-3">
+                  <div className="w-14 h-14 rounded-xl bg-stone-200 flex-shrink-0" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-3 bg-stone-200 rounded w-2/3" />
+                    <div className="h-2.5 bg-stone-100 rounded w-1/2" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : refunded.length === 0 ? (
+            <div className="bg-white rounded-2xl p-12 text-center border border-stone-100 shadow-sm animate-fadeUp">
+              <RotateCcw className="w-10 h-10 text-stone-200 mx-auto mb-2" />
+              <p className="text-stone-400 text-sm">No refunded orders</p>
+            </div>
+          ) : (
+            <div className="space-y-2.5 animate-fadeUp">
+              {refunded.map(a => <RefundedCard key={a.id} a={a} onViewDetails={setDetailAssignment} />)}
             </div>
           )
         )}
@@ -630,7 +873,7 @@ export default function RiderDashboard() {
             </div>
           ) : (
             <div className="space-y-2.5 animate-fadeUp">
-              {history.map(a => <HistoryCard key={a.id} a={a} />)}
+              {history.map(a => <HistoryCard key={a.id} a={a} onViewDetails={setDetailAssignment} />)}
             </div>
           )
         )}
@@ -645,6 +888,10 @@ export default function RiderDashboard() {
           submitting={updating === proofModal.assignment.id}
           error={modalError}
         />
+      )}
+
+      {detailAssignment && (
+        <OrderDetailModal a={detailAssignment} onClose={() => setDetailAssignment(null)} />
       )}
     </div>
   );

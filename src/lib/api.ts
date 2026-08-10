@@ -28,8 +28,10 @@ export interface RegisterData {
   hostel: string;
   school: string;
   matric_number?: string;
+  nin?: string;
   campus?: string;
   business_name?: string;
+  disclaimer_accepted?: boolean;
 }
 
 export interface LoginData {
@@ -817,6 +819,11 @@ export const api = {
     myAssignments: () => fetchWithAuth(u("/api/delivery/my-assignments/")),
 
     myBatches: () => fetchWithAuth(u("/api/delivery/my-batches/")),
+
+    // Orders fully refunded out from under an in-progress delivery — kept
+    // separate from myBatches() so a dead order stops obstructing the
+    // rider's active view. See delivery/views.py RiderRefundedListView.
+    myRefunded: () => fetchWithAuth(u("/api/delivery/my-refunded/")),
 
     myHistory: () => fetchWithAuth(u("/api/delivery/my-history/")),
 

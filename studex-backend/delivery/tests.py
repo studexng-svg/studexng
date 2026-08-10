@@ -305,6 +305,56 @@ class CompletionEvidenceTests(DeliveryTestBase):
         self.assertIsNotNone(assignment.completed_at)
 
 
+class AtPickupPointNotificationTests(DeliveryTestBase):
+    """
+    The buyer must get the delivery code pushed to them the instant the rider
+    reaches the pickup point/drop-off — not just have it sit on their order
+    page waiting to be looked up. Regression coverage for both: the code
+    landing in the notification body (the "send it like an OTP" behavior),
+    and the pickup_point.name lookup not crashing (silently, via the view's
+    bare except) for an auto-assigned delivery that has no pickup_point.
+    """
+    def _pick_up(self, assignment):
+        with patch("services.views.upload_to_cloudinary", return_value="https://cdn.example.com/pickup.jpg"):
+            self.client.force_authenticate(user=self.rider)
+            self.client.post(
+                f"/api/delivery/assignments/{assignment.id}/update-status/",
+                {"status": "picked_up", "proof_image": make_proof_file()},
+                format="multipart",
+            )
+
+    def test_notification_includes_delivery_code(self):
+        assignment = self.assign()
+        self._pick_up(assignment)
+        with patch("accounts.utils.send_notification") as mock_notify:
+            response = self.client.post(
+                f"/api/delivery/assignments/{assignment.id}/update-status/",
+                {"status": "at_pickup_point"},
+            )
+        self.assertEqual(response.status_code, 200)
+        assignment.refresh_from_db()
+        mock_notify.assert_called_once()
+        message = mock_notify.call_args.kwargs["message"]
+        self.assertIn(assignment.delivery_code, message)
+        self.assertEqual(mock_notify.call_args.kwargs["recipient"], self.buyer)
+
+    def test_notification_falls_back_to_delivery_location_when_no_pickup_point(self):
+        """Auto-assignment never sets pickup_point — see delivery.assignment.auto_assign_rider."""
+        self.order.delivery_location = "3rd floor, Block C, Room 12"
+        self.order.save(update_fields=["delivery_location"])
+        assignment = DeliveryAssignment.objects.create(order=self.order, rider=self.rider, pickup_point=None)
+        self._pick_up(assignment)
+        with patch("accounts.utils.send_notification") as mock_notify:
+            response = self.client.post(
+                f"/api/delivery/assignments/{assignment.id}/update-status/",
+                {"status": "at_pickup_point"},
+            )
+        self.assertEqual(response.status_code, 200)
+        mock_notify.assert_called_once()
+        message = mock_notify.call_args.kwargs["message"]
+        self.assertIn("3rd floor, Block C, Room 12", message)
+
+
 class DeliveryStatusTransitionGuardTests(DeliveryTestBase):
     """Existing state-machine guard behavior — never had test coverage before this blocker."""
 

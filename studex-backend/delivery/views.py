@@ -346,7 +346,14 @@ class RiderStatsView(APIView):
         completed = base.filter(status='completed', completed_at__isnull=False)
 
         total_completed = completed.count()
-        active_count = base.exclude(status='completed').count()
+        # A fully-refunded order (every OrderItem unavailable — see
+        # payments.item_refund.mark_order_item_unavailable) flips Order.status
+        # to 'cancelled' but never touches DeliveryAssignment.status, since
+        # there's no delivery left to drive through the pickup/dropoff state
+        # machine. Without this exclusion such an assignment still reads as
+        # "active" here even though RiderBatchListView (below) now keeps it
+        # out of the rider's active list — the two would silently disagree.
+        active_count = base.exclude(status='completed').exclude(order__status='cancelled').count()
 
         completed_local_dates = [c.astimezone(LAGOS).date() for c in completed.values_list('completed_at', flat=True)]
         completed_today = sum(1 for d in completed_local_dates if d == today)
@@ -394,7 +401,7 @@ class RiderBatchListView(APIView):
 
         assignments = DeliveryAssignment.objects.filter(
             rider=request.user,
-        ).exclude(status__in=['completed', 'cancelled']).select_related(
+        ).exclude(status__in=['completed', 'cancelled']).exclude(order__status='cancelled').select_related(
             'order__buyer', 'order__listing__vendor', 'pickup_point', 'delivery_slot__vendor',
         ).prefetch_related('order__items__selected_addons').order_by(
             'delivery_slot__delivery_time', '-assigned_at',
@@ -425,6 +432,31 @@ class RiderBatchListView(APIView):
             'batches': list(slots.values()),
             'unbatched': unbatched,
         })
+
+
+class RiderRefundedListView(APIView):
+    """
+    GET /api/delivery/my-refunded/ — a rider's assignments whose underlying
+    Order was fully refunded out from under the delivery (every OrderItem
+    marked unavailable — see payments.item_refund.mark_order_item_unavailable
+    — flips Order.status to 'cancelled' but never touches
+    DeliveryAssignment.status, since there's nothing left to drive through
+    the pickup/dropoff state machine). RiderBatchListView excludes these from
+    the active list; this is where they actually show up, so a rider can see
+    why an order vanished instead of it just disappearing.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        if request.user.user_type != 'rider':
+            return Response({'error': 'Not a rider'}, status=status.HTTP_403_FORBIDDEN)
+
+        qs = DeliveryAssignment.objects.filter(
+            rider=request.user, order__status='cancelled',
+        ).exclude(status='completed').select_related(
+            'order__buyer', 'order__listing__vendor', 'pickup_point', 'delivery_slot__vendor',
+        ).prefetch_related('order__items__selected_addons').order_by('-assigned_at')[:100]
+        return Response(DeliveryAssignmentSerializer(qs, many=True).data)
 
 
 def _client_ip(request):
@@ -646,14 +678,28 @@ class RiderUpdateStatusView(APIView):
         if new_status == 'at_pickup_point':
             try:
                 from accounts.utils import send_notification
+                # Auto-assigned deliveries (delivery.assignment.auto_assign_rider)
+                # never set pickup_point — same gap BuyerDeliveryStatusSerializer's
+                # delivery_location field exists to cover. Falling back here keeps
+                # this notification from silently no-oping (pickup_point.name would
+                # raise AttributeError on None, swallowed by the bare except below)
+                # for exactly the orders that most need the buyer's location, not
+                # a pickup point, spelled out.
+                where = assignment.pickup_point.name if assignment.pickup_point_id else (
+                    assignment.order.delivery_location or "your delivery location"
+                )
+                # The code itself goes straight in the push notification — sent
+                # like an OTP the instant the rider arrives — instead of making
+                # the buyer open the app and find their order page first. Still
+                # shown there too (BuyerDeliveryStatusSerializer.delivery_code),
+                # this is just the faster path to the same value.
                 send_notification(
                     recipient=assignment.order.buyer,
                     notification_type='order',
                     title='Your package is ready for pickup!',
                     message=(
-                        f'Your order #{assignment.order.reference} has arrived at '
-                        f'"{assignment.pickup_point.name}". Come collect it! '
-                        f'Give the rider the delivery code shown on your order page.'
+                        f'Your order #{assignment.order.reference} has arrived at {where}. '
+                        f'Give the rider this code to collect it: {assignment.delivery_code}'
                     ),
                     action_url=f'/account/orders/{assignment.order.id}',
                     send_email=False,

@@ -141,19 +141,44 @@ class RiderBatchListViewTests(TestCase):
             order=order, listing=self.listing, quantity=2,
             unit_price_at_order_time=Decimal('1620'), line_total=Decimal('3240'),
         )
-        OrderItemAddon.objects.create(order_item=order_item, addon=addon, name_snapshot='Extra Chicken', price_delta_snapshot=Decimal('300'))
+        OrderItemAddon.objects.create(
+            order_item=order_item, addon=addon, name_snapshot='Extra Chicken',
+            price_delta_snapshot=Decimal('300'), quantity=2,
+        )
         DeliveryAssignment.objects.create(order=order, rider=self.rider, pickup_point=self.point, delivery_slot=self.slot)
 
         self.client.force_authenticate(user=self.rider)
         response = self.client.get('/api/delivery/my-batches/')
 
-        items = response.data['batches'][0]['assignments'][0]['items']
+        assignment = response.data['batches'][0]['assignments'][0]
+        items = assignment['items']
         self.assertEqual(len(items), 1)
         self.assertEqual(items[0]['id'], order_item.id)
         self.assertEqual(items[0]['listing_title'], 'Jollof Rice')
         self.assertEqual(items[0]['image'], 'https://cdn.example.com/jollof.jpg')
         self.assertEqual(items[0]['quantity'], 2)
-        self.assertEqual(items[0]['addons'], [{'name': 'Extra Chicken', 'price_delta': '300.00'}])
+        self.assertEqual(items[0]['addons'], [{'name': 'Extra Chicken', 'price_delta': '300.00', 'quantity': 2}])
+        # Full receipt total — what the rider previously had to check in Django
+        # admin. _make_order stamps Order.amount independently of any OrderItem
+        # rows added afterward (it's frozen at checkout, not re-derived), so
+        # this reflects that field directly rather than the items' own total.
+        self.assertEqual(assignment['order_amount'], '1500.00')
+        self.assertEqual(assignment['order_delivery_fee'], '0.00')
+
+    def test_order_amount_includes_delivery_fee_paid(self):
+        """Regression: the rider-facing total reflects the actual amount charged (delivery fee folded in), not just item cost."""
+        order = self._make_order('STX-RB-0011')
+        order.amount = Decimal('1800')
+        order.delivery_fee = Decimal('300')
+        order.save(update_fields=['amount', 'delivery_fee'])
+        DeliveryAssignment.objects.create(order=order, rider=self.rider, pickup_point=self.point, delivery_slot=self.slot)
+
+        self.client.force_authenticate(user=self.rider)
+        response = self.client.get('/api/delivery/my-batches/')
+
+        assignment = response.data['batches'][0]['assignments'][0]
+        self.assertEqual(assignment['order_amount'], '1800.00')
+        self.assertEqual(assignment['order_delivery_fee'], '300.00')
 
     def test_legacy_single_item_order_falls_back_to_anchor_listing(self):
         order = self._make_order('STX-RB-0008')  # no OrderItem rows
@@ -178,6 +203,35 @@ class RiderBatchListViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data), 1)
         self.assertEqual(response.data[0]['batch_id'], self.slot.id)
+
+    def test_fully_refunded_order_excluded_from_active_batches(self):
+        """
+        A fully-refunded order (payments.item_refund.mark_order_item_unavailable
+        flips Order.status to 'cancelled' once every item is unavailable)
+        never touches DeliveryAssignment.status — it must not keep sitting in
+        the rider's active list, obstructing real deliveries.
+        """
+        order = self._make_order('STX-RB-0012')
+        order.status = 'cancelled'
+        order.save(update_fields=['status'])
+        DeliveryAssignment.objects.create(order=order, rider=self.rider, pickup_point=self.point, delivery_slot=self.slot)
+
+        self.client.force_authenticate(user=self.rider)
+        response = self.client.get('/api/delivery/my-batches/')
+
+        self.assertEqual(response.data['batches'], [])
+        self.assertEqual(response.data['unbatched'], [])
+
+    def test_fully_refunded_order_excluded_from_unbatched_active_too(self):
+        order = self._make_order('STX-RB-0013')
+        order.status = 'cancelled'
+        order.save(update_fields=['status'])
+        DeliveryAssignment.objects.create(order=order, rider=self.rider, pickup_point=self.point, delivery_slot=None)
+
+        self.client.force_authenticate(user=self.rider)
+        response = self.client.get('/api/delivery/my-batches/')
+
+        self.assertEqual(response.data['unbatched'], [])
 
     def test_auto_assigned_order_with_no_pickup_point_shows_delivery_location(self):
         """Auto-assignment never sets a pickup_point — the rider must still see where to drop off, from the buyer's own typed location."""

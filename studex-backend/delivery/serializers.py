@@ -35,6 +35,13 @@ class DeliveryAssignmentSerializer(serializers.ModelSerializer):
     # checkout), else a single synthetic line for the anchor listing (every
     # order that predates OrderItem, and every non-menu order after it).
     items = serializers.SerializerMethodField()
+    # Full receipt total the buyer actually paid at checkout (delivery_fee
+    # already folded in — see Order.delivery_fee's docstring) — so the rider
+    # can see it without going into Django admin. order_delivery_fee is kept
+    # alongside it purely so the UI can show "₦X items + ₦Y delivery" instead
+    # of one opaque total.
+    order_amount = serializers.DecimalField(source='order.amount', max_digits=10, decimal_places=2, read_only=True)
+    order_delivery_fee = serializers.DecimalField(source='order.delivery_fee', max_digits=10, decimal_places=2, read_only=True)
 
     class Meta:
         model = DeliveryAssignment
@@ -45,7 +52,7 @@ class DeliveryAssignmentSerializer(serializers.ModelSerializer):
             'status', 'assigned_at', 'picked_up_at', 'at_pickup_point_at', 'completed_at',
             'pickup_proof_image', 'completion_proof_image',
             'responsibility', 'responsibility_transferred_at', 'code_locked',
-            'batch_id', 'batch_display_name', 'items',
+            'batch_id', 'batch_display_name', 'items', 'order_amount', 'order_delivery_fee',
         ]
         # delivery_code is intentionally excluded here — this serializer backs
         # rider-facing and general admin views. It must never reach a rider,
@@ -71,7 +78,7 @@ class DeliveryAssignmentSerializer(serializers.ModelSerializer):
                     'line_total': str(item.line_total),
                     'status': item.status,
                     'addons': [
-                        {'name': a.name_snapshot, 'price_delta': str(a.price_delta_snapshot)}
+                        {'name': a.name_snapshot, 'price_delta': str(a.price_delta_snapshot), 'quantity': a.quantity}
                         for a in item.selected_addons.all()
                     ],
                 }
