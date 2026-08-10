@@ -272,6 +272,7 @@ class AdminUserDetailView(APIView):
             'free_delivery_quota': v.free_delivery_quota,
             'free_deliveries_used': used,
             'free_deliveries_remaining': remaining,
+            'delivery_paused': v.delivery_paused,
         }
 
     def patch(self, request, user_id):
@@ -286,6 +287,9 @@ class AdminUserDetailView(APIView):
             - vendor.delivery_fee / vendor.free_delivery_quota: Delivery fee
               and "first N deliveries free" promo quota (see delivery.fees).
               Only meaningful for a vendor using batched delivery.
+            - vendor.delivery_paused: Kill-switch — true means checkout shows
+              no delivery slots for this vendor at all, without touching any
+              individual DeliverySlot row (see delivery.capacity).
         """
         try:
             user = User.objects.get(id=user_id)
@@ -365,11 +369,19 @@ class AdminUserDetailView(APIView):
                                 status=status.HTTP_400_BAD_REQUEST
                             )
 
+                if 'delivery_paused' in vendor_data and not isinstance(vendor_data['delivery_paused'], bool):
+                    return Response(
+                        {'error': 'delivery_paused must be a boolean'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+
                 v, _ = Vendor.objects.get_or_create(user=user)
                 if 'delivery_fee' in vendor_data:
                     v.delivery_fee = fee
                 if 'free_delivery_quota' in vendor_data:
                     v.free_delivery_quota = quota
+                if 'delivery_paused' in vendor_data:
+                    v.delivery_paused = vendor_data['delivery_paused']
                 v.save()
 
             serializer = UserSerializer(user)

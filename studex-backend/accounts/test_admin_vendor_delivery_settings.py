@@ -6,7 +6,9 @@ Before this, the only way to set these fields was raw Django admin — this
 covers the /api/admin/users/{id}/ GET+PATCH path the Next.js admin dashboard
 actually uses.
 """
+from datetime import datetime, timedelta
 from decimal import Decimal
+from unittest import mock
 
 from django.test import TestCase
 from django.urls import reverse
@@ -14,9 +16,12 @@ from rest_framework.test import APIClient
 from rest_framework import status
 
 from accounts.models import User, Vendor, VendorType
+from delivery.capacity import LAGOS
 from delivery.models import DeliverySlot
 from orders.models import Order
 from services.models import Category, Listing
+
+FROZEN_NOW = datetime(2026, 6, 15, 12, 0, 0, tzinfo=LAGOS)
 
 
 class AdminVendorDeliverySettingsTests(TestCase):
@@ -48,6 +53,7 @@ class AdminVendorDeliverySettingsTests(TestCase):
             'free_delivery_quota': None,
             'free_deliveries_used': None,
             'free_deliveries_remaining': None,
+            'delivery_paused': False,
         })
 
     def test_get_vendor_block_is_none_when_no_vendor_row(self):
@@ -160,6 +166,51 @@ class AdminVendorDeliverySettingsTests(TestCase):
         v = Vendor.objects.get(user=no_record)
         self.assertEqual(v.delivery_fee, Decimal('200.00'))
         self.assertEqual(v.free_delivery_quota, 5)
+
+    def test_patch_sets_delivery_paused(self):
+        res = self.client.patch(
+            self._url(self.vendor_user), {'vendor': {'delivery_paused': True}}, format='json',
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.vendor_record.refresh_from_db()
+        self.assertTrue(self.vendor_record.delivery_paused)
+        self.assertTrue(res.data['vendor']['delivery_paused'])
+
+        res = self.client.patch(
+            self._url(self.vendor_user), {'vendor': {'delivery_paused': False}}, format='json',
+        )
+        self.vendor_record.refresh_from_db()
+        self.assertFalse(self.vendor_record.delivery_paused)
+        self.assertFalse(res.data['vendor']['delivery_paused'])
+
+    def test_patch_rejects_non_boolean_delivery_paused(self):
+        res = self.client.patch(
+            self._url(self.vendor_user), {'vendor': {'delivery_paused': 'yes'}}, format='json',
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.vendor_record.refresh_from_db()
+        self.assertFalse(self.vendor_record.delivery_paused)
+
+    def test_pause_actually_hides_delivery_at_checkout(self):
+        """Integration with delivery.capacity — the whole point of the switch."""
+        from delivery.capacity import has_eligible_slot
+        with mock.patch('django.utils.timezone.now', return_value=FROZEN_NOW):
+            DeliverySlot.objects.create(
+                vendor=self.vendor_user, campus='pau', display_name='Lunch',
+                delivery_time=(FROZEN_NOW + timedelta(hours=3)).time(), max_orders=10,
+            )
+            self.assertTrue(has_eligible_slot(self.vendor_user, 'pau'))
+
+            res = self.client.patch(
+                self._url(self.vendor_user), {'vendor': {'delivery_paused': True}}, format='json',
+            )
+            self.assertEqual(res.status_code, status.HTTP_200_OK)
+            # The PATCH updated the row through its own freshly-fetched User/
+            # Vendor instances inside the view — re-fetch here too, otherwise
+            # this check reads the reverse-relation Django already cached on
+            # self.vendor_user back in setUp's Vendor.objects.create(...).
+            reloaded_vendor_user = User.objects.get(id=self.vendor_user.id)
+            self.assertFalse(has_eligible_slot(reloaded_vendor_user, 'pau'))
 
     def test_patch_requires_admin(self):
         self.client.force_authenticate(user=self.plain_user)

@@ -106,6 +106,74 @@ class VendorUsesBatchedDeliveryTests(CapacityTestBase):
         self.assertFalse(vendor_uses_batched_delivery(plain))
 
 
+class DeliveryPausedTests(CapacityTestBase):
+    """
+    accounts.models.Vendor.delivery_paused — the admin kill-switch. Checked
+    once in _eligible_slots, the one choke point has_eligible_slot,
+    list_eligible_slots, and reserve_delivery_slot all funnel through, so
+    every assertion here doubles as coverage for all three.
+    """
+
+    def _pause(self, vendor, paused=True):
+        # Mutate through vendor.vendor itself, not a separately-fetched
+        # Vendor.objects.get(...) row — CapacityTestBase.setUp's
+        # Vendor.objects.create(user=vendor, ...) already populated Django's
+        # reverse-relation cache on `vendor`, so a second, distinct instance
+        # would go stale the moment _delivery_paused reads vendor.vendor again.
+        record = vendor.vendor
+        record.delivery_paused = paused
+        record.save(update_fields=['delivery_paused'])
+        return record
+
+    def test_has_eligible_slot_false_while_paused(self):
+        make_slot(self.vendor, max_orders=5)
+        self._pause(self.vendor)
+        self.assertFalse(has_eligible_slot(self.vendor, 'pau'))
+
+    def test_list_eligible_slots_empty_while_paused(self):
+        make_slot(self.vendor, max_orders=5)
+        self._pause(self.vendor)
+        self.assertEqual(list_eligible_slots(self.vendor, 'pau'), [])
+
+    def test_reserve_raises_while_paused(self):
+        make_slot(self.vendor, max_orders=5)
+        self._pause(self.vendor)
+        with self.assertRaises(NoDeliverySlotCapacityError):
+            reserve_delivery_slot(self.vendor, 'pau')
+
+    def test_slots_are_preserved_and_restored_on_unpause(self):
+        """Pausing never touches the DeliverySlot rows — unpausing restores exactly what was configured."""
+        slot = make_slot(self.vendor, max_orders=5)
+        record = self._pause(self.vendor)
+        self.assertEqual(list_eligible_slots(self.vendor, 'pau'), [])
+        self.assertTrue(DeliverySlot.objects.filter(id=slot.id, is_active=True).exists())
+
+        record.delivery_paused = False
+        record.save(update_fields=['delivery_paused'])
+        eligible = list_eligible_slots(self.vendor, 'pau')
+        self.assertEqual(len(eligible), 1)
+        self.assertEqual(eligible[0]['slot'].id, slot.id)
+
+    def test_other_vendors_unaffected_by_one_vendors_pause(self):
+        make_slot(self.vendor, max_orders=5)
+        make_slot(self.other_vendor, max_orders=5)
+        self._pause(self.vendor)
+        self.assertEqual(list_eligible_slots(self.vendor, 'pau'), [])
+        self.assertEqual(len(list_eligible_slots(self.other_vendor, 'pau')), 1)
+
+    def test_no_vendor_row_is_never_paused(self):
+        """A vendor with no Vendor row can't have delivery_paused set — must behave as not-paused, not crash."""
+        plain = User.objects.create_user(username='cap_plain2', email='cap_plain2@pau.edu.ng', password='pass123')
+        self.assertFalse(has_eligible_slot(plain, 'pau'))  # false because no slots exist, not because of an error
+        # Give it a slot to prove list_eligible_slots doesn't blow up on Vendor.DoesNotExist either.
+        from delivery.models import DeliverySlot as DS
+        DS.objects.create(
+            vendor=plain, campus='pau', display_name='X',
+            delivery_time=(FROZEN_NOW + timedelta(minutes=180)).time(), max_orders=5,
+        )
+        self.assertEqual(len(list_eligible_slots(plain, 'pau')), 1)
+
+
 class ReserveDeliverySlotTests(CapacityTestBase):
     def test_reserves_slot_with_room(self):
         slot = make_slot(self.vendor, max_orders=5)

@@ -342,6 +342,17 @@ class Vendor(models.Model):
         null=True, blank=True, default=None,
         help_text="First N delivery orders are free. Leave blank to always charge the fee above.",
     )
+    # Admin kill-switch for this vendor's batched delivery, independent of
+    # any individual DeliverySlot.is_active flag. Flipping this on makes
+    # checkout show "no delivery slots available" immediately, the same as
+    # if every slot had filled up — without touching (or losing) the actual
+    # slot rows, so turning it back off restores exactly what was configured
+    # before. See delivery.capacity._eligible_slots, the one choke point
+    # every capacity read/reservation funnels through.
+    delivery_paused = models.BooleanField(
+        default=False,
+        help_text="When on, checkout shows no delivery slots for this vendor at all — existing slots are preserved, not deleted.",
+    )
 
     created_at = models.DateTimeField(auto_now_add=True)
 

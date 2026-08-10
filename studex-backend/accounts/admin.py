@@ -402,7 +402,8 @@ class VendorTypeAdmin(admin.ModelAdmin):
 
 @admin.register(Vendor)
 class VendorAdmin(admin.ModelAdmin):
-    list_display = ['user', 'vendor_type', 'is_verified', 'delivery_fee', 'free_delivery_quota', 'free_deliveries_used_display', 'verified_at', 'verified_by', 'unverified_at', 'unverified_by']
+    list_display = ['user', 'vendor_type', 'is_verified', 'delivery_paused', 'delivery_fee', 'free_delivery_quota', 'free_deliveries_used_display', 'verified_at', 'verified_by', 'unverified_at', 'unverified_by']
+    list_editable = ['delivery_paused']
     list_filter = ['is_verified', 'vendor_type']
     search_fields = ['user__username', 'user__email', 'user__business_name']
     readonly_fields = ['created_at', 'verified_at', 'unverified_at', 'free_deliveries_used_display']
@@ -410,15 +411,18 @@ class VendorAdmin(admin.ModelAdmin):
 
     fieldsets = (
         ('Vendor', {'fields': ('user', 'vendor_type', 'is_verified', 'created_at')}),
-        ('Delivery Fee', {
-            'fields': ('delivery_fee', 'free_delivery_quota', 'free_deliveries_used_display'),
+        ('Delivery', {
+            'fields': ('delivery_paused', 'delivery_fee', 'free_delivery_quota', 'free_deliveries_used_display'),
             'description': (
                 'Only takes effect for a vendor using batched delivery (an admin-created '
-                'DeliverySlot must already exist). ₦0 delivery_fee (default) means no '
-                'delivery fee is charged at all — nothing else here matters. To always '
-                'charge the fee with no free-delivery promo, leave "Free delivery quota" '
-                'blank. To disable the fee entirely, set delivery_fee back to 0 — everyone '
-                'then pays nothing regardless of quota.'
+                'DeliverySlot must already exist). "Delivery paused" is a kill-switch — '
+                'when on, checkout shows no delivery slots for this vendor at all, as if '
+                'every slot were full, without touching (or losing) the slot rows '
+                'themselves. ₦0 delivery_fee (default) means no delivery fee is charged '
+                'at all — nothing else here matters. To always charge the fee with no '
+                'free-delivery promo, leave "Free delivery quota" blank. To disable the '
+                'fee entirely, set delivery_fee back to 0 — everyone then pays nothing '
+                'regardless of quota.'
             ),
         }),
         ('Verification', {'fields': ('verified_at', 'verified_by')}),

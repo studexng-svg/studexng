@@ -5,6 +5,7 @@ import {
   Mail, Phone, ShieldCheck, User, Ban, AlertTriangle, Users,
   Store, Hash, Home, MessageCircle, Instagram, Star,
   ShoppingBag, Wallet, Calendar, BadgeCheck, Shield, Clock, Truck, Bike,
+  PauseCircle, PlayCircle,
 } from "lucide-react";
 import AdminTopBar from "@/components/layout/AdminTopBar";
 import { useParams, useRouter } from "next/navigation";
@@ -263,10 +264,33 @@ export default function AdminUserDetail() {
         {/* Delivery fee + free-delivery promo (batched-delivery vendors only) */}
         {isVendor && (
           <Section title="Delivery">
+            <div className="flex items-center justify-between gap-3 mb-3 p-3 rounded-xl bg-stone-50 border border-stone-100">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-stone-900">Delivery Availability</p>
+                <p className="text-xs text-stone-400">
+                  {user.vendor?.delivery_paused
+                    ? "Paused — checkout shows no delivery slots for this vendor"
+                    : "Live — checkout shows this vendor's delivery slots normally"}
+                </p>
+              </div>
+              <button
+                onClick={() => patch({ vendor: { delivery_paused: !user.vendor?.delivery_paused } })}
+                disabled={actionLoading}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold flex-shrink-0 transition disabled:opacity-50 ${
+                  user.vendor?.delivery_paused
+                    ? "bg-teal-100 text-teal-700 hover:bg-teal-200"
+                    : "bg-amber-100 text-amber-700 hover:bg-amber-200"
+                }`}
+              >
+                {user.vendor?.delivery_paused
+                  ? <><PlayCircle className="w-3.5 h-3.5" /> Resume</>
+                  : <><PauseCircle className="w-3.5 h-3.5" /> Pause</>}
+              </button>
+            </div>
             <p className="text-xs text-stone-400 mb-3">
-              Only takes effect if this vendor uses batched delivery (has an active delivery slot).
-              ₦0 fee (default) means delivery is always free — nothing else here matters. Leave the
-              quota blank to always charge the fee with no free-delivery promo.
+              Fee/quota below only take effect if this vendor uses batched delivery (has an active
+              delivery slot). ₦0 fee (default) means delivery is always free — nothing else here
+              matters. Leave the quota blank to always charge the fee with no free-delivery promo.
             </p>
             <div className="grid grid-cols-2 gap-3 mb-1">
               <div>

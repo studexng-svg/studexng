@@ -73,13 +73,32 @@ def _orders_today_count(slot, day):
     )
 
 
+def _delivery_paused(vendor):
+    """
+    Admin kill-switch (accounts.models.Vendor.delivery_paused) — checked
+    here, the one choke point every capacity read (has_eligible_slot,
+    list_eligible_slots) and the real reservation (reserve_delivery_slot)
+    all funnel through, so pausing takes effect everywhere at once without
+    touching any individual DeliverySlot row.
+    """
+    from accounts.models import Vendor
+    try:
+        return vendor.vendor.delivery_paused
+    except Vendor.DoesNotExist:
+        return False
+
+
 def _eligible_slots(vendor, campus, now_lagos, lock=False):
     """
     Every slot this vendor+campus could still take an order for right now:
     active, cutoff not yet passed today, room left today. Soonest-cutoff-
     first so auto-selection always picks the next slot a buyer could
-    actually still make.
+    actually still make. Empty whenever the vendor's delivery is paused,
+    same as if every slot had simply filled up.
     """
+    if _delivery_paused(vendor):
+        return []
+
     today = now_lagos.date()
     qs = DeliverySlot.objects.filter(vendor=vendor, campus=campus, is_active=True)
     if lock:
