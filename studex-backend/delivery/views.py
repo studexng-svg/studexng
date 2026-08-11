@@ -693,6 +693,14 @@ class RiderUpdateStatusView(APIView):
                 # the buyer open the app and find their order page first. Still
                 # shown there too (BuyerDeliveryStatusSerializer.delivery_code),
                 # this is just the faster path to the same value.
+                #
+                # send_email=True (was False): push has no delivery guarantee —
+                # no registered token, a stale/uninstalled Expo token, FCM
+                # rejecting it, the buyer's phone offline. Email is the fallback
+                # that still lands the code even when every one of those happens,
+                # since send_notification_email fires independently of push
+                # success/failure. Respects the buyer's email_notifications
+                # preference same as every other notification email.
                 send_notification(
                     recipient=assignment.order.buyer,
                     notification_type='order',
@@ -702,7 +710,7 @@ class RiderUpdateStatusView(APIView):
                         f'Give the rider this code to collect it: {assignment.delivery_code}'
                     ),
                     action_url=f'/account/orders/{assignment.order.id}',
-                    send_email=False,
+                    send_email=True,
                 )
             except Exception:
                 pass

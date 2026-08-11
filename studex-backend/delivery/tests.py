@@ -338,6 +338,24 @@ class AtPickupPointNotificationTests(DeliveryTestBase):
         self.assertIn(assignment.delivery_code, message)
         self.assertEqual(mock_notify.call_args.kwargs["recipient"], self.buyer)
 
+    def test_delivery_code_notification_emails_as_push_fallback(self):
+        """
+        Push has no delivery guarantee (no token registered, stale Expo
+        token, phone offline) — email is what still lands the code when
+        push doesn't. send_notification fires both independently, so this
+        just confirms the code notification opts in to the email channel
+        instead of the send_email=False used for admin-only notifications.
+        """
+        assignment = self.assign()
+        self._pick_up(assignment)
+        with patch("accounts.utils.send_notification") as mock_notify:
+            self.client.post(
+                f"/api/delivery/assignments/{assignment.id}/update-status/",
+                {"status": "at_pickup_point"},
+            )
+        mock_notify.assert_called_once()
+        self.assertTrue(mock_notify.call_args.kwargs["send_email"])
+
     def test_notification_falls_back_to_delivery_location_when_no_pickup_point(self):
         """Auto-assignment never sets pickup_point — see delivery.assignment.auto_assign_rider."""
         self.order.delivery_location = "3rd floor, Block C, Room 12"
