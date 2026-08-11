@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Mail, Lock, Eye, EyeOff, Store, ArrowLeft, User, Phone, MapPin, AlertCircle, CheckCircle2, XCircle, Loader2, GraduationCap, Hash } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/authStore";
 import { GRAD, TEAL } from "@/lib/tokens";
@@ -311,6 +312,7 @@ export default function AuthPage() {
           campus: signupForm.school.toLowerCase(),
           ...(signupForm.matric_number ? { matric_number: signupForm.matric_number } : {}),
           ...(signupForm.nin ? { nin: signupForm.nin } : {}),
+          disclaimer_accepted: disclaimerAccepted,
         });
         storeLogin(result.user, result.tokens.access, result.tokens.refresh);
         setMessage("Welcome to StudEx!");
@@ -874,14 +876,19 @@ export default function AuthPage() {
                         </motion.div>
                       )}
                     </AnimatePresence>
-                    <label className="flex items-center gap-3 px-4 py-3 border-t border-amber-200 cursor-pointer">
+                    <label className="flex items-start gap-3 px-4 py-3 border-t border-amber-200 cursor-pointer">
                       <input
                         type="checkbox"
                         checked={disclaimerAccepted}
                         onChange={e => setDisclaimerAccepted(e.target.checked)}
-                        className="w-4 h-4 accent-teal-600 rounded"
+                        className="w-4 h-4 mt-0.5 accent-teal-600 rounded flex-shrink-0"
                       />
-                      <span className="text-xs font-medium text-amber-900">I have read and agree to the disclaimer</span>
+                      <span className="text-xs font-medium text-amber-900">
+                        I have read and agree to the disclaimer above, the{" "}
+                        <Link href="/terms" target="_blank" className="underline text-teal-700">Terms &amp; Conditions</Link>
+                        {" "}and{" "}
+                        <Link href="/privacy-policy" target="_blank" className="underline text-teal-700">Privacy Policy</Link>.
+                      </span>
                     </label>
                   </div>
                 )}

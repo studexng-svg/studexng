@@ -52,7 +52,11 @@
       "Bash(SECRET_KEY=\"test-secret-key-for-ci-cd-only\" DEBUG=\"True\" ALLOWED_HOSTS=\"localhost,127.0.0.1\" python manage.py test accounts orders wallet services chat)",
       "Bash(python manage.py showmigrations accounts orders services cart payments)",
       "Bash(timeout 60 python manage.py showmigrations accounts orders services cart payments delivery)",
-      "Bash(python manage.py showmigrations accounts orders services cart payments delivery)"
+      "Bash(python manage.py showmigrations accounts orders services cart payments delivery)",
+      "Bash(nohup npm run dev -- -p 3002)",
+      "Bash(disown)",
+      "Read(//tmp/**)",
+      "Bash(netstat -ano)"
     ]
   }
 }

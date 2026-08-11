@@ -122,6 +122,42 @@ class AuthenticationAPITests(APITestCase):
         self.assertIn('tokens', response.data)
         self.assertEqual(response.data['user']['email'], 'test@pau.edu.ng')
 
+    def test_register_user_stamps_disclaimer_acceptance(self):
+        """
+        Evidence of consent (NDPA) — src/app/auth/page.tsx sends
+        disclaimer_accepted only once the signup checkbox (linking Terms &
+        Privacy Policy) is checked; register_user must persist it with a
+        timestamp at the moment it happened, not leave it to a later
+        profile-update call that might never come.
+        """
+        cache.set(f"otp_verified:{self.user_data['email']}", True, timeout=300)
+        registration_data = {
+            **self.user_data,
+            'password': 'Testpass123',
+            'password2': 'Testpass123',
+            'disclaimer_accepted': True,
+        }
+        response = self.client.post(self.register_url, registration_data)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        user = User.objects.get(email='test@pau.edu.ng')
+        self.assertTrue(user.profile.disclaimer_accepted)
+        self.assertIsNotNone(user.profile.disclaimer_accepted_at)
+
+    def test_register_user_without_disclaimer_flag_leaves_it_unaccepted(self):
+        cache.set(f"otp_verified:{self.user_data['email']}", True, timeout=300)
+        registration_data = {
+            **self.user_data,
+            'password': 'Testpass123',
+            'password2': 'Testpass123',
+        }
+        response = self.client.post(self.register_url, registration_data)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        user = User.objects.get(email='test@pau.edu.ng')
+        self.assertFalse(user.profile.disclaimer_accepted)
+        self.assertIsNone(user.profile.disclaimer_accepted_at)
+
     def test_register_user_missing_fields(self):
         """Test registration fails with missing fields"""
         incomplete_data = {'username': 'testuser'}

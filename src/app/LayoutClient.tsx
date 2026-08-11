@@ -3,6 +3,8 @@
 import BottomNav from "@/components/layout/BottomNav";
 import SiteHeader from "@/components/layout/SiteHeader";
 import CookieConsent from "@/components/CookieConsent";
+import Analytics from "@/components/Analytics";
+import { GA_ID } from "@/lib/analyticsConfig";
 import { Toaster } from "@/components/ui/sonner";
 import { usePathname } from "next/navigation";
 import { ThemeProvider } from "@/components/ThemeProvider";
@@ -153,6 +155,7 @@ export default function LayoutClient({ children }: { children: React.ReactNode }
           {!hideNav && <BottomNav />}
 
           <DraggableAdminShield />
+          <Analytics gaId={GA_ID} />
           <CookieConsent />
           <Toaster position="top-center" richColors closeButton />
         </NotificationProvider>

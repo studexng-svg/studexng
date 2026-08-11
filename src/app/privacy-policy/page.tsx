@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ChevronLeft, Shield } from "lucide-react";
+import ManageCookiePreferencesButton from "@/components/ManageCookiePreferencesButton";
 
 export const metadata: Metadata = {
   title: "Privacy Policy",
@@ -20,7 +21,7 @@ const sections = [
   {
     num: "01",
     title: "Data We Collect",
-    body: "We collect your name, email, phone number, campus, and transaction history when you register and use StudEx.",
+    body: "We collect your name, email, phone number, campus, matric number or NIN (for verification), and transaction history when you register and use StudEx.",
   },
   {
     num: "02",
@@ -29,21 +30,31 @@ const sections = [
   },
   {
     num: "03",
+    title: "Cookies & Analytics",
+    body: "We use essential cookies to keep you signed in and cart working. Analytics cookies (Google Analytics) only load after you accept them in the cookie banner — if you reject or ignore it, no analytics script runs on your visit. You can change your choice any time below.",
+  },
+  {
+    num: "04",
     title: "Payments",
     body: "Payment processing is handled by Paystack. StudEx does not store your card details. Paystack's own privacy policy applies to all payment transactions.",
   },
   {
-    num: "04",
+    num: "05",
     title: "Data Security",
     body: "We use industry-standard encryption and secure servers to protect your data. Access to personal data is restricted to authorised personnel only.",
   },
   {
-    num: "05",
-    title: "Your Rights",
-    body: "You can request deletion of your account and data at any time by contacting us at studex.ng@gmail.com.",
+    num: "06",
+    title: "Data Retention",
+    body: "We keep your account data for as long as your account is active. If you delete your account, your personal details (name, email, phone, matric number/NIN, and similar) are permanently erased immediately. Order and payment records tied to your account are kept in anonymized form — no longer linked to you personally — because we have a separate legal and accounting basis to retain transaction records.",
   },
   {
-    num: "06",
+    num: "07",
+    title: "Your Rights",
+    body: "Under Nigeria's Data Protection Act, you have the right to access the personal data we hold on you, correct it if it's wrong, restrict or object to how it's used, and request its erasure. You can delete your own account and data at any time from Account Settings → Delete Account — no need to email us for that one. For access, correction, or anything else, contact studex.ng@gmail.com.",
+  },
+  {
+    num: "08",
     title: "Contact",
     body: "For privacy concerns, email us at studex.ng@gmail.com — we typically respond within 24 hours.",
   },
@@ -108,6 +119,11 @@ export default function PrivacyPolicyPage() {
                   {s.title}
                 </h3>
                 <p className="text-stone-500 text-sm leading-relaxed">{s.body}</p>
+                {s.num === "03" && (
+                  <div className="mt-3">
+                    <ManageCookiePreferencesButton />
+                  </div>
+                )}
               </div>
             </div>
           </div>

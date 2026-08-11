@@ -150,6 +150,22 @@ def register_user(request):
         user = serializer.save()
         cache.delete(f'otp_verified:{email}')
 
+        # Evidence of consent (NDPA) — the signup checkbox links the Terms &
+        # Privacy Policy directly (src/app/auth/page.tsx), but a client-side
+        # checkbox alone proves nothing once this request lands; stamping it
+        # on Profile at the moment of creation is what makes it evidence.
+        # Same field/pattern update_user_profile already uses post-signup —
+        # this is just the first, authoritative write, at the point consent
+        # actually happened.
+        if request.data.get('disclaimer_accepted'):
+            try:
+                profile, _ = Profile.objects.get_or_create(user=user)
+                profile.disclaimer_accepted = True
+                profile.disclaimer_accepted_at = timezone.now()
+                profile.save(update_fields=['disclaimer_accepted', 'disclaimer_accepted_at'])
+            except Exception:
+                pass
+
         campus = getattr(user, 'school', 'pau') or 'pau'
         campus_name = {'futo': 'FUTO', 'imsu': 'IMSU'}.get(campus.lower(), 'PAU')
 

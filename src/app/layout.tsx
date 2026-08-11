@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { headers } from "next/headers";
-import Script from "next/script";
 import "./globals.css";
 import LayoutClient from "./LayoutClient";
 
-const GA_ID = "G-RZMK0KLZHB";
+// GA is no longer loaded here — this is a Server Component with no access
+// to the visitor's cookie-consent choice (localStorage). LayoutClient
+// renders <Analytics> (a Client Component) which loads GA only once the
+// visitor accepts cookies. See src/lib/analyticsConfig.ts + src/components/Analytics.tsx.
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -98,13 +100,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       </head>
       <body className={`${inter.className} bg-[#FFF8F0] text-gray-900`}>
-        <Script src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`} strategy="afterInteractive" />
-        <Script id="ga4-init" strategy="afterInteractive">{`
-          window.dataLayer = window.dataLayer || [];
-          function gtag(){dataLayer.push(arguments);}
-          gtag('js', new Date());
-          gtag('config', '${GA_ID}');
-        `}</Script>
         {isMaintenance ? children : <LayoutClient>{children}</LayoutClient>}
       </body>
     </html>

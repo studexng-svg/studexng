@@ -39,6 +39,21 @@ const sections = [
   },
   {
     num: "05",
+    title: "Your Data",
+    body: "How we collect, use, and protect your data is covered in our Privacy Policy, not repeated here. You can delete your account and personal data yourself at any time from Account Settings.",
+  },
+  {
+    num: "06",
+    title: "Account Deletion",
+    body: "You may not delete your account while an order is in progress or while you have a wallet balance to withdraw — settle both first. Deleting your account is permanent: your listings are taken down immediately and your personal details are erased. Order and payment history tied to your account is kept in anonymized form for accounting and legal record-keeping, never shown as yours again.",
+  },
+  {
+    num: "07",
+    title: "Governing Law",
+    body: "These terms are governed by the laws of the Federal Republic of Nigeria.",
+  },
+  {
+    num: "08",
     title: "Contact",
     body: "For support, reach us at studex.ng@gmail.com — we typically respond within 24 hours.",
   },
@@ -103,6 +118,16 @@ export default function TermsPage() {
                   {s.title}
                 </h3>
                 <p className="text-stone-500 text-sm leading-relaxed">{s.body}</p>
+                {s.num === "05" && (
+                  <Link href="/privacy-policy" className="inline-block mt-2 text-sm font-semibold text-teal-700 hover:text-teal-800 underline">
+                    Read the Privacy Policy →
+                  </Link>
+                )}
+                {s.num === "06" && (
+                  <Link href="/account/delete-account" className="inline-block mt-2 text-sm font-semibold text-teal-700 hover:text-teal-800 underline">
+                    Delete your account →
+                  </Link>
+                )}
               </div>
             </div>
           </div>

@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion"; // kept for exit animation
 import { X, Cookie } from "lucide-react";
 import Link from "next/link";
+import { getCookieConsent, setCookieConsent } from "@/lib/cookieConsent";
 
 export default function CookieConsent() {
   const [isVisible, setIsVisible] = useState(false);
@@ -12,22 +13,22 @@ export default function CookieConsent() {
 
   useEffect(() => {
     setMounted(true);
-    const hasConsented = localStorage.getItem("cookieConsent");
-    if (!hasConsented) {
+    if (!getCookieConsent()) {
       // Show after 1.5 seconds
       const timer = setTimeout(() => setIsVisible(true), 1500);
       return () => clearTimeout(timer);
     }
   }, []);
 
+  // Analytics.tsx listens for this via the studex:cookie-consent-changed
+  // event — Accept loads GA on this same tab immediately, no reload needed.
   const handleAccept = () => {
-    localStorage.setItem("cookieConsent", "accepted");
-    localStorage.setItem("cookieConsentDate", new Date().toISOString());
+    setCookieConsent("accepted");
     setIsVisible(false);
   };
 
   const handleReject = () => {
-    localStorage.setItem("cookieConsent", "rejected");
+    setCookieConsent("rejected");
     setIsVisible(false);
   };
 
