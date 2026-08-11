@@ -215,6 +215,15 @@ export default function CheckoutPage() {
     b => new Date(b.cutoff_time).getTime() - nowTick > 0
   );
 
+  // Batched-delivery vendors only: every slot has hit its cutoff (the same
+  // condition the Delivery Slot section above shows its "no slots" amber
+  // notice for, and the Pay button already disables on). While true there's
+  // nothing to actually pay for, so the bank account details disappear too
+  // instead of sitting there implying a transfer would still go somewhere —
+  // ticks back on its own the moment nowTick/batchInfo's 15s poll picks up a
+  // freshly opened slot, no reload needed.
+  const noDeliverySlotOpen = !!batchInfo?.uses_batched_delivery && visibleBatches.length === 0;
+
   useEffect(() => {
     if (typeof window === "undefined") return;
     if ((window as any).PaystackPop) { setPaystackLoaded(true); return; }
@@ -743,8 +752,9 @@ export default function CheckoutPage() {
         </motion.div>
 
         {/* ── BANK TRANSFER (temporary — menu vendors only, while Payout on
-             Demand isn't approved) ── */}
-        {useBankTransfer && (
+             Demand isn't approved) — hidden while noDeliverySlotOpen; the
+             Delivery Slot section above already explains why. ── */}
+        {useBankTransfer && !noDeliverySlotOpen && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 }}
             className="bg-purple-50 border border-purple-200 rounded-2xl p-5 shadow-sm space-y-3">
             <p className="font-bold text-purple-900 text-sm">Pay by Bank Transfer</p>
@@ -873,7 +883,7 @@ export default function CheckoutPage() {
               whileTap={{ scale: isProcessing ? 1 : 0.97 }}
               disabled={
                 isProcessing || !isLoggedIn
-                || (usesMenuCheckout && !!batchInfo?.uses_batched_delivery && visibleBatches.length === 0)
+                || noDeliverySlotOpen
                 || (useBankTransfer ? !bankTransferConfirmed : !paystackLoaded)
               }
               className="w-full py-4 rounded-full font-semibold text-white text-base shadow-lg shadow-teal-200/60 flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
