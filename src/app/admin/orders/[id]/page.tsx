@@ -179,6 +179,19 @@ export default function AdminOrderDetail() {
           </div>
         )}
 
+        {/* Bank Transfer Payment Proof — buyer-uploaded screenshot from checkout
+             (payments.initiate_bank_transfer_cart), optional, so this only
+             ever renders when one was actually attached. */}
+        {order.bank_transfer_proof && (
+          <div className="bg-white border border-purple-200 rounded-2xl p-4 shadow-sm">
+            <p className="text-purple-600 text-xs tracking-[0.2em] uppercase font-semibold mb-3">Payment Proof</p>
+            <a href={order.bank_transfer_proof} target="_blank" rel="noopener noreferrer"
+              className="block max-w-[200px] rounded-xl overflow-hidden border border-stone-200 hover:opacity-90 transition">
+              <img src={order.bank_transfer_proof} alt="Bank transfer proof" className="w-full h-auto object-cover" />
+            </a>
+          </div>
+        )}
+
         {/* Delivery Assignment */}
         <div className="bg-white border border-stone-200 rounded-2xl p-4 shadow-sm space-y-3">
           <div className="flex items-center gap-2 mb-1">

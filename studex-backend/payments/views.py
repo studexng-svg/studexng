@@ -1076,6 +1076,22 @@ def initiate_bank_transfer_cart(request):
     except NoDeliverySlotCapacityError as e:
         return Response({"error": e.detail}, status=400)
 
+    # Optional screenshot of the transfer the buyer says they sent — never
+    # required (the confirmation checkbox on its own is still enough to
+    # submit), just gives the admin something to check against their bank
+    # statement instead of taking the buyer's word for it. Failure here must
+    # never take down an order that was already created above.
+    proof_image = request.FILES.get('proof_image')
+    if proof_image:
+        try:
+            from services.views import upload_to_cloudinary
+            proof_url = upload_to_cloudinary(proof_image, folder='studex/bank_transfer_proofs')
+            if proof_url:
+                order.bank_transfer_proof = proof_url
+                order.save(update_fields=['bank_transfer_proof'])
+        except Exception as e:
+            logger.warning(f"initiate_bank_transfer_cart: proof upload failed for order {order.id}: {e}")
+
     seller = anchor_listing.vendor
     vendor_amount, platform_amount = split_settlement(total_amount, total_payout_amount)
     PaymentTransaction.objects.update_or_create(
@@ -1121,8 +1137,9 @@ def initiate_bank_transfer_cart(request):
                 title=f'⏳ Bank Transfer Awaiting Confirmation — ₦{total_amount:,.0f}',
                 message=(
                     f'{request.user.username} placed an order for {item_count} item(s) from '
-                    f'"{seller.username}" via bank transfer (₦{total_amount:,.0f}). Check your '
-                    f'account and confirm or reject it in admin.'
+                    f'"{seller.username}" via bank transfer (₦{total_amount:,.0f}). '
+                    + ('Payment proof attached — ' if order.bank_transfer_proof else 'No payment proof attached — ')
+                    + 'check your account and confirm or reject it in admin.'
                 ),
                 action_url=f'/admin/orders/{order.id}',
                 send_email=False,

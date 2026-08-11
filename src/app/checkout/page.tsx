@@ -5,7 +5,8 @@ import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import {
   Package, CreditCard, Shield, Lock, Check, RotateCcw, ShieldCheck,
-  Calendar, MapPin, Clock, Loader, Sparkles, ArrowRight, AlertCircle
+  Calendar, MapPin, Clock, Loader, Sparkles, ArrowRight, AlertCircle,
+  ImagePlus, X
 } from "lucide-react";
 import { useCartStore } from "@/lib/cartStore";
 import { useBookingStore } from "@/lib/bookingStore";
@@ -94,6 +95,24 @@ export default function CheckoutPage() {
     bank_name: string;
   } | null>(null);
   const [bankTransferConfirmed, setBankTransferConfirmed] = useState(false);
+  // Optional screenshot of the transfer — never required, the checkbox above
+  // is still enough to submit. Gives the admin something to check against
+  // their bank statement instead of taking the buyer's word for it. See
+  // handleBankTransferSubmit (FormData) and payments.initiate_bank_transfer_cart.
+  const [bankTransferProof, setBankTransferProof] = useState<File | null>(null);
+  const [bankTransferProofPreview, setBankTransferProofPreview] = useState<string | null>(null);
+
+  // Revokes the previous object URL whenever a new file is picked (cleanup
+  // runs with last render's value before the effect re-fires) or the page
+  // unmounts — otherwise each re-selection leaks the last blob.
+  useEffect(() => {
+    return () => { if (bankTransferProofPreview) URL.revokeObjectURL(bankTransferProofPreview); };
+  }, [bankTransferProofPreview]);
+
+  const handleProofChange = useCallback((file: File | null) => {
+    setBankTransferProof(file);
+    setBankTransferProofPreview(file ? URL.createObjectURL(file) : null);
+  }, []);
 
   // discountedBase is already all-inclusive (vendor payout + platform fee baked in
   // at listing-creation time) — no separate fee gets added at checkout anymore.
@@ -270,12 +289,17 @@ export default function CheckoutPage() {
 
     setIsProcessing(true);
     try {
-      const res = await api.payments.bankTransferCart({
-        vendor_id: vendorId,
-        cart_amount: foodTotal,
-        delivery_location: deliveryLocation.trim(),
-        ...(selectedBatchId != null ? { batch_id: selectedBatchId } : {}),
-      });
+      // FormData (not JSON) so the optional proof screenshot can ride along
+      // in the same request — bankTransferCart/initiate_bank_transfer_cart
+      // reads every field the same way either way (request.data.get).
+      const fd = new FormData();
+      fd.append("vendor_id", String(vendorId));
+      fd.append("cart_amount", String(foodTotal));
+      fd.append("delivery_location", deliveryLocation.trim());
+      if (selectedBatchId != null) fd.append("batch_id", String(selectedBatchId));
+      if (bankTransferProof) fd.append("proof_image", bankTransferProof);
+
+      const res = await api.payments.bankTransferCart(fd);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not submit your order");
       // Same vendor-scoped cleanup handlePayment uses below — refetch rather
@@ -287,7 +311,7 @@ export default function CheckoutPage() {
       setPaymentError(err.message || "Something went wrong. Please try again.");
       setIsProcessing(false);
     }
-  }, [bankTransferConfirmed, deliveryLocation, vendorId, foodTotal, selectedBatchId, fetchCart, router]);
+  }, [bankTransferConfirmed, deliveryLocation, vendorId, foodTotal, selectedBatchId, bankTransferProof, fetchCart, router]);
 
   const handlePayment = useCallback(async () => {
     const paystackKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || "";
@@ -742,6 +766,32 @@ export default function CheckoutPage() {
                 <span className="font-semibold text-stone-900">{bankTransferInfo?.bank_name}</span>
               </div>
             </div>
+
+            {/* Optional payment proof — speeds up admin confirmation, never
+                required (the checkbox below is still enough to submit). */}
+            <div className="pt-1">
+              <p className="text-xs font-semibold text-purple-900 mb-1.5">
+                Payment Proof <span className="font-normal text-purple-600">(optional, speeds up confirmation)</span>
+              </p>
+              {bankTransferProofPreview ? (
+                <div className="relative w-24 h-24">
+                  <img src={bankTransferProofPreview} alt="Payment proof preview"
+                    className="w-24 h-24 object-cover rounded-xl border border-purple-200" />
+                  <button type="button" onClick={() => handleProofChange(null)}
+                    className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-white border border-stone-200 shadow-sm flex items-center justify-center text-stone-500 hover:text-red-600 transition">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <label className="flex items-center gap-2 px-4 py-3 bg-white border border-dashed border-purple-300 rounded-xl cursor-pointer hover:border-purple-400 transition">
+                  <ImagePlus className="w-4 h-4 text-purple-500 flex-shrink-0" />
+                  <span className="text-xs text-purple-700 font-medium">Upload a screenshot of the transfer</span>
+                  <input type="file" accept="image/*" className="hidden"
+                    onChange={e => handleProofChange(e.target.files?.[0] || null)} />
+                </label>
+              )}
+            </div>
+
             <label className="flex items-start gap-2.5 cursor-pointer pt-1">
               <input type="checkbox" checked={bankTransferConfirmed}
                 onChange={e => setBankTransferConfirmed(e.target.checked)}

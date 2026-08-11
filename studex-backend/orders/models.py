@@ -52,6 +52,14 @@ class Order(models.Model):
     delivery_location = models.CharField(max_length=200, blank=True, default="")
     delivery_proof_1 = models.URLField(max_length=500, null=True, blank=True)
     delivery_proof_2 = models.URLField(max_length=500, null=True, blank=True)
+    # Buyer-supplied screenshot of the bank transfer they say they sent —
+    # optional, attached at payments.views.initiate_bank_transfer_cart time
+    # (same pending_bank_transfer path above). Never required: the "I've
+    # sent the money" checkbox alone is still enough to submit, this just
+    # gives the admin something to check against their bank statement
+    # instead of taking the buyer's word for it. Shown on the admin order
+    # detail page (AdminOrderDetailView -> OrderSerializer).
+    bank_transfer_proof = models.URLField(max_length=500, null=True, blank=True)
     # Null for every order from a vendor that doesn't use delivery slots —
     # identical to today's behavior in that case. Set exactly once, at
     # checkout (see payments.cart_checkout.create_order_from_priced_lines),

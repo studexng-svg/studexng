@@ -13,6 +13,7 @@ from decimal import Decimal
 from unittest import mock
 
 from django.core.cache import cache
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from rest_framework.test import APIClient
 
@@ -122,6 +123,47 @@ class InitiateBankTransferCartTests(BankTransferTestBase):
         self.assertFalse(CartItem.objects.filter(user=self.buyer, listing=self.listing).exists())
         self.listing.refresh_from_db()
         self.assertEqual(self.listing.stock_quantity, 9)
+
+    def test_proof_image_uploaded_and_saved_on_order(self):
+        BankTransferSettings.objects.create(is_enabled=True, account_name='X', account_number='1', bank_name='Y')
+        CartItem.objects.create(user=self.buyer, listing=self.listing, quantity=1)
+        proof = SimpleUploadedFile('proof.jpg', b'fake-image-bytes', content_type='image/jpeg')
+
+        with mock.patch('services.views.upload_to_cloudinary', return_value='https://cdn.example.com/proof.jpg') as mock_upload:
+            res = self.client.post('/api/payments/bank-transfer-cart/', {
+                'vendor_id': self.vendor.id, 'proof_image': proof,
+            }, format='multipart')
+
+        self.assertEqual(res.status_code, 200)
+        mock_upload.assert_called_once()
+        self.assertEqual(mock_upload.call_args.kwargs.get('folder') or mock_upload.call_args.args[1], 'studex/bank_transfer_proofs')
+        order = Order.objects.get(id=res.data['order_id'])
+        self.assertEqual(order.bank_transfer_proof, 'https://cdn.example.com/proof.jpg')
+
+    def test_no_proof_image_leaves_field_null(self):
+        BankTransferSettings.objects.create(is_enabled=True, account_name='X', account_number='1', bank_name='Y')
+        CartItem.objects.create(user=self.buyer, listing=self.listing, quantity=1)
+
+        res = self.client.post('/api/payments/bank-transfer-cart/', {'vendor_id': self.vendor.id}, format='json')
+
+        self.assertEqual(res.status_code, 200)
+        order = Order.objects.get(id=res.data['order_id'])
+        self.assertIsNone(order.bank_transfer_proof)
+
+    def test_proof_upload_failure_does_not_break_order_creation(self):
+        """A payout-side/upload bug must never break order creation itself."""
+        BankTransferSettings.objects.create(is_enabled=True, account_name='X', account_number='1', bank_name='Y')
+        CartItem.objects.create(user=self.buyer, listing=self.listing, quantity=1)
+        proof = SimpleUploadedFile('proof.jpg', b'fake-image-bytes', content_type='image/jpeg')
+
+        with mock.patch('services.views.upload_to_cloudinary', side_effect=Exception('cloudinary down')):
+            res = self.client.post('/api/payments/bank-transfer-cart/', {
+                'vendor_id': self.vendor.id, 'proof_image': proof,
+            }, format='multipart')
+
+        self.assertEqual(res.status_code, 200)
+        order = Order.objects.get(id=res.data['order_id'])
+        self.assertIsNone(order.bank_transfer_proof)
 
     def test_delivery_fee_still_applies(self):
         BankTransferSettings.objects.create(is_enabled=True, account_name='X', account_number='1', bank_name='Y')

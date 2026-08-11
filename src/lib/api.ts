@@ -416,8 +416,11 @@ export const api = {
     // ── Temporary manual bank-transfer settlement (menu vendors only) ──
     bankTransferDetails: () => fetchWithAuth(u("/api/payments/bank-transfer-details/")),
 
-    bankTransferCart: (body: Record<string, unknown>) =>
-      fetchWithAuth(u("/api/payments/bank-transfer-cart/"), { method: "POST", body: s(body) }),
+    bankTransferCart: (body: FormData | Record<string, unknown>) =>
+      fetchWithAuth(u("/api/payments/bank-transfer-cart/"), {
+        method: "POST",
+        body: body instanceof FormData ? body : s(body),
+      }),
 
     manualRefund: (id: number | string) => fetchWithAuth(u(`/api/payments/manual-refunds/${id}/`)),
 
