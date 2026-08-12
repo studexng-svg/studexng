@@ -429,16 +429,17 @@ def initialize_payment(request):
                 amount = Decimal(str(listing.price))
         else:
             # Single listing — apply deal discount if active
+            from payments.settlement import get_vendor_type
             if booking is not None and (booking.listing.is_per_unit or booking.variant_id):
                 from payments.pricing import calculate_final_price
                 unit_payout = booking.variant.payout_amount if booking.variant_id else listing.payout_amount
                 qty = booking.quantity if booking.listing.is_per_unit else 1
-                total_payout = Decimal(str(unit_payout)) * qty
-                from payments.settlement import get_vendor_type
+                payout_base = Decimal(str(unit_payout)) * qty
                 amount = calculate_final_price(
-                    total_payout, campus=listing.campus, vendor_type=get_vendor_type(listing.vendor),
+                    payout_base, campus=listing.campus, vendor_type=get_vendor_type(listing.vendor),
                 )
             else:
+                payout_base = listing.payout_amount
                 amount = Decimal(str(listing.price))
             try:
                 deal = listing.deal
@@ -450,12 +451,19 @@ def initialize_payment(request):
                     # listing_vendor_discount stays 0
                     amount = effective
             except Exception:
-                # Vendor-set discount — vendor bears the cost
+                # Vendor-set discount — vendor bears the cost. Applied to
+                # payout_base (what the vendor actually asked for), never to
+                # `amount` (fee-inclusive) — see payments.pricing.
+                # apply_vendor_discount's docstring for why that distinction
+                # matters (it isn't just a rounding difference).
                 vd = getattr(listing, 'discount_percent', 0) or 0
                 if vd > 0:
-                    effective = amount - amount * Decimal(vd) / 100
+                    from payments.pricing import apply_vendor_discount
+                    _, vendor_discount_currency, effective = apply_vendor_discount(
+                        payout_base, vd, price=amount, campus=listing.campus, vendor_type=get_vendor_type(listing.vendor),
+                    )
                     listing_deal_discount = (amount - effective).quantize(Decimal("0.01"))
-                    listing_vendor_discount = listing_deal_discount
+                    listing_vendor_discount = vendor_discount_currency
                     deal_discount_total = listing_deal_discount
                     amount = effective
     except Exception:
@@ -1448,14 +1456,16 @@ def pay_with_credits(request):
 
     quantity = booking.quantity if (booking is not None and booking.listing.is_per_unit) else 1
 
+    from payments.settlement import get_vendor_type
     if booking is not None and (booking.listing.is_per_unit or booking.variant_id):
         from payments.pricing import calculate_final_price
         unit_payout = booking.variant.payout_amount if booking.variant_id else listing.payout_amount
-        from payments.settlement import get_vendor_type
+        payout_base = Decimal(str(unit_payout)) * quantity
         listing_price = calculate_final_price(
-            Decimal(str(unit_payout)) * quantity, campus=listing.campus, vendor_type=get_vendor_type(listing.vendor),
+            payout_base, campus=listing.campus, vendor_type=get_vendor_type(listing.vendor),
         )
     else:
+        payout_base = listing.payout_amount
         listing_price = Decimal(str(listing.price))
     deal_discount_amount = Decimal("0")
     vendor_discount_currency = Decimal("0")
@@ -1468,11 +1478,15 @@ def pay_with_credits(request):
             listing_price = effective
             deal_absorbed = True
     except Exception:
+        # Vendor-set discount — applied to payout_base, not listing_price
+        # (fee-inclusive) — see payments.pricing.apply_vendor_discount.
         vd = getattr(listing, 'discount_percent', 0) or 0
         if vd > 0:
-            effective = listing_price - listing_price * Decimal(vd) / 100
+            from payments.pricing import apply_vendor_discount
+            _, vendor_discount_currency, effective = apply_vendor_discount(
+                payout_base, vd, price=listing_price, campus=listing.campus, vendor_type=get_vendor_type(listing.vendor),
+            )
             deal_discount_amount = listing_price - effective
-            vendor_discount_currency = deal_discount_amount
             listing_price = effective
 
     try:

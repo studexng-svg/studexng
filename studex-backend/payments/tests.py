@@ -103,24 +103,36 @@ class CreateOrderFromPaystackDataTests(TestCase):
 
 class VendorDiscountAbsorptionTests(TestCase):
     """
-    Regression test for a real reported bug: a vendor set their own
-    Listing.discount_percent (never an admin Deal) and was still paid their
-    full, undiscounted payout_amount.
+    Regression coverage for a real reported bug, in two parts:
 
-    Root cause: _create_order_from_paystack_data computed
-    deal_absorbed_by_platform as bool(deal_discount_amount) — but
-    initialize_payment populates deal_discount_amount identically for an
-    admin Deal AND a vendor's own discount (it just means "some discount
-    was applied", not "who's paying for it"). That made
-    deal_absorbed_by_platform True for a vendor's own sale too, routing it
-    into split_settlement's platform-absorbs-it branch and silently
-    discarding vendor_discount_currency. Fixed by also checking
-    listing_vendor_discount, which initialize_payment only ever sets
-    non-zero for a vendor's own discount_percent (stays 0 for an admin
-    Deal) — the actual discriminator between the two cases.
+    1. WHO absorbs the discount. _create_order_from_paystack_data computed
+       deal_absorbed_by_platform as bool(deal_discount_amount) — but
+       initialize_payment populates deal_discount_amount identically for an
+       admin Deal AND a vendor's own discount (it just means "some discount
+       was applied", not "who's paying for it"). That made
+       deal_absorbed_by_platform True for a vendor's own sale too, routing
+       it into split_settlement's platform-absorbs-it branch and silently
+       discarding vendor_discount_currency. Fixed by also checking
+       listing_vendor_discount, which initialize_payment only ever sets
+       non-zero for a vendor's own discount_percent (stays 0 for an admin
+       Deal) — the actual discriminator between the two cases.
+
+    2. HOW MUCH the vendor absorbs. Fixing (1) alone still paid the vendor
+       the wrong number: the discount currency was computed against
+       listing.price (fee-inclusive — ₦2,160 for a ₦2,000 payout at 8%),
+       not against payout_amount itself. A 17% vendor discount must leave
+       them with exactly ₦1,660.00 (2,000 × 0.83), not ₦1,632.80
+       (2,160 × 0.83) — the ₦27.20 gap between those two is the platform's
+       own fee naturally shrinking on a smaller base, which must stay with
+       the platform, not get pulled out of the vendor. Fixed via
+       payments.pricing.apply_vendor_discount, the one shared function
+       every discount->currency conversion in the codebase must now use.
     """
 
     def setUp(self):
+        from payments.models import PricingSettings
+        PricingSettings.objects.update_or_create(pk=1, defaults={'service_fee_percent': Decimal('8.00')})
+        self.client = APIClient()
         self.buyer = User.objects.create_user(
             username='vda_buyer', email='vda_buyer@pau.edu.ng', password='pass123'
         )
@@ -139,33 +151,62 @@ class VendorDiscountAbsorptionTests(TestCase):
             'metadata': metadata,
         }
 
-    def test_vendor_own_discount_reduces_vendor_payout(self):
-        """The exact reported bug — hair accessories, 17% vendor discount, ₦2,000 payout."""
+    def _mock_paystack_init_response(self):
+        mock_res = MagicMock()
+        mock_res.status_code = 200
+        mock_res.json.return_value = {
+            'status': True,
+            'data': {'access_code': 'test_code', 'authorization_url': 'https://paystack.test/pay', 'reference': 'STX-TEST'},
+        }
+        return mock_res
+
+    @patch('payments.views.requests.post')
+    def test_initialize_payment_computes_discount_against_payout_not_price(self, mock_post):
+        """
+        End-to-end through the real view: the exact reported case — hair
+        accessories, 17% vendor discount, ₦2,000 payout, ₦2,160 price.
+        """
+        mock_post.return_value = self._mock_paystack_init_response()
         listing = Listing.objects.create(
             title='Hair bands and hair rings', description='x', price=Decimal('2160.00'),
             payout_amount=Decimal('2000.00'), discount_percent=17,
             vendor=self.seller, category=self.category, is_available=True,
         )
-        # Same metadata shape initialize_payment actually produces for a
-        # vendor-set discount (payments/views.py:456-459): deal_discount_amount
-        # is non-zero (some discount happened) but listing_vendor_discount is
-        # what actually says who absorbs it.
+        self.client.force_authenticate(user=self.buyer)
+
+        response = self.client.post('/api/payments/initialize/', {'listing_id': listing.id})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        sent = mock_post.call_args.kwargs['json']
+        # Buyer charge: fee (8% of 1,660 = 132.80) recomputed on the
+        # discounted payout, same total either formula gives here since
+        # neither the floor nor cap kicks in — 1,660 + 132.80 = 1,792.80.
+        self.assertEqual(sent['amount'], 179280)
+        # The number that actually matters: ₦340.00 (17% of the ₦2,000
+        # payout), not ₦367.20 (17% of the ₦2,160 fee-inclusive price).
+        self.assertEqual(sent['metadata']['listing_vendor_discount'], '340.00')
+
+    def test_vendor_own_discount_reduces_vendor_payout_by_exact_amount(self):
+        """Consuming side: given that correct metadata, the vendor is paid exactly ₦1,660.00."""
+        listing = Listing.objects.create(
+            title='Hair bands and hair rings', description='x', price=Decimal('2160.00'),
+            payout_amount=Decimal('2000.00'), discount_percent=17,
+            vendor=self.seller, category=self.category, is_available=True,
+        )
         order_id, error = _create_order_from_paystack_data(
             self._fake_paystack_data('ORD-VDA-0001', 179280, {
                 'listing_id': str(listing.id),
-                'deal_discount_amount': '367.20',
-                'listing_deal_discount': '367.20',
-                'listing_vendor_discount': '367.20',
+                'deal_discount_amount': '340.00',
+                'listing_deal_discount': '340.00',
+                'listing_vendor_discount': '340.00',
             }),
             self.buyer, listing.id, 'product',
         )
         self.assertIsNone(error)
         from payments.models import PaymentTransaction
         txn = PaymentTransaction.objects.get(order_id=order_id)
-        # Vendor absorbs their own ₦367.20 discount — must NOT receive the
-        # full undiscounted payout_amount.
-        self.assertEqual(txn.seller_amount, Decimal('1632.80'))
-        self.assertLess(txn.seller_amount, listing.payout_amount)
+        self.assertEqual(txn.seller_amount, Decimal('1660.00'))
+        self.assertEqual(listing.payout_amount - txn.seller_amount, Decimal('340.00'))
 
     def test_admin_deal_still_pays_vendor_full_payout(self):
         """Unchanged existing behavior: an admin Deal stays platform-absorbed."""
@@ -177,8 +218,8 @@ class VendorDiscountAbsorptionTests(TestCase):
         order_id, error = _create_order_from_paystack_data(
             self._fake_paystack_data('ORD-VDA-0002', 179280, {
                 'listing_id': str(listing.id),
-                'deal_discount_amount': '367.20',
-                'listing_deal_discount': '367.20',
+                'deal_discount_amount': '340.00',
+                'listing_deal_discount': '340.00',
                 'listing_vendor_discount': '0',
             }),
             self.buyer, listing.id, 'product',
@@ -300,6 +341,31 @@ class PricingTests(TestCase):
         )
         self.assertEqual(vendor_amount, Decimal('0'))
         self.assertEqual(platform_amount, Decimal('100'))
+
+    def test_apply_vendor_discount_uses_payout_not_price_as_the_base(self):
+        """
+        The exact reported bug's root cause, isolated: a 17% discount on a
+        ₦2,000 payout (₦2,160 price at 8% fee) must take exactly ₦340.00
+        off the payout, not ₦367.20 (17% of the fee-inclusive price) — that
+        ₦27.20 gap is the platform's own fee shrinking on the smaller base,
+        not vendor money.
+        """
+        from payments.pricing import apply_vendor_discount
+        discounted_payout, vendor_discount_currency, discounted_price = apply_vendor_discount(
+            Decimal('2000'), Decimal('17'), fee_percent=Decimal('8'),
+        )
+        self.assertEqual(vendor_discount_currency, Decimal('340.00'))
+        self.assertEqual(discounted_payout, Decimal('1660.00'))
+        # Fee recomputed on the discounted payout: 1660 * 0.08 = 132.80.
+        self.assertEqual(discounted_price, Decimal('1792.80'))
+
+    def test_apply_vendor_discount_floors_at_zero(self):
+        from payments.pricing import apply_vendor_discount
+        discounted_payout, vendor_discount_currency, _ = apply_vendor_discount(
+            Decimal('100'), Decimal('150'), fee_percent=Decimal('8'),  # >100% discount, shouldn't happen but must not go negative
+        )
+        self.assertEqual(discounted_payout, Decimal('0'))
+        self.assertEqual(vendor_discount_currency, Decimal('150.00'))
 
     def test_recompute_all_listing_prices_is_retroactive(self):
         """Confirmed product decision: changing the fee % updates every existing listing immediately."""

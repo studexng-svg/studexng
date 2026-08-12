@@ -103,10 +103,16 @@ class CartItemSerializer(serializers.ModelSerializer):
         except Exception:
             pass
         # No admin Deal — same fallback as get_deal_discount_percent above.
-        # Matches ListingSerializer.get_sale_price's exact formula so the
-        # cart's price always agrees with what the listing/home page shows.
+        # Matches ListingSerializer.get_sale_price's exact formula (both go
+        # through payments.pricing.apply_vendor_discount) so the cart's
+        # price always agrees with what the listing/home page shows.
         if obj.listing.discount_percent and obj.listing.discount_percent > 0:
-            from decimal import Decimal
-            price = obj.listing.price
-            return float(price - price * Decimal(obj.listing.discount_percent) / 100)
+            from payments.pricing import apply_vendor_discount
+            from payments.settlement import get_vendor_type
+            listing = obj.listing
+            _, _, discounted_price = apply_vendor_discount(
+                listing.payout_amount, listing.discount_percent, price=listing.price,
+                campus=listing.campus, vendor_type=get_vendor_type(listing.vendor),
+            )
+            return float(discounted_price)
         return float(obj.listing.price)

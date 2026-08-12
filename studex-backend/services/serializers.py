@@ -279,8 +279,13 @@ class ListingSerializer(serializers.ModelSerializer):
 
     def get_sale_price(self, obj):
         if obj.discount_percent and obj.discount_percent > 0:
-            from decimal import Decimal
-            return float(obj.price - obj.price * Decimal(obj.discount_percent) / 100)
+            from payments.pricing import apply_vendor_discount
+            from payments.settlement import get_vendor_type
+            _, _, discounted_price = apply_vendor_discount(
+                obj.payout_amount, obj.discount_percent, price=obj.price,
+                campus=obj.campus, vendor_type=get_vendor_type(obj.vendor),
+            )
+            return float(discounted_price)
         return None
 
     def get_weekly_order_count(self, obj):

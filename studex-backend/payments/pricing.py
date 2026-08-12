@@ -64,6 +64,56 @@ def calculate_final_price(
     return payout_amount + calculate_platform_fee(payout_amount, fee_percent, campus, vendor_type)
 
 
+def apply_vendor_discount(
+    payout_amount, discount_percent, price=None, fee_percent: Decimal = None, campus: str = None, vendor_type=None,
+) -> tuple[Decimal | None, Decimal, Decimal]:
+    """
+    A vendor's own Listing.discount_percent takes X% off THEIR payout, not
+    off the fee-inclusive buyer price — StudEx's fee is then recomputed on
+    that already-discounted payout, so the platform's own cut shrinks
+    naturally (a smaller base means a smaller %-of-base fee) without the
+    vendor absorbing any of that shrinkage.
+
+    Applying the percentage to `price` instead (price already has the fee
+    baked in) pulls a slice of that fee-shrinkage out of the vendor's own
+    payout too — e.g. a ₦2,000 payout (→ ₦2,160 price at an 8% fee) with a
+    17% vendor discount must leave the vendor with exactly ₦1,660
+    (2,000 × 0.83), not ₦1,632.80 (2,160 × 0.83, then treating the whole
+    ₦367.20 gap as vendor-side rather than recognizing ₦27.20 of it as the
+    fee naturally shrinking). Every call site that turns a vendor's
+    discount_percent into money — checkout, the buyer-facing sale-price
+    display, cart — must go through this one function so they can never
+    drift apart again.
+
+    payout_amount=None (a listing that predates the payout_amount backfill
+    migration — every other pricing call site in this codebase falls back
+    to `price` in that case) is the one case this does NOT run through
+    calculate_final_price: `price` is already fee-inclusive, so adding the
+    fee to it again would double-count it. Falls back to discounting
+    `price` directly instead — the same behavior every call site had
+    before this function existed, for exactly the listings where the
+    payout/fee split isn't known. Pass `price` whenever payout_amount
+    might be None.
+
+    Returns (discounted_payout, vendor_discount_currency, discounted_price).
+    discounted_payout is None in the payout_amount=None fallback (there's
+    no payout figure to report) — every current caller discards it.
+    discounted_price is always the new buyer-facing all-inclusive price.
+    """
+    discount_percent = Decimal(str(discount_percent))
+    if payout_amount is not None:
+        payout_amount = Decimal(str(payout_amount))
+        vendor_discount_currency = (payout_amount * discount_percent / 100).quantize(Decimal("0.01"))
+        discounted_payout = max(payout_amount - vendor_discount_currency, Decimal("0"))
+        discounted_price = calculate_final_price(discounted_payout, fee_percent, campus, vendor_type)
+        return discounted_payout, vendor_discount_currency, discounted_price
+
+    price = Decimal(str(price))
+    vendor_discount_currency = (price * discount_percent / 100).quantize(Decimal("0.01"))
+    discounted_price = max(price - vendor_discount_currency, Decimal("0"))
+    return None, vendor_discount_currency, discounted_price
+
+
 def split_settlement(
     amount_paid: Decimal,
     payout_amount: Decimal,

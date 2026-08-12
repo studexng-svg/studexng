@@ -508,7 +508,6 @@ class DealsListView(APIView):
     def get(self, request):
         from services.models import Deal, Listing
         from services.serializers import DealDetailSerializer, ListingSerializer
-        from decimal import Decimal
 
         campus = request.query_params.get('campus')
 
@@ -533,11 +532,17 @@ class DealsListView(APIView):
         if campus:
             vendor_qs = vendor_qs.filter(campus__iexact=campus)
 
+        from payments.pricing import apply_vendor_discount
+        from payments.settlement import get_vendor_type
         vendor_data = []
         for listing in vendor_qs:
             serialized = dict(ListingSerializer(listing).data)
             discount = listing.discount_percent
-            discounted = float(listing.price - listing.price * Decimal(discount) / 100)
+            _, _, discounted_price = apply_vendor_discount(
+                listing.payout_amount, discount, price=listing.price,
+                campus=listing.campus, vendor_type=get_vendor_type(listing.vendor),
+            )
+            discounted = float(discounted_price)
             vendor_data.append({
                 'id': f'v_{listing.id}',
                 'listing': serialized,
