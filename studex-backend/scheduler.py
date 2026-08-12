@@ -1107,6 +1107,203 @@ def recover_stuck_refunds():
         logger.info(f"recover_stuck_refunds: recovered {count} stuck refund claim(s).")
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# JOB 16: Warn vendors of an approaching fulfillment auto-refund — hourly
+# ─────────────────────────────────────────────────────────────────────────────
+
+def warn_vendors_of_pending_auto_refund():
+    """
+    Halfway checkpoint for JOB 17 below — same scoping (self-fulfilled
+    marketplace 'product' orders only, see auto_refund_stale_paid_orders for
+    the full rationale). A 'paid' order past half of orders.models.
+    AutoRefundSettings.hours with no seller_completed gets one warning
+    notification so the vendor has a chance to act before the full window
+    auto-refunds the buyer. Idempotent: vendor_timeout_warned=True prevents
+    repeat warnings for the same order.
+    """
+    from orders.models import Order, AutoRefundSettings
+    from accounts.utils import send_notification
+
+    settings_obj = AutoRefundSettings.get()
+    halfway_cutoff = timezone.now() - timedelta(hours=settings_obj.hours / 2)
+
+    stale = (
+        Order.objects
+        .filter(
+            status='paid',
+            paid_at__lte=halfway_cutoff,
+            vendor_timeout_warned=False,
+            delivery_slot__isnull=True,
+            listing__listing_type='product',
+        )
+        .filter(delivery__isnull=True)
+        .exclude(disputes__status__in=['open', 'under_review'])
+        .select_related('listing__vendor')
+    )
+
+    warned = 0
+    for order in stale:
+        # Claim first (single UPDATE, no lock needed — losing the race just
+        # means we skip, the other process already sent it) so two overlapping
+        # runs can never double-warn the same order.
+        claimed = Order.objects.filter(pk=order.pk, vendor_timeout_warned=False).update(vendor_timeout_warned=True)
+        if not claimed:
+            continue
+        try:
+            send_notification(
+                recipient=order.listing.vendor,
+                notification_type='order_timeout_warning',
+                title=f'Fulfil order #{order.reference} soon',
+                message=(
+                    f'Order #{order.reference} for "{order.listing.title}" hasn\'t been marked complete yet. '
+                    f'It will be automatically refunded to the buyer if it\'s still unfulfilled '
+                    f'{settings_obj.hours} hours after payment.'
+                ),
+                action_url='/vendor/dashboard/orders',
+                send_email=False,
+            )
+            warned += 1
+        except Exception as e:
+            logger.error(f"warn_vendors_of_pending_auto_refund: notify failed for order {order.id}: {e}", exc_info=True)
+
+    if warned:
+        logger.info(f"Warned {warned} vendor(s) of a pending fulfillment-timeout auto-refund.")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# JOB 17: Auto-refund stale paid marketplace orders — hourly
+# ─────────────────────────────────────────────────────────────────────────────
+
+def auto_refund_stale_paid_orders():
+    """
+    Buyer-protection counterpart to auto_release_orders (JOB 2 — which
+    protects the *vendor* when a buyer goes silent after seller_completed):
+    protects the *buyer* when a vendor never fulfils a paid, self-fulfilled
+    marketplace order at all. Same full-refund call orders.views.
+    OrderViewSet.vendor_decline already uses for a manually-declined order —
+    nothing new, just triggered by a timeout instead of the vendor clicking
+    Decline.
+
+    Scope, deliberately narrow:
+      - listing.listing_type == 'product' only — a service booking is
+        pinned to its own scheduled_date, not a fulfillment-speed window.
+      - No DeliveryAssignment and no delivery_slot — a food/batched-delivery
+        order already resolves through its own rider pipeline (pickup, at
+        pickup point, buyer-confirmed handoff code), usually same-day. This
+        is exactly what keeps a Buka-9-style food order out of this job.
+
+    Bank-transfer orders (PaymentTransaction.is_bank_transfer) have no real
+    Paystack transaction to refund — same branch payments.item_refund.
+    mark_order_item_unavailable already uses: a whole-order ManualRefund
+    record (order_item=None distinguishes it from a partial-item one)
+    instead, for an admin to action and the buyer to submit their own bank
+    details against.
+
+    Reuses status='vendor_declined' rather than a new status — the buyer/
+    vendor-facing copy (and vendor_timeout_refunded=True) is what actually
+    distinguishes "timed out" from "vendor clicked Decline"; every existing
+    frontend status badge/filter for vendor_declined already applies
+    correctly with zero further changes.
+
+    Idempotent: vendor_timeout_refunded=True prevents double-processing.
+    """
+    from django.db import transaction as db_tx
+    from orders.models import Order, AutoRefundSettings
+    from payments.models import PaymentTransaction, ManualRefund
+    from payments.views import refund_paystack_transaction
+    from accounts.utils import send_notification
+
+    settings_obj = AutoRefundSettings.get()
+    cutoff = timezone.now() - timedelta(hours=settings_obj.hours)
+
+    stale = (
+        Order.objects
+        .filter(
+            status='paid',
+            paid_at__lte=cutoff,
+            vendor_timeout_refunded=False,
+            delivery_slot__isnull=True,
+            listing__listing_type='product',
+        )
+        .filter(delivery__isnull=True)
+        .exclude(disputes__status__in=['open', 'under_review'])
+        .select_related('buyer', 'listing__vendor')
+    )
+
+    refunded = 0
+    for order in stale:
+        manual_refund = None
+        try:
+            with db_tx.atomic():
+                # Re-check inside the lock — another process may have beat us,
+                # same convention as auto_release_orders above.
+                locked = Order.objects.select_for_update().get(pk=order.pk)
+                if locked.vendor_timeout_refunded or locked.status != 'paid':
+                    continue
+                txn = PaymentTransaction.objects.select_for_update().filter(
+                    reference=locked.reference, status='success',
+                ).first()
+                if not txn:
+                    logger.warning(f"auto_refund_stale_paid_orders: no successful transaction for order {locked.id}")
+                    continue
+
+                if txn.is_bank_transfer:
+                    manual_refund, _ = ManualRefund.objects.get_or_create(
+                        order=locked, order_item=None, buyer=locked.buyer,
+                        defaults={
+                            'amount': txn.amount,
+                            'reason': (
+                                f'Vendor did not fulfil order #{locked.reference} within '
+                                f'{settings_obj.hours}h of payment'
+                            ),
+                        },
+                    )
+                else:
+                    if not refund_paystack_transaction(locked.reference):
+                        logger.warning(f"auto_refund_stale_paid_orders: Paystack refund failed for order {locked.id}")
+                        continue
+
+                locked.status = 'vendor_declined'
+                locked.vendor_timeout_refunded = True
+                locked.save(update_fields=['status', 'vendor_timeout_refunded'])
+        except Exception as e:
+            logger.error(f"auto_refund_stale_paid_orders failed for order {order.id}: {e}", exc_info=True)
+            continue
+
+        try:
+            buyer_url = f'/account/refunds/{manual_refund.id}' if manual_refund else '/account/orders'
+            buyer_message = (
+                f'Your order #{order.reference} for "{order.listing.title}" wasn\'t marked complete within '
+                f'{settings_obj.hours} hours of payment, so it has been automatically refunded.'
+            )
+            if manual_refund:
+                buyer_message += ' Since you paid by bank transfer, please submit your bank details so we can send it directly.'
+            send_notification(
+                recipient=order.buyer,
+                notification_type='order_auto_refunded',
+                title=f'Order #{order.reference} refunded',
+                message=buyer_message,
+                action_url=buyer_url,
+            )
+            send_notification(
+                recipient=order.listing.vendor,
+                notification_type='order_auto_refunded',
+                title=f'Order #{order.reference} auto-refunded',
+                message=(
+                    f'Order #{order.reference} was automatically refunded to the buyer — it wasn\'t marked '
+                    f'complete within {settings_obj.hours} hours of payment.'
+                ),
+                action_url='/vendor/dashboard/orders',
+                send_email=False,
+            )
+            refunded += 1
+        except Exception as e:
+            logger.error(f"auto_refund_stale_paid_orders: notify failed for order {order.id}: {e}", exc_info=True)
+
+    if refunded:
+        logger.info(f"Auto-refunded {refunded} stale paid order(s) (vendor fulfillment timeout).")
+
+
 # Delivery slot capacity no longer needs a generation job (Phase 2
 # simplification) — a DeliverySlot applies every day forever on its own,
 # and "today's" capacity is counted live from real Order rows (see
@@ -1285,6 +1482,29 @@ def start():
         coalesce=True,
     )
 
+    # Every hour — halfway warning before a stale marketplace order auto-refunds
+    scheduler.add_job(
+        warn_vendors_of_pending_auto_refund,
+        trigger=IntervalTrigger(hours=1),
+        id='warn_vendors_of_pending_auto_refund',
+        name='Warn vendors of a pending fulfillment-timeout auto-refund (hourly)',
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+
+    # Every hour — auto-refund a self-fulfilled marketplace order the vendor
+    # never fulfilled (see orders.models.AutoRefundSettings for the window)
+    scheduler.add_job(
+        auto_refund_stale_paid_orders,
+        trigger=IntervalTrigger(hours=1),
+        id='auto_refund_stale_paid_orders',
+        name='Auto-refund stale paid marketplace orders (hourly)',
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+
     try:
         scheduler.start()
         logger.info(
@@ -1295,7 +1515,8 @@ def start():
             "prompt_rating_reviews (30 min), send_lunch_notifications (Mon-Fri 12:30 WAT), "
             "send_vendor_daily_digest (08:00 WAT), nudge_pending_booking_vendors (30 min), "
             "send_buyer_daily_nudge (Mon-Fri 09:00 WAT), send_buyer_reengagement_nudge (17:00 WAT), "
-            "recover_stuck_refunds (5 min)."
+            "recover_stuck_refunds (5 min), warn_vendors_of_pending_auto_refund (1h), "
+            "auto_refund_stale_paid_orders (1h)."
         )
     except Exception as e:
         logger.error(f"Failed to start scheduler: {e}", exc_info=True)

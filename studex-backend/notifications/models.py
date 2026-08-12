@@ -28,6 +28,8 @@ class Notification(models.Model):
         ('ai_tip', 'AI Tip / Engagement Message'),
         ('rate_vendor', 'Rate Your Vendor'),
         ('order_auto_released', 'Order Auto-Released'),
+        ('order_timeout_warning', 'Vendor Fulfillment Timeout Warning'),
+        ('order_auto_refunded', 'Order Auto-Refunded — Vendor Timeout'),
         ('new_order', 'New Order Received'),
         ('order_placed', 'Order Placed'),
         ('order_cancelled', 'Order Cancelled'),

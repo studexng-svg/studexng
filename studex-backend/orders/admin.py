@@ -5,10 +5,29 @@ from django.http import HttpResponse
 from django.db.models import Sum
 from datetime import timedelta
 import csv
-from .models import Order, Dispute, OrderItem, OrderItemAddon
+from .models import Order, Dispute, OrderItem, OrderItemAddon, AutoRefundSettings
 from delivery.admin import DeliveryAssignmentInline
 from delivery.contracts import notify_rider_assignment
 from delivery.models import DeliveryAssignment
+
+
+@admin.register(AutoRefundSettings)
+class AutoRefundSettingsAdmin(admin.ModelAdmin):
+    """
+    Singleton (same pattern as payments.admin.BankTransferSettingsAdmin) —
+    how many hours a self-fulfilled marketplace order can sit 'paid' before
+    scheduler.auto_refund_stale_paid_orders auto-refunds the buyer. Vendors
+    get a warning notification at the halfway point (scheduler.
+    warn_vendors_of_pending_auto_refund) before that happens.
+    """
+    list_display = ['hours', 'updated_at']
+    readonly_fields = ['updated_at']
+
+    def has_add_permission(self, request):
+        return not AutoRefundSettings.objects.exists()
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 class OrderItemInline(admin.TabularInline):

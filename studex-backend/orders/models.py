@@ -49,6 +49,15 @@ class Order(models.Model):
     seller_completed_at = models.DateTimeField(null=True, blank=True)
     buyer_confirmed_at = models.DateTimeField(null=True, blank=True)
     auto_released = models.BooleanField(default=False)
+    # Buyer-protection counterpart to auto_released above (which protects the
+    # *vendor* when a buyer goes silent after seller_completed) — protects
+    # the *buyer* when a vendor never fulfils a paid, self-fulfilled
+    # marketplace order at all. See scheduler.auto_refund_stale_paid_orders /
+    # warn_vendors_of_pending_auto_refund and orders.models.AutoRefundSettings
+    # for the configurable window (default 72h). Idempotency flags, same
+    # role auto_released plays for its own job.
+    vendor_timeout_warned = models.BooleanField(default=False)
+    vendor_timeout_refunded = models.BooleanField(default=False)
     delivery_location = models.CharField(max_length=200, blank=True, default="")
     delivery_proof_1 = models.URLField(max_length=500, null=True, blank=True)
     delivery_proof_2 = models.URLField(max_length=500, null=True, blank=True)
@@ -326,3 +335,31 @@ class BookingReferenceImage(models.Model):
 
     def __str__(self):
         return f"Reference image for booking #{self.booking_id}"
+
+
+class AutoRefundSettings(models.Model):
+    """
+    Singleton (same pattern as payments.models.BankTransferSettings) —
+    admin-configurable window for scheduler.auto_refund_stale_paid_orders.
+    A self-fulfilled marketplace order (no DeliveryAssignment, no
+    delivery_slot — a food/batched-delivery order already resolves through
+    its own rider pipeline) that sits in 'paid' this many hours past
+    paid_at with no seller_completed gets auto-refunded, same full-refund
+    call orders.views.OrderViewSet.vendor_decline already uses for a
+    manually-declined order. Service bookings are never touched — they're
+    pinned to their own scheduled_date, not a fulfillment-speed window.
+    """
+    hours = models.PositiveIntegerField(default=72)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    @classmethod
+    def get(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"Auto-Refund Settings ({self.hours}h)"
