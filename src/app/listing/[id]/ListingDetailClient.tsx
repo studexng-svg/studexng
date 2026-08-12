@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
+import CenteredLoader from "@/components/CenteredLoader";
 import {
   Star, MessageCircle, ShoppingCart, Calendar,
   Clock, CheckCircle, AlertCircle,
@@ -91,16 +92,7 @@ function RelatedCard({ item }: { item: any }) {
 }
 
 function RelatedSkeleton() {
-  return (
-    <div className="flex gap-3 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
-      {[0,1,2,3].map(i => (
-        <div key={i} className="w-44 flex-shrink-0 bg-white rounded-2xl overflow-hidden animate-pulse">
-          <div className="aspect-[3/4] bg-stone-100" />
-          <div className="p-3 space-y-2"><div className="h-3 bg-stone-100 rounded" /><div className="h-3 bg-stone-100 rounded w-2/3" /></div>
-        </div>
-      ))}
-    </div>
-  );
+  return <CenteredLoader fullScreen={false} />;
 }
 
 function getStockWarning(data: Listing | null): string {

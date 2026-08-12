@@ -8,6 +8,7 @@ import {
   Calendar, Package, CheckCircle2,
 } from "lucide-react";
 import TopNav from "@/components/layout/TopNav";
+import CenteredLoader from "@/components/CenteredLoader";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { api } from "@/lib/api";
@@ -148,24 +149,7 @@ export default function VendorProfileClient() {
   if (loading) return (
     <div className="min-h-screen bg-white" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       <TopNav showBack activeNav="vendors" />
-      <div className="max-w-6xl mx-auto px-6 lg:px-8 pt-10">
-        <div className="flex gap-8 mb-10">
-          <div className="w-48 h-48 rounded-3xl bg-stone-100 animate-pulse flex-shrink-0" />
-          <div className="flex-1 space-y-3 pt-2">
-            <div className="h-8 bg-stone-100 rounded-xl w-56 animate-pulse" />
-            <div className="h-4 bg-stone-100 rounded-lg w-32 animate-pulse" />
-            <div className="h-4 bg-stone-100 rounded-lg w-72 animate-pulse" />
-          </div>
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          {[...Array(6)].map((_, i) => (
-            <div key={i} className="rounded-2xl overflow-hidden animate-pulse border border-stone-100">
-              <div className="aspect-[3/4] bg-stone-100" />
-              <div className="p-3 space-y-2"><div className="h-3 bg-stone-100 rounded" /><div className="h-3 bg-stone-100 rounded w-2/3" /></div>
-            </div>
-          ))}
-        </div>
-      </div>
+      <CenteredLoader fullScreen={false} />
     </div>
   );
 

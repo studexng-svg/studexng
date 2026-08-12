@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, Sparkles, Heart, ShoppingCart, Share2, MapPin, Star } from "lucide-react";
 import Link from "next/link";
 import { motion } from "framer-motion";
+import CenteredLoader from "@/components/CenteredLoader";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/authStore";
 import { useWishlistStore } from "@/lib/wishlistStore";
@@ -74,18 +75,7 @@ export default function DealsPage() {
         <div className="px-4 pt-5 pb-28 max-w-2xl mx-auto">
 
           {loading ? (
-            <div className="grid grid-cols-2 gap-4">
-              {[0,1,2,3].map(i => (
-                <div key={i} className="bg-white rounded-xl border border-stone-100 overflow-hidden animate-pulse">
-                  <div className="aspect-square bg-stone-100" />
-                  <div className="p-3 space-y-2">
-                    <div className="h-3 bg-stone-100 rounded w-3/4" />
-                    <div className="h-2.5 bg-stone-100 rounded w-1/2" />
-                    <div className="h-4 bg-stone-100 rounded w-1/3" />
-                  </div>
-                </div>
-              ))}
-            </div>
+            <CenteredLoader fullScreen={false} />
           ) : deals.length === 0 ? (
             <div className="bg-white rounded-2xl p-16 text-center border border-stone-100 shadow-sm mt-4">
               <Sparkles className="w-12 h-12 text-stone-200 mx-auto mb-3" />

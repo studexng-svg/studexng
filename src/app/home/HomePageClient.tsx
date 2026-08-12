@@ -18,6 +18,7 @@ import { api } from "@/lib/api";
 import { useWishlistStore } from "@/lib/wishlistStore";
 import { useCart } from "@/lib/cartStore";
 import { useNavProgress, isLoading } from "@/lib/navProgressStore";
+import CenteredLoader from "@/components/CenteredLoader";
 import { GRAD, GRAD_TEXT, TEAL, PURPLE } from "@/lib/tokens";
 import VendorOfMonthModal from "@/components/VendorOfMonthModal";
 import { useScrollRestoration } from "@/hooks/useScrollRestoration";
@@ -1276,30 +1277,9 @@ export default function HomePageClient({ initialVendors, initialListings, initia
               </div>
             </div>
 
-            {/* Deals skeleton — shown while deals are loading */}
+            {/* Deals loader — shown while deals are loading */}
             {activeTab === "listings" && activeFilter === "All" && !dealsReady && (
-              <div className="mb-6">
-                <div className="animate-pulse mb-4">
-                  <div className="h-2.5 bg-stone-200 rounded w-20 mb-1.5" />
-                  <div className="h-5 bg-stone-200 rounded w-28" />
-                </div>
-                <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4" style={{ scrollbarWidth: "none" }}>
-                  {[0,1,2,3].map(i => (
-                    <div key={i} className="flex-shrink-0 w-44 bg-white rounded-xl border border-stone-100 overflow-hidden animate-pulse">
-                      <div className="aspect-square bg-stone-100" />
-                      <div className="p-3 space-y-2">
-                        <div className="h-3 bg-stone-100 rounded w-3/4" />
-                        <div className="h-2.5 bg-stone-100 rounded w-1/2" />
-                        <div className="h-4 bg-stone-100 rounded w-1/3 mt-1" />
-                        <div className="flex gap-1.5 pt-1">
-                          <div className="flex-1 h-7 bg-stone-100 rounded-xl" />
-                          <div className="w-7 h-7 bg-stone-100 rounded-xl" />
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              <CenteredLoader fullScreen={false} />
             )}
 
             {/* Deals Section — horizontal scroll strip */}
@@ -1331,68 +1311,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
             {activeTab === "listings" && (
               <>
                 {mounted && !campusReady ? (
-                  <div className="space-y-10">
-                    {[0, 1].map(section => (
-                      <div key={section}>
-                        <div className="animate-pulse mb-4">
-                          <div className="h-2.5 bg-stone-200 rounded w-16 mb-1.5" />
-                          <div className="h-5 bg-stone-200 rounded w-32" />
-                        </div>
-                        {viewMode === "scroll" ? (
-                          <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4" style={{ scrollbarWidth: "none" }}>
-                            {[0,1,2,3,4].map(i => (
-                              <div key={i} className="flex-shrink-0 w-44 bg-white rounded-xl border border-stone-100 overflow-hidden animate-pulse">
-                                <div className="aspect-square bg-stone-100" />
-                                <div className="p-3 space-y-2">
-                                  <div className="h-3 bg-stone-100 rounded w-3/4" />
-                                  <div className="h-2.5 bg-stone-100 rounded w-1/2" />
-                                  <div className="h-2.5 bg-stone-100 rounded w-2/3" />
-                                  <div className="h-2.5 bg-stone-100 rounded w-1/3" />
-                                  <div className="h-4 bg-stone-100 rounded w-1/3 mt-1" />
-                                  <div className="flex gap-1.5 pt-1">
-                                    <div className="flex-1 h-8 bg-stone-100 rounded-xl" />
-                                    <div className="w-8 h-8 bg-stone-100 rounded-xl" />
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        ) : viewMode === "list" ? (
-                          <div className="space-y-2">
-                            {[0,1,2,3].map(i => (
-                              <div key={i} className="bg-white rounded-xl border border-stone-100 overflow-hidden animate-pulse flex gap-3 p-3">
-                                <div className="w-16 h-16 bg-stone-100 rounded-lg flex-shrink-0" />
-                                <div className="flex-1 space-y-2 py-1">
-                                  <div className="h-3 bg-stone-100 rounded w-3/4" />
-                                  <div className="h-2.5 bg-stone-100 rounded w-1/2" />
-                                  <div className="h-4 bg-stone-100 rounded w-1/3" />
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                            {[0,1,2,3].map(i => (
-                              <div key={i} className="bg-white rounded-xl border border-stone-100 overflow-hidden animate-pulse">
-                                <div className="aspect-square bg-stone-100" />
-                                <div className="p-3 space-y-2">
-                                  <div className="h-3 bg-stone-100 rounded w-3/4" />
-                                  <div className="h-2.5 bg-stone-100 rounded w-1/2" />
-                                  <div className="h-2.5 bg-stone-100 rounded w-2/3" />
-                                  <div className="h-2.5 bg-stone-100 rounded w-1/3" />
-                                  <div className="h-4 bg-stone-100 rounded w-1/3 mt-1" />
-                                  <div className="flex gap-1.5 pt-1">
-                                    <div className="flex-1 h-8 bg-stone-100 rounded-xl" />
-                                    <div className="w-8 h-8 bg-stone-100 rounded-xl" />
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+                  <CenteredLoader fullScreen={false} />
                 ) : activeFilter === "All" ? (
                   nonDealListings.length === 0 && deals.length === 0 ? (
                     <div className="bg-white rounded-2xl p-16 text-center border border-stone-100 shadow-sm">

@@ -3,6 +3,7 @@
 
 import { MessageCircle, Search, ChevronRight } from "lucide-react";
 import AdminTopBar from "@/components/layout/AdminTopBar";
+import CenteredLoader from "@/components/CenteredLoader";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { fetchAllPages, BASE_URL } from "@/lib/api";
@@ -85,11 +86,7 @@ export default function AdminConversationsPage() {
         </div>
 
         {loading ? (
-          <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
-            {[...Array(5)].map((_, i) => (
-              <div key={i} className="p-4 h-20 animate-pulse border-b border-stone-100 last:border-0 bg-stone-50/50" />
-            ))}
-          </div>
+          <CenteredLoader fullScreen={false} />
         ) : convs.length === 0 ? (
           <div className="bg-white border border-stone-100 rounded-2xl p-14 text-center">
             <MessageCircle className="w-10 h-10 text-stone-200 mx-auto mb-3" />

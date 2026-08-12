@@ -3,6 +3,7 @@
 
 import { CreditCard, Clock, Check, X, ChevronRight, RefreshCw, Users } from "lucide-react";
 import AdminTopBar from "@/components/layout/AdminTopBar";
+import CenteredLoader from "@/components/CenteredLoader";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
@@ -110,11 +111,7 @@ export default function AdminSellerApprovals() {
         )}
 
         {loading ? (
-          <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="p-4 h-16 animate-pulse border-b border-stone-100 last:border-0 bg-stone-50/50" />
-            ))}
-          </div>
+          <CenteredLoader fullScreen={false} />
         ) : (() => {
           const visible = statusFilter ? applications.filter(a => a.status === statusFilter) : applications;
           return visible.length === 0 ? (

@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, Sparkles, Search, X } from "lucide-react";
 import TopNav from "@/components/layout/TopNav";
+import CenteredLoader from "@/components/CenteredLoader";
 import { useScrollRestoration } from "@/hooks/useScrollRestoration";
 import { api } from "@/lib/api";
 
@@ -133,18 +134,7 @@ export default function CategoriesClient({ categories }: { categories: Category[
     </Link>
   );
 
-  const SkeletonGrid = () => (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-      {Array.from({ length: 8 }).map((_, i) => (
-        <div key={i} className="animate-pulse">
-          <div className="aspect-[3/4] rounded-2xl bg-stone-200" />
-          <div className="h-3 bg-stone-200 rounded-full mt-3 w-4/5" />
-          <div className="h-2.5 bg-stone-100 rounded-full mt-1.5 w-3/5" />
-          <div className="h-3 bg-stone-200 rounded-full mt-1.5 w-2/5" />
-        </div>
-      ))}
-    </div>
-  );
+  const SkeletonGrid = () => <CenteredLoader fullScreen={false} />;
 
   return (
     <div className="min-h-screen bg-[#F5F5F5]" style={{ fontFamily: "'DM Sans', sans-serif" }}>

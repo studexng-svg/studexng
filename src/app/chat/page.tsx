@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { MessageCircle, Search, X, Pin, Trash2, PinOff } from "lucide-react";
 import TopNav from "@/components/layout/TopNav";
+import CenteredLoader from "@/components/CenteredLoader";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "@/lib/authStore";
 import { TEAL, PURPLE } from "@/lib/tokens";
@@ -137,17 +138,7 @@ export default function ChatListPage() {
         </div>
 
         {loading ? (
-          <div className="space-y-3">
-            {[1, 2, 3, 4].map(i => (
-              <div key={i} className="bg-white border border-stone-100 rounded-2xl p-4 flex items-center gap-3 animate-pulse">
-                <div className="w-12 h-12 rounded-full bg-stone-200 flex-shrink-0" />
-                <div className="flex-1 space-y-2">
-                  <div className="h-3 bg-stone-200 rounded-full w-1/3" />
-                  <div className="h-2.5 bg-stone-100 rounded-full w-2/3" />
-                </div>
-              </div>
-            ))}
-          </div>
+          <CenteredLoader fullScreen={false} />
         ) : filtered.length === 0 ? (
           <div className="bg-white rounded-2xl p-12 text-center border border-stone-100 shadow-sm animate-fadeUp">
             <div className="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center" style={{ background: TEAL }}>

@@ -30,6 +30,7 @@ function ActivityStatus({ lastSeen }: { lastSeen?: string | null }) {
   return <span className="text-stone-400 text-xs">{relativeTime(lastSeen)}</span>;
 }
 import AdminTopBar from "@/components/layout/AdminTopBar";
+import CenteredLoader from "@/components/CenteredLoader";
 import { useState, useEffect, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { fetchAllPages, BASE_URL } from "@/lib/api";
@@ -125,11 +126,7 @@ export default function AdminUsers() {
 
         {/* User list */}
         {loading ? (
-          <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
-            {[...Array(5)].map((_, i) => (
-              <div key={i} className="p-4 h-16 animate-pulse border-b border-stone-100 last:border-0 bg-stone-50/50" />
-            ))}
-          </div>
+          <CenteredLoader fullScreen={false} />
         ) : visible.length === 0 ? (
           <div className="bg-white border border-stone-100 rounded-2xl p-10 text-center">
             <Users className="w-10 h-10 text-stone-200 mx-auto mb-3" />

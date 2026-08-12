@@ -1,5 +1,6 @@
 "use client";
-import { Loader, ToggleRight, ToggleLeft } from "lucide-react";
+import { ToggleRight, ToggleLeft } from "lucide-react";
+import CenteredLoader from "@/components/CenteredLoader";
 
 // Shared between the Listings tab (where dishes/listings are created and
 // approval status is authoritative) and the Kitchen tab (where add-ons are
@@ -58,11 +59,7 @@ export function EmptyState({ icon: Icon, message }: { icon: any; message: string
 }
 
 export function LoadingSpinner() {
-  return (
-    <div className="flex items-center justify-center py-16">
-      <Loader className="w-7 h-7 text-teal-600 animate-spin" />
-    </div>
-  );
+  return <CenteredLoader fullScreen={false} />;
 }
 
 export const HEADING_FONT = { fontFamily: "var(--font-jakarta), 'Plus Jakarta Sans', sans-serif" };

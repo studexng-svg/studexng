@@ -5,6 +5,7 @@ import { CreditCard, Search, ToggleLeft, ToggleRight } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import AdminTopBar from "@/components/layout/AdminTopBar";
+import CenteredLoader from "@/components/CenteredLoader";
 import { api, fetchAllPages, BASE_URL } from "@/lib/api";
 
 export default function AdminBankAccountsPage() {
@@ -55,11 +56,7 @@ export default function AdminBankAccountsPage() {
         {!loading && <p className="text-xs text-stone-400">{accounts.length} bank account{accounts.length !== 1 ? "s" : ""}</p>}
 
         {loading ? (
-          <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="p-4 h-24 animate-pulse border-b border-stone-100 last:border-0 bg-stone-50/50" />
-            ))}
-          </div>
+          <CenteredLoader fullScreen={false} />
         ) : accounts.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 gap-3">
             <CreditCard className="w-10 h-10 text-stone-300" />

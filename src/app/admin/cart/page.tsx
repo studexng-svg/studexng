@@ -3,6 +3,7 @@
 
 import { ShoppingCart, Search, Package, Bell, Clock, ChevronDown, ChevronUp, CheckSquare, Square } from "lucide-react";
 import AdminTopBar from "@/components/layout/AdminTopBar";
+import CenteredLoader from "@/components/CenteredLoader";
 import { useState, useEffect, useCallback } from "react";
 import { fetchAllPages, BASE_URL, api } from "@/lib/api";
 import { CampusPills, type Campus } from "@/components/admin/CampusPills";
@@ -158,9 +159,7 @@ export default function AdminCartPage() {
             </div>
 
             {loading ? (
-              <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
-                {[...Array(5)].map((_, i) => <div key={i} className="p-4 h-16 animate-pulse border-b border-stone-100 last:border-0 bg-stone-50/50" />)}
-              </div>
+              <CenteredLoader fullScreen={false} />
             ) : items.length === 0 ? (
               <div className="bg-white border border-stone-100 rounded-2xl p-14 text-center">
                 <ShoppingCart className="w-10 h-10 text-stone-200 mx-auto mb-3" />
@@ -225,9 +224,7 @@ export default function AdminCartPage() {
             </div>
 
             {abLoading ? (
-              <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
-                {[...Array(4)].map((_, i) => <div key={i} className="p-4 h-20 animate-pulse border-b border-stone-100 last:border-0 bg-stone-50/50" />)}
-              </div>
+              <CenteredLoader fullScreen={false} />
             ) : abandoned.length === 0 ? (
               <div className="bg-white border border-stone-100 rounded-2xl p-14 text-center">
                 <ShoppingCart className="w-10 h-10 text-stone-200 mx-auto mb-3" />

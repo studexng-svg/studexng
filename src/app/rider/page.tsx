@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/authStore";
 import { api } from "@/lib/api";
 import { TEAL } from "@/lib/tokens";
 import TopNav from "@/components/layout/TopNav";
+import CenteredLoader from "@/components/CenteredLoader";
 import {
   Package, CheckCircle, Truck, Clock, X, AlertCircle,
   TrendingUp, CalendarCheck, ListChecks, Activity, Phone,
@@ -664,15 +665,7 @@ export default function RiderDashboard() {
 
         {/* ── STAT CARDS ── */}
         {loading ? (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            {[1, 2, 3, 4].map(i => (
-              <div key={i} className="bg-white rounded-2xl p-5 border border-stone-100 shadow-sm animate-pulse">
-                <div className="w-11 h-11 rounded-xl bg-stone-200 mb-3" />
-                <div className="h-3 bg-stone-200 rounded w-3/4 mb-2" />
-                <div className="h-6 bg-stone-200 rounded w-1/2" />
-              </div>
-            ))}
-          </div>
+          <CenteredLoader fullScreen={false} />
         ) : (
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <StatCard label="Active Deliveries" value={stats?.active_count ?? 0} sub="In progress"
@@ -744,14 +737,7 @@ export default function RiderDashboard() {
         {/* ── ACTIVE TAB ── */}
         {tab === "active" && (
           loading ? (
-            <div className="space-y-3">
-              {[1, 2].map(i => (
-                <div key={i} className="bg-white rounded-2xl p-4 animate-pulse border border-stone-100">
-                  <div className="h-4 bg-stone-200 rounded-full w-1/2 mb-3" />
-                  <div className="h-3 bg-stone-100 rounded-full w-3/4" />
-                </div>
-              ))}
-            </div>
+            <CenteredLoader fullScreen={false} />
           ) : assignments.length === 0 ? (
             <div className="bg-white rounded-2xl p-12 text-center border border-stone-100 shadow-sm animate-fadeUp">
               <div className="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center" style={{ background: TEAL }}>
@@ -797,17 +783,7 @@ export default function RiderDashboard() {
         {/* ── REFUNDED TAB ── */}
         {tab === "refunded" && (
           refundedLoading ? (
-            <div className="space-y-3">
-              {[1, 2].map(i => (
-                <div key={i} className="bg-white rounded-2xl p-4 animate-pulse border border-stone-100 flex gap-3">
-                  <div className="w-14 h-14 rounded-xl bg-stone-200 flex-shrink-0" />
-                  <div className="flex-1 space-y-2">
-                    <div className="h-3 bg-stone-200 rounded w-2/3" />
-                    <div className="h-2.5 bg-stone-100 rounded w-1/2" />
-                  </div>
-                </div>
-              ))}
-            </div>
+            <CenteredLoader fullScreen={false} />
           ) : refunded.length === 0 ? (
             <div className="bg-white rounded-2xl p-12 text-center border border-stone-100 shadow-sm animate-fadeUp">
               <RotateCcw className="w-10 h-10 text-stone-200 mx-auto mb-2" />
@@ -823,17 +799,7 @@ export default function RiderDashboard() {
         {/* ── HISTORY TAB ── */}
         {tab === "history" && (
           historyLoading ? (
-            <div className="space-y-3">
-              {[1, 2, 3].map(i => (
-                <div key={i} className="bg-white rounded-2xl p-4 animate-pulse border border-stone-100 flex gap-3">
-                  <div className="w-14 h-14 rounded-xl bg-stone-200 flex-shrink-0" />
-                  <div className="flex-1 space-y-2">
-                    <div className="h-3 bg-stone-200 rounded w-2/3" />
-                    <div className="h-2.5 bg-stone-100 rounded w-1/2" />
-                  </div>
-                </div>
-              ))}
-            </div>
+            <CenteredLoader fullScreen={false} />
           ) : history.length === 0 ? (
             <div className="bg-white rounded-2xl p-12 text-center border border-stone-100 shadow-sm animate-fadeUp">
               <ListChecks className="w-10 h-10 text-stone-200 mx-auto mb-2" />

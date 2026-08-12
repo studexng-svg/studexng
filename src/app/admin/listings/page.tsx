@@ -5,6 +5,7 @@ import { Package, Search, CheckCircle, XCircle, Tag, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import AdminTopBar from "@/components/layout/AdminTopBar";
+import CenteredLoader from "@/components/CenteredLoader";
 import { api, fetchAllPages, BASE_URL } from "@/lib/api";
 import { CampusPills, type Campus } from "@/components/admin/CampusPills";
 import { toast } from "sonner";
@@ -198,11 +199,7 @@ export default function AdminListingsPage() {
 
         {/* List */}
         {loading ? (
-          <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
-            {[...Array(5)].map((_, i) => (
-              <div key={i} className="p-4 h-20 animate-pulse border-b border-stone-100 last:border-0 bg-stone-50/50" />
-            ))}
-          </div>
+          <CenteredLoader fullScreen={false} />
         ) : listings.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 gap-3">
             <Package className="w-10 h-10 text-stone-300" />

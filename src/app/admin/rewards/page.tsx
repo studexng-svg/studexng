@@ -3,6 +3,7 @@
 
 import { useEffect, useState } from "react";
 import AdminTopBar from "@/components/layout/AdminTopBar";
+import CenteredLoader from "@/components/CenteredLoader";
 import { api } from "@/lib/api";
 import { GRAD } from "@/lib/tokens";
 
@@ -61,11 +62,7 @@ export default function AdminRewardsPage() {
         </div>
 
         {loading ? (
-          <div className="grid grid-cols-2 gap-3">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="bg-white border border-stone-200 rounded-2xl p-4 h-20 animate-pulse" />
-            ))}
-          </div>
+          <CenteredLoader fullScreen={false} />
         ) : summary && (
           <div className="grid grid-cols-2 gap-3">
             {[

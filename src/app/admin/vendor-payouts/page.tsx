@@ -4,6 +4,7 @@
 import { Store, Search } from "lucide-react";
 import { useEffect, useState } from "react";
 import AdminTopBar from "@/components/layout/AdminTopBar";
+import CenteredLoader from "@/components/CenteredLoader";
 import { api } from "@/lib/api";
 import { CampusPills, type Campus } from "@/components/admin/CampusPills";
 
@@ -69,11 +70,7 @@ export default function AdminVendorPayoutsPage() {
         )}
 
         {loading ? (
-          <div className="bg-white rounded-2xl overflow-hidden shadow-sm">
-            {[...Array(6)].map((_, i) => (
-              <div key={i} className="p-4 h-20 animate-pulse border-b border-stone-100 last:border-0 bg-stone-50/50" />
-            ))}
-          </div>
+          <CenteredLoader fullScreen={false} />
         ) : vendors.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 gap-3">
             <Store className="w-10 h-10 text-stone-300" />

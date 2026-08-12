@@ -8,6 +8,7 @@ import {
 } from "recharts";
 import { RefreshCw, TrendingUp, Users, Package, DollarSign, FileText, Activity, UserCheck, Zap, Search } from "lucide-react";
 import AdminTopBar from "@/components/layout/AdminTopBar";
+import CenteredLoader from "@/components/CenteredLoader";
 import { api } from "@/lib/api";
 
 const TEAL  = "#0D9488";
@@ -131,11 +132,7 @@ export default function AdminAnalytics() {
         )}
 
         {loading ? (
-          <div className="space-y-3">
-            {[...Array(5)].map((_, i) => (
-              <div key={i} className="bg-white border border-stone-200 rounded-2xl h-48 animate-pulse" />
-            ))}
-          </div>
+          <CenteredLoader fullScreen={false} />
         ) : (
           <>
             {/* Summary stats */}

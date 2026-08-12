@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import TopNav from "@/components/layout/TopNav";
 import VendorAvatar from "@/components/VendorAvatar";
+import CenteredLoader from "@/components/CenteredLoader";
 import { BADGE_STYLES, BADGE_LABELS } from "@/lib/vendor-badges";
 import { TEAL } from "@/lib/tokens";
 
@@ -159,11 +160,7 @@ export default function LeaderboardClient({ initialVendors, initialCampus, curre
         )}
 
         {loading ? (
-          <div className="space-y-3">
-            {[0, 1, 2, 3, 4].map(i => (
-              <div key={i} className="bg-white rounded-2xl h-16 animate-pulse border border-stone-100" />
-            ))}
-          </div>
+          <CenteredLoader fullScreen={false} />
         ) : ranked.length === 0 ? (
           <div className="bg-white rounded-2xl p-16 text-center border border-stone-100 shadow-sm">
             <p className="text-lg font-bold text-stone-400">No vendors yet</p>

@@ -10,6 +10,7 @@ import {
 import Link from "next/link";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import AdminTopBar from "@/components/layout/AdminTopBar";
+import CenteredLoader from "@/components/CenteredLoader";
 import { api } from "@/lib/api";
 import { SERIF } from "@/lib/tokens";
 
@@ -116,11 +117,7 @@ export default function AdminDashboard() {
         </div>
 
         {loading ? (
-          <div className="grid grid-cols-2 gap-3">
-            {[...Array(6)].map((_, i) => (
-              <div key={i} className="bg-white border border-stone-200 rounded-2xl p-4 h-24 animate-pulse" />
-            ))}
-          </div>
+          <CenteredLoader fullScreen={false} />
         ) : stats ? (
           <>
             {/* Platform overview */}

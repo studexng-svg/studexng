@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useAuth } from "@/lib/authStore";
 import { api } from "@/lib/api";
 import { TEAL } from "@/lib/tokens";
+import CenteredLoader from "@/components/CenteredLoader";
 import {
   DollarSign, ShoppingBag, Package, Star,
   TrendingUp, Clock, CheckCircle2, ArrowRight,
@@ -126,15 +127,7 @@ export default function VendorOverviewPage() {
 
       {/* ── STAT CARDS ── */}
       {loading ? (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          {[1, 2, 3, 4].map(i => (
-            <div key={i} className="bg-white rounded-2xl p-5 border border-stone-100 shadow-sm animate-pulse">
-              <div className="w-11 h-11 rounded-xl bg-stone-200 mb-3" />
-              <div className="h-3 bg-stone-200 rounded w-3/4 mb-2" />
-              <div className="h-6 bg-stone-200 rounded w-1/2" />
-            </div>
-          ))}
-        </div>
+        <CenteredLoader fullScreen={false} />
       ) : (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <StatCard
@@ -238,18 +231,7 @@ export default function VendorOverviewPage() {
           </div>
 
           {loading ? (
-            <div className="divide-y divide-stone-50">
-              {[1, 2, 3, 4].map(i => (
-                <div key={i} className="px-5 py-4 flex items-center gap-3 animate-pulse">
-                  <div className="w-9 h-9 rounded-full bg-stone-200 flex-shrink-0" />
-                  <div className="flex-1 space-y-1.5">
-                    <div className="h-3 bg-stone-200 rounded w-2/3" />
-                    <div className="h-2.5 bg-stone-100 rounded w-1/2" />
-                  </div>
-                  <div className="h-3 bg-stone-200 rounded w-12" />
-                </div>
-              ))}
-            </div>
+            <CenteredLoader fullScreen={false} />
           ) : recentOrders.length === 0 ? (
             <div className="px-5 py-12 text-center">
               <ShoppingBag className="w-10 h-10 text-stone-200 mx-auto mb-2" />
