@@ -22,12 +22,12 @@ export default function NavigationProgress() {
   const completionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevPath = useRef(pathname);
 
-  const setBreathing = useNavProgress(s => s.setActive);
+  const setNavActive = useNavProgress(s => s.setNavActive);
 
   const start = () => {
     if (ticker.current) clearInterval(ticker.current);
     setActive(true);
-    setBreathing(true);
+    setNavActive(true);
     setWidth(15);
     ticker.current = setInterval(() => {
       setWidth(w => {
@@ -44,7 +44,7 @@ export default function NavigationProgress() {
     completionTimer.current = setTimeout(() => {
       setActive(false);
       setWidth(0);
-      setBreathing(false);
+      setNavActive(false);
     }, 350);
   };
 

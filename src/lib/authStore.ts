@@ -1,6 +1,7 @@
 // src/lib/authStore.ts
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { useNavProgress } from "@/lib/navProgressStore";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -266,39 +267,52 @@ export const fetchAllPages = async (url: string, maxPages = 20): Promise<any[]> 
   return all;
 };
 
+// Every api.* method in src/lib/api.ts funnels through this one function, so
+// counting requests here — rather than at each individual call site — is
+// what lets navProgressStore's isLoading() react to literally any fetch or
+// mutation in the app with zero per-page wiring. beginRequest/endRequest
+// wrap the whole logical call, including the 401/403 refresh-and-retry
+// below, so the indicator stays on for the full round trip, not just the
+// first attempt.
 export const fetchWithAuth = async (
   url: string,
   options: RequestInit = {}
 ): Promise<Response> => {
-  const token = getToken();
+  const { beginRequest, endRequest } = useNavProgress.getState();
+  beginRequest();
+  try {
+    const token = getToken();
 
-  const makeRequest = (t: string | null) => {
-    const headers = new Headers(options.headers || {});
-    if (t) headers.set("Authorization", `Bearer ${t}`);
-    if (!headers.has("Content-Type") && !(options.body instanceof FormData)) {
-      headers.set("Content-Type", "application/json");
+    const makeRequest = (t: string | null) => {
+      const headers = new Headers(options.headers || {});
+      if (t) headers.set("Authorization", `Bearer ${t}`);
+      if (!headers.has("Content-Type") && !(options.body instanceof FormData)) {
+        headers.set("Content-Type", "application/json");
+      }
+      return fetch(url, { ...options, headers, credentials: "include" });
+    };
+
+    let response = await makeRequest(token);
+
+    if (response.status === 401) {
+      const newToken = await refreshAccessToken();
+      if (newToken) {
+        response = await makeRequest(newToken);
+      }
     }
-    return fetch(url, { ...options, headers, credentials: "include" });
-  };
 
-  let response = await makeRequest(token);
-
-  if (response.status === 401) {
-    const newToken = await refreshAccessToken();
-    if (newToken) {
-      response = await makeRequest(newToken);
+    // DRF returns 403 (not 401) for fully anonymous requests (no Authorization header).
+    // This happens on page refresh when accessToken is null but the user is still "logged in"
+    // (refresh cookie exists). Attempt a token restore and retry once.
+    if (response.status === 403 && !token && useAuth.getState().isLoggedIn) {
+      const newToken = await refreshAccessToken();
+      if (newToken) {
+        response = await makeRequest(newToken);
+      }
     }
+
+    return response;
+  } finally {
+    endRequest();
   }
-
-  // DRF returns 403 (not 401) for fully anonymous requests (no Authorization header).
-  // This happens on page refresh when accessToken is null but the user is still "logged in"
-  // (refresh cookie exists). Attempt a token restore and retry once.
-  if (response.status === 403 && !token && useAuth.getState().isLoggedIn) {
-    const newToken = await refreshAccessToken();
-    if (newToken) {
-      response = await makeRequest(newToken);
-    }
-  }
-
-  return response;
 };

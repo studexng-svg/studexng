@@ -225,10 +225,36 @@ class WarnVendorsOfPendingAutoRefundTests(AutoRefundTestBase):
         self.assertFalse(rider_order.vendor_timeout_warned)
 
 
+class AutoRefundKillSwitchTests(AutoRefundTestBase):
+    """is_enabled=False — the Django admin toggle to turn the whole feature off."""
+
+    @patch('payments.views.refund_paystack_transaction', return_value=True)
+    def test_disabled_setting_skips_the_refund_job_entirely(self, mock_refund):
+        AutoRefundSettings.objects.update_or_create(pk=1, defaults={'is_enabled': False})
+        order = self.make_order(hours_ago=100)
+
+        auto_refund_stale_paid_orders()
+
+        order.refresh_from_db()
+        self.assertEqual(order.status, 'paid')
+        self.assertFalse(order.vendor_timeout_refunded)
+        mock_refund.assert_not_called()
+
+    def test_disabled_setting_skips_the_warning_job_entirely(self):
+        AutoRefundSettings.objects.update_or_create(pk=1, defaults={'is_enabled': False})
+        order = self.make_order(hours_ago=100)
+
+        warn_vendors_of_pending_auto_refund()
+
+        order.refresh_from_db()
+        self.assertFalse(order.vendor_timeout_warned)
+
+
 class AutoRefundSettingsTests(TestCase):
-    def test_get_creates_singleton_with_default_72_hours(self):
+    def test_get_creates_singleton_with_defaults(self):
         settings_obj = AutoRefundSettings.get()
         self.assertEqual(settings_obj.hours, 72)
+        self.assertTrue(settings_obj.is_enabled)
         self.assertEqual(AutoRefundSettings.objects.count(), 1)
 
     def test_get_returns_the_same_row_on_repeated_calls(self):

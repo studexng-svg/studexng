@@ -17,6 +17,7 @@ import { useAuth } from "@/lib/authStore";
 import { api } from "@/lib/api";
 import { useWishlistStore } from "@/lib/wishlistStore";
 import { useCart } from "@/lib/cartStore";
+import { useNavProgress, isLoading } from "@/lib/navProgressStore";
 import { GRAD, GRAD_TEXT, TEAL, PURPLE } from "@/lib/tokens";
 import VendorOfMonthModal from "@/components/VendorOfMonthModal";
 import { useScrollRestoration } from "@/hooks/useScrollRestoration";
@@ -114,6 +115,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
   const { isLoggedIn, user, isHydrated, updateUser } = useAuth();
   const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlistStore();
   const { addToCart, cart } = useCart();
+  const navLoading = useNavProgress(isLoading);
   const router = useRouter();
 
   const [mounted, setMounted]           = useState(false);
@@ -898,7 +900,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
           <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-4">
 
             <Link href="/home" className="flex items-center gap-2 flex-shrink-0">
-              <div className="w-9 h-9 rounded-xl overflow-hidden border border-stone-100 shadow-sm flex items-center justify-center p-1 bg-white">
+              <div className={`w-9 h-9 rounded-xl overflow-hidden border border-stone-100 shadow-sm flex items-center justify-center p-1 bg-white ${navLoading ? "animate-breathe" : ""}`}>
                 <img src="/images/logo-1.jpg" alt="StudEx" loading="lazy" className="w-full h-full object-contain" />
               </div>
               <span className="font-black text-lg text-stone-900 hidden sm:block" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>

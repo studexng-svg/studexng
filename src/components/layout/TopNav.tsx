@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Heart, ShoppingCart, ChevronLeft } from "lucide-react";
 import { useAuth } from "@/lib/authStore";
 import { useCart } from "@/lib/cartStore";
-import { useNavProgress } from "@/lib/navProgressStore";
+import { useNavProgress, isLoading } from "@/lib/navProgressStore";
 import { GRAD, TEAL } from "@/lib/tokens";
 
 interface TopNavProps {
@@ -18,7 +18,7 @@ export default function TopNav({ showBack = false, backHref, activeNav }: TopNav
   const router = useRouter();
   const { isLoggedIn, user } = useAuth();
   const { cart } = useCart();
-  const navLoading = useNavProgress(s => s.active);
+  const navLoading = useNavProgress(isLoading);
 
   const handleBack = () => {
     if (backHref && window.history.length <= 1) {

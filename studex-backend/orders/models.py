@@ -348,7 +348,14 @@ class AutoRefundSettings(models.Model):
     call orders.views.OrderViewSet.vendor_decline already uses for a
     manually-declined order. Service bookings are never touched — they're
     pinned to their own scheduled_date, not a fulfillment-speed window.
+
+    is_enabled=False (flip it off here, no deploy needed) is checked by
+    both scheduler.warn_vendors_of_pending_auto_refund and
+    auto_refund_stale_paid_orders — same is_enabled kill-switch pattern as
+    BankTransferSettings. Off means those jobs no-op entirely on every
+    hourly run; nothing already refunded reverts.
     """
+    is_enabled = models.BooleanField(default=True)
     hours = models.PositiveIntegerField(default=72)
     updated_at = models.DateTimeField(auto_now=True)
 

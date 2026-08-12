@@ -20,7 +20,7 @@ class AutoRefundSettingsAdmin(admin.ModelAdmin):
     get a warning notification at the halfway point (scheduler.
     warn_vendors_of_pending_auto_refund) before that happens.
     """
-    list_display = ['hours', 'updated_at']
+    list_display = ['is_enabled', 'hours', 'updated_at']
     readonly_fields = ['updated_at']
 
     def has_add_permission(self, request):

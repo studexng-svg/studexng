@@ -39,7 +39,14 @@ class Command(BaseCommand):
         from orders.models import Order, AutoRefundSettings
 
         now = timezone.now()
-        hours = AutoRefundSettings.get().hours
+        settings_obj = AutoRefundSettings.get()
+        hours = settings_obj.hours
+
+        if not settings_obj.is_enabled:
+            self.stdout.write(self.style.WARNING(
+                "[DRY RUN] AutoRefundSettings.is_enabled is False — both jobs "
+                "no-op on every real run. Showing what WOULD match if it were on:"
+            ))
 
         def qs(cutoff_hours, warned_flag):
             cutoff = now - timedelta(hours=cutoff_hours)

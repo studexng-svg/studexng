@@ -1125,6 +1125,8 @@ def warn_vendors_of_pending_auto_refund():
     from accounts.utils import send_notification
 
     settings_obj = AutoRefundSettings.get()
+    if not settings_obj.is_enabled:
+        return
     halfway_cutoff = timezone.now() - timedelta(hours=settings_obj.hours / 2)
 
     stale = (
@@ -1214,6 +1216,8 @@ def auto_refund_stale_paid_orders():
     from accounts.utils import send_notification
 
     settings_obj = AutoRefundSettings.get()
+    if not settings_obj.is_enabled:
+        return
     cutoff = timezone.now() - timedelta(hours=settings_obj.hours)
 
     stale = (
