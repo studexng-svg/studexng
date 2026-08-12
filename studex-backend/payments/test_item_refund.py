@@ -12,6 +12,7 @@ only at the order level).
 from decimal import Decimal
 from unittest.mock import patch
 
+from django.core.cache import cache
 from django.test import TestCase
 
 from accounts.models import User
@@ -23,6 +24,13 @@ from payments.item_refund import mark_order_item_unavailable, ItemRefundError
 
 class MarkOrderItemUnavailableTests(TestCase):
     def setUp(self):
+        # accounts.utils.send_notification dedupes identical (recipient,
+        # notification_type, title) sends within a real 30s wall-clock
+        # window — without this, a notification assertion here can be
+        # silently defeated by an earlier test in the same run that hit the
+        # same recipient id + title inside that window (SQLite reuses PKs
+        # across TestCase's per-test transaction rollback).
+        cache.clear()
         self.buyer = User.objects.create_user(username='ir_buyer', email='ir_buyer@pau.edu.ng', password='pass123')
         self.vendor = User.objects.create_user(username='ir_vendor', email='ir_vendor@pau.edu.ng', password='pass123')
         self.category = Category.objects.create(title='FoodIR', slug='food-ir')
@@ -164,6 +172,7 @@ class MarkOrderItemUnavailableBankTransferTests(TestCase):
     back manually.
     """
     def setUp(self):
+        cache.clear()  # see MarkOrderItemUnavailableTests.setUp
         self.buyer = User.objects.create_user(username='irbt_buyer', email='irbt_buyer@pau.edu.ng', password='pass123')
         self.vendor = User.objects.create_user(username='irbt_vendor', email='irbt_vendor@pau.edu.ng', password='pass123')
         self.admin = User.objects.create_user(
