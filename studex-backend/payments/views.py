@@ -2145,10 +2145,25 @@ def _create_order_from_paystack_data(paystack_data, buyer, listing_id, order_typ
         else:
             payout_amount = listing.payout_amount if listing.payout_amount is not None else Decimal(str(listing.price))
         payout_amount = payout_amount * quantity
+        # deal_discount_amount alone does NOT distinguish an admin Deal from
+        # the vendor's own discount_percent — initialize_payment populates it
+        # identically for both (it's just "how much was knocked off the
+        # price", not "who's paying for it"). Before this fix, `bool(
+        # deal_discount_amount)` was True for *any* discount at all, so a
+        # vendor's own sale silently fell into the platform-absorbs-it
+        # branch and they were paid their full, undiscounted payout_amount
+        # regardless of vendor_discount_currency above. listing_vendor_
+        # discount is the actual discriminator: initialize_payment only
+        # ever sets it non-zero for a vendor's own discount_percent (stays 0
+        # for an admin Deal, see the two branches around line 450 there) —
+        # so "there was a discount, and it wasn't the vendor's" is exactly
+        # deal_discount_amount being non-zero while listing_vendor_discount
+        # is zero.
+        deal_absorbed_by_platform = bool(deal_discount_amount) and not bool(listing_vendor_discount)
         vendor_amount, platform_amount = split_settlement(
             amount_paid, payout_amount,
             vendor_discount_currency=listing_vendor_discount,
-            deal_absorbed_by_platform=bool(deal_discount_amount),
+            deal_absorbed_by_platform=deal_absorbed_by_platform,
         )
     else:
         vendor_amount, platform_amount = _split_amounts(amount_paid)

@@ -101,6 +101,109 @@ class CreateOrderFromPaystackDataTests(TestCase):
         self.assertEqual(existing.order_id, order_id)
 
 
+class VendorDiscountAbsorptionTests(TestCase):
+    """
+    Regression test for a real reported bug: a vendor set their own
+    Listing.discount_percent (never an admin Deal) and was still paid their
+    full, undiscounted payout_amount.
+
+    Root cause: _create_order_from_paystack_data computed
+    deal_absorbed_by_platform as bool(deal_discount_amount) — but
+    initialize_payment populates deal_discount_amount identically for an
+    admin Deal AND a vendor's own discount (it just means "some discount
+    was applied", not "who's paying for it"). That made
+    deal_absorbed_by_platform True for a vendor's own sale too, routing it
+    into split_settlement's platform-absorbs-it branch and silently
+    discarding vendor_discount_currency. Fixed by also checking
+    listing_vendor_discount, which initialize_payment only ever sets
+    non-zero for a vendor's own discount_percent (stays 0 for an admin
+    Deal) — the actual discriminator between the two cases.
+    """
+
+    def setUp(self):
+        self.buyer = User.objects.create_user(
+            username='vda_buyer', email='vda_buyer@pau.edu.ng', password='pass123'
+        )
+        self.seller = User.objects.create_user(
+            username='vda_seller', email='vda_seller@pau.edu.ng', password='pass123',
+            user_type='vendor', is_verified_vendor=True,
+        )
+        self.category = Category.objects.create(title='Beauty2', slug='beauty2')
+
+    def _fake_paystack_data(self, reference, amount_kobo, metadata):
+        return {
+            'amount': amount_kobo,
+            'reference': reference,
+            'id': 999,
+            'customer': {'email': self.buyer.email},
+            'metadata': metadata,
+        }
+
+    def test_vendor_own_discount_reduces_vendor_payout(self):
+        """The exact reported bug — hair accessories, 17% vendor discount, ₦2,000 payout."""
+        listing = Listing.objects.create(
+            title='Hair bands and hair rings', description='x', price=Decimal('2160.00'),
+            payout_amount=Decimal('2000.00'), discount_percent=17,
+            vendor=self.seller, category=self.category, is_available=True,
+        )
+        # Same metadata shape initialize_payment actually produces for a
+        # vendor-set discount (payments/views.py:456-459): deal_discount_amount
+        # is non-zero (some discount happened) but listing_vendor_discount is
+        # what actually says who absorbs it.
+        order_id, error = _create_order_from_paystack_data(
+            self._fake_paystack_data('ORD-VDA-0001', 179280, {
+                'listing_id': str(listing.id),
+                'deal_discount_amount': '367.20',
+                'listing_deal_discount': '367.20',
+                'listing_vendor_discount': '367.20',
+            }),
+            self.buyer, listing.id, 'product',
+        )
+        self.assertIsNone(error)
+        from payments.models import PaymentTransaction
+        txn = PaymentTransaction.objects.get(order_id=order_id)
+        # Vendor absorbs their own ₦367.20 discount — must NOT receive the
+        # full undiscounted payout_amount.
+        self.assertEqual(txn.seller_amount, Decimal('1632.80'))
+        self.assertLess(txn.seller_amount, listing.payout_amount)
+
+    def test_admin_deal_still_pays_vendor_full_payout(self):
+        """Unchanged existing behavior: an admin Deal stays platform-absorbed."""
+        listing = Listing.objects.create(
+            title='Admin Deal Item', description='x', price=Decimal('2160.00'),
+            payout_amount=Decimal('2000.00'),
+            vendor=self.seller, category=self.category, is_available=True,
+        )
+        order_id, error = _create_order_from_paystack_data(
+            self._fake_paystack_data('ORD-VDA-0002', 179280, {
+                'listing_id': str(listing.id),
+                'deal_discount_amount': '367.20',
+                'listing_deal_discount': '367.20',
+                'listing_vendor_discount': '0',
+            }),
+            self.buyer, listing.id, 'product',
+        )
+        self.assertIsNone(error)
+        from payments.models import PaymentTransaction
+        txn = PaymentTransaction.objects.get(order_id=order_id)
+        self.assertEqual(txn.seller_amount, listing.payout_amount)
+
+    def test_no_discount_at_all_pays_full_payout(self):
+        listing = Listing.objects.create(
+            title='No Discount Item', description='x', price=Decimal('2160.00'),
+            payout_amount=Decimal('2000.00'),
+            vendor=self.seller, category=self.category, is_available=True,
+        )
+        order_id, error = _create_order_from_paystack_data(
+            self._fake_paystack_data('ORD-VDA-0003', 216000, {'listing_id': str(listing.id)}),
+            self.buyer, listing.id, 'product',
+        )
+        self.assertIsNone(error)
+        from payments.models import PaymentTransaction
+        txn = PaymentTransaction.objects.get(order_id=order_id)
+        self.assertEqual(txn.seller_amount, listing.payout_amount)
+
+
 class PricingTests(TestCase):
     """
     payments/pricing.py — the single pricing service. Vendors enter payout_amount;
