@@ -99,12 +99,18 @@ export default function AdminOrderDetail() {
   }, [id]);
 
   const assignRider = async () => {
-    if (!selectedRider || !selectedPoint) return;
+    if (!selectedRider) return;
     setAssigning(true);
     try {
+      // pickup_point_id is optional (delivery.views.AdminAssignRiderView) —
+      // leave it out entirely for orders that should drop off at the
+      // buyer's own delivery_location instead of a shared campus hub.
+      // Picking one here used to be mandatory, which is why deliveries kept
+      // showing a pickup point's name as "Drop-off" instead of the address
+      // the buyer actually typed at checkout.
       const res = await api.admin.assignRider(id as string, {
         rider_id: Number(selectedRider),
-        pickup_point_id: Number(selectedPoint),
+        ...(selectedPoint ? { pickup_point_id: Number(selectedPoint) } : {}),
       });
       if (res.ok) setDelivery(await res.json());
     } catch {}
@@ -245,14 +251,18 @@ export default function AdminOrderDetail() {
                 onChange={e => setSelectedPoint(e.target.value)}
                 className="w-full px-3 py-2.5 rounded-xl border border-stone-200 text-sm text-stone-900 bg-white focus:outline-none focus:border-teal-500"
               >
-                <option value="">Select pickup point…</option>
+                <option value="">No pickup point — deliver to buyer&apos;s address</option>
                 {pickupPoints.filter((p: any) => p.is_active).map((p: any) => (
                   <option key={p.id} value={p.id}>{p.name} · {p.campus}</option>
                 ))}
               </select>
+              <p className="text-xs text-stone-400 -mt-1">
+                Only pick a point for orders that hand off at a shared campus hub — otherwise the rider
+                sees &ldquo;{order.delivery_location || "the buyer's typed address"}&rdquo; as the drop-off.
+              </p>
               <button
                 onClick={assignRider}
-                disabled={assigning || !selectedRider || !selectedPoint}
+                disabled={assigning || !selectedRider}
                 className="w-full py-3 rounded-xl text-white text-sm font-semibold disabled:opacity-50 transition"
                 style={{ background: "#0d9488" }}
               >

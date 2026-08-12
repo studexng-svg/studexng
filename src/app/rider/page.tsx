@@ -226,9 +226,9 @@ function OrderDetailModal({ a, onClose }: { a: Assignment; onClose: () => void }
     .reduce((sum, item) => sum + Number(item.line_total ?? 0), 0);
 
   return (
-    <div className="fixed inset-0 z-[70] bg-black/40 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[70] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
       <div
-        className="bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl w-full sm:max-w-md max-h-[92vh] overflow-y-auto"
+        className="bg-white rounded-3xl shadow-2xl w-full sm:max-w-md max-h-[92vh] overflow-y-auto"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}

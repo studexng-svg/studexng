@@ -144,7 +144,19 @@ class AdminPickupPointDetailView(APIView):
 class AdminAssignRiderView(APIView):
     """
     POST /api/admin/orders/<order_id>/assign-rider/
-    Body: { rider_id, pickup_point_id }
+    Body: { rider_id, pickup_point_id? }
+
+    pickup_point_id is optional — only pass it for orders that genuinely
+    hand off at a shared campus hub. Omit it and the rider/buyer both see
+    order.delivery_location (the address the buyer actually typed at
+    checkout) as the drop-off, same as delivery.assignment.auto_assign_rider
+    already does for the automatic path. Before this, pickup_point_id was
+    required on every manual assignment, which meant every admin-assigned
+    order showed whatever pickup point happened to be picked instead of
+    where the buyer said to deliver — see rider/page.tsx's dropoffLabel,
+    which has always preferred pickup_point over delivery_location once one
+    is set.
+
     Creates or updates the DeliveryAssignment for this order.
     """
     permission_classes = [IsAdminUser]
@@ -162,21 +174,25 @@ class AdminAssignRiderView(APIView):
         rider_id = request.data.get('rider_id')
         pickup_point_id = request.data.get('pickup_point_id')
 
-        if not rider_id or not pickup_point_id:
-            return Response(
-                {'error': 'rider_id and pickup_point_id are required'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        if not rider_id:
+            return Response({'error': 'rider_id is required'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             rider = User.objects.get(id=rider_id, user_type='rider')
         except User.DoesNotExist:
             return Response({'error': 'Rider not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        try:
-            point = CampusPickupPoint.objects.get(id=pickup_point_id, is_active=True)
-        except CampusPickupPoint.DoesNotExist:
-            return Response({'error': 'Pickup point not found'}, status=status.HTTP_404_NOT_FOUND)
+        point = None
+        if pickup_point_id:
+            try:
+                point = CampusPickupPoint.objects.get(id=pickup_point_id, is_active=True)
+            except CampusPickupPoint.DoesNotExist:
+                return Response({'error': 'Pickup point not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Used in both notification copy below and nowhere else — order.
+        # delivery_location is the buyer's own typed address, same fallback
+        # RiderUpdateStatusView's at_pickup_point notification already uses.
+        drop_label = point.name if point else (order.delivery_location or "the delivery location on the order")
 
         assignment, created = DeliveryAssignment.objects.update_or_create(
             order=order,
@@ -224,7 +240,7 @@ class AdminAssignRiderView(APIView):
                 title='New Delivery Assignment',
                 message=(
                     f'You have been assigned to deliver order #{order.reference}. '
-                    f'Collect from vendor "@{order.listing.vendor.username}" and drop at "{point.name}".'
+                    f'Collect from vendor "@{order.listing.vendor.username}" and drop at "{drop_label}".'
                 ),
                 action_url='/rider',
                 send_email=False,
@@ -250,7 +266,7 @@ class AdminAssignRiderView(APIView):
                 title='Your delivery is on the way!',
                 message=(
                     f'A rider has been assigned to your order #{order.reference}. '
-                    f'Your package will be delivered to "{point.name}". We\'ll notify you when it arrives.'
+                    f'Your package will be delivered to "{drop_label}". We\'ll notify you when it arrives.'
                 ),
                 action_url=f'/account/orders/{order.id}',
                 send_email=False,

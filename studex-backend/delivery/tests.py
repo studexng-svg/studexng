@@ -81,6 +81,73 @@ class DeliveryTestBase(TestCase):
         return DeliveryAssignment.objects.get(order=self.order)
 
 
+class AdminAssignRiderViewTests(DeliveryTestBase):
+    """
+    pickup_point_id used to be mandatory on every manual assignment, so an
+    admin had to pick *some* CampusPickupPoint even for orders that should
+    just go to the buyer's own typed delivery_location — which is exactly
+    what ended up showing as "Drop-off" on the rider dashboard instead of
+    the buyer's actual address. Covers the fix: pickup_point_id is now
+    optional, rider_id alone is enough.
+    """
+
+    def test_assign_without_pickup_point_succeeds(self):
+        self.order.delivery_location = "Hostel B, Room 12"
+        self.order.save(update_fields=["delivery_location"])
+        self.client.force_authenticate(user=self.staff)
+
+        res = self.client.post(
+            f"/api/admin/orders/{self.order.id}/assign-rider/",
+            {"rider_id": self.rider.id},
+        )
+
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED, res.data)
+        assignment = DeliveryAssignment.objects.get(order=self.order)
+        self.assertIsNone(assignment.pickup_point)
+        # DRF drops a read_only CharField entirely (SkipField, not null) when
+        # its nested source can't resolve (pickup_point.name on a None
+        # pickup_point) — key is just absent, not present-as-None. That's
+        # fine: rider/page.tsx's dropoffLabel treats a.pickup_point_name as
+        # falsy either way and falls back to delivery_location.
+        self.assertNotIn("pickup_point_name", res.data)
+        self.assertEqual(res.data["delivery_location"], "Hostel B, Room 12")
+
+    def test_missing_rider_id_still_rejected(self):
+        self.client.force_authenticate(user=self.staff)
+        res = self.client.post(f"/api/admin/orders/{self.order.id}/assign-rider/", {})
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(DeliveryAssignment.objects.filter(order=self.order).exists())
+
+    def test_notifications_use_delivery_location_when_no_pickup_point(self):
+        """Must not crash on point.name when point is None (drop_label fallback)."""
+        self.order.delivery_location = "Hostel B, Room 12"
+        self.order.save(update_fields=["delivery_location"])
+        self.client.force_authenticate(user=self.staff)
+
+        with patch("accounts.utils.send_notification") as mock_notify:
+            res = self.client.post(
+                f"/api/admin/orders/{self.order.id}/assign-rider/",
+                {"rider_id": self.rider.id},
+            )
+
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED, res.data)
+        self.assertEqual(mock_notify.call_count, 3)  # rider, vendor, buyer
+        messages = [c.kwargs["message"] for c in mock_notify.call_args_list]
+        assert any("Hostel B, Room 12" in m for m in messages)
+
+    def test_assign_with_pickup_point_still_works(self):
+        """Existing behavior unchanged when an admin does pick a hub."""
+        self.client.force_authenticate(user=self.staff)
+        res = self.client.post(
+            f"/api/admin/orders/{self.order.id}/assign-rider/",
+            {"rider_id": self.rider.id, "pickup_point_id": self.point.id},
+        )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED, res.data)
+        assignment = DeliveryAssignment.objects.get(order=self.order)
+        self.assertEqual(assignment.pickup_point_id, self.point.id)
+        self.assertEqual(res.data["pickup_point_name"], "Hall A Gate")
+
+
 class DeliveryCodeSecrecyTests(DeliveryTestBase):
     """The buyer handoff code must never appear on any rider-facing response."""
 
