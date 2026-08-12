@@ -5,6 +5,7 @@ import Link from "next/link";
 import TopNav from "@/components/layout/TopNav";
 import VendorAvatar from "@/components/VendorAvatar";
 import { BADGE_STYLES, BADGE_LABELS } from "@/lib/vendor-badges";
+import { TEAL } from "@/lib/tokens";
 
 import { api } from "@/lib/api";
 
@@ -14,7 +15,6 @@ const RING: Record<number, string> = {
   3: "linear-gradient(135deg, #C2410C 0%, #FB923C 100%)",
 };
 const BADGE_BG: Record<number, string> = { 1: "#F59E0B", 2: "#94A3B8", 3: "#C2410C" };
-const LIST_RING = "linear-gradient(135deg,#0D9488,#7C3AED)";
 
 function ordinal(n: number) {
   if (n % 100 >= 11 && n % 100 <= 13) return `${n}th`;
@@ -204,7 +204,6 @@ export default function LeaderboardClient({ initialVendors, initialCampus, curre
                         picture={vendor.profile_picture}
                         size={48}
                         shape="circle"
-                        ring={LIST_RING}
                       />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5">
@@ -227,7 +226,7 @@ export default function LeaderboardClient({ initialVendors, initialCampus, curre
                       </div>
                       <div
                         className="flex-shrink-0 px-2.5 py-1.5 rounded-xl text-white text-xs font-black"
-                        style={{ background: LIST_RING }}
+                        style={{ background: TEAL }}
                       >
                         {ordinal(rank)}
                       </div>

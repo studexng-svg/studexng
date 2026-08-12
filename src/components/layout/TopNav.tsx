@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Heart, ShoppingCart, ChevronLeft } from "lucide-react";
 import { useAuth } from "@/lib/authStore";
 import { useCart } from "@/lib/cartStore";
+import { useNavProgress } from "@/lib/navProgressStore";
 import { GRAD, TEAL } from "@/lib/tokens";
 
 interface TopNavProps {
@@ -17,6 +18,7 @@ export default function TopNav({ showBack = false, backHref, activeNav }: TopNav
   const router = useRouter();
   const { isLoggedIn, user } = useAuth();
   const { cart } = useCart();
+  const navLoading = useNavProgress(s => s.active);
 
   const handleBack = () => {
     if (backHref && window.history.length <= 1) {
@@ -38,7 +40,7 @@ export default function TopNav({ showBack = false, backHref, activeNav }: TopNav
         )}
 
         <Link href="/home" className="flex items-center gap-2 flex-shrink-0">
-          <div className="w-9 h-9 rounded-xl overflow-hidden border border-stone-100 shadow-sm flex items-center justify-center p-1 bg-white">
+          <div className={`w-9 h-9 rounded-xl overflow-hidden border border-stone-100 shadow-sm flex items-center justify-center p-1 bg-white ${navLoading ? "animate-breathe" : ""}`}>
             <img src="/images/logo-1.jpg" alt="StudEx" loading="lazy" className="w-full h-full object-contain" />
           </div>
           <span className="font-black text-lg text-stone-900 hidden sm:block" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>

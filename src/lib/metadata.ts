@@ -13,7 +13,7 @@ export interface PageMetadata {
 
 export const defaultMetadata: PageMetadata = {
   title: "StudEx - Campus Marketplace for Student Services | PAU",
-  description: "Nigeria's #1 campus marketplace for students. Book lashes, nails, laundry, and food from verified vendors at Pan-Atlantic University. Fast, safe, and affordable.",
+  description: "The campus marketplace for students. Book lashes, nails, laundry, and food from verified vendors at Pan-Atlantic University. Fast, safe, and affordable.",
   keywords: [
     "campus marketplace",
     "student services",
@@ -90,7 +90,7 @@ export const generateStructuredData = {
     alternateName: "StudEx Campus Marketplace",
     url: "https://studex.com.ng",
     logo: "https://studex.com.ng/images/logo.png",
-    description: "Nigeria's #1 campus marketplace for student services at Pan-Atlantic University",
+    description: "The campus marketplace for student services at Pan-Atlantic University",
     address: {
       "@type": "PostalAddress",
       addressLocality: "Lagos",

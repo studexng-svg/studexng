@@ -18,7 +18,7 @@ export const metadata: Metadata = {
     template: "%s | StudEx",
   },
   description:
-    "Nigeria's #1 student campus marketplace. Order food, beauty, laundry, photography and more from verified vendors on campus. Fast, safe, affordable.",
+    "The student campus marketplace. Order food, beauty, laundry, photography and more from verified vendors on campus. Fast, safe, affordable.",
   keywords: [
     "campus marketplace",
     "student services",
@@ -49,7 +49,7 @@ export const metadata: Metadata = {
     siteName: "StudEx",
     title: "StudEx - Campus Marketplace",
     description:
-      "Nigeria's #1 student campus marketplace. Order food, beauty, laundry, photography and more from verified vendors on campus.",
+      "The student campus marketplace. Order food, beauty, laundry, photography and more from verified vendors on campus.",
     images: [
       {
         url: "/images/og-image.jpg",
@@ -63,7 +63,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     site: "@studexng",
     title: "StudEx - Campus Marketplace",
-    description: "Nigeria's #1 student campus marketplace for food, beauty, laundry & more.",
+    description: "The student campus marketplace for food, beauty, laundry & more.",
     images: ["/images/og-image.jpg"],
   },
   icons: {
