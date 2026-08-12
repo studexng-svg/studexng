@@ -5,7 +5,7 @@ import {
   Mail, Phone, ShieldCheck, User, Ban, AlertTriangle, Users,
   Store, Hash, Home, MessageCircle, Instagram, Star,
   ShoppingBag, Wallet, Calendar, BadgeCheck, Shield, Clock, Truck, Bike,
-  PauseCircle, PlayCircle,
+  PauseCircle, PlayCircle, MapPin,
 } from "lucide-react";
 import AdminTopBar from "@/components/layout/AdminTopBar";
 import { useParams, useRouter } from "next/navigation";
@@ -66,6 +66,8 @@ export default function AdminUserDetail() {
   const [deliveryFee, setDeliveryFee] = useState("0");
   const [deliveryQuota, setDeliveryQuota] = useState("");
   const [deliverySaving, setDeliverySaving] = useState(false);
+  const [riderCampus, setRiderCampus] = useState("pau");
+  const [riderCampusSaving, setRiderCampusSaving] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -84,6 +86,7 @@ export default function AdminUserDetail() {
     setDeliveryQuota(
       user?.vendor?.free_delivery_quota != null ? String(user.vendor.free_delivery_quota) : ""
     );
+    setRiderCampus((user?.school || "pau").toLowerCase());
   }, [user]);
 
   const patch = async (body: object) => {
@@ -143,6 +146,21 @@ export default function AdminUserDetail() {
       setError(e.message || "Action failed");
     } finally {
       setDeliverySaving(false);
+    }
+  };
+
+  const saveRiderCampus = async () => {
+    setRiderCampusSaving(true);
+    setError("");
+    try {
+      const res = await api.admin.updateUser(id as string, { school: riderCampus });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed");
+      setUser(data);
+    } catch (e: any) {
+      setError(e.message || "Action failed");
+    } finally {
+      setRiderCampusSaving(false);
     }
   };
 
@@ -323,6 +341,40 @@ export default function AdminUserDetail() {
             >
               <Bike className="w-4 h-4" />
               {deliverySaving ? "Saving…" : "Save Delivery Settings"}
+            </button>
+          </Section>
+        )}
+
+        {/* Rider coverage — which campus this rider can be auto-assigned
+            orders from. delivery.assignment._pick_least_busy_rider filters
+            on this exact field (User.school); before it did, auto-assign
+            picked the least-busy rider platform-wide with no regard for
+            whether they could physically reach the order's campus. */}
+        {isRider && (
+          <Section title="Rider Coverage">
+            <p className="text-xs text-stone-400 mb-3">
+              The campus this rider gets auto-assigned orders from. Orders from other campuses will
+              never auto-assign to them — an admin can still assign one manually from an order's page
+              if needed.
+            </p>
+            <label className="text-xs font-semibold text-stone-500 mb-1 block">Covers campus</label>
+            <select
+              value={riderCampus}
+              onChange={e => setRiderCampus(e.target.value)}
+              className="w-full px-3 py-2.5 rounded-xl border border-stone-200 text-sm text-stone-900 bg-white focus:outline-none focus:border-teal-500"
+            >
+              <option value="pau">PAU</option>
+              <option value="futo">FUTO</option>
+              <option value="imsu">IMSU</option>
+            </select>
+            <button
+              onClick={saveRiderCampus}
+              disabled={riderCampusSaving}
+              className="w-full py-3 mt-3 font-semibold rounded-xl flex items-center justify-center gap-2 text-sm text-white transition hover:opacity-90 disabled:opacity-50"
+              style={{ background: "#0D9488" }}
+            >
+              <MapPin className="w-4 h-4" />
+              {riderCampusSaving ? "Saving…" : "Save Coverage"}
             </button>
           </Section>
         )}

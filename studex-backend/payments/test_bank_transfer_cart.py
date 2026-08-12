@@ -191,8 +191,12 @@ class AdminBankTransferConfirmRejectTests(BankTransferTestBase):
         self.client.force_authenticate(user=self.admin)
 
     def test_confirm_marks_paid_assigns_rider_and_notifies_vendor(self):
+        # school must match self.listing's campus (defaults to 'pau') —
+        # delivery.assignment.auto_assign_rider only picks riders covering
+        # the order's own campus since the cross-campus auto-assign fix.
         rider = User.objects.create_user(
-            username='bt_rider', email='bt_rider@pau.edu.ng', password='pass123', user_type='rider',
+            username='bt_rider', email='bt_rider@pau.edu.ng', password='pass123',
+            user_type='rider', school='pau',
         )
         res = self.client.patch(f'/api/admin/orders/{self.order.id}/', {'status': 'paid'}, format='json')
         self.assertEqual(res.status_code, 200)

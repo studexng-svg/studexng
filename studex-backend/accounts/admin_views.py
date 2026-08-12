@@ -309,6 +309,21 @@ class AdminUserDetailView(APIView):
                     )
                 user.is_staff = request.data['is_staff']
 
+            if 'school' in request.data:
+                # The only "coverage area" this codebase's location model
+                # supports (services.models.Listing.campus / delivery.models.
+                # CampusPickupPoint.CAMPUS_CHOICES use the same 3 values) —
+                # this is what delivery.assignment._pick_least_busy_rider
+                # filters riders by, so setting it here is literally "which
+                # campus can this rider be auto-assigned orders from."
+                new_school = (request.data['school'] or '').strip().lower()
+                if new_school not in ('pau', 'futo', 'imsu'):
+                    return Response(
+                        {'error': "school must be one of: pau, futo, imsu"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                user.school = new_school
+
             if 'user_type' in request.data:
                 new_type = request.data['user_type']
                 if new_type == 'vendor' and not user.is_verified_vendor:

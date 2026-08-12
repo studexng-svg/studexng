@@ -27,10 +27,20 @@ from django.db.models import Count, Q
 logger = logging.getLogger(__name__)
 
 
-def _pick_least_busy_rider():
+def _pick_least_busy_rider(campus):
+    """
+    Restricted to riders whose registered campus (accounts.models.User.school
+    — the same field an admin sets per rider from /admin/users/<id>, and the
+    only "coverage area" this codebase's location model supports; see
+    services.models.Listing.campus / delivery.models.CampusPickupPoint.
+    CAMPUS_CHOICES for the same 3-value taxonomy everywhere else) matches the
+    order's own campus. Before this filter existed, a FUTO order could
+    auto-assign to a PAU-based rider — least-busy globally, with no regard
+    for whether they could physically reach it.
+    """
     User = get_user_model()
     return (
-        User.objects.filter(user_type='rider', is_active=True)
+        User.objects.filter(user_type='rider', is_active=True, school__iexact=campus)
         .annotate(active_count=Count(
             'deliveries', filter=Q(deliveries__status__in=['assigned', 'picked_up', 'at_pickup_point']),
         ))
@@ -42,19 +52,22 @@ def _pick_least_busy_rider():
 def auto_assign_rider(order):
     """
     Creates a DeliveryAssignment for `order` with the least-busy currently
-    active rider, using order.delivery_location directly — no
+    active rider covering the order's campus (order.listing.campus — see
+    _pick_least_busy_rider), using order.delivery_location directly — no
     CampusPickupPoint required or set. No-op (returns None, logs a
-    warning) if there are no active riders at all; an admin can still
-    assign one manually afterward. Never raises — a failure here must
-    never surface as a checkout failure, same convention as every other
-    post-creation side effect in verify_cart_payment.
+    warning) if there's no active rider covering that campus at all; an
+    admin can still assign one manually afterward (delivery.views.
+    AdminAssignRiderView). Never raises — a failure here must never surface
+    as a checkout failure, same convention as every other post-creation
+    side effect in verify_cart_payment.
     """
     from delivery.models import DeliveryAssignment
 
     try:
-        rider = _pick_least_busy_rider()
+        campus = order.listing.campus
+        rider = _pick_least_busy_rider(campus)
         if not rider:
-            logger.warning(f"auto_assign_rider: no active riders available for order {order.id}")
+            logger.warning(f"auto_assign_rider: no active {campus} rider available for order {order.id}")
             return None
 
         assignment, created = DeliveryAssignment.objects.get_or_create(
