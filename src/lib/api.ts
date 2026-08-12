@@ -838,26 +838,14 @@ export const api = {
     updateStatus: (
       assignmentId: number | string,
       newStatus: string,
-      extra?: { proofImage?: File; deliveryCode?: string },
-    ) => {
-      // 'picked_up' and 'completed' require a proof photo (and 'completed'
-      // also a delivery code) — see delivery/views.py RiderUpdateStatusView.
-      // 'at_pickup_point' needs neither, so keep sending plain JSON for it.
-      if (extra?.proofImage) {
-        const fd = new FormData();
-        fd.append("status", newStatus);
-        if (extra.deliveryCode) fd.append("delivery_code", extra.deliveryCode);
-        fd.append("proof_image", extra.proofImage);
-        return fetchWithAuth(u(`/api/delivery/assignments/${assignmentId}/update-status/`), {
-          method: "POST",
-          body: fd,
-        });
-      }
-      return fetchWithAuth(u(`/api/delivery/assignments/${assignmentId}/update-status/`), {
+      extra?: { deliveryCode?: string },
+    ) =>
+      // Only 'completed' needs anything beyond the status itself (the
+      // delivery code) — see delivery/views.py RiderUpdateStatusView.
+      fetchWithAuth(u(`/api/delivery/assignments/${assignmentId}/update-status/`), {
         method: "POST",
-        body: s({ status: newStatus }),
-      });
-    },
+        body: s({ status: newStatus, ...(extra?.deliveryCode ? { delivery_code: extra.deliveryCode } : {}) }),
+      }),
 
     orderStatus: (orderId: number | string) =>
       fetchWithAuth(u(`/api/delivery/order/${orderId}/`)),

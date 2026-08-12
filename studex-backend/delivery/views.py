@@ -534,30 +534,16 @@ class RiderUpdateStatusView(APIView):
 
                 now = timezone.now()
                 if new_status == 'picked_up':
-                    proof = request.FILES.get('proof_image')
-                    if not proof:
-                        return Response(
-                            {'error': 'A photo proving pickup from the vendor is required.'},
-                            status=status.HTTP_400_BAD_REQUEST,
-                        )
-                    from services.views import upload_to_cloudinary
-                    proof_url = upload_to_cloudinary(proof, folder='studex/delivery_pickup_proofs')
-                    if not proof_url:
-                        return Response(
-                            {'error': 'Failed to upload proof image. Please try again.'},
-                            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                        )
                     try:
                         DeliveryVerificationEvent.objects.create(
                             assignment=assignment, event_type='pickup', rider=request.user,
-                            evidence_image=proof_url, ip_address=_client_ip(request),
+                            ip_address=_client_ip(request),
                         )
                     except IntegrityError:
                         return Response(
                             {'error': 'Pickup has already been verified for this assignment.'},
                             status=status.HTTP_409_CONFLICT,
                         )
-                    assignment.pickup_proof_image = proof_url
                     assignment.picked_up_at = now
                     # Responsibility transfer: the vendor's obligation ends the
                     # instant pickup is verified — from here StudEx Delivery
@@ -585,30 +571,16 @@ class RiderUpdateStatusView(APIView):
                             },
                             status=status.HTTP_400_BAD_REQUEST,
                         )
-                    proof = request.FILES.get('proof_image')
-                    if not proof:
-                        return Response(
-                            {'error': 'A photo proving handoff to the buyer is required.'},
-                            status=status.HTTP_400_BAD_REQUEST,
-                        )
-                    from services.views import upload_to_cloudinary
-                    proof_url = upload_to_cloudinary(proof, folder='studex/delivery_completion_proofs')
-                    if not proof_url:
-                        return Response(
-                            {'error': 'Failed to upload proof image. Please try again.'},
-                            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                        )
                     try:
                         DeliveryVerificationEvent.objects.create(
                             assignment=assignment, event_type='completion', rider=request.user,
-                            evidence_image=proof_url, ip_address=_client_ip(request),
+                            ip_address=_client_ip(request),
                         )
                     except IntegrityError:
                         return Response(
                             {'error': 'Completion has already been verified for this assignment.'},
                             status=status.HTTP_409_CONFLICT,
                         )
-                    assignment.completion_proof_image = proof_url
                     assignment.completed_at = now
 
                     # Nothing else in the delivery app ever touches

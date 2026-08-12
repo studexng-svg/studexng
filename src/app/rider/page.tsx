@@ -4,11 +4,10 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/authStore";
 import { api } from "@/lib/api";
-import { compressImage } from "@/lib/utils";
 import { TEAL } from "@/lib/tokens";
 import TopNav from "@/components/layout/TopNav";
 import {
-  Package, CheckCircle, Truck, Clock, Camera, X, AlertCircle,
+  Package, CheckCircle, Truck, Clock, X, AlertCircle,
   TrendingUp, CalendarCheck, ListChecks, Activity, Phone,
   ChevronRight, MapPin, RotateCcw, Receipt, Hash,
 } from "lucide-react";
@@ -89,14 +88,10 @@ const STATUS_COLOR: Record<string, string> = {
   at_pickup_point: "bg-teal-100 text-teal-700",
 };
 
-// 'picked_up' (proof of collection from vendor) and 'completed' (delivery
-// code + proof of handoff to buyer) both require extra input the rider must
-// provide before the status can advance — see delivery/views.py
-// RiderUpdateStatusView. 'at_pickup_point' needs nothing extra.
-const REQUIRES_PROOF: Record<string, boolean> = {
-  picked_up: true,
-  completed: true,
-};
+// Only 'completed' needs anything extra from the rider before the status
+// can advance — the delivery code the buyer reads off their own order page.
+// 'picked_up' and 'at_pickup_point' are both a single tap. See
+// delivery/views.py RiderUpdateStatusView.
 
 function naira(v: string | number | undefined | null): string {
   const n = Number(v ?? 0);
@@ -122,71 +117,44 @@ function StatCard({
   );
 }
 
-function ProofModal({
-  assignment, nextStatus, onClose, onSubmit, submitting, error,
+// Only ever opened for the 'completed' transition now — asks for nothing
+// but the buyer's delivery code. See delivery/views.py RiderUpdateStatusView.
+function CodeModal({
+  assignment, onClose, onSubmit, submitting, error,
 }: {
   assignment: Assignment;
-  nextStatus: string;
   onClose: () => void;
-  onSubmit: (args: { proofImage: File; deliveryCode?: string }) => void;
+  onSubmit: (args: { deliveryCode: string }) => void;
   submitting: boolean;
   error: string;
 }) {
-  const [image, setImage] = useState<File | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
   const [code, setCode] = useState("");
-
-  const pickImage = async (file?: File) => {
-    if (!file) return;
-    const compressed = await compressImage(file);
-    setImage(compressed);
-    setPreview(URL.createObjectURL(compressed));
-  };
-
-  const isCompletion = nextStatus === "completed";
-  const canSubmit = !!image && (!isCompletion || code.trim().length > 0);
+  const canSubmit = code.trim().length > 0;
 
   return (
     <div className="fixed inset-0 z-[70] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => !submitting && onClose()}>
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-5 space-y-4 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-5 space-y-4" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between">
-          <p className="font-bold text-stone-900 text-base">
-            {isCompletion ? "Confirm Handoff to Buyer" : "Confirm Pickup from Vendor"}
-          </p>
+          <p className="font-bold text-stone-900 text-base">Confirm Handoff to Buyer</p>
           <button onClick={onClose} disabled={submitting} className="p-1 text-stone-400 hover:text-stone-700">
             <X className="w-5 h-5" />
           </button>
         </div>
 
         <p className="text-xs text-stone-400">
-          {isCompletion
-            ? `Ask ${assignment.buyer_username} for the delivery code shown on their order page, and take a photo of the handoff.`
-            : `Take a photo proving you collected "${assignment.listing_title}" from @${assignment.vendor_username}.`}
+          Ask {assignment.buyer_username} for the delivery code shown on their order page.
         </p>
 
-        {isCompletion && (
-          <div>
-            <label className="text-xs font-semibold text-stone-600 mb-1 block">Delivery code</label>
-            <input
-              value={code}
-              onChange={e => setCode(e.target.value)}
-              placeholder="e.g. 4821"
-              className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-900 tracking-widest focus:outline-none focus:ring-2 focus:ring-teal-400 transition"
-            />
-          </div>
-        )}
-
-        <label className="w-full aspect-video rounded-xl border-2 border-dashed border-stone-200 flex flex-col items-center justify-center cursor-pointer hover:border-teal-400 transition overflow-hidden bg-stone-50">
-          {preview ? (
-            <img src={preview} alt="" className="w-full h-full object-cover" />
-          ) : (
-            <>
-              <Camera className="w-7 h-7 text-stone-300 mb-1" />
-              <span className="text-xs text-stone-400 font-medium">Tap to take a photo</span>
-            </>
-          )}
-          <input type="file" accept="image/*" capture="environment" className="hidden" onChange={e => pickImage(e.target.files?.[0])} />
-        </label>
+        <div>
+          <label className="text-xs font-semibold text-stone-600 mb-1 block">Delivery code</label>
+          <input
+            value={code}
+            onChange={e => setCode(e.target.value)}
+            placeholder="e.g. 4821"
+            autoFocus
+            className="w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-900 tracking-widest focus:outline-none focus:ring-2 focus:ring-teal-400 transition"
+          />
+        </div>
 
         {error && (
           <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2.5">
@@ -196,7 +164,7 @@ function ProofModal({
         )}
 
         <button
-          onClick={() => image && onSubmit({ proofImage: image, deliveryCode: isCompletion ? code.trim() : undefined })}
+          onClick={() => canSubmit && onSubmit({ deliveryCode: code.trim() })}
           disabled={!canSubmit || submitting}
           className="w-full py-3.5 rounded-full font-bold text-white text-sm disabled:opacity-50 transition"
           style={{ background: TEAL }}
@@ -575,7 +543,7 @@ export default function RiderDashboard() {
   const [historyLoading, setHistoryLoading] = useState(true);
   const [updating, setUpdating] = useState<number | null>(null);
   const [errors, setErrors] = useState<Record<number, string>>({});
-  const [proofModal, setProofModal] = useState<{ assignment: Assignment; nextStatus: string } | null>(null);
+  const [codeModal, setCodeModal] = useState<Assignment | null>(null);
   const [modalError, setModalError] = useState("");
   const [markingItem, setMarkingItem] = useState<number | null>(null);
   const [detailAssignment, setDetailAssignment] = useState<Assignment | null>(null);
@@ -626,7 +594,7 @@ export default function RiderDashboard() {
   const assignments = [...batches.flatMap(b => b.assignments), ...unbatched];
 
   const submitStatus = async (
-    assignment: Assignment, next: string, extra?: { proofImage: File; deliveryCode?: string },
+    assignment: Assignment, next: string, extra?: { deliveryCode: string },
   ) => {
     setUpdating(assignment.id);
     setErrors(prev => { const p = { ...prev }; delete p[assignment.id]; return p; });
@@ -635,7 +603,7 @@ export default function RiderDashboard() {
       const res = await api.delivery.updateStatus(assignment.id, next, extra);
       const data = await res.json().catch(() => ({}));
       if (res.ok) {
-        setProofModal(null);
+        setCodeModal(null);
         loadActive();
       } else {
         const message = data.error || "Could not update status. Please try again.";
@@ -653,9 +621,9 @@ export default function RiderDashboard() {
   const updateStatus = (assignment: Assignment) => {
     const next = STATUS_NEXT[assignment.status];
     if (!next) return;
-    if (REQUIRES_PROOF[next]) {
+    if (next === "completed") {
       setModalError("");
-      setProofModal({ assignment, nextStatus: next });
+      setCodeModal(assignment);
       return;
     }
     submitStatus(assignment, next);
@@ -879,13 +847,12 @@ export default function RiderDashboard() {
         )}
       </div>
 
-      {proofModal && (
-        <ProofModal
-          assignment={proofModal.assignment}
-          nextStatus={proofModal.nextStatus}
-          onClose={() => setProofModal(null)}
-          onSubmit={extra => submitStatus(proofModal.assignment, proofModal.nextStatus, extra)}
-          submitting={updating === proofModal.assignment.id}
+      {codeModal && (
+        <CodeModal
+          assignment={codeModal}
+          onClose={() => setCodeModal(null)}
+          onSubmit={extra => submitStatus(codeModal, "completed", extra)}
+          submitting={updating === codeModal.id}
           error={modalError}
         />
       )}

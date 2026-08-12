@@ -186,6 +186,13 @@ class DeliveryVerificationEvent(models.Model):
     The (assignment, event_type) uniqueness constraint is a hard DB-level
     guarantee against duplicate verification, independent of and in addition
     to the application-level state-machine check in RiderUpdateStatusView.
+
+    evidence_image is nullable — a rider photo is no longer required to
+    verify pickup or completion (RiderUpdateStatusView), only the delivery
+    code for completion. This event still fires for both transitions purely
+    as the who/when/where (IP) audit record and the duplicate-verification
+    guard; evidence_image stays populated on every event created before
+    that change.
     """
     EVENT_TYPE_CHOICES = (
         ('pickup', 'Pickup Verification'),
@@ -199,7 +206,7 @@ class DeliveryVerificationEvent(models.Model):
     rider = models.ForeignKey(
         User, on_delete=models.SET_NULL, null=True, related_name='delivery_verification_events',
     )
-    evidence_image = models.URLField(max_length=500)
+    evidence_image = models.URLField(max_length=500, null=True, blank=True)
     ip_address = models.GenericIPAddressField(null=True, blank=True)
     occurred_at = models.DateTimeField(auto_now_add=True)
 

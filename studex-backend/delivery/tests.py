@@ -1,24 +1,31 @@
 # delivery/tests.py
 """
-Test suite for Blocker 4 (Rider Verification Evidence) — see the Design
-Validation & Risk Register. Before this, RiderUpdateStatusView let a rider
-transition a DeliveryAssignment all the way to "completed" (buyer collected
-it) with zero evidence: no photo, no buyer confirmation of any kind. A
-dishonest or compromised rider account could mark any delivery collected
-and the buyer would have no recourse.
+Test suite for the rider verification flow (originally Blocker 4 — Rider
+Verification Evidence, see the Design Validation & Risk Register). Before
+that blocker, RiderUpdateStatusView let a rider transition a
+DeliveryAssignment all the way to "completed" (buyer collected it) with
+zero evidence: no photo, no buyer confirmation of any kind.
+
+Photo evidence at both the pickup and completion transitions has since been
+removed again (it added friction without buyer-side verification value at
+the pickup step, and duplicated the delivery code's own verification at the
+completion step) — the delivery code the buyer reads off their own order
+page is what actually verifies handoff now. DeliveryVerificationEvent still
+fires at both transitions as a who/when/where (IP) audit trail and a
+DB-level duplicate-verification guard; evidence_image on it is now optional
+and simply never populated going forward.
 
 Covers: the buyer-only delivery_code never leaking to rider-facing
-endpoints, the code being required (and validated) before "completed",
-photo evidence being required at both the pickup and completion
-transitions, and the code being rotated on reassignment.
+endpoints, the code being required (and validated) before "completed", and
+the code being rotated on reassignment.
 
-The `delivery` app had zero pre-existing tests before this blocker, so this
-file also exercises the base assignment/status-transition golden path —
-there's no prior baseline to regress against, but the flow still needs its
-own coverage.
+The `delivery` app had zero pre-existing tests before the original blocker,
+so this file also exercises the base assignment/status-transition golden
+path — there's no prior baseline to regress against, but the flow still
+needs its own coverage.
 """
 from decimal import Decimal
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from django.test import TestCase
 from django.contrib.auth import get_user_model
@@ -35,11 +42,6 @@ from accounts.models import Vendor, VendorType
 from payments.models import PaymentTransaction
 
 User = get_user_model()
-
-
-def make_proof_file(name="proof.jpg"):
-    from django.core.files.uploadedfile import SimpleUploadedFile
-    return SimpleUploadedFile(name, b"fake-image-bytes", content_type="image/jpeg")
 
 
 class DeliveryTestBase(TestCase):
@@ -79,6 +81,77 @@ class DeliveryTestBase(TestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
         return DeliveryAssignment.objects.get(order=self.order)
+
+    def pick_up(self, assignment):
+        """Advances 'assigned' -> 'picked_up' — no photo required."""
+        self.client.force_authenticate(user=self.rider)
+        return self.client.post(
+            f"/api/delivery/assignments/{assignment.id}/update-status/",
+            {"status": "picked_up"},
+        )
+
+    def advance_to_at_pickup_point(self, assignment=None):
+        if assignment is None:
+            assignment = self.assign()
+        self.pick_up(assignment)
+        self.client.force_authenticate(user=self.rider)
+        self.client.post(
+            f"/api/delivery/assignments/{assignment.id}/update-status/",
+            {"status": "at_pickup_point"},
+        )
+        assignment.refresh_from_db()
+        return assignment
+
+    def complete(self, assignment, code=None):
+        """Advances 'at_pickup_point' -> 'completed' — code required, no photo."""
+        self.client.force_authenticate(user=self.rider)
+        return self.client.post(
+            f"/api/delivery/assignments/{assignment.id}/update-status/",
+            {"status": "completed", "delivery_code": code if code is not None else assignment.delivery_code},
+        )
+
+
+class AutoAssignRiderCampusTests(DeliveryTestBase):
+    """
+    delivery.assignment.auto_assign_rider — before the campus filter, this
+    picked the least-busy rider platform-wide with zero regard for whether
+    they could physically reach the order's campus (self.listing defaults
+    to 'pau' — see services.models.Listing.campus). Covers: same-campus
+    riders get picked, other-campus riders never do, and a no-coverage
+    campus no-ops exactly like "no active riders at all" already did.
+    """
+
+    def test_picks_rider_covering_the_order_campus(self):
+        from delivery.assignment import auto_assign_rider
+        self.rider.school = "pau"
+        self.rider.save(update_fields=["school"])
+        User.objects.create_user(
+            username="futo_rider", email="futo_rider@futo.edu.ng", password="pass12345",
+            user_type="rider", school="futo",
+        )
+
+        assignment = auto_assign_rider(self.order)
+
+        self.assertIsNotNone(assignment)
+        self.assertEqual(assignment.rider_id, self.rider.id)
+
+    def test_never_assigns_a_rider_from_a_different_campus(self):
+        from delivery.assignment import auto_assign_rider
+        self.rider.school = "futo"  # only rider that exists, but wrong campus
+        self.rider.save(update_fields=["school"])
+
+        assignment = auto_assign_rider(self.order)
+
+        self.assertIsNone(assignment)
+        self.assertFalse(DeliveryAssignment.objects.filter(order=self.order).exists())
+
+    def test_no_op_when_no_rider_covers_the_campus_at_all(self):
+        from delivery.assignment import auto_assign_rider
+        self.rider.delete()  # DeliveryTestBase's only rider gone
+
+        assignment = auto_assign_rider(self.order)
+
+        self.assertIsNone(assignment)
 
 
 class AdminAssignRiderViewTests(DeliveryTestBase):
@@ -166,14 +239,7 @@ class DeliveryCodeSecrecyTests(DeliveryTestBase):
 
     def test_code_absent_from_rider_update_status_response(self):
         assignment = self.assign()
-        self.client.force_authenticate(user=self.rider)
-        proof = make_proof_file()
-        with patch("services.views.upload_to_cloudinary", return_value="https://cdn.example.com/fake.jpg"):
-            response = self.client.post(
-                f"/api/delivery/assignments/{assignment.id}/update-status/",
-                {"status": "picked_up", "proof_image": proof},
-                format="multipart",
-            )
+        response = self.pick_up(assignment)
         self.assertEqual(response.status_code, 200)
         self.assertNotIn("delivery_code", response.data)
 
@@ -217,49 +283,20 @@ class DeliveryCodeSecrecyTests(DeliveryTestBase):
         self.assertNotEqual(assignment.delivery_code, original_code)
 
 
-class PickupEvidenceTests(DeliveryTestBase):
-    def test_pickup_requires_photo(self):
-        assignment = self.assign()
-        self.client.force_authenticate(user=self.rider)
-        response = self.client.post(
-            f"/api/delivery/assignments/{assignment.id}/update-status/",
-            {"status": "picked_up"},
-        )
-        self.assertEqual(response.status_code, 400)
-        assignment.refresh_from_db()
-        self.assertEqual(assignment.status, "assigned")
+class PickupTransitionTests(DeliveryTestBase):
+    """
+    'assigned' -> 'picked_up' is a single tap, no photo — see RiderUpdateStatusView.
+    """
 
-    def test_pickup_succeeds_with_photo_and_stores_url(self):
+    def test_pickup_succeeds_with_no_photo(self):
         assignment = self.assign()
-        self.client.force_authenticate(user=self.rider)
-        proof = make_proof_file()
-        with patch("services.views.upload_to_cloudinary", return_value="https://cdn.example.com/pickup.jpg") as mock_upload:
-            response = self.client.post(
-                f"/api/delivery/assignments/{assignment.id}/update-status/",
-                {"status": "picked_up", "proof_image": proof},
-                format="multipart",
-            )
+        response = self.pick_up(assignment)
+
         self.assertEqual(response.status_code, 200)
-        mock_upload.assert_called_once()
-        self.assertEqual(mock_upload.call_args.kwargs.get("folder"), "studex/delivery_pickup_proofs")
         assignment.refresh_from_db()
         self.assertEqual(assignment.status, "picked_up")
-        self.assertEqual(assignment.pickup_proof_image, "https://cdn.example.com/pickup.jpg")
         self.assertIsNotNone(assignment.picked_up_at)
-
-    def test_pickup_upload_failure_does_not_advance_status(self):
-        assignment = self.assign()
-        self.client.force_authenticate(user=self.rider)
-        proof = make_proof_file()
-        with patch("services.views.upload_to_cloudinary", return_value=None):
-            response = self.client.post(
-                f"/api/delivery/assignments/{assignment.id}/update-status/",
-                {"status": "picked_up", "proof_image": proof},
-                format="multipart",
-            )
-        self.assertEqual(response.status_code, 500)
-        assignment.refresh_from_db()
-        self.assertEqual(assignment.status, "assigned")
+        self.assertIsNone(assignment.pickup_proof_image)
 
 
 class RiderUpdateStatusPostgresLockingTests(DeliveryTestBase):
@@ -278,8 +315,6 @@ class RiderUpdateStatusPostgresLockingTests(DeliveryTestBase):
     """
     def test_lookup_scopes_for_update_to_self_only(self):
         assignment = self.assign()
-        self.client.force_authenticate(user=self.rider)
-        proof = make_proof_file()
 
         original = QuerySet.select_for_update
         captured = []
@@ -290,12 +325,7 @@ class RiderUpdateStatusPostgresLockingTests(DeliveryTestBase):
 
         QuerySet.select_for_update = spy
         try:
-            with patch("services.views.upload_to_cloudinary", return_value="https://cdn.example.com/pickup.jpg"):
-                response = self.client.post(
-                    f"/api/delivery/assignments/{assignment.id}/update-status/",
-                    {"status": "picked_up", "proof_image": proof},
-                    format="multipart",
-                )
+            response = self.pick_up(assignment)
         finally:
             QuerySet.select_for_update = original
 
@@ -304,72 +334,39 @@ class RiderUpdateStatusPostgresLockingTests(DeliveryTestBase):
         self.assertEqual(captured[0].get("of"), ("self",))
 
 
-class CompletionEvidenceTests(DeliveryTestBase):
-    def _advance_to_at_pickup_point(self):
-        assignment = self.assign()
-        with patch("services.views.upload_to_cloudinary", return_value="https://cdn.example.com/pickup.jpg"):
-            self.client.force_authenticate(user=self.rider)
-            self.client.post(
-                f"/api/delivery/assignments/{assignment.id}/update-status/",
-                {"status": "picked_up", "proof_image": make_proof_file()},
-                format="multipart",
-            )
-        self.client.post(
-            f"/api/delivery/assignments/{assignment.id}/update-status/",
-            {"status": "at_pickup_point"},
-        )
-        assignment.refresh_from_db()
-        return assignment
+class CompletionCodeTests(DeliveryTestBase):
+    """
+    'at_pickup_point' -> 'completed' still requires the buyer's delivery
+    code — that's the actual handoff verification now, no photo alongside it.
+    """
 
     def test_completion_rejected_without_code(self):
-        assignment = self._advance_to_at_pickup_point()
-        proof = make_proof_file()
+        assignment = self.advance_to_at_pickup_point()
+        self.client.force_authenticate(user=self.rider)
         response = self.client.post(
             f"/api/delivery/assignments/{assignment.id}/update-status/",
-            {"status": "completed", "proof_image": proof},
-            format="multipart",
+            {"status": "completed"},
         )
         self.assertEqual(response.status_code, 400)
         assignment.refresh_from_db()
         self.assertEqual(assignment.status, "at_pickup_point")
 
     def test_completion_rejected_with_wrong_code(self):
-        assignment = self._advance_to_at_pickup_point()
-        proof = make_proof_file()
-        response = self.client.post(
-            f"/api/delivery/assignments/{assignment.id}/update-status/",
-            {"status": "completed", "delivery_code": "000000", "proof_image": proof},
-            format="multipart",
-        )
+        assignment = self.advance_to_at_pickup_point()
+        response = self.complete(assignment, code="000000")
         self.assertEqual(response.status_code, 400)
         assignment.refresh_from_db()
         self.assertEqual(assignment.status, "at_pickup_point")
 
-    def test_completion_rejected_without_photo_even_with_correct_code(self):
-        assignment = self._advance_to_at_pickup_point()
-        response = self.client.post(
-            f"/api/delivery/assignments/{assignment.id}/update-status/",
-            {"status": "completed", "delivery_code": assignment.delivery_code},
-        )
-        self.assertEqual(response.status_code, 400)
-        assignment.refresh_from_db()
-        self.assertEqual(assignment.status, "at_pickup_point")
+    def test_completion_succeeds_with_correct_code_and_no_photo(self):
+        assignment = self.advance_to_at_pickup_point()
+        response = self.complete(assignment)
 
-    def test_completion_succeeds_with_correct_code_and_photo(self):
-        assignment = self._advance_to_at_pickup_point()
-        proof = make_proof_file()
-        with patch("services.views.upload_to_cloudinary", return_value="https://cdn.example.com/complete.jpg") as mock_upload:
-            response = self.client.post(
-                f"/api/delivery/assignments/{assignment.id}/update-status/",
-                {"status": "completed", "delivery_code": assignment.delivery_code, "proof_image": proof},
-                format="multipart",
-            )
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(mock_upload.call_args.kwargs.get("folder"), "studex/delivery_completion_proofs")
         assignment.refresh_from_db()
         self.assertEqual(assignment.status, "completed")
-        self.assertEqual(assignment.completion_proof_image, "https://cdn.example.com/complete.jpg")
         self.assertIsNotNone(assignment.completed_at)
+        self.assertIsNone(assignment.completion_proof_image)
 
 
 class AtPickupPointNotificationTests(DeliveryTestBase):
@@ -381,18 +378,10 @@ class AtPickupPointNotificationTests(DeliveryTestBase):
     and the pickup_point.name lookup not crashing (silently, via the view's
     bare except) for an auto-assigned delivery that has no pickup_point.
     """
-    def _pick_up(self, assignment):
-        with patch("services.views.upload_to_cloudinary", return_value="https://cdn.example.com/pickup.jpg"):
-            self.client.force_authenticate(user=self.rider)
-            self.client.post(
-                f"/api/delivery/assignments/{assignment.id}/update-status/",
-                {"status": "picked_up", "proof_image": make_proof_file()},
-                format="multipart",
-            )
 
     def test_notification_includes_delivery_code(self):
         assignment = self.assign()
-        self._pick_up(assignment)
+        self.pick_up(assignment)
         with patch("accounts.utils.send_notification") as mock_notify:
             response = self.client.post(
                 f"/api/delivery/assignments/{assignment.id}/update-status/",
@@ -414,7 +403,7 @@ class AtPickupPointNotificationTests(DeliveryTestBase):
         instead of the send_email=False used for admin-only notifications.
         """
         assignment = self.assign()
-        self._pick_up(assignment)
+        self.pick_up(assignment)
         with patch("accounts.utils.send_notification") as mock_notify:
             self.client.post(
                 f"/api/delivery/assignments/{assignment.id}/update-status/",
@@ -428,7 +417,7 @@ class AtPickupPointNotificationTests(DeliveryTestBase):
         self.order.delivery_location = "3rd floor, Block C, Room 12"
         self.order.save(update_fields=["delivery_location"])
         assignment = DeliveryAssignment.objects.create(order=self.order, rider=self.rider, pickup_point=None)
-        self._pick_up(assignment)
+        self.pick_up(assignment)
         with patch("accounts.utils.send_notification") as mock_notify:
             response = self.client.post(
                 f"/api/delivery/assignments/{assignment.id}/update-status/",
@@ -489,21 +478,19 @@ class ResponsibilityTransferTests(DeliveryTestBase):
 
     def test_responsibility_transfers_on_pickup_verification(self):
         assignment = self.assign()
-        self.client.force_authenticate(user=self.rider)
-        with patch("services.views.upload_to_cloudinary", return_value="https://cdn.example.com/pickup.jpg"):
-            response = self.client.post(
-                f"/api/delivery/assignments/{assignment.id}/update-status/",
-                {"status": "picked_up", "proof_image": make_proof_file()},
-                format="multipart",
-            )
+        response = self.pick_up(assignment)
+
         self.assertEqual(response.status_code, 200)
         assignment.refresh_from_db()
         self.assertEqual(assignment.responsibility, "studex_delivery")
         self.assertIsNotNone(assignment.responsibility_transferred_at)
 
     def test_responsibility_unaffected_by_later_transitions(self):
-        assignment = self._advance_through_pickup()
+        assignment = self.assign()
+        self.pick_up(assignment)
+        assignment.refresh_from_db()
         transferred_at = assignment.responsibility_transferred_at
+
         self.client.force_authenticate(user=self.rider)
         self.client.post(
             f"/api/delivery/assignments/{assignment.id}/update-status/",
@@ -514,7 +501,9 @@ class ResponsibilityTransferTests(DeliveryTestBase):
         self.assertEqual(assignment.responsibility_transferred_at, transferred_at)
 
     def test_responsibility_resets_on_reassignment(self):
-        assignment = self._advance_through_pickup()
+        assignment = self.assign()
+        self.pick_up(assignment)
+        assignment.refresh_from_db()
         self.assertEqual(assignment.responsibility, "studex_delivery")
 
         new_rider = User.objects.create_user(
@@ -529,83 +518,51 @@ class ResponsibilityTransferTests(DeliveryTestBase):
         self.assertEqual(assignment.responsibility, "vendor")
         self.assertIsNone(assignment.responsibility_transferred_at)
 
-    def _advance_through_pickup(self):
-        assignment = self.assign()
-        self.client.force_authenticate(user=self.rider)
-        with patch("services.views.upload_to_cloudinary", return_value="https://cdn.example.com/pickup.jpg"):
-            self.client.post(
-                f"/api/delivery/assignments/{assignment.id}/update-status/",
-                {"status": "picked_up", "proof_image": make_proof_file()},
-                format="multipart",
-            )
-        assignment.refresh_from_db()
-        return assignment
-
 
 class VerificationEventTests(DeliveryTestBase):
     """
     Permanent, append-only audit trail: every verification event records who
-    (rider), what (evidence image), and when (timestamp) — independent of
-    DeliveryAssignment's own mutable fields.
+    (rider) and when (timestamp) — independent of DeliveryAssignment's own
+    mutable fields. evidence_image is optional and unpopulated now that
+    neither transition requires a photo.
     """
 
     def test_pickup_creates_verification_event(self):
         assignment = self.assign()
-        self.client.force_authenticate(user=self.rider)
-        with patch("services.views.upload_to_cloudinary", return_value="https://cdn.example.com/pickup.jpg"):
-            self.client.post(
-                f"/api/delivery/assignments/{assignment.id}/update-status/",
-                {"status": "picked_up", "proof_image": make_proof_file()},
-                format="multipart",
-            )
+        self.pick_up(assignment)
+
         event = DeliveryVerificationEvent.objects.get(assignment=assignment, event_type="pickup")
         self.assertEqual(event.rider, self.rider)
-        self.assertEqual(event.evidence_image, "https://cdn.example.com/pickup.jpg")
+        self.assertIsNone(event.evidence_image)
         self.assertIsNotNone(event.occurred_at)
         self.assertEqual(event.ip_address, "127.0.0.1")
 
     def test_completion_creates_verification_event(self):
-        assignment = self._advance_to_at_pickup_point_helper()
-        self.client.force_authenticate(user=self.rider)
-        with patch("services.views.upload_to_cloudinary", return_value="https://cdn.example.com/complete.jpg"):
-            self.client.post(
-                f"/api/delivery/assignments/{assignment.id}/update-status/",
-                {"status": "completed", "delivery_code": assignment.delivery_code, "proof_image": make_proof_file()},
-                format="multipart",
-            )
+        assignment = self.advance_to_at_pickup_point()
+        self.complete(assignment)
+
         event = DeliveryVerificationEvent.objects.get(assignment=assignment, event_type="completion")
         self.assertEqual(event.rider, self.rider)
-        self.assertEqual(event.evidence_image, "https://cdn.example.com/complete.jpg")
+        self.assertIsNone(event.evidence_image)
 
     def test_duplicate_event_blocked_at_db_level(self):
         """Direct model-level proof of the hard DB constraint, independent of view logic."""
         assignment = self.assign()
         DeliveryVerificationEvent.objects.create(
             assignment=assignment, event_type="pickup", rider=self.rider,
-            evidence_image="https://cdn.example.com/one.jpg",
         )
         from django.db import IntegrityError
         with self.assertRaises(IntegrityError):
             DeliveryVerificationEvent.objects.create(
                 assignment=assignment, event_type="pickup", rider=self.rider,
-                evidence_image="https://cdn.example.com/two.jpg",
             )
 
     def test_second_pickup_submission_rejected_by_state_machine(self):
         """A repeated 'picked_up' submission after it already succeeded is rejected."""
         assignment = self.assign()
-        self.client.force_authenticate(user=self.rider)
-        with patch("services.views.upload_to_cloudinary", return_value="https://cdn.example.com/pickup.jpg"):
-            first = self.client.post(
-                f"/api/delivery/assignments/{assignment.id}/update-status/",
-                {"status": "picked_up", "proof_image": make_proof_file()},
-                format="multipart",
-            )
-            second = self.client.post(
-                f"/api/delivery/assignments/{assignment.id}/update-status/",
-                {"status": "picked_up", "proof_image": make_proof_file()},
-                format="multipart",
-            )
+        first = self.pick_up(assignment)
+        second = self.pick_up(assignment)
+
         self.assertEqual(first.status_code, 200)
         self.assertEqual(second.status_code, 400)
         self.assertEqual(
@@ -618,7 +575,8 @@ class VerificationEventTests(DeliveryTestBase):
         a leftover pickup event from the previous rider must not permanently
         block the new rider from ever verifying pickup themselves.
         """
-        assignment = self._advance_through_pickup()
+        assignment = self.assign()
+        self.pick_up(assignment)
         self.assertEqual(
             DeliveryVerificationEvent.objects.filter(assignment=assignment).count(), 1,
         )
@@ -634,107 +592,47 @@ class VerificationEventTests(DeliveryTestBase):
         self.assertEqual(DeliveryVerificationEvent.objects.filter(assignment=assignment).count(), 0)
 
         self.client.force_authenticate(user=new_rider)
-        with patch("services.views.upload_to_cloudinary", return_value="https://cdn.example.com/pickup2.jpg"):
-            response = self.client.post(
-                f"/api/delivery/assignments/{assignment.id}/update-status/",
-                {"status": "picked_up", "proof_image": make_proof_file()},
-                format="multipart",
-            )
+        response = self.client.post(
+            f"/api/delivery/assignments/{assignment.id}/update-status/",
+            {"status": "picked_up"},
+        )
         self.assertEqual(response.status_code, 200)
         event = DeliveryVerificationEvent.objects.get(assignment=assignment, event_type="pickup")
         self.assertEqual(event.rider, new_rider)
-
-    def _advance_through_pickup(self):
-        assignment = self.assign()
-        self.client.force_authenticate(user=self.rider)
-        with patch("services.views.upload_to_cloudinary", return_value="https://cdn.example.com/pickup.jpg"):
-            self.client.post(
-                f"/api/delivery/assignments/{assignment.id}/update-status/",
-                {"status": "picked_up", "proof_image": make_proof_file()},
-                format="multipart",
-            )
-        assignment.refresh_from_db()
-        return assignment
-
-    def _advance_to_at_pickup_point_helper(self):
-        assignment = self._advance_through_pickup()
-        self.client.post(
-            f"/api/delivery/assignments/{assignment.id}/update-status/",
-            {"status": "at_pickup_point"},
-        )
-        assignment.refresh_from_db()
-        return assignment
 
 
 class CodeLockoutTests(DeliveryTestBase):
     """Brute-force defense on the 6-digit buyer handoff code."""
 
-    def _advance_to_at_pickup_point(self):
-        assignment = self.assign()
-        self.client.force_authenticate(user=self.rider)
-        with patch("services.views.upload_to_cloudinary", return_value="https://cdn.example.com/pickup.jpg"):
-            self.client.post(
-                f"/api/delivery/assignments/{assignment.id}/update-status/",
-                {"status": "picked_up", "proof_image": make_proof_file()},
-                format="multipart",
-            )
-        self.client.post(
-            f"/api/delivery/assignments/{assignment.id}/update-status/",
-            {"status": "at_pickup_point"},
-        )
-        assignment.refresh_from_db()
-        return assignment
-
     def test_attempts_counter_increments_on_wrong_code(self):
-        assignment = self._advance_to_at_pickup_point()
-        self.client.post(
-            f"/api/delivery/assignments/{assignment.id}/update-status/",
-            {"status": "completed", "delivery_code": "000000", "proof_image": make_proof_file()},
-            format="multipart",
-        )
+        assignment = self.advance_to_at_pickup_point()
+        self.complete(assignment, code="000000")
         assignment.refresh_from_db()
         self.assertEqual(assignment.code_attempts, 1)
         self.assertFalse(assignment.code_locked)
 
     def test_locks_after_max_attempts(self):
-        assignment = self._advance_to_at_pickup_point()
+        assignment = self.advance_to_at_pickup_point()
         for _ in range(MAX_CODE_ATTEMPTS):
-            self.client.post(
-                f"/api/delivery/assignments/{assignment.id}/update-status/",
-                {"status": "completed", "delivery_code": "000000", "proof_image": make_proof_file()},
-                format="multipart",
-            )
+            self.complete(assignment, code="000000")
         assignment.refresh_from_db()
         self.assertTrue(assignment.code_locked)
 
         # Even the CORRECT code is now rejected — must go through admin recovery.
-        response = self.client.post(
-            f"/api/delivery/assignments/{assignment.id}/update-status/",
-            {"status": "completed", "delivery_code": assignment.delivery_code, "proof_image": make_proof_file()},
-            format="multipart",
-        )
+        response = self.complete(assignment)
         self.assertEqual(response.status_code, 423)
         assignment.refresh_from_db()
         self.assertEqual(assignment.status, "at_pickup_point")
 
     def test_correct_code_before_lockout_threshold_still_works(self):
-        assignment = self._advance_to_at_pickup_point()
+        assignment = self.advance_to_at_pickup_point()
         for _ in range(MAX_CODE_ATTEMPTS - 1):
-            self.client.post(
-                f"/api/delivery/assignments/{assignment.id}/update-status/",
-                {"status": "completed", "delivery_code": "000000", "proof_image": make_proof_file()},
-                format="multipart",
-            )
-        with patch("services.views.upload_to_cloudinary", return_value="https://cdn.example.com/complete.jpg"):
-            response = self.client.post(
-                f"/api/delivery/assignments/{assignment.id}/update-status/",
-                {"status": "completed", "delivery_code": assignment.delivery_code, "proof_image": make_proof_file()},
-                format="multipart",
-            )
+            self.complete(assignment, code="000000")
+        response = self.complete(assignment)
         self.assertEqual(response.status_code, 200)
 
     def test_admin_regenerate_code_clears_lockout(self):
-        assignment = self._advance_to_at_pickup_point()
+        assignment = self.advance_to_at_pickup_point()
         assignment.code_locked = True
         assignment.code_attempts = MAX_CODE_ATTEMPTS
         assignment.save(update_fields=["code_locked", "code_attempts"])
@@ -776,24 +674,14 @@ class SettlementPolicyTests(DeliveryTestBase):
         defaults.update(overrides)
         return PaymentTransaction.objects.create(**defaults)
 
-    def _verify_pickup(self, assignment=None):
-        if assignment is None:
-            assignment = self.assign()
-        self.client.force_authenticate(user=self.rider)
-        with patch("services.views.upload_to_cloudinary", return_value="https://cdn.example.com/pickup.jpg"):
-            return self.client.post(
-                f"/api/delivery/assignments/{assignment.id}/update-status/",
-                {"status": "picked_up", "proof_image": make_proof_file()},
-                format="multipart",
-            )
-
     def test_food_vendor_pickup_verification_triggers_payout(self):
         food = VendorType.objects.get(name="food")
         Vendor.objects.create(user=self.vendor, vendor_type=food)
         txn = self._make_txn()
+        assignment = self.assign()
 
         with patch("payments.views.trigger_vendor_payout") as mock_transfer:
-            response = self._verify_pickup()
+            response = self.pick_up(assignment)
 
         self.assertEqual(response.status_code, 200)
         mock_transfer.assert_called_once()
@@ -803,9 +691,10 @@ class SettlementPolicyTests(DeliveryTestBase):
     def test_vendor_with_no_vendor_record_does_not_trigger_payout_on_pickup(self):
         """Every vendor that existed before this blocker has no Vendor.vendor_type at all."""
         self._make_txn()
+        assignment = self.assign()
 
         with patch("payments.views.trigger_vendor_payout") as mock_transfer:
-            response = self._verify_pickup()
+            response = self.pick_up(assignment)
 
         self.assertEqual(response.status_code, 200)
         mock_transfer.assert_not_called()
@@ -814,9 +703,10 @@ class SettlementPolicyTests(DeliveryTestBase):
         beauty = VendorType.objects.get(name="beauty")
         Vendor.objects.create(user=self.vendor, vendor_type=beauty)
         self._make_txn()
+        assignment = self.assign()
 
         with patch("payments.views.trigger_vendor_payout") as mock_transfer:
-            response = self._verify_pickup()
+            response = self.pick_up(assignment)
 
         self.assertEqual(response.status_code, 200)
         mock_transfer.assert_not_called()
@@ -825,9 +715,10 @@ class SettlementPolicyTests(DeliveryTestBase):
         food = VendorType.objects.get(name="food")
         Vendor.objects.create(user=self.vendor, vendor_type=food)
         self._make_txn(transfer_reference="PAYOUT-ALREADY-DONE", transfer_status="success")
+        assignment = self.assign()
 
         with patch("payments.views.trigger_vendor_payout") as mock_transfer:
-            response = self._verify_pickup()
+            response = self.pick_up(assignment)
 
         self.assertEqual(response.status_code, 200)
         mock_transfer.assert_not_called()
@@ -837,9 +728,10 @@ class SettlementPolicyTests(DeliveryTestBase):
         food = VendorType.objects.get(name="food")
         Vendor.objects.create(user=self.vendor, vendor_type=food)
         self._make_txn()
+        assignment = self.assign()
 
         with patch("payments.views.trigger_vendor_payout", side_effect=Exception("boom")):
-            response = self._verify_pickup()
+            response = self.pick_up(assignment)
 
         self.assertEqual(response.status_code, 200)
         assignment = DeliveryAssignment.objects.get(order=self.order)
@@ -848,7 +740,7 @@ class SettlementPolicyTests(DeliveryTestBase):
     def test_buyer_notified_on_pickup_verification(self):
         assignment = self.assign()
         with patch("accounts.utils.send_notification") as mock_notify:
-            response = self._verify_pickup(assignment)
+            response = self.pick_up(assignment)
 
         self.assertEqual(response.status_code, 200)
         mock_notify.assert_called_once()
@@ -870,31 +762,6 @@ class OrderStatusFinalizationOnCompletionTests(DeliveryTestBase):
     protection just because a rider was involved).
     """
 
-    def _advance_to_at_pickup_point(self):
-        assignment = self.assign()
-        self.client.force_authenticate(user=self.rider)
-        with patch("services.views.upload_to_cloudinary", return_value="https://cdn.example.com/pickup.jpg"):
-            self.client.post(
-                f"/api/delivery/assignments/{assignment.id}/update-status/",
-                {"status": "picked_up", "proof_image": make_proof_file()},
-                format="multipart",
-            )
-        self.client.post(
-            f"/api/delivery/assignments/{assignment.id}/update-status/",
-            {"status": "at_pickup_point"},
-        )
-        assignment.refresh_from_db()
-        self.assertEqual(assignment.status, "at_pickup_point")
-        return assignment
-
-    def _complete(self, assignment):
-        with patch("services.views.upload_to_cloudinary", return_value="https://cdn.example.com/complete.jpg"):
-            return self.client.post(
-                f"/api/delivery/assignments/{assignment.id}/update-status/",
-                {"status": "completed", "delivery_code": assignment.delivery_code, "proof_image": make_proof_file()},
-                format="multipart",
-            )
-
     def test_pickup_verification_vendor_order_marked_completed_and_earns_badge_progress(self):
         food = VendorType.objects.get(name="food")
         Vendor.objects.create(user=self.vendor, vendor_type=food)
@@ -903,10 +770,10 @@ class OrderStatusFinalizationOnCompletionTests(DeliveryTestBase):
             seller_amount=Decimal("950.00"), platform_amount=Decimal("50.00"),
             buyer_email=self.buyer.email, status="success", seller=self.vendor,
         )
-        assignment = self._advance_to_at_pickup_point()
+        assignment = self.advance_to_at_pickup_point()
 
         with patch("payments.views.trigger_vendor_payout"):
-            response = self._complete(assignment)
+            response = self.complete(assignment)
 
         self.assertEqual(response.status_code, 200)
         self.order.refresh_from_db()
@@ -917,9 +784,9 @@ class OrderStatusFinalizationOnCompletionTests(DeliveryTestBase):
 
     def test_buyer_confirmation_vendor_order_marked_seller_completed_not_completed(self):
         """No VendorType at all -> default buyer_confirmation trigger — payout was never triggered at pickup."""
-        assignment = self._advance_to_at_pickup_point()
+        assignment = self.advance_to_at_pickup_point()
 
-        response = self._complete(assignment)
+        response = self.complete(assignment)
 
         self.assertEqual(response.status_code, 200)
         self.order.refresh_from_db()
@@ -931,8 +798,8 @@ class OrderStatusFinalizationOnCompletionTests(DeliveryTestBase):
 
     def test_buyer_confirmation_vendor_can_still_confirm_after_rider_delivery(self):
         """The buyer's own Confirm button (existing payout/badge machinery) must work normally afterward."""
-        assignment = self._advance_to_at_pickup_point()
-        self._complete(assignment)
+        assignment = self.advance_to_at_pickup_point()
+        self.complete(assignment)
         self.order.refresh_from_db()
         self.assertEqual(self.order.status, "seller_completed")
 
