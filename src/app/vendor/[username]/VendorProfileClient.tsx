@@ -166,6 +166,10 @@ export default function VendorProfileClient() {
   const respMins     = vendor.avg_response_minutes ?? null;
   const respLabel    = respMins === null ? null : respMins < 60 ? `~${respMins}m` : respMins < 1440 ? `~${Math.round(respMins / 60)}h` : `~${Math.round(respMins / 1440)}d`;
   const availDays: string[] = vendor.available_days || [];
+  // Backend is the single source of truth (services.availability.check_vendor_open —
+  // the exact same check checkout runs) — default to open if the field is somehow
+  // missing so an older cached response never falsely shows "closed".
+  const isOpenNow = vendor.is_open_now !== false;
   const sorted       = [...listings.filter(l => l.is_available), ...listings.filter(l => !l.is_available)];
   const vendorRating = Number(vendor.rating) || 0;
   const totalReviews = Number(vendor.total_reviews) || 0;
@@ -290,6 +294,11 @@ export default function VendorProfileClient() {
                       {badge.emoji} {badge.label}
                     </span>
                   )}
+                  {!isOpenNow && (
+                    <span className="flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full bg-red-50 text-red-600 border border-red-200 flex-shrink-0">
+                      <Clock className="w-3 h-3" /> Closed now
+                    </span>
+                  )}
                 </div>
                 <p className="text-stone-400 text-sm mt-1.5">@{vendor.username}</p>
 
@@ -370,6 +379,7 @@ export default function VendorProfileClient() {
             listings={sorted as MenuOrderingItem[]}
             isOwn={!!(user?.id && user.id === vendor.id)}
             catalogLabel={catalogLabel}
+            isOpen={isOpenNow}
             onSelectItem={(item) => setAddonPicker({
               listing: { id: item.id, title: item.title, price: Number(item.price), image: item.image, description: item.description },
               groups: item.menu_item?.addon_groups || [],
@@ -380,6 +390,14 @@ export default function VendorProfileClient() {
         {/* ── Listings tab (marketplace grid — non menu-ordering vendors) ── */}
         {tab === "listings" && !isMenuVendor && (
           <>
+            {!isOpenNow && !(user?.id && user.id === vendor.id) && (
+              <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-2xl px-4 py-3 mb-4">
+                <Clock className="w-4 h-4 text-red-500 flex-shrink-0" />
+                <p className="text-red-700 text-sm font-semibold">
+                  Closed right now — you can browse, but ordering opens back up during business hours.
+                </p>
+              </div>
+            )}
             {sorted.length === 0 ? (
               <div className="bg-stone-50 rounded-2xl p-16 text-center border border-stone-100">
                 <Sparkles className="w-10 h-10 text-stone-200 mx-auto mb-3" />
@@ -407,9 +425,11 @@ export default function VendorProfileClient() {
                         <div className="relative w-full aspect-[3/4] overflow-hidden bg-stone-50">
                           <SafeImg src={listing.image?.startsWith("http") ? listing.image : null} alt={listing.title}
                             className="group-hover:scale-[1.04] transition-transform duration-500" />
-                          {!listing.is_available && (
+                          {(!listing.is_available || !isOpenNow) && (
                             <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                              <span className="text-white text-xs font-bold bg-black/70 px-3 py-1 rounded-full tracking-wide">Unavailable</span>
+                              <span className="text-white text-xs font-bold bg-black/70 px-3 py-1 rounded-full tracking-wide">
+                                {listing.is_available ? "Closed" : "Unavailable"}
+                              </span>
                             </div>
                           )}
                           {(discount > 0 || dealPrice) && (
@@ -422,7 +442,7 @@ export default function VendorProfileClient() {
                               <Zap className="w-2.5 h-2.5 text-yellow-400" /> {wc}/wk
                             </div>
                           )}
-                          {listing.is_available && !isOwn && (
+                          {listing.is_available && isOpenNow && !isOwn && (
                             <div className="absolute inset-x-0 bottom-0 translate-y-full group-hover:translate-y-0 transition-transform duration-200 p-2 hidden sm:block">
                               <button onClick={e => {
                                   e.preventDefault();
@@ -451,7 +471,7 @@ export default function VendorProfileClient() {
                         </div>
                       </Link>
 
-                      {listing.is_available && !isOwn && (
+                      {listing.is_available && isOpenNow && !isOwn && (
                         <div className="px-3 pb-3 sm:hidden">
                           <button onClick={() => {
                               if (isService) { router.push(`/listing/${listing.id}`); return; }

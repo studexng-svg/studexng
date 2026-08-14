@@ -587,6 +587,7 @@ class VendorListSerializer(serializers.ModelSerializer):
     available_days = serializers.SerializerMethodField()
     opening_time = serializers.SerializerMethodField()
     closing_time = serializers.SerializerMethodField()
+    is_open_now = serializers.SerializerMethodField()
     is_menu_vendor = serializers.SerializerMethodField()
     has_vendor_type = serializers.SerializerMethodField()
     catalog_label = serializers.SerializerMethodField()
@@ -599,7 +600,7 @@ class VendorListSerializer(serializers.ModelSerializer):
             'id', 'username', 'business_name', 'profile_picture',
             'bio', 'vendor_badge', 'rating', 'total_reviews',
             'completion_rate', 'total_listings', 'hostel', 'is_online', 'school',
-            'completed_order_count', 'available_days', 'opening_time', 'closing_time',
+            'completed_order_count', 'available_days', 'opening_time', 'closing_time', 'is_open_now',
             'avg_response_minutes', 'is_menu_vendor', 'has_vendor_type',
             'catalog_label', 'catalog_item_label', 'catalog_route_slug',
         ]
@@ -683,6 +684,15 @@ class VendorListSerializer(serializers.ModelSerializer):
             return t.strftime('%H:%M') if t else None
         except Profile.DoesNotExist:
             return None
+
+    def get_is_open_now(self, obj):
+        # Single source of truth with the checkout-time gate (services.
+        # availability.check_vendor_open, used by check_menu_item_availability
+        # in payments.cart_checkout) — the storefront must never show
+        # "open" while checkout would actually reject the order, or vice
+        # versa.
+        from services.availability import check_vendor_open
+        return check_vendor_open(obj).available
 
     def get_rating(self, obj):
         try:

@@ -363,9 +363,18 @@ def initialize_payment(request):
 
     try:
         from services.models import Listing
-        listing = Listing.objects.select_related("vendor").get(id=listing_id)
+        listing = Listing.objects.select_related("vendor__profile").get(id=listing_id)
     except Exception:
         return Response({"error": "Listing not found."}, status=404)
+
+    # Vendor-level opening/closing hours (accounts.models.Profile) — the
+    # single-listing checkout path's counterpart to cart_checkout.py's
+    # check_menu_item_availability call for menu vendors. Opt-in: a vendor
+    # with no hours configured is unaffected.
+    from services.availability import check_vendor_open
+    vendor_open = check_vendor_open(listing.vendor)
+    if not vendor_open.available:
+        return Response({"error": vendor_open.message}, status=400)
 
     buyer = request.user
 
@@ -1436,9 +1445,17 @@ def pay_with_credits(request):
 
     try:
         from services.models import Listing
-        listing = Listing.objects.select_related("vendor").get(id=listing_id)
+        listing = Listing.objects.select_related("vendor__profile").get(id=listing_id)
     except Exception:
         return Response({"error": "Listing not found."}, status=404)
+
+    # Vendor-level opening/closing hours (accounts.models.Profile) — same
+    # gate initialize_payment runs. Opt-in: a vendor with no hours
+    # configured is unaffected.
+    from services.availability import check_vendor_open
+    vendor_open = check_vendor_open(listing.vendor)
+    if not vendor_open.available:
+        return Response({"error": vendor_open.message}, status=400)
 
     buyer = request.user
 

@@ -245,6 +245,66 @@ class VendorDiscountAbsorptionTests(TestCase):
         self.assertEqual(txn.seller_amount, listing.payout_amount)
 
 
+class VendorHoursCheckoutGateTests(APITestCase):
+    """
+    services.availability.check_vendor_open, wired into the single-listing
+    checkout entry points (initialize_payment, pay_with_credits) — the
+    counterpart to cart_checkout.py's check_menu_item_availability call for
+    menu-vendor cart checkout. Ugo's ask: a vendor like "Buka 9" outside
+    their configured hours must not be orderable through either path.
+    """
+
+    def setUp(self):
+        self.client = APIClient()
+        self.buyer = User.objects.create_user(
+            username='hours_gate_buyer', email='hours_gate_buyer@pau.edu.ng', password='pass123',
+        )
+        self.seller = User.objects.create_user(
+            username='hours_gate_seller', email='hours_gate_seller@pau.edu.ng', password='pass123',
+            user_type='vendor', is_verified_vendor=True,
+        )
+        self.category = Category.objects.create(title='Hours Gate', slug='hours-gate')
+        self.listing = Listing.objects.create(
+            title='Buka 9 Jollof', description='x', price=Decimal('1080.00'),
+            payout_amount=Decimal('1000.00'), vendor=self.seller, category=self.category, is_available=True,
+        )
+        self.client.force_authenticate(user=self.buyer)
+
+    def test_initialize_payment_blocked_when_vendor_closed(self):
+        from datetime import time, datetime
+        self.seller.profile.opening_time = time(9, 0)
+        self.seller.profile.closing_time = time(10, 0)
+        self.seller.profile.save(update_fields=['opening_time', 'closing_time'])
+        with patch('services.availability.timezone.localtime') as mock_localtime:
+            mock_localtime.return_value = datetime(2024, 1, 1, 23, 0)  # outside 09:00-10:00
+            response = self.client.post('/api/payments/initialize/', {'listing_id': self.listing.id})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('closed', response.data['error'].lower())
+
+    @patch('payments.views.requests.post')
+    def test_initialize_payment_allowed_when_vendor_has_no_hours_configured(self, mock_post):
+        mock_res = MagicMock()
+        mock_res.status_code = 200
+        mock_res.json.return_value = {
+            'status': True,
+            'data': {'access_code': 'test_code', 'authorization_url': 'https://paystack.test/pay', 'reference': 'STX-TEST'},
+        }
+        mock_post.return_value = mock_res
+        response = self.client.post('/api/payments/initialize/', {'listing_id': self.listing.id})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_pay_with_credits_blocked_when_vendor_closed(self):
+        from datetime import time, datetime
+        self.seller.profile.opening_time = time(9, 0)
+        self.seller.profile.closing_time = time(10, 0)
+        self.seller.profile.save(update_fields=['opening_time', 'closing_time'])
+        with patch('services.availability.timezone.localtime') as mock_localtime:
+            mock_localtime.return_value = datetime(2024, 1, 1, 23, 0)
+            response = self.client.post('/api/payments/pay-with-credits/', {'listing_id': self.listing.id})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('closed', response.data['error'].lower())
+
+
 class PricingTests(TestCase):
     """
     payments/pricing.py — the single pricing service. Vendors enter payout_amount;

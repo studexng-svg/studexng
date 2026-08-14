@@ -132,6 +132,24 @@ class PriceCartItemTests(TestCase):
         with self.assertRaises(CartCheckoutError):
             price_cart_item(cart_item, vendor_type=None)
 
+    def test_vendor_outside_configured_hours_raises_checkout_error(self):
+        """
+        "Buka 9" (or any vendor with opening_time/closing_time set on their
+        Profile) must not be orderable through cart checkout outside those
+        hours — services.availability.check_vendor_open, run via
+        check_menu_item_availability inside price_cart_item.
+        """
+        from datetime import time, datetime
+        self.vendor.profile.opening_time = time(9, 0)
+        self.vendor.profile.closing_time = time(21, 0)
+        self.vendor.profile.save(update_fields=['opening_time', 'closing_time'])
+        cart_item = CartItem.objects.create(user=self.buyer, listing=self.listing, quantity=1)
+        with mock.patch('services.availability.timezone.localtime') as mock_localtime:
+            mock_localtime.return_value = datetime(2024, 1, 1, 23, 0)  # outside 09:00-21:00
+            with self.assertRaises(CartCheckoutError) as ctx:
+                price_cart_item(cart_item, vendor_type=None)
+        self.assertIn('closed', str(ctx.exception).lower())
+
 
 class PriceVendorCartTests(TestCase):
     """Multi-vendor cart scoping — checkout for vendor A must never touch vendor B's lines."""

@@ -6,7 +6,7 @@ checkout-time (and cart-time) availability check goes through: moderation
 (Listing.is_available), hidden/archived/scheduling (MenuItem), and inventory
 (Listing.track_inventory/stock_quantity).
 """
-from datetime import time
+from datetime import time, datetime
 from decimal import Decimal
 from unittest.mock import patch
 
@@ -14,7 +14,7 @@ from django.test import TestCase
 
 from accounts.models import User
 from services.models import Category, Listing, MenuItem, AddonGroup, Addon
-from services.availability import check_menu_item_availability, check_addon_availability
+from services.availability import check_menu_item_availability, check_addon_availability, check_vendor_open
 
 
 class PlainListingAvailabilityTests(TestCase):
@@ -169,6 +169,117 @@ class MenuItemAvailabilityTests(TestCase):
         result = check_menu_item_availability(self.listing)
         self.assertFalse(result.available)
         self.assertEqual(result.reason, 'inventory')
+
+
+class VendorHoursAvailabilityTests(TestCase):
+    """
+    check_vendor_open — accounts.models.Profile.opening_time/closing_time/
+    available_days, the vendor-level (whole-storefront) counterpart to
+    MenuItem's per-item availability_window. Ugo's ask: "Buka 9" should show
+    closed outside its own active hours.
+    """
+
+    def setUp(self):
+        self.vendor = User.objects.create_user(username='hours_vendor', email='hours_vendor@pau.edu.ng', password='pass123')
+        self.category = Category.objects.create(title='Food Hours', slug='food-hours')
+        self.listing = Listing.objects.create(
+            title='Jollof Rice', description='x', price=Decimal('1500'),
+            vendor=self.vendor, category=self.category, is_available=True,
+        )
+        MenuItem.objects.create(listing=self.listing)
+
+    def test_no_hours_configured_is_always_open(self):
+        """The overwhelming majority of vendors — opt-in, not a new default gate."""
+        result = check_vendor_open(self.vendor)
+        self.assertTrue(result.available)
+
+    def test_only_opening_time_set_is_still_always_open(self):
+        """Both times are required to engage the gate at all — one alone is ambiguous."""
+        self.vendor.profile.opening_time = time(9, 0)
+        self.vendor.profile.save(update_fields=['opening_time'])
+        self.assertTrue(check_vendor_open(self.vendor).available)
+
+    def test_inside_hours_is_open(self):
+        self.vendor.profile.opening_time = time(9, 0)
+        self.vendor.profile.closing_time = time(21, 0)
+        self.vendor.profile.save(update_fields=['opening_time', 'closing_time'])
+        result = check_vendor_open(self.vendor, now=datetime(2024, 1, 1, 14, 0))  # Monday
+        self.assertTrue(result.available)
+
+    def test_outside_hours_is_closed(self):
+        self.vendor.profile.opening_time = time(9, 0)
+        self.vendor.profile.closing_time = time(21, 0)
+        self.vendor.profile.save(update_fields=['opening_time', 'closing_time'])
+        result = check_vendor_open(self.vendor, now=datetime(2024, 1, 1, 23, 0))  # Monday
+        self.assertFalse(result.available)
+        self.assertEqual(result.reason, 'vendor_hours')
+        self.assertIn('closed', result.message.lower())
+
+    def test_overnight_window_wraps_past_midnight(self):
+        self.vendor.profile.opening_time = time(22, 0)
+        self.vendor.profile.closing_time = time(2, 0)
+        self.vendor.profile.save(update_fields=['opening_time', 'closing_time'])
+        self.assertTrue(check_vendor_open(self.vendor, now=datetime(2024, 1, 1, 23, 30)).available)
+        self.assertTrue(check_vendor_open(self.vendor, now=datetime(2024, 1, 2, 1, 0)).available)
+        self.assertFalse(check_vendor_open(self.vendor, now=datetime(2024, 1, 1, 12, 0)).available)
+
+    def test_available_days_blocks_a_day_not_listed(self):
+        self.vendor.profile.opening_time = time(9, 0)
+        self.vendor.profile.closing_time = time(21, 0)
+        self.vendor.profile.available_days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']
+        self.vendor.profile.save(update_fields=['opening_time', 'closing_time', 'available_days'])
+        saturday_afternoon = datetime(2024, 1, 6, 14, 0)  # a Saturday
+        result = check_vendor_open(self.vendor, now=saturday_afternoon)
+        self.assertFalse(result.available)
+        self.assertEqual(result.reason, 'vendor_hours')
+
+    def test_available_days_allows_a_listed_day(self):
+        self.vendor.profile.opening_time = time(9, 0)
+        self.vendor.profile.closing_time = time(21, 0)
+        self.vendor.profile.available_days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri']
+        self.vendor.profile.save(update_fields=['opening_time', 'closing_time', 'available_days'])
+        monday_afternoon = datetime(2024, 1, 1, 14, 0)  # a Monday
+        result = check_vendor_open(self.vendor, now=monday_afternoon)
+        self.assertTrue(result.available)
+
+    def test_empty_available_days_is_not_gated_by_day(self):
+        """Hours configured but available_days left untouched (default []) — every day, not zero days."""
+        self.vendor.profile.opening_time = time(9, 0)
+        self.vendor.profile.closing_time = time(21, 0)
+        self.vendor.profile.save(update_fields=['opening_time', 'closing_time'])
+        result = check_vendor_open(self.vendor, now=datetime(2024, 1, 6, 14, 0))  # a Saturday
+        self.assertTrue(result.available)
+
+    @patch('services.availability.timezone.localtime')
+    def test_integrates_with_check_menu_item_availability(self, mock_localtime):
+        mock_localtime.return_value = datetime(2024, 1, 1, 23, 0)  # Monday, outside hours
+        self.vendor.profile.opening_time = time(9, 0)
+        self.vendor.profile.closing_time = time(21, 0)
+        self.vendor.profile.save(update_fields=['opening_time', 'closing_time'])
+        result = check_menu_item_availability(self.listing)
+        self.assertFalse(result.available)
+        self.assertEqual(result.reason, 'vendor_hours')
+
+    def test_moderation_still_takes_priority_over_vendor_hours(self):
+        self.listing.is_available = False
+        self.listing.save(update_fields=['is_available'])
+        self.vendor.profile.opening_time = time(9, 0)
+        self.vendor.profile.closing_time = time(21, 0)
+        self.vendor.profile.save(update_fields=['opening_time', 'closing_time'])
+        result = check_menu_item_availability(self.listing)
+        self.assertFalse(result.available)
+        self.assertEqual(result.reason, 'moderation')
+
+    @patch('services.availability.timezone.localtime')
+    def test_vendor_hours_takes_priority_over_hidden_item(self, mock_localtime):
+        mock_localtime.return_value = datetime(2024, 1, 1, 23, 0)  # outside hours
+        self.listing.menu_item.is_hidden = True
+        self.listing.menu_item.save(update_fields=['is_hidden'])
+        self.vendor.profile.opening_time = time(9, 0)
+        self.vendor.profile.closing_time = time(21, 0)
+        self.vendor.profile.save(update_fields=['opening_time', 'closing_time'])
+        result = check_menu_item_availability(self.listing)
+        self.assertEqual(result.reason, 'vendor_hours')
 
 
 class AddonAvailabilityTests(TestCase):

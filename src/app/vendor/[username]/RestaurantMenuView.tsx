@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Plus, UtensilsCrossed } from "lucide-react";
+import { Plus, UtensilsCrossed, Clock } from "lucide-react";
 import { TEAL } from "@/lib/tokens";
 import { AddonGroupData } from "@/components/cart/AddonPickerModal";
 
@@ -32,12 +32,17 @@ export interface MenuOrderingItem {
 // support menu ordering; no backend change needed since ListingSerializer
 // already exposes this on every listing).
 export default function RestaurantMenuView({
-  listings, isOwn, onSelectItem, catalogLabel = "Menu",
+  listings, isOwn, onSelectItem, catalogLabel = "Menu", isOpen = true,
 }: {
   listings: MenuOrderingItem[];
   isOwn: boolean;
   onSelectItem: (item: MenuOrderingItem) => void;
   catalogLabel?: string;
+  // Vendor-level opening/closing hours (accounts.models.Profile, gated
+  // server-side by services.availability.check_vendor_open — the same check
+  // checkout runs). Browsing stays open even when closed; only ordering is
+  // blocked, so buyers can still see what to come back for.
+  isOpen?: boolean;
 }) {
   const [activeCategory, setActiveCategory] = useState("All");
 
@@ -67,6 +72,15 @@ export default function RestaurantMenuView({
 
   return (
     <div className="space-y-5">
+      {!isOpen && !isOwn && (
+        <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-2xl px-4 py-3">
+          <Clock className="w-4 h-4 text-red-500 flex-shrink-0" />
+          <p className="text-red-700 text-sm font-semibold">
+            Closed right now — you can browse, but ordering opens back up during business hours.
+          </p>
+        </div>
+      )}
+
       {/* Category chips */}
       {categories.length > 2 && (
         <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
@@ -89,7 +103,7 @@ export default function RestaurantMenuView({
           const price = Number(item.price);
           return (
             <button key={item.id} onClick={() => onSelectItem(item)}
-              disabled={isOwn}
+              disabled={isOwn || !isOpen}
               className="w-full flex gap-4 bg-white border border-stone-100 rounded-2xl p-3 text-left hover:border-teal-200 hover:shadow-sm transition-all disabled:opacity-70 disabled:cursor-default">
               <div className="w-20 h-20 rounded-xl overflow-hidden flex-shrink-0">
                 <SafeImg src={item.image} alt={item.title} />
@@ -108,9 +122,13 @@ export default function RestaurantMenuView({
               </div>
               {!isOwn && (
                 <div className="flex items-center flex-shrink-0">
-                  <span className="w-9 h-9 rounded-full flex items-center justify-center text-white shadow-sm" style={{ background: TEAL }}>
-                    <Plus className="w-4 h-4" />
-                  </span>
+                  {isOpen ? (
+                    <span className="w-9 h-9 rounded-full flex items-center justify-center text-white shadow-sm" style={{ background: TEAL }}>
+                      <Plus className="w-4 h-4" />
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-bold text-red-500 bg-red-50 px-2 py-1 rounded-full">Closed</span>
+                  )}
                 </div>
               )}
             </button>

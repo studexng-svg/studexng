@@ -268,6 +268,10 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
 
   const vendorName    = listing.vendor.business_name || listing.vendor.username;
   const vendorHref    = listing.vendor.is_menu_vendor ? `/store/${listing.vendor.username}` : `/vendor/${listing.vendor.username}`;
+  // services.availability.check_vendor_open, mirrored on the vendor profile
+  // page and enforced again server-side at checkout — a buyer landing here
+  // directly (search, a shared link) must see the same closed state.
+  const isVendorOpen  = (listing.vendor as any).is_open_now !== false;
   const badge         = listing.vendor.vendor_badge;
   const rating        = Number(listing.vendor.rating) || 0;
   const totalReviews  = Number(listing.vendor.total_reviews) || 0;
@@ -521,7 +525,11 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
               {/* ── CTA: product ── */}
               {!isService && listing.is_available && (
                 <div className="space-y-3 pt-2">
-                  {listing.is_reserved ? (
+                  {!isVendorOpen ? (
+                    <div className="w-full py-4 bg-red-50 border border-red-200 rounded-2xl flex items-center justify-center gap-2 text-red-600 font-semibold">
+                      <Clock className="w-4 h-4" /> {vendorName} is closed right now
+                    </div>
+                  ) : listing.is_reserved ? (
                     <div className="w-full py-4 bg-stone-100 border border-stone-200 rounded-2xl flex items-center justify-center gap-2 text-stone-400 font-semibold cursor-not-allowed">
                       <Clock className="w-4 h-4" /> Currently Reserved
                     </div>
@@ -556,12 +564,18 @@ export default function ListingDetailClient({ id, initialListing, initialReviews
               {/* ── CTA: service ── */}
               {isService && listing.is_available && (
                 <div className="flex gap-3 pt-2">
-                  <motion.button whileHover={{ scale:1.02 }} whileTap={{ scale:0.97 }}
-                    onClick={openBookingWizard}
-                    className="flex-1 py-3.5 text-white font-bold rounded-2xl flex items-center justify-center gap-2 text-sm shadow-lg"
-                    style={{ background: TEAL }}>
-                    <Calendar className="w-4 h-4" /> Book Now
-                  </motion.button>
+                  {!isVendorOpen ? (
+                    <div className="flex-1 py-4 bg-red-50 border border-red-200 rounded-2xl flex items-center justify-center gap-2 text-red-600 font-semibold">
+                      <Clock className="w-4 h-4" /> {vendorName} is closed right now
+                    </div>
+                  ) : (
+                    <motion.button whileHover={{ scale:1.02 }} whileTap={{ scale:0.97 }}
+                      onClick={openBookingWizard}
+                      className="flex-1 py-3.5 text-white font-bold rounded-2xl flex items-center justify-center gap-2 text-sm shadow-lg"
+                      style={{ background: TEAL }}>
+                      <Calendar className="w-4 h-4" /> Book Now
+                    </motion.button>
+                  )}
                   <button onClick={handleShare} className="p-3.5 border border-stone-200 rounded-2xl text-stone-500 hover:text-teal-600 hover:border-teal-300 transition">
                     <Share2 className="w-4 h-4" />
                   </button>

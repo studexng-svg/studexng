@@ -64,15 +64,28 @@ class ListingVendorSerializer(serializers.ModelSerializer):
     profile = serializers.SerializerMethodField()
     profile_picture = serializers.SerializerMethodField()
     is_menu_vendor = serializers.SerializerMethodField()
+    is_open_now = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ['id', 'username', 'business_name', 'hostel', 'vendor_badge', 'completion_rate', 'rating', 'total_reviews', 'profile', 'profile_picture', 'is_menu_vendor']
+        fields = [
+            'id', 'username', 'business_name', 'hostel', 'vendor_badge', 'completion_rate',
+            'rating', 'total_reviews', 'profile', 'profile_picture', 'is_menu_vendor', 'is_open_now',
+        ]
 
     def get_is_menu_vendor(self, obj):
         from payments.settlement import get_vendor_type
         vt = get_vendor_type(obj)
         return bool(vt and vt.supports_menu_ordering)
+
+    def get_is_open_now(self, obj):
+        # Same check_vendor_open used by checkout (payments.cart_checkout via
+        # services.availability.check_menu_item_availability) and the vendor
+        # profile page (accounts.serializers.VendorListSerializer) — one
+        # implementation, three surfaces, so "open" never disagrees with
+        # what buying actually does.
+        from services.availability import check_vendor_open
+        return check_vendor_open(obj).available
 
     def get_profile_picture(self, obj):
         try:
