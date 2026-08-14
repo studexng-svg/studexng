@@ -839,6 +839,29 @@ class ForgotPasswordView(APIView):
         email = request.data.get('email')
         if not email:
             return Response({'detail': 'Email is required'}, status=400)
+        email = email.strip().lower()
+
+        # Two guards, same _rate_limited helper login_user/register_user/
+        # send_otp already share:
+        #  - per email+IP: stops someone spamming one target's inbox with
+        #    reset-link emails.
+        #  - per IP alone: stops a sweep trying many different emails from
+        #    one source to enumerate which addresses have accounts (the
+        #    unified "if this email exists" response below already defeats
+        #    enumeration via the response body — this defeats it via volume/
+        #    timing too, and caps the email cost either way).
+        ip = _client_ip(request)
+        if _rate_limited(f'forgot_pw_rate:{email}:{ip}', max_attempts=3, window_seconds=600):
+            return Response(
+                {'detail': 'Too many password reset requests for this email. Please wait 10 minutes and try again.'},
+                status=429,
+            )
+        if _rate_limited(f'forgot_pw_rate:ip:{ip}', max_attempts=10, window_seconds=3600):
+            return Response(
+                {'detail': 'Too many password reset requests from this network. Please wait an hour and try again.'},
+                status=429,
+            )
+
         try:
             user = User.objects.get(email=email)
         except User.DoesNotExist:

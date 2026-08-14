@@ -721,6 +721,31 @@ try:
                 data['paid_at'] = order.paid_at.isoformat() if order.paid_at else None
                 data['seller_completed_at'] = order.seller_completed_at.isoformat() if order.seller_completed_at else None
                 data['buyer_confirmed_at'] = order.buyer_confirmed_at.isoformat() if order.buyer_confirmed_at else None
+
+                # Payment breakdown — what the buyer actually paid vs. what the
+                # vendor is owed vs. StudEx's cut. order.amount is buyer-paid
+                # only; PaymentTransaction (matched by the same `reference`
+                # every checkout path stamps on both rows — see e.g. the
+                # payout-trigger lookup a few lines below in patch()) is the
+                # one place seller_amount/platform_amount already live, computed
+                # once at checkout by payments.pricing.split_settlement. Never
+                # re-derive this from listing.price here — that's exactly the
+                # fee-inclusive-vs-payout mixup pricing.py's apply_vendor_discount
+                # docstring warns about.
+                from payments.models import PaymentTransaction
+                txn = PaymentTransaction.objects.filter(reference=order.reference).order_by('-created_at').first()
+                if txn:
+                    data['buyer_paid'] = str(txn.amount)
+                    data['vendor_gets'] = str(txn.seller_amount)
+                    data['platform_fee'] = str(txn.platform_amount)
+                    data['payment_status'] = txn.status
+                    data['vendor_payout_status'] = txn.transfer_status
+                else:
+                    data['buyer_paid'] = None
+                    data['vendor_gets'] = None
+                    data['platform_fee'] = None
+                    data['payment_status'] = None
+                    data['vendor_payout_status'] = None
                 return Response(data, status=status.HTTP_200_OK)
             except Order.DoesNotExist:
                 return Response({'error': 'Order not found'}, status=status.HTTP_404_NOT_FOUND)

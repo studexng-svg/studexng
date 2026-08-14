@@ -241,9 +241,10 @@ class AuthenticationAPITests(APITestCase):
 class AuthRateLimitTests(APITestCase):
     """
     accounts.views._rate_limited / _client_ip and their use in login_user /
-    register_user — brute-force and mass-signup protection. Every request in
-    this class shares the Django test client's fixed REMOTE_ADDR, which is
-    exactly what lets these tests exercise the IP-scoped counters directly.
+    register_user / ForgotPasswordView — brute-force, mass-signup, and
+    reset-email-spam protection. Every request in this class shares the
+    Django test client's fixed REMOTE_ADDR, which is exactly what lets these
+    tests exercise the IP-scoped counters directly.
     """
 
     def setUp(self):
@@ -251,6 +252,7 @@ class AuthRateLimitTests(APITestCase):
         self.client = APIClient()
         self.login_url = '/api/auth/login/'
         self.register_url = '/api/auth/register/'
+        self.forgot_password_url = '/api/auth/forgot-password/'
         self.user = User.objects.create_user(
             username='ratelimituser',
             email='ratelimit@pau.edu.ng',
@@ -349,6 +351,43 @@ class AuthRateLimitTests(APITestCase):
         })
         self.assertEqual(response.status_code, 429)
         self.assertIn('Too many signup attempts', response.data['error'])
+
+    # ── Forgot password: per email+IP guard ─────────────────────────────────
+
+    def test_forgot_password_blocks_after_3_requests_for_same_email(self):
+        for _ in range(3):
+            response = self.client.post(self.forgot_password_url, {'email': self.user.email})
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        response = self.client.post(self.forgot_password_url, {'email': self.user.email})
+        self.assertEqual(response.status_code, 429)
+        self.assertIn('Too many password reset requests for this email', response.data['detail'])
+
+    def test_forgot_password_lockout_is_scoped_to_the_targeted_email(self):
+        for _ in range(3):
+            self.client.post(self.forgot_password_url, {'email': self.user.email})
+
+        # A different email, same source IP, is unaffected — isolates the
+        # per-email+IP guard from the separate per-IP guard below.
+        response = self.client.post(self.forgot_password_url, {'email': 'someone-else@pau.edu.ng'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_forgot_password_unknown_email_still_returns_the_generic_message(self):
+        """Rate limiting must not create a side channel for email enumeration."""
+        response = self.client.post(self.forgot_password_url, {'email': 'nobody-here@pau.edu.ng'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('If this email exists', response.data['detail'])
+
+    # ── Forgot password: per-IP guard (enumeration sweep across many emails) ─
+
+    def test_forgot_password_ip_guard_blocks_after_10_requests_across_many_emails(self):
+        for i in range(10):
+            response = self.client.post(self.forgot_password_url, {'email': f'sweep{i}@pau.edu.ng'})
+            self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        response = self.client.post(self.forgot_password_url, {'email': 'sweep10@pau.edu.ng'})
+        self.assertEqual(response.status_code, 429)
+        self.assertIn('Too many password reset requests from this network', response.data['detail'])
 
 
 class SellerApplicationTests(APITestCase):
@@ -643,6 +682,77 @@ class AdminListingDetailFeeCalculationTests(APITestCase):
         self.listing.refresh_from_db()
         self.assertEqual(self.listing.title, 'Renamed Item')
         self.assertFalse(self.listing.is_available)
+
+
+class AdminOrderDetailPaymentBreakdownTests(APITestCase):
+    """
+    GET /api/admin/orders/{id}/ — buyer-paid vs. vendor-payout vs. platform-fee
+    breakdown, sourced from the matching PaymentTransaction (accounts.
+    admin_views.AdminOrderDetailView.get). Covers the exact scenario Ugo asked
+    about: a ₦1500 payout item where the buyer paid ₦1620 (8% fee) and the
+    vendor is owed the full ₦1500.
+    """
+
+    def setUp(self):
+        from decimal import Decimal
+        from services.models import Category, Listing
+        from orders.models import Order
+        from payments.models import PaymentTransaction
+
+        self.client = APIClient()
+        self.admin = User.objects.create_user(
+            username='order_breakdown_admin', email='order_breakdown_admin@pau.edu.ng',
+            password='pass123', is_staff=True,
+        )
+        self.buyer = User.objects.create_user(
+            username='order_breakdown_buyer', email='order_breakdown_buyer@pau.edu.ng', password='pass123',
+        )
+        self.vendor = User.objects.create_user(
+            username='order_breakdown_vendor', email='order_breakdown_vendor@pau.edu.ng', password='pass123',
+            user_type='vendor', is_verified_vendor=True,
+        )
+        category = Category.objects.create(title='Order Breakdown Cat', slug='order-breakdown-cat')
+        self.listing = Listing.objects.create(
+            vendor=self.vendor, category=category, title='Jollof Rice', description='x',
+            payout_amount=Decimal('1500'), price=Decimal('1620'), is_available=True,
+        )
+        self.order = Order.objects.create(
+            reference='ORDER-BREAKDOWN-1', buyer=self.buyer, listing=self.listing,
+            amount=Decimal('1620'), status='completed',
+        )
+        self.txn = PaymentTransaction.objects.create(
+            buyer=self.buyer, seller=self.vendor, reference='ORDER-BREAKDOWN-1',
+            amount=Decimal('1620.00'), seller_amount=Decimal('1500.00'), platform_amount=Decimal('120.00'),
+            service_charge=Decimal('120.00'), status='success', buyer_email=self.buyer.email,
+        )
+        self.url = f'/api/admin/orders/{self.order.id}/'
+
+    def test_non_admin_forbidden(self):
+        self.client.force_authenticate(user=self.buyer)
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_admin_sees_buyer_paid_vendor_gets_and_platform_fee(self):
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['buyer_paid'], '1620.00')
+        self.assertEqual(response.data['vendor_gets'], '1500.00')
+        self.assertEqual(response.data['platform_fee'], '120.00')
+        self.assertEqual(response.data['payment_status'], 'success')
+
+    def test_order_with_no_matching_transaction_returns_none_not_an_error(self):
+        from orders.models import Order
+        orphan = Order.objects.create(
+            reference='ORDER-NO-TXN', buyer=self.buyer, listing=self.listing,
+            amount=Decimal('1620'), status='pending',
+        )
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.get(f'/api/admin/orders/{orphan.id}/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIsNone(response.data['buyer_paid'])
+        self.assertIsNone(response.data['vendor_gets'])
+        self.assertIsNone(response.data['platform_fee'])
 
 
 class AdminAnalyticsProductStatsTests(TestCase):

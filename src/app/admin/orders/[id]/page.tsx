@@ -170,6 +170,21 @@ export default function AdminOrderDetail() {
           <Row label="Date"             value={order.created_at ? new Date(order.created_at).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" }) : undefined} />
         </div>
 
+        {/* Payment Breakdown — buyer paid vs. vendor payout vs. StudEx's cut,
+             from the matching PaymentTransaction (accounts.admin_views.
+             AdminOrderDetailView). Absent for orders with no linked
+             transaction (pre-payment, or a payment record that never landed). */}
+        {order.buyer_paid && (
+          <div className="bg-white border border-stone-200 rounded-2xl p-4 shadow-sm">
+            <p className="text-teal-600 text-xs tracking-[0.2em] uppercase font-semibold mb-2">Payment Breakdown</p>
+            <Row label="Buyer Paid"    value={`₦${Number(order.buyer_paid).toLocaleString()}`} />
+            <Row label="Vendor Gets"   value={`₦${Number(order.vendor_gets).toLocaleString()}`} />
+            <Row label="StudEx Fee"    value={`₦${Number(order.platform_fee).toLocaleString()}`} />
+            <Row label="Payment Status" value={order.payment_status} />
+            {order.vendor_payout_status && <Row label="Vendor Payout" value={order.vendor_payout_status} />}
+          </div>
+        )}
+
         {/* Delivery Proof */}
         {(order.delivery_proof_1 || order.delivery_proof_2) && (
           <div className="bg-white border border-stone-200 rounded-2xl p-4 shadow-sm">
