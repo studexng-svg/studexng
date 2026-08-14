@@ -44,6 +44,34 @@ from .utils import send_notification
 import re
 
 
+# ─── Rate limiting ────────────────────────────────────────────────────────────
+# One shared cache-backed counter for every rate-limited auth endpoint (OTP,
+# login, registration) so the windowing behavior can't drift between them —
+# this is the same fixed-window-that-resets-on-each-hit approach send_otp
+# already used before this helper existed; login/registration are just the
+# 2nd/3rd places that needed it (see CLAUDE.md: repeated manual patterns get
+# codified, not re-copy-pasted a third time).
+
+def _client_ip(request):
+    """Best-effort client IP, honoring a reverse proxy's X-Forwarded-For (Render sits behind one)."""
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    return x_forwarded_for.split(',')[0].strip() if x_forwarded_for else request.META.get('REMOTE_ADDR', '')
+
+
+def _rate_limited(key: str, max_attempts: int, window_seconds: int) -> bool:
+    """
+    True (and leaves the counter untouched) once `key` has already hit
+    max_attempts within the current window; otherwise bumps the counter and
+    returns False. Caller decides what "an attempt" means (every request vs.
+    only failures) by choosing when to call this.
+    """
+    attempts = cache.get(key, 0)
+    if attempts >= max_attempts:
+        return True
+    cache.set(key, attempts + 1, window_seconds)
+    return False
+
+
 # ─── OTP helpers ─────────────────────────────────────────────────────────────
 
 def generate_otp():
@@ -58,16 +86,12 @@ def send_otp(request):
         return Response({'error': 'Email is required'}, status=400)
 
     # Rate limit by email+IP combined: max 3 requests per email per 5 minutes
-    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
-    ip = (x_forwarded_for.split(',')[0].strip() if x_forwarded_for else request.META.get('REMOTE_ADDR', ''))
-    otp_rate_key = f'otp_rate:{email}:{ip}'
-    attempts = cache.get(otp_rate_key, 0)
-    if attempts >= 3:
+    ip = _client_ip(request)
+    if _rate_limited(f'otp_rate:{email}:{ip}', max_attempts=3, window_seconds=300):
         return Response(
             {'error': 'Too many OTP requests. Please wait a few minutes before trying again.'},
             status=429,
         )
-    cache.set(otp_rate_key, attempts + 1, 300)  # 5-minute window
 
     otp = generate_otp()
     cache.set(f'otp_{email}', otp, timeout=600)
@@ -138,6 +162,18 @@ def check_username(request):
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def register_user(request):
+    # IP-scoped volumetric guard against mass account creation — the OTP step
+    # (send_otp above) already rate-limits per email, but nothing stopped a
+    # script that already holds a verified email from hammering this endpoint.
+    # Generous ceiling: legitimate signups from one IP (shared campus
+    # WiFi/NAT) never come close to it.
+    ip = _client_ip(request)
+    if _rate_limited(f'register_rate:ip:{ip}', max_attempts=10, window_seconds=3600):
+        return Response(
+            {'error': 'Too many signup attempts from this network. Please wait an hour and try again.'},
+            status=429,
+        )
+
     email = request.data.get('email', '').strip().lower()
     if email and not cache.get(f'otp_verified:{email}'):
         return Response(
@@ -196,9 +232,38 @@ def register_user(request):
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def login_user(request):
+    # Two independent guards:
+    #  - IP-scoped volumetric limit: blocks a scripted brute-force/credential-
+    #    stuffing sweep hitting many accounts from one source. Generous window
+    #    since shared campus WiFi/NAT puts many real users behind one IP.
+    #  - Per-account limit: blocks repeated password guessing against ONE
+    #    account regardless of which IP it comes from (a botnet spreading
+    #    guesses across many IPs would sail through the IP guard alone).
+    #    Only failed attempts count against it, and a successful login clears
+    #    it — a user who mistypes their password once isn't punished.
+    ip = _client_ip(request)
+    if _rate_limited(f'login_rate:ip:{ip}', max_attempts=20, window_seconds=900):
+        return Response(
+            {'error': 'Too many login attempts from this network. Please wait 15 minutes and try again.'},
+            status=429,
+        )
+
+    email = (request.data.get('email') or '').strip().lower()
+    fail_key = f'login_fail:{email}' if email else None
+    if fail_key and cache.get(fail_key, 0) >= 5:
+        return Response(
+            {'error': 'Too many failed login attempts for this account. Please wait 15 minutes and try again, or reset your password.'},
+            status=429,
+        )
+
     serializer = UserLoginSerializer(data=request.data)
     if not serializer.is_valid():
+        if fail_key:
+            cache.set(fail_key, cache.get(fail_key, 0) + 1, 900)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    if fail_key:
+        cache.delete(fail_key)
     user = serializer.validated_data['user']
     refresh = RefreshToken.for_user(user)
     access = str(refresh.access_token)

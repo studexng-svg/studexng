@@ -92,6 +92,11 @@ class AuthenticationAPITests(APITestCase):
     """Test authentication API endpoints"""
 
     def setUp(self):
+        # Rate limiting (login/register IP + per-account counters) is
+        # cache-backed and keyed by the test client's fixed IP — without a
+        # clear here, counters bleed across tests within this class (and
+        # would eventually trip a 429 on an otherwise-valid test).
+        cache.clear()
         self.client = APIClient()
         self.register_url = '/api/auth/register/'
         self.login_url = '/api/auth/login/'
@@ -231,6 +236,119 @@ class AuthenticationAPITests(APITestCase):
 
         user.refresh_from_db()
         self.assertEqual(user.phone, '+2348012345678')
+
+
+class AuthRateLimitTests(APITestCase):
+    """
+    accounts.views._rate_limited / _client_ip and their use in login_user /
+    register_user — brute-force and mass-signup protection. Every request in
+    this class shares the Django test client's fixed REMOTE_ADDR, which is
+    exactly what lets these tests exercise the IP-scoped counters directly.
+    """
+
+    def setUp(self):
+        cache.clear()
+        self.client = APIClient()
+        self.login_url = '/api/auth/login/'
+        self.register_url = '/api/auth/register/'
+        self.user = User.objects.create_user(
+            username='ratelimituser',
+            email='ratelimit@pau.edu.ng',
+            password='CorrectPass123',
+            user_type='student',
+        )
+
+    def tearDown(self):
+        cache.clear()
+
+    # ── Login: per-account lockout ──────────────────────────────────────────
+
+    def test_login_locks_account_after_5_failed_attempts(self):
+        for _ in range(5):
+            response = self.client.post(self.login_url, {
+                'email': self.user.email, 'password': 'wrongpassword',
+            })
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+        # 6th attempt — even with the CORRECT password — is blocked before
+        # credentials are ever checked, because the account itself is locked.
+        response = self.client.post(self.login_url, {
+            'email': self.user.email, 'password': 'CorrectPass123',
+        })
+        self.assertEqual(response.status_code, 429)
+        self.assertIn('Too many failed login attempts', response.data['error'])
+
+    def test_login_failed_attempts_below_threshold_do_not_lock(self):
+        for _ in range(4):
+            self.client.post(self.login_url, {'email': self.user.email, 'password': 'wrongpassword'})
+
+        response = self.client.post(self.login_url, {
+            'email': self.user.email, 'password': 'CorrectPass123',
+        })
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_successful_login_clears_the_failure_counter(self):
+        for _ in range(4):
+            self.client.post(self.login_url, {'email': self.user.email, 'password': 'wrongpassword'})
+
+        # One correct login resets the count — the next 4 wrong guesses alone
+        # (below the threshold of 5) must not still be locked out.
+        response = self.client.post(self.login_url, {
+            'email': self.user.email, 'password': 'CorrectPass123',
+        })
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        for _ in range(4):
+            response = self.client.post(self.login_url, {'email': self.user.email, 'password': 'wrongpassword'})
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_login_lockout_is_scoped_to_the_targeted_account(self):
+        other = User.objects.create_user(
+            username='otherlogin', email='other@pau.edu.ng', password='OtherPass123', user_type='student',
+        )
+        for _ in range(5):
+            self.client.post(self.login_url, {'email': self.user.email, 'password': 'wrongpassword'})
+
+        # A different account, same source IP, is unaffected by self.user's lockout.
+        response = self.client.post(self.login_url, {'email': other.email, 'password': 'OtherPass123'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    # ── Login: IP volumetric guard ──────────────────────────────────────────
+
+    def test_login_ip_guard_blocks_after_20_attempts_across_many_accounts(self):
+        # Spread attempts across distinct emails so the per-account lockout
+        # (threshold 5) never fires — isolates the IP-scoped guard.
+        for i in range(20):
+            User.objects.create_user(
+                username=f'spray{i}', email=f'spray{i}@pau.edu.ng', password='Whatever123', user_type='student',
+            )
+            response = self.client.post(self.login_url, {'email': f'spray{i}@pau.edu.ng', 'password': 'wrongpassword'})
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+        response = self.client.post(self.login_url, {'email': self.user.email, 'password': 'CorrectPass123'})
+        self.assertEqual(response.status_code, 429)
+        self.assertIn('Too many login attempts', response.data['error'])
+
+    # ── Register: IP volumetric guard ───────────────────────────────────────
+
+    def test_register_ip_guard_blocks_after_10_signups(self):
+        for i in range(10):
+            email = f'signup{i}@pau.edu.ng'
+            cache.set(f'otp_verified:{email}', True, timeout=300)
+            response = self.client.post(self.register_url, {
+                'username': f'signup{i}', 'email': email,
+                'password': 'Testpass123', 'password2': 'Testpass123', 'user_type': 'student',
+            })
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        email = 'signup10@pau.edu.ng'
+        cache.set(f'otp_verified:{email}', True, timeout=300)
+        response = self.client.post(self.register_url, {
+            'username': 'signup10', 'email': email,
+            'password': 'Testpass123', 'password2': 'Testpass123', 'user_type': 'student',
+        })
+        self.assertEqual(response.status_code, 429)
+        self.assertIn('Too many signup attempts', response.data['error'])
 
 
 class SellerApplicationTests(APITestCase):
