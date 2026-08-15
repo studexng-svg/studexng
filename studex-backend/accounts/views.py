@@ -913,15 +913,38 @@ class ResetPasswordView(APIView):
         if not uid or not token or not password:
             return Response({'detail': 'Missing fields'}, status=400)
 
+        # Same two-guard shape as login_user: an IP-wide volumetric limit
+        # (blocks a script sweeping many uid/token guesses) plus a per-uid
+        # lock (blocks repeated token-guessing against one specific reset
+        # link regardless of source IP). django's default_token_generator
+        # is cryptographically hard to guess, but nothing was stopping
+        # unlimited scripted attempts before this — same class of gap as
+        # login/register/forgot-password.
+        ip = _client_ip(request)
+        if _rate_limited(f'reset_pw_rate:ip:{ip}', max_attempts=20, window_seconds=900):
+            return Response(
+                {'detail': 'Too many password reset attempts from this network. Please wait 15 minutes and try again.'},
+                status=429,
+            )
+        fail_key = f'reset_pw_fail:{uid}'
+        if cache.get(fail_key, 0) >= 5:
+            return Response(
+                {'detail': 'Too many failed attempts for this reset link. Please request a new one.'},
+                status=429,
+            )
+
         try:
             user_id = urlsafe_base64_decode(uid).decode()
             user = User.objects.get(pk=user_id)
         except Exception:
+            cache.set(fail_key, cache.get(fail_key, 0) + 1, 900)
             return Response({'detail': 'Invalid link'}, status=400)
 
         if not default_token_generator.check_token(user, token):
+            cache.set(fail_key, cache.get(fail_key, 0) + 1, 900)
             return Response({'detail': 'Token expired or invalid'}, status=400)
 
+        cache.delete(fail_key)
         user.set_password(password)
         user.save()
         return Response({'detail': 'Password reset successful'})

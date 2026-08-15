@@ -40,6 +40,11 @@ interface Vendor {
   completed_order_count?: number;
   is_menu_vendor?: boolean;
   has_vendor_type?: boolean;
+  // services.availability.check_vendor_open, via accounts.serializers.
+  // VendorListSerializer — undefined for any endpoint that hasn't been
+  // updated to include it, so every check below treats undefined as open
+  // (same default as everywhere else this field is consumed).
+  is_open_now?: boolean;
 }
 
 interface Category {
@@ -765,6 +770,9 @@ export default function HomePageClient({ initialVendors, initialListings, initia
               )}
 
               <div className="absolute bottom-0 left-0 right-0 p-3">
+                {vendor.is_open_now === false && (
+                  <span className="inline-block text-[9px] font-bold text-white bg-red-500/90 px-1.5 py-0.5 rounded-full mb-1 tracking-wide">CLOSED</span>
+                )}
                 <p className="font-bold text-white text-sm truncate">{vendor.business_name || vendor.username}</p>
                 <p className="text-white/70 text-xs mt-0.5 truncate flex items-center gap-1">
                   <Store className="w-3 h-3 flex-shrink-0" />
@@ -800,6 +808,11 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                 <div className="absolute top-2.5 right-2.5 flex items-center gap-1 bg-white/90 px-2 py-0.5 rounded-full shadow-sm">
                   <div className="w-1.5 h-1.5 rounded-full bg-green-400" />
                   <span className="text-xs font-semibold text-stone-700">Online</span>
+                </div>
+              )}
+              {vendor.is_open_now === false && (
+                <div className="absolute top-2.5 left-2.5">
+                  <span className="text-xs font-bold text-white bg-red-500/90 px-2 py-0.5 rounded-full shadow-sm">Closed</span>
                 </div>
               )}
               {vendor.vendor_badge && vendor.vendor_badge !== "none" && (

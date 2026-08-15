@@ -241,10 +241,11 @@ class AuthenticationAPITests(APITestCase):
 class AuthRateLimitTests(APITestCase):
     """
     accounts.views._rate_limited / _client_ip and their use in login_user /
-    register_user / ForgotPasswordView — brute-force, mass-signup, and
-    reset-email-spam protection. Every request in this class shares the
-    Django test client's fixed REMOTE_ADDR, which is exactly what lets these
-    tests exercise the IP-scoped counters directly.
+    register_user / ForgotPasswordView / ResetPasswordView — brute-force,
+    mass-signup, and reset-email/reset-token-guessing protection. Every
+    request in this class shares the Django test client's fixed REMOTE_ADDR,
+    which is exactly what lets these tests exercise the IP-scoped counters
+    directly.
     """
 
     def setUp(self):
@@ -253,6 +254,7 @@ class AuthRateLimitTests(APITestCase):
         self.login_url = '/api/auth/login/'
         self.register_url = '/api/auth/register/'
         self.forgot_password_url = '/api/auth/forgot-password/'
+        self.reset_password_url = '/api/auth/reset-password/'
         self.user = User.objects.create_user(
             username='ratelimituser',
             email='ratelimit@pau.edu.ng',
@@ -388,6 +390,72 @@ class AuthRateLimitTests(APITestCase):
         response = self.client.post(self.forgot_password_url, {'email': 'sweep10@pau.edu.ng'})
         self.assertEqual(response.status_code, 429)
         self.assertIn('Too many password reset requests from this network', response.data['detail'])
+
+    # ── Reset password: per-uid guard (guessing one link's token) ───────────
+
+    def _valid_uid(self):
+        from django.utils.http import urlsafe_base64_encode
+        from django.utils.encoding import force_bytes
+        return urlsafe_base64_encode(force_bytes(self.user.pk))
+
+    def test_reset_password_locks_after_5_failed_token_attempts_for_same_uid(self):
+        uid = self._valid_uid()
+        for _ in range(5):
+            response = self.client.post(self.reset_password_url, {'uid': uid, 'token': 'bad-token', 'password': 'NewPass123'})
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+        # 6th attempt is blocked outright, even with a well-formed request.
+        response = self.client.post(self.reset_password_url, {'uid': uid, 'token': 'bad-token', 'password': 'NewPass123'})
+        self.assertEqual(response.status_code, 429)
+        self.assertIn('Too many failed attempts for this reset link', response.data['detail'])
+
+    def test_reset_password_valid_token_still_works_below_the_threshold(self):
+        from django.contrib.auth.tokens import default_token_generator
+        uid = self._valid_uid()
+        token = default_token_generator.make_token(self.user)
+        for _ in range(4):
+            self.client.post(self.reset_password_url, {'uid': uid, 'token': 'bad-token', 'password': 'NewPass123'})
+
+        response = self.client.post(self.reset_password_url, {'uid': uid, 'token': token, 'password': 'NewPass123'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password('NewPass123'))
+
+    def test_reset_password_lockout_is_scoped_to_the_targeted_uid(self):
+        other = User.objects.create_user(
+            username='reset_other', email='reset_other@pau.edu.ng', password='OtherPass123', user_type='student',
+        )
+        uid = self._valid_uid()
+        for _ in range(5):
+            self.client.post(self.reset_password_url, {'uid': uid, 'token': 'bad-token', 'password': 'NewPass123'})
+
+        # A different uid, same source IP, is unaffected — isolates the
+        # per-uid guard from the separate per-IP guard below.
+        from django.utils.http import urlsafe_base64_encode
+        from django.utils.encoding import force_bytes
+        from django.contrib.auth.tokens import default_token_generator
+        other_uid = urlsafe_base64_encode(force_bytes(other.pk))
+        other_token = default_token_generator.make_token(other)
+        response = self.client.post(self.reset_password_url, {'uid': other_uid, 'token': other_token, 'password': 'NewPass123'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    # ── Reset password: per-IP guard (sweeping many uids) ────────────────────
+
+    def test_reset_password_ip_guard_blocks_after_20_attempts_across_many_uids(self):
+        for i in range(20):
+            u = User.objects.create_user(
+                username=f'reset_sweep{i}', email=f'reset_sweep{i}@pau.edu.ng', password='Whatever123', user_type='student',
+            )
+            from django.utils.http import urlsafe_base64_encode
+            from django.utils.encoding import force_bytes
+            response = self.client.post(self.reset_password_url, {
+                'uid': urlsafe_base64_encode(force_bytes(u.pk)), 'token': 'bad-token', 'password': 'NewPass123',
+            })
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+        response = self.client.post(self.reset_password_url, {'uid': self._valid_uid(), 'token': 'bad-token', 'password': 'NewPass123'})
+        self.assertEqual(response.status_code, 429)
+        self.assertIn('Too many password reset attempts from this network', response.data['detail'])
 
 
 class SellerApplicationTests(APITestCase):
