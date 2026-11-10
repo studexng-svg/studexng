@@ -288,6 +288,9 @@ export const api = {
     deleteMenuItem: (id: number | string) =>
       fetchWithAuth(u(`/api/services/menu-items/${id}/`), { method: "DELETE" }),
 
+    // Vendor-level add-on library (Phase 2) — AddonGroup is owned by the
+    // vendor directly, not any one dish. Linking a group to a dish is the
+    // separate addon-group-links/ endpoint below.
     addonGroups: () => fetchWithAuth(u("/api/services/addon-groups/")),
     createAddonGroup: (body: Record<string, unknown>) =>
       fetchWithAuth(u("/api/services/addon-groups/"), { method: "POST", body: s(body) }),
@@ -303,6 +306,15 @@ export const api = {
       fetchWithAuth(u(`/api/services/addons/${id}/`), { method: "PATCH", body: s(body) }),
     deleteAddon: (id: number | string) =>
       fetchWithAuth(u(`/api/services/addons/${id}/`), { method: "DELETE" }),
+
+    // Links a library AddonGroup to one dish, with optional per-dish
+    // overrides of is_required/min_selections/max_selections.
+    linkAddonGroup: (body: Record<string, unknown>) =>
+      fetchWithAuth(u("/api/services/addon-group-links/"), { method: "POST", body: s(body) }),
+    updateAddonGroupLink: (id: number | string, body: Record<string, unknown>) =>
+      fetchWithAuth(u(`/api/services/addon-group-links/${id}/`), { method: "PATCH", body: s(body) }),
+    unlinkAddonGroup: (id: number | string) =>
+      fetchWithAuth(u(`/api/services/addon-group-links/${id}/`), { method: "DELETE" }),
   },
 
   // ─── Orders ───────────────────────────────────────────────────────────────
@@ -755,6 +767,10 @@ export const api = {
 
     notifyUser: (id: number | string, body: Record<string, unknown>) =>
       fetchWithAuth(u(`/api/admin/users/${id}/notify/`), { method: "POST", body: s(body) }),
+
+    // VendorType options for the "Vendor Type" dropdown on the user detail
+    // page — updateUser(id, { vendor: { vendor_type: id | null } }) applies it.
+    vendorTypes: () => fetchWithAuth(u("/api/admin/vendor-types/")),
 
     makeRider: (id: number | string) =>
       fetchWithAuth(u(`/api/admin/users/${id}/make-rider/`), { method: "POST" }),
