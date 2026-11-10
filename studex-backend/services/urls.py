@@ -4,7 +4,7 @@ from rest_framework.routers import DefaultRouter
 from .views import CategoryViewSet, ListingViewSet, TransactionViewSet
 from .views import ChangePasswordView, VendorOfMonthView, VendorOfMonthHistoryView, DealsListView, HeroSlideListView
 from .views import PreviewPriceView
-from .views import MenuCategoryViewSet, MenuItemViewSet, AddonGroupViewSet, AddonViewSet
+from .views import MenuCategoryViewSet, MenuItemViewSet, AddonGroupViewSet, AddonViewSet, MenuItemAddonGroupViewSet
 
 router = DefaultRouter()
 router.register(r'categories', CategoryViewSet, basename='category')
@@ -13,8 +13,11 @@ router.register(r'transactions', TransactionViewSet, basename='transaction')
 # Phase 1 — Food Commerce Engine: menu management (Step 2)
 router.register(r'menu-categories', MenuCategoryViewSet, basename='menu-category')
 router.register(r'menu-items', MenuItemViewSet, basename='menu-item')
+# Phase 2 — vendor-level add-on library: groups/options are vendor-owned
+# templates; addon-group-links is where a dish links to one.
 router.register(r'addon-groups', AddonGroupViewSet, basename='addon-group')
 router.register(r'addons', AddonViewSet, basename='addon')
+router.register(r'addon-group-links', MenuItemAddonGroupViewSet, basename='addon-group-link')
 
 
 urlpatterns = [

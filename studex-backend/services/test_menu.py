@@ -15,7 +15,7 @@ from django.test import TestCase
 from django.db import IntegrityError
 
 from accounts.models import User
-from services.models import Category, Listing, MenuCategory, MenuItem, AddonGroup, Addon
+from services.models import Category, Listing, MenuCategory, MenuItem, AddonGroup, Addon, MenuItemAddonGroup
 
 
 class ListingUnaffectedByMenuItemTests(TestCase):
@@ -87,7 +87,7 @@ class AddonGroupAndAddonTests(TestCase):
 
     def test_addon_group_and_addons_created(self):
         group = AddonGroup.objects.create(
-            menu_item=self.menu_item, name='Choose your protein', is_required=True,
+            vendor=self.vendor, name='Choose your protein', is_required=True,
             min_selections=1, max_selections=1,
         )
         chicken = Addon.objects.create(group=group, name='Chicken', price_delta=Decimal('300.00'))
@@ -95,24 +95,62 @@ class AddonGroupAndAddonTests(TestCase):
         self.assertEqual(list(group.addons.all()), [chicken, beef])
 
     def test_addon_price_delta_can_be_negative(self):
-        group = AddonGroup.objects.create(menu_item=self.menu_item, name='Remove ingredient')
+        group = AddonGroup.objects.create(vendor=self.vendor, name='Remove ingredient')
         addon = Addon.objects.create(group=group, name='No plantain', price_delta=Decimal('-200.00'))
         self.assertEqual(addon.price_delta, Decimal('-200.00'))
 
     def test_addon_can_be_marked_unavailable_without_deleting(self):
-        group = AddonGroup.objects.create(menu_item=self.menu_item, name='Extras')
+        group = AddonGroup.objects.create(vendor=self.vendor, name='Extras')
         addon = Addon.objects.create(group=group, name='Extra cheese', price_delta=Decimal('200.00'))
         addon.is_available = False
         addon.save(update_fields=['is_available'])
         addon.refresh_from_db()
         self.assertFalse(addon.is_available)
 
-    def test_deleting_menu_item_cascades_to_addon_groups(self):
-        group = AddonGroup.objects.create(menu_item=self.menu_item, name='Extras')
+    def test_deleting_addon_group_cascades_to_addons(self):
+        group = AddonGroup.objects.create(vendor=self.vendor, name='Extras')
         Addon.objects.create(group=group, name='Extra cheese', price_delta=Decimal('200.00'))
-        self.menu_item.delete()
-        self.assertEqual(AddonGroup.objects.count(), 0)
+        group.delete()
         self.assertEqual(Addon.objects.count(), 0)
+
+    def test_group_is_reusable_across_multiple_menu_items(self):
+        other_listing = Listing.objects.create(
+            title='Fried Rice', description='x', price=Decimal('1500.00'),
+            vendor=self.vendor, category=self.category, is_available=True,
+        )
+        other_menu_item = MenuItem.objects.create(listing=other_listing)
+        group = AddonGroup.objects.create(vendor=self.vendor, name='Protein')
+        MenuItemAddonGroup.objects.create(menu_item=self.menu_item, addon_group=group)
+        MenuItemAddonGroup.objects.create(menu_item=other_menu_item, addon_group=group)
+        self.assertEqual(set(group.menu_items.all()), {self.menu_item, other_menu_item})
+
+    def test_deleting_menu_item_only_removes_its_own_link_not_the_group(self):
+        group = AddonGroup.objects.create(vendor=self.vendor, name='Extras')
+        MenuItemAddonGroup.objects.create(menu_item=self.menu_item, addon_group=group)
+        self.menu_item.delete()
+        self.assertEqual(MenuItemAddonGroup.objects.count(), 0)
+        self.assertTrue(AddonGroup.objects.filter(id=group.id).exists())
+
+    def test_link_override_falls_back_to_group_defaults_when_null(self):
+        group = AddonGroup.objects.create(
+            vendor=self.vendor, name='Spice Level', is_required=True, min_selections=1, max_selections=1,
+        )
+        link = MenuItemAddonGroup.objects.create(menu_item=self.menu_item, addon_group=group)
+        self.assertTrue(link.effective_is_required)
+        self.assertEqual(link.effective_min_selections, 1)
+        self.assertEqual(link.effective_max_selections, 1)
+
+    def test_link_override_takes_precedence_over_group_defaults(self):
+        group = AddonGroup.objects.create(
+            vendor=self.vendor, name='Spice Level', is_required=True, min_selections=1, max_selections=1,
+        )
+        link = MenuItemAddonGroup.objects.create(
+            menu_item=self.menu_item, addon_group=group,
+            is_required_override=False, min_selections_override=0, max_selections_override=3,
+        )
+        self.assertFalse(link.effective_is_required)
+        self.assertEqual(link.effective_min_selections, 0)
+        self.assertEqual(link.effective_max_selections, 3)
 
 
 class MenuItemExtensionFieldsTests(TestCase):

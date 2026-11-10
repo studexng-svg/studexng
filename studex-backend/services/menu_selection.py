@@ -54,7 +54,7 @@ def validate_addon_selection(listing, addon_ids, addon_quantities=None):
             raise AddonSelectionError(f'"{listing.title}" does not support add-ons.')
 
         selected = list(
-            Addon.objects.filter(id__in=addon_ids, group__menu_item=menu_item).select_related('group')
+            Addon.objects.filter(id__in=addon_ids, group__menu_items=menu_item).select_related('group')
         )
         found_ids = {a.id for a in selected}
         missing = set(addon_ids) - found_ids
@@ -76,17 +76,23 @@ def validate_addon_selection(listing, addon_ids, addon_quantities=None):
         for addon in selected:
             selected_by_group.setdefault(addon.group_id, []).append(addon)
 
-        for group in menu_item.addon_groups.all():
+        # Each group's rule is this dish's *effective* rule — the link's own
+        # override if set, else the library group's default (see
+        # MenuItemAddonGroup.effective_*) — never the library group's bare
+        # is_required/min_selections/max_selections, since those can be
+        # overridden per dish.
+        for link in menu_item.addon_group_links.select_related('addon_group').all():
+            group = link.addon_group
             count = len(selected_by_group.get(group.id, []))
-            if group.is_required and count == 0:
+            if link.effective_is_required and count == 0:
                 raise AddonSelectionError(f'"{group.name}" requires a selection.')
-            if count < group.min_selections:
+            if count < link.effective_min_selections:
                 raise AddonSelectionError(
-                    f'"{group.name}" requires at least {group.min_selections} selection(s).'
+                    f'"{group.name}" requires at least {link.effective_min_selections} selection(s).'
                 )
-            if count > group.max_selections:
+            if count > link.effective_max_selections:
                 raise AddonSelectionError(
-                    f'"{group.name}" allows at most {group.max_selections} selection(s).'
+                    f'"{group.name}" allows at most {link.effective_max_selections} selection(s).'
                 )
 
     return [(addon, addon_quantities.get(addon.id, 1)) for addon in selected]

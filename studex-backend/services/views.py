@@ -567,9 +567,10 @@ class DealsListView(APIView):
 # admin flips its supports_menu_ordering flag (Step 1).
 # ─────────────────────────────────────────────────────────────────────────────
 
-from .models import MenuCategory, MenuItem, AddonGroup, Addon
+from .models import MenuCategory, MenuItem, AddonGroup, Addon, MenuItemAddonGroup
 from .serializers import (
-    MenuCategorySerializer, MenuItemSerializer, AddonGroupSerializer, AddonSerializer, ReorderSerializer,
+    MenuCategorySerializer, MenuItemSerializer, AddonGroupSerializer, AddonSerializer,
+    MenuItemAddonGroupSerializer, ReorderSerializer,
 )
 from .permissions import CanManageMenu
 
@@ -626,9 +627,9 @@ class MenuItemViewSet(viewsets.ModelViewSet):
 
     Deliberately does NOT use ReorderMixin: MenuItem has no display_order
     field of its own — ordering within a category is a MenuCategory-level
-    concern (and, within a category, an AddonGroup/Addon-level concern for
-    their own children). Adding the mixin here would register a `reorder`
-    action that crashes the instant it's called.
+    concern (and, within a category, a MenuItemAddonGroup/Addon-level
+    concern for their own children). Adding the mixin here would register a
+    `reorder` action that crashes the instant it's called.
     """
     serializer_class = MenuItemSerializer
     permission_classes = [IsAuthenticated, CanManageMenu]
@@ -637,29 +638,50 @@ class MenuItemViewSet(viewsets.ModelViewSet):
         return (
             MenuItem.objects.filter(listing__vendor=self.request.user)
             .select_related('listing', 'menu_category')
-            .prefetch_related('addon_groups__addons')
+            .prefetch_related('addon_group_links__addon_group__addons')
         )
 
 
 class AddonGroupViewSet(ReorderMixin, viewsets.ModelViewSet):
-    """/api/v1/services/addon-groups/ — customization prompts on the vendor's own menu items."""
+    """
+    /api/v1/services/addon-groups/ — a vendor's reusable add-on library
+    (Phase 2 — Add-on Library). These are templates owned directly by the
+    vendor, no longer scoped through any single MenuItem; linking one to a
+    dish is MenuItemAddonGroupViewSet's job, below.
+    """
     serializer_class = AddonGroupSerializer
     permission_classes = [IsAuthenticated, CanManageMenu]
 
     def get_queryset(self):
-        return (
-            AddonGroup.objects.filter(menu_item__listing__vendor=self.request.user)
-            .select_related('menu_item__listing')
-            .prefetch_related('addons')
-        )
+        return AddonGroup.objects.filter(vendor=self.request.user).prefetch_related('addons', 'menu_items')
+
+    def perform_create(self, serializer):
+        serializer.save(vendor=self.request.user)
 
 
 class AddonViewSet(ReorderMixin, viewsets.ModelViewSet):
-    """/api/v1/services/addons/ — individual selectable options within an add-on group."""
+    """/api/v1/services/addons/ — individual selectable options within one of the vendor's library groups."""
     serializer_class = AddonSerializer
     permission_classes = [IsAuthenticated, CanManageMenu]
 
     def get_queryset(self):
-        return Addon.objects.filter(group__menu_item__listing__vendor=self.request.user).select_related(
-            'group__menu_item__listing',
+        return Addon.objects.filter(group__vendor=self.request.user).select_related('group')
+
+
+class MenuItemAddonGroupViewSet(ReorderMixin, viewsets.ModelViewSet):
+    """
+    /api/v1/services/addon-group-links/ — links one of the vendor's library
+    AddonGroups to one of their dishes, with optional per-dish overrides of
+    is_required/min_selections/max_selections (Phase 2 — Add-on Library).
+    Deleting a link only removes that one dish's use of the group — the
+    group, its options, and every other dish's link to it are untouched.
+    """
+    serializer_class = MenuItemAddonGroupSerializer
+    permission_classes = [IsAuthenticated, CanManageMenu]
+
+    def get_queryset(self):
+        return (
+            MenuItemAddonGroup.objects.filter(menu_item__listing__vendor=self.request.user)
+            .select_related('menu_item__listing', 'addon_group')
+            .prefetch_related('addon_group__addons')
         )

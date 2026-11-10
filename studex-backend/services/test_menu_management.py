@@ -16,7 +16,7 @@ from django.test import TestCase
 from rest_framework.test import APIClient
 
 from accounts.models import User, Vendor, VendorType
-from services.models import Category, Listing, MenuCategory, MenuItem, AddonGroup, Addon
+from services.models import Category, Listing, MenuCategory, MenuItem, AddonGroup, Addon, MenuItemAddonGroup
 
 
 class MenuManagementTestBase(TestCase):
@@ -89,7 +89,7 @@ class CapabilityGatingTests(MenuManagementTestBase):
 
     def test_gating_applies_identically_to_menu_items_addon_groups_addons(self):
         self.client.force_authenticate(user=self.non_menu_vendor)
-        for path in ('menu-items', 'addon-groups', 'addons'):
+        for path in ('menu-items', 'addon-groups', 'addons', 'addon-group-links'):
             response = self.client.get(f'/api/v1/services/{path}/')
             self.assertEqual(response.status_code, 403, f'{path} should be gated too')
 
@@ -223,14 +223,28 @@ class MenuItemCRUDTests(MenuManagementTestBase):
 
     def test_retrieve_includes_nested_addon_groups(self):
         item = MenuItem.objects.create(listing=self.listing)
-        group = AddonGroup.objects.create(menu_item=item, name='Protein')
+        group = AddonGroup.objects.create(vendor=self.vendor, name='Protein')
         Addon.objects.create(group=group, name='Chicken', price_delta=Decimal('300.00'))
+        MenuItemAddonGroup.objects.create(menu_item=item, addon_group=group)
 
         response = self.client.get(f'/api/v1/services/menu-items/{item.id}/')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data['addon_groups']), 1)
+        self.assertEqual(response.data['addon_groups'][0]['name'], 'Protein')
         self.assertEqual(len(response.data['addon_groups'][0]['addons']), 1)
         self.assertEqual(response.data['listing_title'], 'Jollof Rice')
+
+    def test_retrieve_shows_effective_rule_not_group_default(self):
+        item = MenuItem.objects.create(listing=self.listing)
+        group = AddonGroup.objects.create(vendor=self.vendor, name='Spice Level', is_required=False, max_selections=2)
+        MenuItemAddonGroup.objects.create(
+            menu_item=item, addon_group=group, is_required_override=True, min_selections_override=1, max_selections_override=1,
+        )
+        response = self.client.get(f'/api/v1/services/menu-items/{item.id}/')
+        [link] = response.data['addon_groups']
+        self.assertTrue(link['is_required'])
+        self.assertEqual(link['min_selections'], 1)
+        self.assertEqual(link['max_selections'], 1)
 
     def test_cannot_retrieve_another_vendors_menu_item(self):
         other_item = MenuItem.objects.create(listing=self.other_listing)
@@ -272,58 +286,184 @@ class MenuItemCRUDTests(MenuManagementTestBase):
 
 
 class AddonGroupCRUDAndValidationTests(MenuManagementTestBase):
+    """
+    AddonGroup is a vendor-level library template (Phase 2 — Add-on
+    Library) — created and owned directly by the vendor, with no menu_item
+    involved at all. Linking one to a dish is covered separately below in
+    AddonGroupLinkCRUDTests.
+    """
     def setUp(self):
         super().setUp()
         self.client.force_authenticate(user=self.vendor)
-        self.menu_item = MenuItem.objects.create(listing=self.listing)
-        self.other_menu_item = MenuItem.objects.create(listing=self.other_listing)
 
     def test_create_addon_group(self):
         response = self.client.post('/api/v1/services/addon-groups/', {
-            'menu_item': self.menu_item.id, 'name': 'Choose your protein',
-            'is_required': True, 'min_selections': 1, 'max_selections': 1,
+            'name': 'Choose your protein', 'is_required': True, 'min_selections': 1, 'max_selections': 1,
         })
         self.assertEqual(response.status_code, 201, response.data)
+        group = AddonGroup.objects.get(id=response.data['id'])
+        self.assertEqual(group.vendor, self.vendor)
 
-    def test_cannot_create_addon_group_on_another_vendors_menu_item(self):
-        response = self.client.post('/api/v1/services/addon-groups/', {
-            'menu_item': self.other_menu_item.id, 'name': 'Choose your protein',
-        })
-        self.assertEqual(response.status_code, 400)
+    def test_list_only_shows_own_groups(self):
+        AddonGroup.objects.create(vendor=self.vendor, name='Protein')
+        AddonGroup.objects.create(vendor=self.other_vendor, name='Spice')
+        response = self.client.get('/api/v1/services/addon-groups/')
+        self.assertEqual(response.status_code, 200)
+        names = [g['name'] for g in response.data['results']]
+        self.assertEqual(names, ['Protein'])
+
+    def test_cannot_retrieve_another_vendors_group(self):
+        other_group = AddonGroup.objects.create(vendor=self.other_vendor, name='Spice')
+        response = self.client.get(f'/api/v1/services/addon-groups/{other_group.id}/')
+        self.assertEqual(response.status_code, 404)
+
+    def test_cannot_update_another_vendors_group(self):
+        other_group = AddonGroup.objects.create(vendor=self.other_vendor, name='Spice')
+        response = self.client.patch(f'/api/v1/services/addon-groups/{other_group.id}/', {'name': 'Hacked'})
+        self.assertEqual(response.status_code, 404)
 
     def test_min_selections_cannot_exceed_max_selections(self):
         response = self.client.post('/api/v1/services/addon-groups/', {
-            'menu_item': self.menu_item.id, 'name': 'Extras', 'min_selections': 3, 'max_selections': 1,
+            'name': 'Extras', 'min_selections': 3, 'max_selections': 1,
         })
         self.assertEqual(response.status_code, 400)
 
     def test_required_group_must_have_min_selections_at_least_one(self):
         response = self.client.post('/api/v1/services/addon-groups/', {
-            'menu_item': self.menu_item.id, 'name': 'Protein', 'is_required': True, 'min_selections': 0,
+            'name': 'Protein', 'is_required': True, 'min_selections': 0,
         })
         self.assertEqual(response.status_code, 400)
 
     def test_max_selections_must_be_at_least_one(self):
         response = self.client.post('/api/v1/services/addon-groups/', {
-            'menu_item': self.menu_item.id, 'name': 'Extras', 'max_selections': 0,
+            'name': 'Extras', 'max_selections': 0,
         })
         self.assertEqual(response.status_code, 400)
 
     def test_optional_group_with_zero_min_selections_is_valid(self):
         response = self.client.post('/api/v1/services/addon-groups/', {
-            'menu_item': self.menu_item.id, 'name': 'Extras', 'is_required': False, 'min_selections': 0, 'max_selections': 3,
+            'name': 'Extras', 'is_required': False, 'min_selections': 0, 'max_selections': 3,
         })
         self.assertEqual(response.status_code, 201, response.data)
+
+    def test_linked_menu_item_ids_reflects_links(self):
+        item = MenuItem.objects.create(listing=self.listing)
+        group = AddonGroup.objects.create(vendor=self.vendor, name='Protein')
+        MenuItemAddonGroup.objects.create(menu_item=item, addon_group=group)
+        response = self.client.get(f'/api/v1/services/addon-groups/{group.id}/')
+        self.assertEqual(response.data['linked_menu_item_ids'], [item.id])
+
+    def test_deleting_group_cascades_its_links(self):
+        item = MenuItem.objects.create(listing=self.listing)
+        group = AddonGroup.objects.create(vendor=self.vendor, name='Protein')
+        MenuItemAddonGroup.objects.create(menu_item=item, addon_group=group)
+        response = self.client.delete(f'/api/v1/services/addon-groups/{group.id}/')
+        self.assertEqual(response.status_code, 204)
+        self.assertEqual(MenuItemAddonGroup.objects.count(), 0)
+
+
+class AddonGroupLinkCRUDTests(MenuManagementTestBase):
+    """Covers /api/v1/services/addon-group-links/ — linking a vendor's library AddonGroup to one of their dishes."""
+    def setUp(self):
+        super().setUp()
+        self.client.force_authenticate(user=self.vendor)
+        self.menu_item = MenuItem.objects.create(listing=self.listing)
+        self.other_menu_item = MenuItem.objects.create(listing=self.other_listing)
+        self.group = AddonGroup.objects.create(vendor=self.vendor, name='Spice Level', min_selections=0, max_selections=2)
+        self.other_group = AddonGroup.objects.create(vendor=self.other_vendor, name='Extras')
+
+    def test_link_group_to_own_menu_item(self):
+        response = self.client.post('/api/v1/services/addon-group-links/', {
+            'menu_item': self.menu_item.id, 'addon_group': self.group.id,
+        })
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(response.data['name'], 'Spice Level')
+        self.assertEqual(response.data['min_selections'], 0)
+        self.assertEqual(response.data['max_selections'], 2)
+
+    def test_cannot_link_to_another_vendors_menu_item(self):
+        response = self.client.post('/api/v1/services/addon-group-links/', {
+            'menu_item': self.other_menu_item.id, 'addon_group': self.group.id,
+        })
+        self.assertEqual(response.status_code, 400)
+
+    def test_cannot_link_another_vendors_group(self):
+        response = self.client.post('/api/v1/services/addon-group-links/', {
+            'menu_item': self.menu_item.id, 'addon_group': self.other_group.id,
+        })
+        self.assertEqual(response.status_code, 400)
+
+    def test_cannot_link_same_group_to_same_item_twice(self):
+        MenuItemAddonGroup.objects.create(menu_item=self.menu_item, addon_group=self.group)
+        response = self.client.post('/api/v1/services/addon-group-links/', {
+            'menu_item': self.menu_item.id, 'addon_group': self.group.id,
+        })
+        self.assertEqual(response.status_code, 400)
+
+    def test_same_group_can_be_linked_to_a_second_menu_item(self):
+        own_second_listing = Listing.objects.create(
+            title='Fried Rice', description='x', price=Decimal('1600.00'),
+            vendor=self.vendor, category=self.category, is_available=True,
+        )
+        second_item = MenuItem.objects.create(listing=own_second_listing)
+        MenuItemAddonGroup.objects.create(menu_item=self.menu_item, addon_group=self.group)
+        response = self.client.post('/api/v1/services/addon-group-links/', {
+            'menu_item': second_item.id, 'addon_group': self.group.id,
+        })
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(self.group.menu_items.count(), 2)
+
+    def test_override_rejected_when_effective_min_exceeds_effective_max(self):
+        response = self.client.post('/api/v1/services/addon-group-links/', {
+            'menu_item': self.menu_item.id, 'addon_group': self.group.id,
+            'min_selections_override': 3,
+        })
+        self.assertEqual(response.status_code, 400)
+
+    def test_override_rejected_when_required_without_effective_min(self):
+        response = self.client.post('/api/v1/services/addon-group-links/', {
+            'menu_item': self.menu_item.id, 'addon_group': self.group.id,
+            'is_required_override': True, 'min_selections_override': 0,
+        })
+        self.assertEqual(response.status_code, 400)
+
+    def test_update_override_on_existing_link(self):
+        link = MenuItemAddonGroup.objects.create(menu_item=self.menu_item, addon_group=self.group)
+        response = self.client.patch(f'/api/v1/services/addon-group-links/{link.id}/', {
+            'is_required_override': True, 'min_selections_override': 1,
+        })
+        self.assertEqual(response.status_code, 200, response.data)
+        link.refresh_from_db()
+        self.assertTrue(link.effective_is_required)
+        self.assertEqual(link.effective_min_selections, 1)
+
+    def test_unlinking_removes_link_but_keeps_group_and_other_links(self):
+        own_second_listing = Listing.objects.create(
+            title='Fried Rice', description='x', price=Decimal('1600.00'),
+            vendor=self.vendor, category=self.category, is_available=True,
+        )
+        second_item = MenuItem.objects.create(listing=own_second_listing)
+        link = MenuItemAddonGroup.objects.create(menu_item=self.menu_item, addon_group=self.group)
+        MenuItemAddonGroup.objects.create(menu_item=second_item, addon_group=self.group)
+
+        response = self.client.delete(f'/api/v1/services/addon-group-links/{link.id}/')
+        self.assertEqual(response.status_code, 204)
+        self.assertTrue(AddonGroup.objects.filter(id=self.group.id).exists())
+        self.assertEqual(self.group.menu_items.count(), 1)
+
+    def test_cannot_delete_another_vendors_link(self):
+        link = MenuItemAddonGroup.objects.create(menu_item=self.other_menu_item, addon_group=self.other_group)
+        response = self.client.delete(f'/api/v1/services/addon-group-links/{link.id}/')
+        self.assertEqual(response.status_code, 404)
+        self.assertTrue(MenuItemAddonGroup.objects.filter(id=link.id).exists())
 
 
 class AddonCRUDTests(MenuManagementTestBase):
     def setUp(self):
         super().setUp()
         self.client.force_authenticate(user=self.vendor)
-        self.menu_item = MenuItem.objects.create(listing=self.listing)
-        self.group = AddonGroup.objects.create(menu_item=self.menu_item, name='Protein')
-        other_menu_item = MenuItem.objects.create(listing=self.other_listing)
-        self.other_group = AddonGroup.objects.create(menu_item=other_menu_item, name='Extras')
+        self.group = AddonGroup.objects.create(vendor=self.vendor, name='Protein')
+        self.other_group = AddonGroup.objects.create(vendor=self.other_vendor, name='Extras')
 
     def test_create_addon(self):
         response = self.client.post('/api/v1/services/addons/', {

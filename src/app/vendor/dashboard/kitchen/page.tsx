@@ -6,17 +6,35 @@ import { api } from "@/lib/api";
 import { TEAL, toArray } from "@/lib/tokens";
 import { compressImage } from "@/lib/utils";
 import { HEADING_FONT, LoadingSpinner, EmptyState, AvailabilityBadge, ListingThumb } from "../_shared";
-import { Plus, Pencil, Trash2, X, ChefHat, Tag, ImagePlus } from "lucide-react";
+import { Plus, Pencil, Trash2, X, ChefHat, Tag, ImagePlus, Link2, BookOpen } from "lucide-react";
 
 interface MenuCategory { id: number; name: string; display_order: number; is_active: boolean; }
 interface Addon { id: number; group: number; name: string; price_delta: string; is_available: boolean; display_order: number; }
-interface AddonGroup { id: number; menu_item: number; name: string; is_required: boolean; min_selections: number; max_selections: number; display_order: number; addons: Addon[]; }
+
+// A vendor-level, reusable add-on template — not tied to any one dish.
+// `linked_menu_item_ids` is which dishes currently use it, so the library
+// view can warn before a delete that would affect more than one.
+interface AddonGroup {
+  id: number; name: string; is_required: boolean; min_selections: number; max_selections: number;
+  display_order: number; addons: Addon[]; linked_menu_item_ids: number[];
+}
+
+// One dish's link to a library AddonGroup. is_required/min_selections/
+// max_selections here are the *effective* rule for this dish (the
+// override if set, else the group's own default) — what buyers actually
+// see and what checkout enforces.
+interface MenuItemAddonGroupLink {
+  id: number; menu_item: number; addon_group: number; name: string; display_order: number;
+  is_required_override: boolean | null; min_selections_override: number | null; max_selections_override: number | null;
+  is_required: boolean; min_selections: number; max_selections: number; addons: Addon[];
+}
+
 interface MenuItem {
   id: number; listing: number; listing_title: string; listing_price: string; listing_is_available: boolean;
   menu_category: number | null; prep_time_minutes: number | null; allergens: string[]; ingredients: string;
   is_seasonal: boolean; is_hidden: boolean; is_archived: boolean;
   availability_window_start: string | null; availability_window_end: string | null;
-  addon_groups: AddonGroup[];
+  addon_groups: MenuItemAddonGroupLink[];
 }
 interface Listing { id: number; title: string; price: string; payout_amount?: string | null; is_available: boolean; image?: string | null; }
 
@@ -27,8 +45,9 @@ const emptyItemDetailsForm = {
   menu_category: "" as number | "", prep_time_minutes: "", allergens: "", ingredients: "",
   is_seasonal: false, availability_window_start: "", availability_window_end: "",
 };
-const emptyGroupForm = { name: "", is_required: false, min_selections: 0, max_selections: 1, display_order: 0 };
+const emptyLibraryGroupForm = { name: "", is_required: false, min_selections: 0, max_selections: 1, display_order: 0 };
 const emptyAddonForm = { name: "", price_delta: "0", is_available: true, display_order: 0 };
+const emptyOverrideForm = { is_required_override: "" as "" | "true" | "false", min_selections_override: "", max_selections_override: "" };
 
 export default function VendorMenuPage() {
   const { user } = useAuth();
@@ -40,6 +59,7 @@ export default function VendorMenuPage() {
   const [toast, setToast] = useState("");
 
   const [categories, setCategories] = useState<MenuCategory[]>([]);
+  const [groups, setGroups] = useState<AddonGroup[]>([]);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [listings, setListings] = useState<Listing[]>([]);
   const [foodCategorySlug, setFoodCategorySlug] = useState<string | null>(null);
@@ -54,11 +74,17 @@ export default function VendorMenuPage() {
   const [detailsModal, setDetailsModal] = useState<MenuItem | null>(null);
   const [detailsForm, setDetailsForm] = useState(emptyItemDetailsForm);
 
-  const [groupModal, setGroupModal] = useState<{ menuItemId: number; editing: AddonGroup | null } | null>(null);
-  const [groupForm, setGroupForm] = useState(emptyGroupForm);
+  // Library group modal — doubles as "create a brand-new group" (Library
+  // section, linkToMenuItemId null) and "create + immediately link to this
+  // dish" (per-dish "New Group" button, linkToMenuItemId set).
+  const [groupModal, setGroupModal] = useState<{ editing: AddonGroup | null; linkToMenuItemId: number | null } | null>(null);
+  const [groupForm, setGroupForm] = useState(emptyLibraryGroupForm);
 
   const [addonModal, setAddonModal] = useState<{ groupId: number; editing: Addon | null } | null>(null);
   const [addonForm, setAddonForm] = useState(emptyAddonForm);
+
+  const [overrideModal, setOverrideModal] = useState<MenuItemAddonGroupLink | null>(null);
+  const [overrideForm, setOverrideForm] = useState(emptyOverrideForm);
 
   const [expanded, setExpanded] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
@@ -67,14 +93,16 @@ export default function VendorMenuPage() {
 
   const loadAll = async () => {
     try {
-      const [catRes, itemRes, listRes, marketplaceCatRes] = await Promise.all([
+      const [catRes, groupRes, itemRes, listRes, marketplaceCatRes] = await Promise.all([
         api.services.menuCategories(),
+        api.services.addonGroups(),
         api.services.menuItems(),
         api.services.listingsAuth({ vendor_username: user?.username || "", page_size: "500" }),
         api.services.categoriesAuth(), // authenticated — resolves the vendor's own campus, not a default
       ]);
       if (catRes.status === 403 || itemRes.status === 403) { setNotEnabled(true); return; }
       setCategories(toArray(await catRes.json()));
+      setGroups(toArray(await groupRes.json()));
       setMenuItems(toArray(await itemRes.json()));
       setListings(toArray(await listRes.json()));
       const marketplaceCats = toArray(await marketplaceCatRes.json());
@@ -238,33 +266,93 @@ export default function VendorMenuPage() {
     await loadAll();
   };
 
-  // ── Customization groups (add-on groups) ──────────────────────────────────
-  const openGroupCreate = (menuItemId: number) => { setGroupForm(emptyGroupForm); setGroupModal({ menuItemId, editing: null }); };
-  const openGroupEdit = (menuItemId: number, g: AddonGroup) => {
+  // ── Add-on Library — vendor-level groups, reusable across every dish ─────
+  const openLibraryGroupCreate = () => { setGroupForm(emptyLibraryGroupForm); setGroupModal({ editing: null, linkToMenuItemId: null }); };
+  const openLibraryGroupEdit = (g: AddonGroup) => {
     setGroupForm({ name: g.name, is_required: g.is_required, min_selections: g.min_selections, max_selections: g.max_selections, display_order: g.display_order });
-    setGroupModal({ menuItemId, editing: g });
+    setGroupModal({ editing: g, linkToMenuItemId: null });
   };
+  // "New Group" from inside a dish's Customizations panel — creates the
+  // group in the library AND immediately links it to that dish, so the
+  // one-step feel of the old per-dish flow is preserved.
+  const openNewGroupForItem = (menuItemId: number) => { setGroupForm(emptyLibraryGroupForm); setGroupModal({ editing: null, linkToMenuItemId: menuItemId }); };
 
   const saveGroup = async () => {
     setSaving(true); setError("");
     try {
       const res = groupModal?.editing
         ? await api.services.updateAddonGroup(groupModal.editing.id, groupForm)
-        : await api.services.createAddonGroup({ ...groupForm, menu_item: groupModal!.menuItemId });
+        : await api.services.createAddonGroup(groupForm);
       if (!res.ok) { const d = await res.json(); setError(Object.values(d)[0]?.toString() || "Could not save customization group."); return; }
+      if (!groupModal?.editing && groupModal?.linkToMenuItemId) {
+        const created = await res.json();
+        const linkRes = await api.services.linkAddonGroup({ menu_item: groupModal.linkToMenuItemId, addon_group: created.id });
+        if (!linkRes.ok) {
+          const d = await linkRes.json().catch(() => ({}));
+          setError(Object.values(d)[0]?.toString() || "Group was created but could not be linked to this item.");
+          return;
+        }
+      }
       setGroupModal(null);
       await loadAll();
     } catch { setError("Network error."); }
     finally { setSaving(false); }
   };
 
-  const deleteGroup = async (id: number) => {
-    if (!confirm("Delete this customization group and all its options?")) return;
-    await api.services.deleteAddonGroup(id);
+  const deleteLibraryGroup = async (g: AddonGroup) => {
+    const n = g.linked_menu_item_ids.length;
+    const msg = n > 0
+      ? `Delete "${g.name}"? It's currently used on ${n} ${n === 1 ? "dish" : "dishes"} — deleting it removes this customization from all of them.`
+      : `Delete "${g.name}"?`;
+    if (!confirm(msg)) return;
+    await api.services.deleteAddonGroup(g.id);
     await loadAll();
   };
 
-  // ── Customization options (add-ons) ────────────────────────────────────────
+  // ── Linking a library group to (or unlinking it from) one dish ───────────
+  const linkExistingGroup = async (menuItemId: number, addonGroupId: number) => {
+    setError("");
+    const res = await api.services.linkAddonGroup({ menu_item: menuItemId, addon_group: addonGroupId });
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      setError(Object.values(d)[0]?.toString() || "Could not link group.");
+      return;
+    }
+    await loadAll();
+  };
+
+  const unlinkGroup = async (link: MenuItemAddonGroupLink) => {
+    if (!confirm(`Remove "${link.name}" from this item? The group itself (and any other dish using it) is unaffected.`)) return;
+    await api.services.unlinkAddonGroup(link.id);
+    await loadAll();
+  };
+
+  const openOverrideEdit = (link: MenuItemAddonGroupLink) => {
+    setOverrideForm({
+      is_required_override: link.is_required_override === null ? "" : link.is_required_override ? "true" : "false",
+      min_selections_override: link.min_selections_override === null ? "" : String(link.min_selections_override),
+      max_selections_override: link.max_selections_override === null ? "" : String(link.max_selections_override),
+    });
+    setOverrideModal(link);
+  };
+
+  const saveOverride = async () => {
+    if (!overrideModal) return;
+    setSaving(true); setError("");
+    try {
+      const res = await api.services.updateAddonGroupLink(overrideModal.id, {
+        is_required_override: overrideForm.is_required_override === "" ? null : overrideForm.is_required_override === "true",
+        min_selections_override: overrideForm.min_selections_override === "" ? null : Number(overrideForm.min_selections_override),
+        max_selections_override: overrideForm.max_selections_override === "" ? null : Number(overrideForm.max_selections_override),
+      });
+      if (!res.ok) { const d = await res.json(); setError(Object.values(d)[0]?.toString() || "Could not save override."); return; }
+      setOverrideModal(null);
+      await loadAll();
+    } catch { setError("Network error."); }
+    finally { setSaving(false); }
+  };
+
+  // ── Customization options (add-ons) — always edited from the Library ─────
   const openAddonCreate = (groupId: number) => { setAddonForm(emptyAddonForm); setAddonModal({ groupId, editing: null }); };
   const openAddonEdit = (groupId: number, a: Addon) => {
     setAddonForm({ name: a.name, price_delta: a.price_delta, is_available: a.is_available, display_order: a.display_order });
@@ -303,6 +391,7 @@ export default function VendorMenuPage() {
   }
 
   const sortedCategories = [...categories].sort((a, b) => a.display_order - b.display_order);
+  const sortedGroups = [...groups].sort((a, b) => a.display_order - b.display_order);
 
   return (
     <div className="pb-4 space-y-6">
@@ -334,6 +423,8 @@ export default function VendorMenuPage() {
           {menuItems.map(item => {
             const isOpen = expanded === item.id;
             const listing = listings.find(l => l.id === item.listing);
+            const linkedGroupIds = new Set(item.addon_groups.map(link => link.addon_group));
+            const linkableGroups = sortedGroups.filter(g => !linkedGroupIds.has(g.id));
             return (
               <div key={item.id} className="bg-white border border-stone-200 rounded-2xl overflow-hidden">
                 <div className="p-4 flex items-center gap-3 cursor-pointer" onClick={() => setExpanded(isOpen ? null : item.id)}>
@@ -367,43 +458,57 @@ export default function VendorMenuPage() {
                       </button>
                     </div>
 
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-2">
                       <p className="text-xs font-bold text-stone-500 uppercase tracking-wide">Customizations</p>
-                      <button onClick={() => openGroupCreate(item.id)} className="flex items-center gap-1 px-2.5 py-1 rounded-full text-white text-xs font-semibold" style={{ background: TEAL }}>
-                        <Plus className="w-3 h-3" /> Add Group
-                      </button>
+                      <div className="flex items-center gap-1.5">
+                        {linkableGroups.length > 0 && (
+                          <select
+                            value=""
+                            onChange={e => { if (e.target.value) linkExistingGroup(item.id, Number(e.target.value)); }}
+                            className="text-xs rounded-full border border-stone-200 px-2 py-1 bg-white text-stone-600 max-w-[140px]"
+                          >
+                            <option value="">Link existing…</option>
+                            {linkableGroups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                          </select>
+                        )}
+                        <button onClick={() => openNewGroupForItem(item.id)} className="flex items-center gap-1 px-2.5 py-1 rounded-full text-white text-xs font-semibold whitespace-nowrap" style={{ background: TEAL }}>
+                          <Plus className="w-3 h-3" /> New Group
+                        </button>
+                      </div>
                     </div>
 
                     {item.addon_groups.length === 0 ? (
-                      <p className="text-stone-400 text-xs">No customizations yet — e.g. "Protein" with Chicken/Beef options.</p>
+                      <p className="text-stone-400 text-xs">No customizations yet — link one from your Add-on Library below, or create a new one.</p>
                     ) : (
                       <div className="space-y-2">
-                        {item.addon_groups.map(g => (
-                          <div key={g.id} className="bg-white rounded-xl border border-stone-200 p-3">
-                            <div className="flex items-center gap-2 mb-2">
-                              <span className="text-sm font-semibold text-stone-800 flex-1">{g.name}</span>
-                              <span className="text-[10px] text-stone-400">
-                                {g.is_required ? "Required" : "Optional"} · {g.min_selections}-{g.max_selections}
-                              </span>
-                              <button onClick={() => openGroupEdit(item.id, g)} className="p-1 text-stone-400 hover:text-stone-700"><Pencil className="w-3 h-3" /></button>
-                              <button onClick={() => deleteGroup(g.id)} className="p-1 text-red-400 hover:text-red-600"><Trash2 className="w-3 h-3" /></button>
+                        {item.addon_groups.map(link => {
+                          const overridden = link.is_required_override !== null || link.min_selections_override !== null || link.max_selections_override !== null;
+                          return (
+                            <div key={link.id} className="bg-white rounded-xl border border-stone-200 p-3">
+                              <div className="flex items-center gap-2 mb-2">
+                                <span className="text-sm font-semibold text-stone-800 flex-1">{link.name}</span>
+                                <span className="text-[10px] text-stone-400">
+                                  {link.is_required ? "Required" : "Optional"} · {link.min_selections}-{link.max_selections}
+                                  {overridden && <span className="ml-1 text-teal-600 font-semibold">· custom</span>}
+                                </span>
+                                <button onClick={() => openOverrideEdit(link)} title="Override for this dish" className="p-1 text-stone-400 hover:text-stone-700"><Pencil className="w-3 h-3" /></button>
+                                <button onClick={() => unlinkGroup(link)} title="Unlink from this dish" className="p-1 text-red-400 hover:text-red-600"><Trash2 className="w-3 h-3" /></button>
+                              </div>
+                              <div className="space-y-1">
+                                {link.addons.map(a => (
+                                  <div key={a.id} className="flex items-center gap-2 text-xs px-2 py-1.5 rounded-lg bg-stone-50">
+                                    <span className="flex-1 text-stone-700">{a.name}</span>
+                                    <span className="text-stone-500 font-medium">{Number(a.price_delta) >= 0 ? "+" : ""}₦{Number(a.price_delta).toLocaleString()}</span>
+                                    {!a.is_available && <span className="text-[10px] text-red-500 font-semibold">Unavailable</span>}
+                                  </div>
+                                ))}
+                                {link.addons.length === 0 && (
+                                  <p className="text-[11px] text-stone-400 px-2">No options yet — add them from the Add-on Library below.</p>
+                                )}
+                              </div>
                             </div>
-                            <div className="space-y-1">
-                              {g.addons.map(a => (
-                                <div key={a.id} className="flex items-center gap-2 text-xs px-2 py-1.5 rounded-lg bg-stone-50">
-                                  <span className="flex-1 text-stone-700">{a.name}</span>
-                                  <span className="text-stone-500 font-medium">{Number(a.price_delta) >= 0 ? "+" : ""}₦{Number(a.price_delta).toLocaleString()}</span>
-                                  {!a.is_available && <span className="text-[10px] text-red-500 font-semibold">Unavailable</span>}
-                                  <button onClick={() => openAddonEdit(g.id, a)} className="p-1 text-stone-400 hover:text-stone-700"><Pencil className="w-3 h-3" /></button>
-                                  <button onClick={() => deleteAddon(a.id)} className="p-1 text-red-400 hover:text-red-600"><Trash2 className="w-3 h-3" /></button>
-                                </div>
-                              ))}
-                              <button onClick={() => openAddonCreate(g.id)} className="text-xs text-teal-600 font-semibold flex items-center gap-1 px-2 py-1">
-                                <Plus className="w-3 h-3" /> Add option
-                              </button>
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </div>
@@ -413,6 +518,51 @@ export default function VendorMenuPage() {
           })}
         </div>
       )}
+
+      {/* ── Add-on Library (Phase 2) — reusable customization templates ── */}
+      <section className="bg-white border border-stone-200 rounded-2xl p-4">
+        <div className="flex items-center justify-between mb-3">
+          <p className="font-bold text-stone-900 text-sm flex items-center gap-2"><BookOpen className="w-4 h-4 text-teal-600" /> Add-on Library</p>
+          <button onClick={openLibraryGroupCreate} className="flex items-center gap-1 px-3 py-1.5 rounded-full text-white text-xs font-semibold" style={{ background: TEAL }}>
+            <Plus className="w-3.5 h-3.5" /> New Group
+          </button>
+        </div>
+        {sortedGroups.length === 0 ? (
+          <p className="text-stone-400 text-sm py-2">Build reusable customizations here — e.g. "Spice Level" with Mild/Hot — then link them to as many dishes as you like.</p>
+        ) : (
+          <div className="space-y-2">
+            {sortedGroups.map(g => (
+              <div key={g.id} className="bg-stone-50 rounded-xl border border-stone-200 p-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-sm font-semibold text-stone-800 flex-1">{g.name}</span>
+                  <span className="text-[10px] text-stone-400 flex items-center gap-1">
+                    <Link2 className="w-3 h-3" /> {g.linked_menu_item_ids.length} {g.linked_menu_item_ids.length === 1 ? "dish" : "dishes"}
+                  </span>
+                  <span className="text-[10px] text-stone-400">
+                    {g.is_required ? "Required" : "Optional"} · {g.min_selections}-{g.max_selections}
+                  </span>
+                  <button onClick={() => openLibraryGroupEdit(g)} className="p-1 text-stone-400 hover:text-stone-700"><Pencil className="w-3 h-3" /></button>
+                  <button onClick={() => deleteLibraryGroup(g)} className="p-1 text-red-400 hover:text-red-600"><Trash2 className="w-3 h-3" /></button>
+                </div>
+                <div className="space-y-1">
+                  {g.addons.map(a => (
+                    <div key={a.id} className="flex items-center gap-2 text-xs px-2 py-1.5 rounded-lg bg-white">
+                      <span className="flex-1 text-stone-700">{a.name}</span>
+                      <span className="text-stone-500 font-medium">{Number(a.price_delta) >= 0 ? "+" : ""}₦{Number(a.price_delta).toLocaleString()}</span>
+                      {!a.is_available && <span className="text-[10px] text-red-500 font-semibold">Unavailable</span>}
+                      <button onClick={() => openAddonEdit(g.id, a)} className="p-1 text-stone-400 hover:text-stone-700"><Pencil className="w-3 h-3" /></button>
+                      <button onClick={() => deleteAddon(a.id)} className="p-1 text-red-400 hover:text-red-600"><Trash2 className="w-3 h-3" /></button>
+                    </div>
+                  ))}
+                  <button onClick={() => openAddonCreate(g.id)} className="text-xs text-teal-600 font-semibold flex items-center gap-1 px-2 py-1">
+                    <Plus className="w-3 h-3" /> Add option
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
 
       {/* ── Categories (e.g. "Rice Dishes", "Drinks") ── */}
       <section className="bg-white border border-stone-200 rounded-2xl p-4">
@@ -517,24 +667,54 @@ export default function VendorMenuPage() {
         </Modal>
       )}
 
-      {/* ── Customization group modal ── */}
+      {/* ── Library group modal (create/edit a reusable customization) ── */}
       {groupModal && (
         <Modal title={groupModal.editing ? "Edit Customization Group" : "New Customization Group"} onClose={() => setGroupModal(null)}>
           <Field label="Name">
             <input value={groupForm.name} onChange={e => setGroupForm(f => ({ ...f, name: e.target.value }))} className={inputCls} placeholder="e.g. Protein" />
           </Field>
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Min selections">
+            <Field label="Default min selections">
               <input type="number" min={0} value={groupForm.min_selections} onChange={e => setGroupForm(f => ({ ...f, min_selections: Number(e.target.value) }))} className={inputCls} />
             </Field>
-            <Field label="Max selections">
+            <Field label="Default max selections">
               <input type="number" min={1} value={groupForm.max_selections} onChange={e => setGroupForm(f => ({ ...f, max_selections: Number(e.target.value) }))} className={inputCls} />
             </Field>
           </div>
           <label className="flex items-center gap-2 text-sm text-stone-600">
-            <input type="checkbox" checked={groupForm.is_required} onChange={e => setGroupForm(f => ({ ...f, is_required: e.target.checked }))} /> Required — buyer must choose
+            <input type="checkbox" checked={groupForm.is_required} onChange={e => setGroupForm(f => ({ ...f, is_required: e.target.checked }))} /> Required by default — buyer must choose
           </label>
+          {!groupModal.editing && (
+            <p className="text-xs text-stone-400">
+              {groupModal.linkToMenuItemId
+                ? "This will be linked to this dish right away — it'll also show up in your Add-on Library to reuse on other dishes."
+                : "These are the defaults — any dish you link this to can override required/min/max just for itself."}
+            </p>
+          )}
           <SaveButton saving={saving} onClick={saveGroup} />
+        </Modal>
+      )}
+
+      {/* ── Per-dish override modal ── */}
+      {overrideModal && (
+        <Modal title={`Override "${overrideModal.name}" for this dish`} onClose={() => setOverrideModal(null)}>
+          <p className="text-xs text-stone-400">Leave a field on "Inherit" to use the Add-on Library group's own setting. Changing the group later won't affect anything you override here.</p>
+          <Field label="Required">
+            <select value={overrideForm.is_required_override} onChange={e => setOverrideForm(f => ({ ...f, is_required_override: e.target.value as "" | "true" | "false" }))} className={inputCls}>
+              <option value="">Inherit from group</option>
+              <option value="true">Required</option>
+              <option value="false">Optional</option>
+            </select>
+          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Min selections">
+              <input type="number" min={0} value={overrideForm.min_selections_override} placeholder="Inherit" onChange={e => setOverrideForm(f => ({ ...f, min_selections_override: e.target.value }))} className={inputCls} />
+            </Field>
+            <Field label="Max selections">
+              <input type="number" min={1} value={overrideForm.max_selections_override} placeholder="Inherit" onChange={e => setOverrideForm(f => ({ ...f, max_selections_override: e.target.value }))} className={inputCls} />
+            </Field>
+          </div>
+          <SaveButton saving={saving} onClick={saveOverride} />
         </Modal>
       )}
 

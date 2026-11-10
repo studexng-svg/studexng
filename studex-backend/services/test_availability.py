@@ -291,7 +291,7 @@ class AddonAvailabilityTests(TestCase):
             vendor=self.vendor, category=self.category, is_available=True,
         )
         self.menu_item = MenuItem.objects.create(listing=self.listing)
-        self.group = AddonGroup.objects.create(menu_item=self.menu_item, name='Protein')
+        self.group = AddonGroup.objects.create(vendor=self.vendor, name='Protein')
 
     def test_available_addon_passes(self):
         addon = Addon.objects.create(group=self.group, name='Chicken', price_delta=Decimal('300'), is_available=True)

@@ -499,7 +499,7 @@ class DealDetailSerializer(serializers.ModelSerializer):
 # foreign keys the client chooses at write time, not implied by the URL.
 # ─────────────────────────────────────────────────────────────────────────────
 
-from .models import MenuCategory, MenuItem, AddonGroup, Addon
+from .models import MenuCategory, MenuItem, AddonGroup, Addon, MenuItemAddonGroup
 
 
 class MenuCategorySerializer(serializers.ModelSerializer):
@@ -517,24 +517,28 @@ class AddonSerializer(serializers.ModelSerializer):
 
     def validate_group(self, group):
         request = self.context['request']
-        if group.menu_item.listing.vendor_id != request.user.id:
-            raise serializers.ValidationError("You can only add add-ons to your own menu items.")
+        if group.vendor_id != request.user.id:
+            raise serializers.ValidationError("You can only add options to your own add-on groups.")
         return group
 
 
 class AddonGroupSerializer(serializers.ModelSerializer):
+    """
+    A vendor's reusable add-on template ("Spice Level") — not tied to any
+    one dish. `linked_menu_item_ids` tells the dashboard which dishes
+    already use this group, so it can offer "unlink" instead of a blind
+    delete. See MenuItemAddonGroupSerializer for how a dish links to one.
+    """
     addons = AddonSerializer(many=True, read_only=True)
+    linked_menu_item_ids = serializers.SerializerMethodField()
 
     class Meta:
         model = AddonGroup
-        fields = ['id', 'menu_item', 'name', 'is_required', 'min_selections', 'max_selections', 'display_order', 'addons']
+        fields = ['id', 'name', 'is_required', 'min_selections', 'max_selections', 'display_order', 'addons', 'linked_menu_item_ids']
         read_only_fields = ['id']
 
-    def validate_menu_item(self, menu_item):
-        request = self.context['request']
-        if menu_item.listing.vendor_id != request.user.id:
-            raise serializers.ValidationError("You can only add add-on groups to your own menu items.")
-        return menu_item
+    def get_linked_menu_item_ids(self, obj):
+        return list(obj.menu_items.values_list('id', flat=True))
 
     def validate(self, data):
         min_selections = data.get('min_selections', getattr(self.instance, 'min_selections', 0))
@@ -552,8 +556,88 @@ class AddonGroupSerializer(serializers.ModelSerializer):
         return data
 
 
+class MenuItemAddonGroupSerializer(serializers.ModelSerializer):
+    """
+    Links one of the vendor's library AddonGroups to one of their dishes.
+    The three `*_override` fields are nullable write inputs; `is_required`/
+    `min_selections`/`max_selections` are the *effective* read-only values
+    (override if set, else the library group's own default) — what the
+    buyer-facing picker and `menu_selection.validate_addon_selection` both
+    actually enforce for this dish.
+    """
+    name = serializers.CharField(source='addon_group.name', read_only=True)
+    addons = AddonSerializer(source='addon_group.addons', many=True, read_only=True)
+    is_required = serializers.SerializerMethodField()
+    min_selections = serializers.SerializerMethodField()
+    max_selections = serializers.SerializerMethodField()
+
+    class Meta:
+        model = MenuItemAddonGroup
+        fields = [
+            'id', 'menu_item', 'addon_group', 'name', 'display_order',
+            'is_required_override', 'min_selections_override', 'max_selections_override',
+            'is_required', 'min_selections', 'max_selections', 'addons',
+        ]
+        read_only_fields = ['id']
+
+    def get_is_required(self, obj):
+        return obj.effective_is_required
+
+    def get_min_selections(self, obj):
+        return obj.effective_min_selections
+
+    def get_max_selections(self, obj):
+        return obj.effective_max_selections
+
+    def validate_menu_item(self, menu_item):
+        request = self.context['request']
+        if menu_item.listing.vendor_id != request.user.id:
+            raise serializers.ValidationError("You can only link add-on groups to your own menu items.")
+        return menu_item
+
+    def validate_addon_group(self, addon_group):
+        request = self.context['request']
+        if addon_group.vendor_id != request.user.id:
+            raise serializers.ValidationError("You can only link your own add-on groups.")
+        return addon_group
+
+    def validate(self, data):
+        menu_item = data.get('menu_item', getattr(self.instance, 'menu_item', None))
+        addon_group = data.get('addon_group', getattr(self.instance, 'addon_group', None))
+
+        if menu_item and addon_group:
+            existing = MenuItemAddonGroup.objects.filter(menu_item=menu_item, addon_group=addon_group)
+            if self.instance is not None:
+                existing = existing.exclude(pk=self.instance.pk)
+            if existing.exists():
+                raise serializers.ValidationError("This add-on group is already linked to this item.")
+
+        def resolve(default_field, override_field):
+            override = data[override_field] if override_field in data else getattr(self.instance, override_field, None)
+            if override is not None:
+                return override
+            return getattr(addon_group, default_field, None)
+
+        if addon_group is not None:
+            is_required = resolve('is_required', 'is_required_override')
+            min_selections = resolve('min_selections', 'min_selections_override')
+            max_selections = resolve('max_selections', 'max_selections_override')
+
+            if max_selections is not None and max_selections < 1:
+                raise serializers.ValidationError({'max_selections_override': 'Effective max_selections must be at least 1.'})
+            if min_selections is not None and max_selections is not None and min_selections > max_selections:
+                raise serializers.ValidationError(
+                    {'min_selections_override': 'Effective min_selections cannot be greater than effective max_selections.'}
+                )
+            if is_required and (min_selections or 0) < 1:
+                raise serializers.ValidationError(
+                    {'min_selections_override': 'A required link must have an effective min_selections of at least 1.'}
+                )
+        return data
+
+
 class MenuItemSerializer(serializers.ModelSerializer):
-    addon_groups = AddonGroupSerializer(many=True, read_only=True)
+    addon_groups = MenuItemAddonGroupSerializer(source='addon_group_links', many=True, read_only=True)
     listing_title = serializers.CharField(source='listing.title', read_only=True)
     listing_price = serializers.DecimalField(source='listing.price', max_digits=10, decimal_places=2, read_only=True)
     listing_is_available = serializers.BooleanField(source='listing.is_available', read_only=True)

@@ -8,7 +8,7 @@ from django import forms
 import csv
 from .models import (
     Category, Listing, ListingVariant, Transaction, VendorOfTheMonth,
-    MenuCategory, MenuItem, AddonGroup, Addon, HeroSlide,
+    MenuCategory, MenuItem, AddonGroup, Addon, MenuItemAddonGroup, HeroSlide,
 )
 
 
@@ -665,30 +665,35 @@ class AddonInline(admin.TabularInline):
 
 @admin.register(AddonGroup)
 class AddonGroupAdmin(admin.ModelAdmin):
-    list_display = ['name', 'menu_item', 'is_required', 'min_selections', 'max_selections', 'display_order']
+    """
+    AddonGroup is now a vendor-level library template (Phase 2 — reusable
+    add-on library), not owned by any single MenuItem. Which dishes it's
+    linked to is managed from MenuItemAdmin's own page via
+    MenuItemAddonGroupInline below, not here.
+    """
+    list_display = ['name', 'vendor', 'is_required', 'min_selections', 'max_selections', 'display_order']
     list_filter = ['is_required']
-    search_fields = ['name', 'menu_item__listing__title']
+    search_fields = ['name', 'vendor__username']
     # Matches the raw_id_fields precedent on ListingAdmin.vendor — avoids an
-    # unpaginated <select> of every MenuItem once a vendor has many listings.
-    # Requires MenuItemAdmin.search_fields, which already exists below.
-    autocomplete_fields = ['menu_item']
+    # unpaginated <select> of every vendor.
+    raw_id_fields = ['vendor']
     inlines = [AddonInline]
 
 
-class AddonGroupInline(admin.StackedInline):
+class MenuItemAddonGroupInline(admin.TabularInline):
     """
-    Lets AddonGroups be added directly from MenuItemAdmin's own page
-    (reached via MenuItemInline's show_change_link on the Listing screen).
-    Deliberately does NOT nest AddonInline underneath — Django admin
-    doesn't support a third level of inline nesting (Addon-inside-
-    AddonGroup-inside-MenuItem-inside-Listing), so entering the 3-5 actual
-    Addons per group still requires one more hop to AddonGroupAdmin's own
-    page, where AddonInline (above) already handles that.
+    Links one of the vendor's library AddonGroups (created/edited via
+    AddonGroupAdmin above) to this dish — reached via MenuItemInline's
+    show_change_link on the Listing screen. The three override fields are
+    optional; leaving them blank means this dish just inherits whatever the
+    library group's own is_required/min_selections/max_selections currently
+    say, so most links need nothing filled in here at all.
     """
-    model = AddonGroup
+    model = MenuItemAddonGroup
     extra = 0
-    fields = ('name', 'is_required', 'min_selections', 'max_selections', 'display_order')
-    show_change_link = True
+    fields = ('addon_group', 'display_order', 'is_required_override', 'min_selections_override', 'max_selections_override')
+    # Requires AddonGroupAdmin.search_fields above, same autocomplete pattern.
+    autocomplete_fields = ['addon_group']
 
 
 @admin.register(MenuItem)
@@ -697,7 +702,7 @@ class MenuItemAdmin(admin.ModelAdmin):
     list_filter = ['is_seasonal', 'is_hidden', 'is_archived']
     search_fields = ['listing__title']
     raw_id_fields = ['listing']
-    inlines = [AddonGroupInline]
+    inlines = [MenuItemAddonGroupInline]
 
 
 @admin.register(HeroSlide)

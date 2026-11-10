@@ -282,21 +282,32 @@ class MenuItem(models.Model):
 
 
 class AddonGroup(models.Model):
-    """A customization prompt on a menu item ("Choose your protein")."""
-    menu_item = models.ForeignKey(MenuItem, on_delete=models.CASCADE, related_name='addon_groups')
+    """
+    A vendor-level customization template ("Spice Level", "Choose your
+    protein") — owned by the vendor, not any single dish. Linked to one or
+    more MenuItems via MenuItemAddonGroup so the same group (and its Addons)
+    is built once and reused across dishes instead of recreated from scratch
+    on each one. is_required/min_selections/max_selections here are the
+    group's defaults; any individual link can override them — see
+    MenuItemAddonGroup.effective_* below.
+    """
+    vendor = models.ForeignKey(User, on_delete=models.CASCADE, related_name='addon_groups')
     name = models.CharField(max_length=100)
     is_required = models.BooleanField(default=False)
     min_selections = models.PositiveIntegerField(default=0)
     max_selections = models.PositiveIntegerField(default=1)
     display_order = models.PositiveIntegerField(default=0)
+    menu_items = models.ManyToManyField(
+        MenuItem, through='MenuItemAddonGroup', related_name='addon_groups', blank=True,
+    )
 
     class Meta:
-        ordering = ['menu_item_id', 'display_order', 'id']
+        ordering = ['vendor_id', 'display_order', 'id']
         verbose_name = "Add-on Group"
         verbose_name_plural = "Add-on Groups"
 
     def __str__(self):
-        return f"{self.menu_item.listing.title} — {self.name}"
+        return f"{self.vendor.username} — {self.name}"
 
 
 class Addon(models.Model):
@@ -315,6 +326,49 @@ class Addon(models.Model):
 
     def __str__(self):
         return f"{self.group.name} — {self.name} ({self.price_delta:+})"
+
+
+class MenuItemAddonGroup(models.Model):
+    """
+    Links one of a vendor's reusable AddonGroups to one of their MenuItems.
+    This is the only place a dish and a library group connect — AddonGroup
+    itself no longer points at any single MenuItem.
+
+    is_required_override/min_selections_override/max_selections_override are
+    nullable and fall back to the AddonGroup's own values when unset (see the
+    effective_* properties) — e.g. "Spice Level" can be required on one dish
+    and optional on another without forking the group itself.
+    """
+    menu_item = models.ForeignKey(MenuItem, on_delete=models.CASCADE, related_name='addon_group_links')
+    addon_group = models.ForeignKey(AddonGroup, on_delete=models.CASCADE, related_name='menu_item_links')
+    display_order = models.PositiveIntegerField(default=0)
+    is_required_override = models.BooleanField(null=True, blank=True)
+    min_selections_override = models.PositiveIntegerField(null=True, blank=True)
+    max_selections_override = models.PositiveIntegerField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['menu_item_id', 'display_order', 'id']
+        constraints = [
+            models.UniqueConstraint(fields=['menu_item', 'addon_group'], name='unique_menuitem_addongroup_link'),
+        ]
+        verbose_name = "Add-on Group Link"
+        verbose_name_plural = "Add-on Group Links"
+
+    @property
+    def effective_is_required(self):
+        return self.addon_group.is_required if self.is_required_override is None else self.is_required_override
+
+    @property
+    def effective_min_selections(self):
+        return self.addon_group.min_selections if self.min_selections_override is None else self.min_selections_override
+
+    @property
+    def effective_max_selections(self):
+        return self.addon_group.max_selections if self.max_selections_override is None else self.max_selections_override
+
+    def __str__(self):
+        return f"{self.menu_item.listing.title} — {self.addon_group.name}"
 
 
 class Transaction(models.Model):
