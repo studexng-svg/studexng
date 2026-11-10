@@ -54,6 +54,11 @@ class AdminVendorDeliverySettingsTests(TestCase):
             'free_deliveries_used': None,
             'free_deliveries_remaining': None,
             'delivery_paused': False,
+            'vendor_type': {
+                'id': self.vendor_record.vendor_type_id,
+                'name': 'food',
+                'display_name': self.vendor_record.vendor_type.display_name,
+            },
         })
 
     def test_get_vendor_block_is_none_when_no_vendor_row(self):

@@ -823,6 +823,124 @@ class AdminOrderDetailPaymentBreakdownTests(APITestCase):
         self.assertIsNone(response.data['platform_fee'])
 
 
+class AdminVendorTypeAssignmentTests(APITestCase):
+    """
+    GET /api/admin/vendor-types/ + PATCH /api/admin/users/{id}/ (vendor.
+    vendor_type) — assigning a VendorType from the admin dashboard instead
+    of raw Django admin. Ugo's ask: "add a Vendor Type dropdown to
+    /admin/users/[id]".
+    """
+
+    def setUp(self):
+        from accounts.models import VendorType
+        self.client = APIClient()
+        self.admin = User.objects.create_user(
+            username='vt_admin', email='vt_admin@pau.edu.ng', password='pass123', is_staff=True,
+        )
+        self.vendor_user = User.objects.create_user(
+            username='vt_vendor', email='vt_vendor@pau.edu.ng', password='pass123',
+            user_type='vendor', is_verified_vendor=True,
+        )
+        self.non_admin = User.objects.create_user(
+            username='vt_regular', email='vt_regular@pau.edu.ng', password='pass123',
+        )
+        self.food_type = VendorType.objects.create(
+            name='food_vt_test', display_name='Food (Test)',
+            supports_menu_ordering=True, supports_batched_delivery=True,
+        )
+        self.retail_type = VendorType.objects.create(name='retail_vt_test', display_name='Retail (Test)')
+
+    def test_vendor_type_list_requires_admin(self):
+        self.client.force_authenticate(user=self.non_admin)
+        response = self.client.get('/api/admin/vendor-types/')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_vendor_type_list_returns_capability_flags(self):
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.get('/api/admin/vendor-types/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        food = next(vt for vt in response.data if vt['name'] == 'food_vt_test')
+        self.assertTrue(food['supports_menu_ordering'])
+        self.assertTrue(food['supports_batched_delivery'])
+
+    def test_new_vendor_has_no_vendor_type_by_default(self):
+        """A vendor row that exists (e.g. just approved) but was never assigned a type."""
+        from accounts.models import Vendor
+        Vendor.objects.create(user=self.vendor_user)
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.get(f'/api/admin/users/{self.vendor_user.id}/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIsNone(response.data['vendor']['vendor_type'])
+
+    def test_vendor_block_is_none_when_no_vendor_row_at_all(self):
+        """Distinct from the case above — no Vendor row exists yet, not just an untyped one."""
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.get(f'/api/admin/users/{self.vendor_user.id}/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIsNone(response.data['vendor'])
+
+    def test_admin_assigns_vendor_type(self):
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.patch(
+            f'/api/admin/users/{self.vendor_user.id}/', {'vendor': {'vendor_type': self.food_type.id}}, format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['vendor']['vendor_type']['name'], 'food_vt_test')
+
+        from accounts.models import Vendor
+        v = Vendor.objects.get(user=self.vendor_user)
+        self.assertEqual(v.vendor_type_id, self.food_type.id)
+
+    def test_admin_reassigns_vendor_type(self):
+        from accounts.models import Vendor
+        Vendor.objects.update_or_create(user=self.vendor_user, defaults={'vendor_type': self.food_type})
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.patch(
+            f'/api/admin/users/{self.vendor_user.id}/', {'vendor': {'vendor_type': self.retail_type.id}}, format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['vendor']['vendor_type']['name'], 'retail_vt_test')
+
+    def test_admin_clears_vendor_type_with_null(self):
+        from accounts.models import Vendor
+        Vendor.objects.update_or_create(user=self.vendor_user, defaults={'vendor_type': self.food_type})
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.patch(
+            f'/api/admin/users/{self.vendor_user.id}/', {'vendor': {'vendor_type': None}}, format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIsNone(response.data['vendor']['vendor_type'])
+
+    def test_invalid_vendor_type_id_rejected(self):
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.patch(
+            f'/api/admin/users/{self.vendor_user.id}/', {'vendor': {'vendor_type': 999999}}, format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_assigning_vendor_type_creates_vendor_row_if_missing(self):
+        """A brand-new vendor (Lala) may not have a Vendor row yet — get_or_create must cover this."""
+        from accounts.models import Vendor
+        self.assertFalse(Vendor.objects.filter(user=self.vendor_user).exists())
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.patch(
+            f'/api/admin/users/{self.vendor_user.id}/', {'vendor': {'vendor_type': self.food_type.id}}, format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(Vendor.objects.filter(user=self.vendor_user, vendor_type=self.food_type).exists())
+
+    def test_vendor_type_unaffected_when_not_in_patch_body(self):
+        """Saving delivery_fee alone must not silently clear an already-set vendor_type."""
+        from accounts.models import Vendor
+        Vendor.objects.update_or_create(user=self.vendor_user, defaults={'vendor_type': self.food_type})
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.patch(
+            f'/api/admin/users/{self.vendor_user.id}/', {'vendor': {'delivery_fee': '200'}}, format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['vendor']['vendor_type']['name'], 'food_vt_test')
+
+
 class AdminAnalyticsProductStatsTests(TestCase):
     """Test the most-searched / most-ordered product admin analytics."""
 

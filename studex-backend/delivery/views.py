@@ -233,6 +233,13 @@ class AdminAssignRiderView(APIView):
         try:
             from accounts.utils import send_notification
 
+            # send_email=True on all three below (was False): same reasoning
+            # as auto_assign_rider (delivery.assignment) and the delivery-code
+            # push in RiderUpdateStatusView — push has no delivery guarantee,
+            # and a missed rider assignment, a vendor who never packages the
+            # order, or a buyer left wondering where their delivery is are all
+            # worse outcomes than one extra email.
+
             # Notify the rider
             send_notification(
                 recipient=rider,
@@ -243,7 +250,7 @@ class AdminAssignRiderView(APIView):
                     f'Collect from vendor "@{order.listing.vendor.username}" and drop at "{drop_label}".'
                 ),
                 action_url='/rider',
-                send_email=False,
+                send_email=True,
             )
 
             # Notify the vendor — package and hand off to rider
@@ -256,7 +263,7 @@ class AdminAssignRiderView(APIView):
                     f'Please package the order and hand it to rider "@{rider.username}" when they arrive.'
                 ),
                 action_url=f'/vendor/dashboard/orders',
-                send_email=False,
+                send_email=True,
             )
 
             # Notify the buyer — delivery is on the way
@@ -269,7 +276,7 @@ class AdminAssignRiderView(APIView):
                     f'Your package will be delivered to "{drop_label}". We\'ll notify you when it arrives.'
                 ),
                 action_url=f'/account/orders/{order.id}',
-                send_email=False,
+                send_email=True,
             )
         except Exception:
             pass

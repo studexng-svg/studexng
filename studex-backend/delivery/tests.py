@@ -153,6 +153,22 @@ class AutoAssignRiderCampusTests(DeliveryTestBase):
 
         self.assertIsNone(assignment)
 
+    def test_rider_assignment_notification_emails_as_push_fallback(self):
+        """
+        Same reasoning as the delivery-code push (RiderUpdateStatusView):
+        push has no delivery guarantee, and a rider who misses this
+        notification has no other way to find out they've got a job.
+        """
+        from delivery.assignment import auto_assign_rider
+        self.rider.school = "pau"
+        self.rider.save(update_fields=["school"])
+        with patch("accounts.utils.send_notification") as mock_notify:
+            assignment = auto_assign_rider(self.order)
+        self.assertIsNotNone(assignment)
+        mock_notify.assert_called_once()
+        self.assertEqual(mock_notify.call_args.kwargs["recipient"], self.rider)
+        self.assertTrue(mock_notify.call_args.kwargs["send_email"])
+
 
 class AdminAssignRiderViewTests(DeliveryTestBase):
     """
@@ -219,6 +235,44 @@ class AdminAssignRiderViewTests(DeliveryTestBase):
         assignment = DeliveryAssignment.objects.get(order=self.order)
         self.assertEqual(assignment.pickup_point_id, self.point.id)
         self.assertEqual(res.data["pickup_point_name"], "Hall A Gate")
+
+    def test_all_three_assignment_notifications_email_as_push_fallback(self):
+        """
+        Same reasoning as auto_assign_rider and the delivery-code push:
+        push has no delivery guarantee, and a missed rider assignment, a
+        vendor who never packages the order, or a buyer left wondering
+        where their delivery is are all worse than one extra email.
+        """
+        self.client.force_authenticate(user=self.staff)
+        with patch("accounts.utils.send_notification") as mock_notify:
+            res = self.client.post(
+                f"/api/admin/orders/{self.order.id}/assign-rider/",
+                {"rider_id": self.rider.id},
+            )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED, res.data)
+        self.assertEqual(mock_notify.call_count, 3)  # rider, vendor, buyer
+        recipients = {c.kwargs["recipient"] for c in mock_notify.call_args_list}
+        self.assertEqual(recipients, {self.rider, self.order.listing.vendor, self.order.buyer})
+        self.assertTrue(all(c.kwargs["send_email"] for c in mock_notify.call_args_list))
+
+
+class NotifyRiderAssignmentDjangoAdminTests(DeliveryTestBase):
+    """
+    delivery.admin.notify_rider_assignment — the Blocker 8 shared contract
+    orders/admin.py calls when a rider is reassigned from the Order admin's
+    inline formset in raw Django admin, not the Next.js AdminAssignRiderView.
+    Same rider-assignment event, different trigger path — must carry the
+    same email fallback.
+    """
+
+    def test_all_three_notifications_email_as_push_fallback(self):
+        from delivery.admin import notify_rider_assignment
+        with patch("accounts.utils.send_notification") as mock_notify:
+            notify_rider_assignment(self.order, self.rider, self.point)
+        self.assertEqual(mock_notify.call_count, 3)  # rider, vendor, buyer
+        recipients = {c.kwargs["recipient"] for c in mock_notify.call_args_list}
+        self.assertEqual(recipients, {self.rider, self.order.listing.vendor, self.order.buyer})
+        self.assertTrue(all(c.kwargs["send_email"] for c in mock_notify.call_args_list))
 
 
 class DeliveryCodeSecrecyTests(DeliveryTestBase):

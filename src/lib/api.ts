@@ -768,10 +768,6 @@ export const api = {
     notifyUser: (id: number | string, body: Record<string, unknown>) =>
       fetchWithAuth(u(`/api/admin/users/${id}/notify/`), { method: "POST", body: s(body) }),
 
-    // VendorType options for the "Vendor Type" dropdown on the user detail
-    // page — updateUser(id, { vendor: { vendor_type: id | null } }) applies it.
-    vendorTypes: () => fetchWithAuth(u("/api/admin/vendor-types/")),
-
     makeRider: (id: number | string) =>
       fetchWithAuth(u(`/api/admin/users/${id}/make-rider/`), { method: "POST" }),
 

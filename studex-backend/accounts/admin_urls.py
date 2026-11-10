@@ -8,6 +8,7 @@ from accounts.admin_views import (
     AdminActivityView,
     AdminUserListView,
     AdminUserDetailView,
+    AdminVendorTypeListView,
     AdminNotifyUserView,
     AdminPromoteToRiderView,
     AdminListingListView,
@@ -65,6 +66,7 @@ urlpatterns = [
     path('users/<int:user_id>/', AdminUserDetailView.as_view(), name='user-detail'),
     path('users/<int:user_id>/notify/', AdminNotifyUserView.as_view(), name='notify-user'),
     path('users/<int:user_id>/make-rider/', AdminPromoteToRiderView.as_view(), name='make-rider'),
+    path('vendor-types/', AdminVendorTypeListView.as_view(), name='vendor-type-list'),
 ]
 
 if AdminListingListView is not None:

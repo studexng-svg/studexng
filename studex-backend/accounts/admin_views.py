@@ -273,6 +273,15 @@ class AdminUserDetailView(APIView):
             'free_deliveries_used': used,
             'free_deliveries_remaining': remaining,
             'delivery_paused': v.delivery_paused,
+            # Drives every VendorType-gated capability (menu ordering,
+            # batched delivery, catalog labels — see accounts.models.
+            # VendorType docstring) — previously only settable via raw
+            # Django admin. None means "plain listing vendor", no type
+            # assigned, identical to today's default for every vendor.
+            'vendor_type': (
+                {'id': v.vendor_type_id, 'name': v.vendor_type.name, 'display_name': v.vendor_type.display_name}
+                if v.vendor_type_id else None
+            ),
         }
 
     def patch(self, request, user_id):
@@ -290,6 +299,9 @@ class AdminUserDetailView(APIView):
             - vendor.delivery_paused: Kill-switch — true means checkout shows
               no delivery slots for this vendor at all, without touching any
               individual DeliverySlot row (see delivery.capacity).
+            - vendor.vendor_type: VendorType id, or null to clear it back to
+              "plain listing vendor" (accounts.models.VendorType — gates
+              menu ordering, batched delivery, catalog labels).
         """
         try:
             user = User.objects.get(id=user_id)
@@ -390,6 +402,18 @@ class AdminUserDetailView(APIView):
                         status=status.HTTP_400_BAD_REQUEST
                     )
 
+                new_vendor_type = None
+                vendor_type_provided = 'vendor_type' in vendor_data
+                if vendor_type_provided and vendor_data['vendor_type'] is not None:
+                    from accounts.models import VendorType
+                    try:
+                        new_vendor_type = VendorType.objects.get(id=vendor_data['vendor_type'])
+                    except (VendorType.DoesNotExist, TypeError, ValueError):
+                        return Response(
+                            {'error': 'vendor_type must be a valid VendorType id, or null.'},
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
+
                 v, _ = Vendor.objects.get_or_create(user=user)
                 if 'delivery_fee' in vendor_data:
                     v.delivery_fee = fee
@@ -397,6 +421,8 @@ class AdminUserDetailView(APIView):
                     v.free_delivery_quota = quota
                 if 'delivery_paused' in vendor_data:
                     v.delivery_paused = vendor_data['delivery_paused']
+                if vendor_type_provided:
+                    v.vendor_type = new_vendor_type
                 v.save()
 
             serializer = UserSerializer(user)
@@ -446,6 +472,28 @@ class AdminUserDetailView(APIView):
                 {'error': 'User not found'},
                 status=status.HTTP_404_NOT_FOUND
             )
+
+
+class AdminVendorTypeListView(APIView):
+    """
+    GET /api/admin/vendor-types/ — every VendorType row, for the "Vendor
+    Type" dropdown on the admin user-detail page (AdminUserDetailView.patch
+    consumes vendor.vendor_type). Read-only; VendorType rows themselves are
+    still created/edited via Django admin — this just lists what already
+    exists so assigning one to a vendor doesn't require leaving the app.
+    """
+    permission_classes = [IsAdminUser]
+
+    def get(self, request):
+        from accounts.models import VendorType
+        return Response([
+            {
+                'id': vt.id, 'name': vt.name, 'display_name': vt.display_name,
+                'supports_menu_ordering': vt.supports_menu_ordering,
+                'supports_batched_delivery': vt.supports_batched_delivery,
+            }
+            for vt in VendorType.objects.all().order_by('display_name')
+        ])
 
 
 # ============================================
