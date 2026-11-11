@@ -18,10 +18,6 @@ def notify_rider_assignment(order, rider, point):
     """
     try:
         from accounts.utils import send_notification
-        # send_email=True on all three (was False): same reasoning as the
-        # Next.js admin's AdminAssignRiderView and auto_assign_rider — push
-        # has no delivery guarantee, and this is the same rider-assignment
-        # event, just triggered from the Django admin inline formset instead.
         send_notification(
             recipient=rider,
             notification_type='order',
@@ -31,7 +27,7 @@ def notify_rider_assignment(order, rider, point):
                 f'Collect from "@{order.listing.vendor.username}" and drop at "{point.name}".'
             ),
             action_url='/rider',
-            send_email=True,
+            send_email=False,
         )
         send_notification(
             recipient=order.listing.vendor,
@@ -42,7 +38,7 @@ def notify_rider_assignment(order, rider, point):
                 f'Hand it to "@{rider.username}" when they arrive.'
             ),
             action_url='/vendor/dashboard/orders',
-            send_email=True,
+            send_email=False,
         )
         send_notification(
             recipient=order.buyer,
@@ -53,7 +49,7 @@ def notify_rider_assignment(order, rider, point):
                 f"We'll notify you when it arrives."
             ),
             action_url=f'/account/orders/{order.id}',
-            send_email=True,
+            send_email=False,
         )
     except Exception:
         pass

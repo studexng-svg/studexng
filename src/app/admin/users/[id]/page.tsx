@@ -68,9 +68,6 @@ export default function AdminUserDetail() {
   const [deliverySaving, setDeliverySaving] = useState(false);
   const [riderCampus, setRiderCampus] = useState("pau");
   const [riderCampusSaving, setRiderCampusSaving] = useState(false);
-  const [vendorTypes, setVendorTypes] = useState<any[]>([]);
-  const [selectedVendorType, setSelectedVendorType] = useState("");
-  const [vendorTypeSaving, setVendorTypeSaving] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -81,13 +78,6 @@ export default function AdminUserDetail() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  useEffect(() => {
-    api.admin.vendorTypes()
-      .then(r => r.ok ? r.json() : [])
-      .then(d => setVendorTypes(Array.isArray(d) ? d : []))
-      .catch(() => {});
-  }, []);
-
   // Re-sync the editable delivery fields whenever the user reloads or a
   // save round-trips a fresh vendor block back — never fires on every
   // keystroke since it only depends on `user`, not deliveryFee/deliveryQuota.
@@ -97,7 +87,6 @@ export default function AdminUserDetail() {
       user?.vendor?.free_delivery_quota != null ? String(user.vendor.free_delivery_quota) : ""
     );
     setRiderCampus((user?.school || "pau").toLowerCase());
-    setSelectedVendorType(user?.vendor?.vendor_type?.id != null ? String(user.vendor.vendor_type.id) : "");
   }, [user]);
 
   const patch = async (body: object) => {
@@ -157,23 +146,6 @@ export default function AdminUserDetail() {
       setError(e.message || "Action failed");
     } finally {
       setDeliverySaving(false);
-    }
-  };
-
-  const saveVendorType = async () => {
-    setVendorTypeSaving(true);
-    setError("");
-    try {
-      const res = await api.admin.updateUser(id as string, {
-        vendor: { vendor_type: selectedVendorType === "" ? null : Number(selectedVendorType) },
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed");
-      setUser(data);
-    } catch (e: any) {
-      setError(e.message || "Action failed");
-    } finally {
-      setVendorTypeSaving(false);
     }
   };
 
@@ -304,47 +276,6 @@ export default function AdminUserDetail() {
             <Row icon={Users}          label="Total Reviews"    value={p.total_reviews} />
             <Row icon={Wallet}         label="On-Platform Sales" value={p.on_platform_sales ? `₦${parseFloat(p.on_platform_sales).toLocaleString()}` : null} />
             <Row icon={BadgeCheck}     label="Vendor Badge"     value={p.vendor_badge} />
-          </Section>
-        )}
-
-        {/* Vendor Type — gates menu ordering, batched delivery, catalog
-            labels (accounts.models.VendorType). Previously only settable
-            via raw Django admin; this is the same PATCH AdminUserDetailView
-            already accepts, just surfaced here. */}
-        {isVendor && (
-          <Section title="Vendor Type">
-            <p className="text-xs text-stone-400 mb-3">
-              Determines whether this vendor gets menu ordering / delivery slots / a store card,
-              same as every other vendor of this type. "None" is a plain listing vendor — the
-              default for every new seller until this is set.
-            </p>
-            <div className="flex items-center gap-2">
-              <select
-                value={selectedVendorType}
-                onChange={e => setSelectedVendorType(e.target.value)}
-                className="flex-1 px-3 py-2.5 rounded-xl border border-stone-200 text-sm text-stone-900 bg-white focus:outline-none focus:border-teal-500"
-              >
-                <option value="">None — plain listing vendor</option>
-                {vendorTypes.map((vt: any) => (
-                  <option key={vt.id} value={vt.id}>{vt.display_name}</option>
-                ))}
-              </select>
-              <button
-                onClick={saveVendorType}
-                disabled={vendorTypeSaving}
-                className="px-4 py-2.5 font-semibold rounded-xl text-sm text-white transition hover:opacity-90 disabled:opacity-50 flex-shrink-0"
-                style={{ background: "#0D9488" }}
-              >
-                {vendorTypeSaving ? "Saving…" : "Save"}
-              </button>
-            </div>
-            {user.vendor?.vendor_type && (
-              <p className="text-xs text-stone-400 mt-2">
-                Current: <span className="font-semibold text-stone-600">{user.vendor.vendor_type.display_name}</span>
-                {vendorTypes.find((vt: any) => vt.id === user.vendor.vendor_type.id)?.supports_menu_ordering && " · Menu ordering"}
-                {vendorTypes.find((vt: any) => vt.id === user.vendor.vendor_type.id)?.supports_batched_delivery && " · Batched delivery"}
-              </p>
-            )}
           </Section>
         )}
 

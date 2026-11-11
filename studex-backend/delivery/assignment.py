@@ -79,10 +79,6 @@ def auto_assign_rider(order):
         try:
             from accounts.utils import send_notification
             destination = order.delivery_location or "see the order for details"
-            # send_email=True (was False): same reasoning as the delivery-code
-            # push in RiderUpdateStatusView — push has no delivery guarantee
-            # (no token, stale token, phone offline), and a rider who misses
-            # this one has no other way to find out they've got a job.
             send_notification(
                 recipient=rider,
                 notification_type='order',
@@ -92,7 +88,7 @@ def auto_assign_rider(order):
                     f'Collect from "@{order.listing.vendor.username}" and deliver to: {destination}.'
                 ),
                 action_url='/rider',
-                send_email=True,
+                send_email=False,
             )
         except Exception as e:
             logger.warning(f"auto_assign_rider: rider notification failed for order {order.id}: {e}")
