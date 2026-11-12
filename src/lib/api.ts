@@ -3,7 +3,7 @@
 // Authenticated methods use fetchWithAuth (auto token refresh + cookie support).
 // Most methods return Response so each call site handles errors in its own context.
 
-import { fetchWithAuth, fetchAllPages } from "@/lib/authStore";
+import { fetchWithAuth, fetchAllPages, setCsrfToken } from "@/lib/authStore";
 
 export const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 export { fetchAllPages };
@@ -119,7 +119,11 @@ export const api = {
       body: s(data),
       credentials: "include",
     });
-    return parseOrThrow(res);
+    const parsed = await parseOrThrow(res);
+    // CSRF token arrives in the body, not a cookie — see authStore.ts's
+    // comment on why a cookie can't work across the Vercel/Render split.
+    if (parsed?.csrf_token) setCsrfToken(parsed.csrf_token);
+    return parsed;
   },
 
   async login(data: LoginData): Promise<AuthResponse> {
@@ -129,7 +133,9 @@ export const api = {
       body: s(data),
       credentials: "include",
     });
-    return parseOrThrow(res);
+    const parsed = await parseOrThrow(res);
+    if (parsed?.csrf_token) setCsrfToken(parsed.csrf_token);
+    return parsed;
   },
 
   async forgotPassword(email: string): Promise<{ detail: string }> {

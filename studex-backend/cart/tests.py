@@ -18,7 +18,7 @@ from django.db import IntegrityError
 from rest_framework.test import APIClient
 
 from accounts.models import User
-from services.models import Category, Listing, MenuItem, AddonGroup, Addon, Deal
+from services.models import Category, Listing, MenuItem, AddonGroup, Addon, Deal, MenuItemAddonGroup
 from cart.models import CartItem, CartItemAddon, compute_addon_signature
 
 
@@ -51,7 +51,8 @@ class CartItemAddonTests(TestCase):
             vendor=self.vendor, category=self.category, is_available=True,
         )
         self.menu_item = MenuItem.objects.create(listing=self.listing)
-        self.group = AddonGroup.objects.create(menu_item=self.menu_item, name='Protein')
+        self.group = AddonGroup.objects.create(vendor=self.vendor, name='Protein')
+        MenuItemAddonGroup.objects.create(menu_item=self.menu_item, addon_group=self.group)
         self.addon = Addon.objects.create(group=self.group, name='Chicken', price_delta=Decimal('300.00'))
 
     def test_cart_item_addon_selection(self):
@@ -114,7 +115,8 @@ class CartItemUniquenessTests(TestCase):
             vendor=self.vendor, category=self.category, is_available=True,
         )
         self.menu_item = MenuItem.objects.create(listing=self.listing)
-        self.group = AddonGroup.objects.create(menu_item=self.menu_item, name='Protein')
+        self.group = AddonGroup.objects.create(vendor=self.vendor, name='Protein')
+        MenuItemAddonGroup.objects.create(menu_item=self.menu_item, addon_group=self.group)
         self.chicken = Addon.objects.create(group=self.group, name='Chicken', price_delta=Decimal('300.00'))
         self.beef = Addon.objects.create(group=self.group, name='Beef', price_delta=Decimal('400.00'))
 
@@ -207,7 +209,8 @@ class AddToCartWithAddonsTests(TestCase):
             vendor=self.vendor, category=self.category, is_available=True,
         )
         self.menu_item = MenuItem.objects.create(listing=self.listing)
-        self.group = AddonGroup.objects.create(menu_item=self.menu_item, name='Protein', max_selections=1)
+        self.group = AddonGroup.objects.create(vendor=self.vendor, name='Protein', max_selections=1)
+        MenuItemAddonGroup.objects.create(menu_item=self.menu_item, addon_group=self.group)
         self.chicken = Addon.objects.create(group=self.group, name='Chicken', price_delta=Decimal('300.00'))
         self.beef = Addon.objects.create(group=self.group, name='Beef', price_delta=Decimal('400.00'))
         self.client.force_authenticate(user=self.buyer)
@@ -275,7 +278,8 @@ class AddToCartWithAddonsTests(TestCase):
             vendor=self.vendor, category=self.category, is_available=True,
         )
         other_menu_item = MenuItem.objects.create(listing=other_listing)
-        other_group = AddonGroup.objects.create(menu_item=other_menu_item, name='Spice')
+        other_group = AddonGroup.objects.create(vendor=self.vendor, name='Spice')
+        MenuItemAddonGroup.objects.create(menu_item=other_menu_item, addon_group=other_group)
         foreign_addon = Addon.objects.create(group=other_group, name='Extra Spicy', price_delta=Decimal('0'))
 
         response = self.client.post(
@@ -318,7 +322,8 @@ class AddToCartWithAddonQuantitiesTests(TestCase):
             vendor=self.vendor, category=self.category, is_available=True,
         )
         self.menu_item = MenuItem.objects.create(listing=self.listing)
-        self.group = AddonGroup.objects.create(menu_item=self.menu_item, name='Extras', max_selections=2)
+        self.group = AddonGroup.objects.create(vendor=self.vendor, name='Extras', max_selections=2)
+        MenuItemAddonGroup.objects.create(menu_item=self.menu_item, addon_group=self.group)
         self.chicken = Addon.objects.create(group=self.group, name='Chicken', price_delta=Decimal('300.00'))
         self.client.force_authenticate(user=self.buyer)
 
@@ -405,7 +410,8 @@ class CartItemByIdEndpointsTests(TestCase):
             vendor=self.vendor, category=self.category, is_available=True,
         )
         self.menu_item = MenuItem.objects.create(listing=self.listing)
-        self.group = AddonGroup.objects.create(menu_item=self.menu_item, name='Protein', max_selections=1)
+        self.group = AddonGroup.objects.create(vendor=self.vendor, name='Protein', max_selections=1)
+        MenuItemAddonGroup.objects.create(menu_item=self.menu_item, addon_group=self.group)
         self.chicken = Addon.objects.create(group=self.group, name='Chicken', price_delta=Decimal('300.00'))
         self.beef = Addon.objects.create(group=self.group, name='Beef', price_delta=Decimal('400.00'))
         self.client.force_authenticate(user=self.buyer)

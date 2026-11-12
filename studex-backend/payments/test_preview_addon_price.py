@@ -17,7 +17,7 @@ from django.test import TestCase
 from rest_framework.test import APIClient
 
 from accounts.models import User
-from services.models import Category, Listing, MenuItem, AddonGroup, Addon
+from services.models import Category, Listing, MenuItem, AddonGroup, Addon, MenuItemAddonGroup
 from cart.models import CartItem, CartItemAddon
 from payments.models import PricingSettings
 from payments.pricing import calculate_final_price
@@ -36,7 +36,8 @@ class PreviewAddonPriceTests(TestCase):
             vendor=self.vendor, category=self.category, is_available=True,
         )
         self.menu_item = MenuItem.objects.create(listing=self.listing)
-        self.group = AddonGroup.objects.create(menu_item=self.menu_item, name='Protein', max_selections=2)
+        self.group = AddonGroup.objects.create(vendor=self.vendor, name='Protein', max_selections=2)
+        MenuItemAddonGroup.objects.create(menu_item=self.menu_item, addon_group=self.group)
         self.chicken = Addon.objects.create(group=self.group, name='Chicken', price_delta=Decimal('500'))
 
     def test_item_alone_matches_listing_price(self):
@@ -105,7 +106,8 @@ class PreviewAddonPriceTests(TestCase):
             vendor=self.vendor, category=self.category, is_available=True,
         )
         other_menu_item = MenuItem.objects.create(listing=other_listing)
-        other_group = AddonGroup.objects.create(menu_item=other_menu_item, name='Protein', max_selections=1)
+        other_group = AddonGroup.objects.create(vendor=self.vendor, name='Protein', max_selections=1)
+        MenuItemAddonGroup.objects.create(menu_item=other_menu_item, addon_group=other_group)
         other_addon = Addon.objects.create(group=other_group, name='Beef', price_delta=Decimal('300'))
 
         response = self.client.post(

@@ -15,7 +15,7 @@ from django.test import TestCase
 from rest_framework.test import APIClient
 
 from accounts.models import User, Vendor, VendorType
-from services.models import Category, Listing, MenuItem, AddonGroup, Addon
+from services.models import Category, Listing, MenuItem, AddonGroup, Addon, MenuItemAddonGroup
 from orders.models import Order, OrderItem, OrderItemAddon
 from delivery.models import DeliverySlot, DeliveryAssignment, CampusPickupPoint
 
@@ -133,7 +133,8 @@ class RiderBatchListViewTests(TestCase):
 
     def test_itemized_contents_from_order_items(self):
         menu_item = MenuItem.objects.create(listing=self.listing)
-        group = AddonGroup.objects.create(menu_item=menu_item, name='Extras')
+        group = AddonGroup.objects.create(vendor=self.vendor, name='Extras')
+        MenuItemAddonGroup.objects.create(menu_item=menu_item, addon_group=group)
         addon = Addon.objects.create(group=group, name='Extra Chicken', price_delta=Decimal('300'))
 
         order = self._make_order('STX-RB-0007')

@@ -17,7 +17,7 @@ from django.test import TestCase
 from django.utils import timezone
 
 from accounts.models import User, Vendor, VendorType
-from services.models import Category, Listing, MenuItem, AddonGroup, Addon
+from services.models import Category, Listing, MenuItem, AddonGroup, Addon, MenuItemAddonGroup
 from cart.models import CartItem, CartItemAddon
 from orders.models import Order, OrderItem, OrderItemAddon
 from delivery.models import DeliverySlot
@@ -40,7 +40,8 @@ class PriceCartItemTests(TestCase):
             vendor=self.vendor, category=self.category, is_available=True,
         )
         self.menu_item = MenuItem.objects.create(listing=self.listing)
-        self.group = AddonGroup.objects.create(menu_item=self.menu_item, name='Extras', max_selections=2)
+        self.group = AddonGroup.objects.create(vendor=self.vendor, name='Extras', max_selections=2)
+        MenuItemAddonGroup.objects.create(menu_item=self.menu_item, addon_group=self.group)
         self.chicken = Addon.objects.create(group=self.group, name='Extra Chicken', price_delta=Decimal('1000'))
 
     def test_item_alone_prices_at_fee_on_base_payout(self):
@@ -214,7 +215,8 @@ class CreateOrderFromPricedLinesTests(TestCase):
             vendor=self.vendor_b, category=self.category, is_available=True,
         )
         self.menu_item = MenuItem.objects.create(listing=self.listing_a)
-        self.group = AddonGroup.objects.create(menu_item=self.menu_item, name='Extras', max_selections=2)
+        self.group = AddonGroup.objects.create(vendor=self.vendor_a, name='Extras', max_selections=2)
+        MenuItemAddonGroup.objects.create(menu_item=self.menu_item, addon_group=self.group)
         self.chicken = Addon.objects.create(group=self.group, name='Extra Chicken', price_delta=Decimal('1000'))
 
     def test_creates_order_and_order_items_for_only_the_priced_vendor(self):

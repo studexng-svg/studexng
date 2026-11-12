@@ -4,7 +4,7 @@ from rest_framework_simplejwt.views import TokenRefreshView
 from . import views
 from .views import SellerApplicationViewSet, VendorViewSet, ForgotPasswordView, ResetPasswordView
 from .views import check_profile_completion, check_username, send_otp, verify_otp
-from .views import VendorDetailView, cookie_token_refresh, heartbeat
+from .views import VendorDetailView, cookie_token_refresh, heartbeat, ensure_csrf_token
 
 router = DefaultRouter()
 router.register(r'seller/applications', SellerApplicationViewSet, basename='seller-application')
@@ -18,6 +18,7 @@ urlpatterns = [
     path('delete-account/', views.delete_account, name='delete-account'),
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('token/cookie-refresh/', cookie_token_refresh, name='cookie_token_refresh'),
+    path('csrf/', ensure_csrf_token, name='ensure-csrf-token'),
 
     # ✅ Username availability check — used by signup form
     path('check-username/', check_username, name='check-username'),

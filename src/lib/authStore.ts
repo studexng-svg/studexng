@@ -91,6 +91,7 @@ export const useAuth = create<AuthState>()(
             useWishlistStore.getState().loadWishlistForUser(null);
           } catch {}
         } catch {}
+        csrfToken = null;
         set({ user: null, isLoggedIn: false, accessToken: null, refreshToken: null, isAuthReady: true });
       },
 
@@ -196,6 +197,7 @@ const refreshAccessToken = async (): Promise<string | null> => {
       const data = await res.json();
       const newAccessToken = data.access;
       const newRefreshToken = data.refresh || null;
+      if (data.csrf_token) csrfToken = data.csrf_token;
 
       if (newAccessToken) {
         useAuth.getState().updateTokens(newAccessToken, newRefreshToken || "");
@@ -210,6 +212,38 @@ const refreshAccessToken = async (): Promise<string | null> => {
   })();
 
   return refreshPromise;
+};
+
+// ─────────────────────────────────────────
+// CSRF token (accounts.authentication.JWTCookieAuthentication).
+// Lives only in memory here — it arrives in the JSON *body* of login/
+// register/token-refresh/csrf responses, never a cookie. It can't be a
+// cookie: the backend (onrender.com) and this frontend (vercel.app) are
+// different domains, and a cookie set by the backend's response lives in
+// the backend's own cookie jar — document.cookie here can never read it,
+// httpOnly or not. A response body a same-origin fetch CAN read, and CORS
+// stops a cross-site attacker's page from ever reading it instead.
+// ─────────────────────────────────────────
+const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+
+let csrfToken: string | null = null;
+
+export const setCsrfToken = (token: string | null) => { csrfToken = token; };
+
+let csrfEnsurePromise: Promise<void> | null = null;
+
+// Idempotent and de-duped: concurrent callers share one in-flight request
+// instead of each firing their own — same pattern as refreshAccessToken above.
+const ensureCsrfToken = (): Promise<void> => {
+  if (csrfToken) return Promise.resolve();
+  if (!csrfEnsurePromise) {
+    csrfEnsurePromise = fetch(`${API_BASE_URL}/api/auth/csrf/`, { credentials: "include" })
+      .then(r => (r.ok ? r.json() : null))
+      .then(data => { if (data?.csrf_token) csrfToken = data.csrf_token; })
+      .catch(() => {})
+      .finally(() => { csrfEnsurePromise = null; });
+  }
+  return csrfEnsurePromise;
 };
 
 // ─────────────────────────────────────────
@@ -282,6 +316,9 @@ export const fetchWithAuth = async (
   beginRequest();
   try {
     const token = getToken();
+    const method = (options.method || "GET").toUpperCase();
+    const unsafe = !SAFE_METHODS.has(method);
+    if (unsafe) await ensureCsrfToken();
 
     const makeRequest = (t: string | null) => {
       const headers = new Headers(options.headers || {});
@@ -289,6 +326,7 @@ export const fetchWithAuth = async (
       if (!headers.has("Content-Type") && !(options.body instanceof FormData)) {
         headers.set("Content-Type", "application/json");
       }
+      if (unsafe && csrfToken) headers.set("X-CSRF-Token", csrfToken);
       return fetch(url, { ...options, headers, credentials: "include" });
     };
 
@@ -308,6 +346,20 @@ export const fetchWithAuth = async (
       const newToken = await refreshAccessToken();
       if (newToken) {
         response = await makeRequest(newToken);
+      }
+    }
+
+    // A stale/missing CSRF token also surfaces as 403 (accounts.authentication.
+    // JWTCookieAuthentication) — distinguished from an ordinary permission 403
+    // by its exact detail message. Clear the cached token, fetch a fresh one,
+    // and retry once; a real permission error has a different message and
+    // falls through untouched.
+    if (unsafe && response.status === 403) {
+      const body = await response.clone().json().catch(() => null);
+      if (body?.detail === "CSRF token missing or incorrect.") {
+        csrfToken = null;
+        await ensureCsrfToken();
+        response = await makeRequest(getToken());
       }
     }
 

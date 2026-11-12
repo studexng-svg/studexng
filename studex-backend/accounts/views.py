@@ -1,9 +1,9 @@
 from rest_framework import status, viewsets
-from rest_framework.decorators import api_view, permission_classes, action
+from rest_framework.decorators import api_view, permission_classes, authentication_classes, action
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser
 from rest_framework.views import APIView
-from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.tokens import RefreshToken, AccessToken
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from django.contrib.auth import authenticate
 from django.contrib.auth import get_user_model
@@ -17,6 +17,7 @@ from django.db import transaction as db_transaction
 import resend
 import random
 import string
+from django.core import signing
 
 
 # ─── Auth cookie helpers ─────────────────────────────────────────────────────
@@ -32,6 +33,51 @@ def _set_auth_cookies(response, access_token: str, refresh_token: str):
 def _clear_auth_cookies(response):
     response.delete_cookie('access_token', path='/')
     response.delete_cookie('refresh_token', path='/')
+
+
+# ─── CSRF token (double-submit over response body, not a cookie) ────────────
+#
+# access_token/refresh_token are httpOnly and SameSite=None in production
+# (required — the frontend on Vercel and this backend on Render are
+# different *domains*, not just different paths, so SameSite=None is the
+# only setting that lets the browser attach them to a cross-origin fetch at
+# all). That means a malicious page can make a victim's browser send those
+# cookies to us on its own; nothing was checking that the request actually
+# originated from studex.com.ng/studexng.vercel.app itself —
+# accounts.authentication.JWTCookieAuthentication enforces that now.
+#
+# A classic double-submit *cookie* doesn't work across two different
+# domains: a cookie set by this backend's Set-Cookie header lives in this
+# backend's own domain's cookie jar — the frontend's JS (running on a
+# different domain) can never read it via document.cookie, no matter what
+# httponly/samesite says, because browsers scope cookie *reads* to the
+# page's own origin regardless. So instead the token travels in the JSON
+# response body of login/register/token-refresh (and the csrf/ bootstrap
+# endpoint below) — a body a same-origin frontend can read, but a
+# cross-site attacker's page cannot: CORS blocks reading any cross-origin
+# response unless the requester's origin is on CORS_ALLOWED_ORIGINS, and an
+# attacker's origin never is. The frontend holds the value in memory and
+# echoes it back as the X-CSRF-Token header (see src/lib/authStore.ts).
+#
+# Stateless by design — signed with SECRET_KEY via django.core.signing,
+# bound to the user's id, nothing stored server-side. That also means
+# there's no shared mutable state an attacker could overwrite to grief a
+# legitimate session (a forged request that reaches this backend still
+# can't read the response, so it never learns a usable token either way).
+_CSRF_SALT = 'studex-csrf'
+_CSRF_MAX_AGE = 30 * 24 * 60 * 60  # 30 days — matches refresh_token's lifetime
+
+
+def _generate_csrf_token(user_id: int) -> str:
+    return signing.dumps({'uid': user_id}, salt=_CSRF_SALT)
+
+
+def _csrf_token_valid_for(token: str, user_id: int) -> bool:
+    try:
+        payload = signing.loads(token, salt=_CSRF_SALT, max_age=_CSRF_MAX_AGE)
+    except signing.BadSignature:
+        return False
+    return payload.get('uid') == user_id
 from .serializers import (
     UserRegistrationSerializer,
     UserLoginSerializer,
@@ -80,6 +126,14 @@ def generate_otp():
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
+# No authentication at all, not just AllowAny — DRF still calls
+# JWTCookieAuthentication.authenticate() on every request regardless of
+# permission_classes, which would enforce CSRF the instant an unrelated
+# valid access_token cookie happens to be attached (e.g. already logged
+# into a different account in the same browser). This view, like every
+# other pre-auth endpoint below, never reads request.user at all, so
+# there's nothing for that check to protect here.
+@authentication_classes([])
 def send_otp(request):
     email = request.data.get('email', '').strip().lower()
     if not email:
@@ -121,6 +175,7 @@ def send_otp(request):
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
+@authentication_classes([])  # see send_otp's comment above
 def verify_otp(request):
     email = request.data.get('email', '').strip().lower()
     otp = request.data.get('otp', '').strip()
@@ -161,6 +216,7 @@ def check_username(request):
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
+@authentication_classes([])  # see send_otp's comment above
 def register_user(request):
     # IP-scoped volumetric guard against mass account creation — the OTP step
     # (send_otp above) already rate-limits per email, but nothing stopped a
@@ -222,7 +278,8 @@ def register_user(request):
             'tokens': {
                 'refresh': str(refresh),
                 'access': access,
-            }
+            },
+            'csrf_token': _generate_csrf_token(user.id),
         }, status=status.HTTP_201_CREATED)
         _set_auth_cookies(response, access, str(refresh))
         return response
@@ -231,6 +288,7 @@ def register_user(request):
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
+@authentication_classes([])  # see send_otp's comment above
 def login_user(request):
     # Two independent guards:
     #  - IP-scoped volumetric limit: blocks a scripted brute-force/credential-
@@ -273,7 +331,8 @@ def login_user(request):
         'tokens': {
             'refresh': str(refresh),
             'access': access,
-        }
+        },
+        'csrf_token': _generate_csrf_token(user.id),
     }, status=status.HTTP_200_OK)
     _set_auth_cookies(response, access, str(refresh))
     return response
@@ -553,6 +612,7 @@ def delete_account(request):
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
+@authentication_classes([])  # see send_otp's comment above
 def cookie_token_refresh(request):
     refresh_token = request.COOKIES.get('refresh_token')
     if not refresh_token:
@@ -566,7 +626,13 @@ def cookie_token_refresh(request):
         return response
     new_access = str(serializer.validated_data['access'])
     new_refresh = str(serializer.validated_data.get('refresh', refresh_token))
-    response = Response({'access': new_access, 'refresh': new_refresh})
+    # AccessToken's 'user_id' claim, not a DB round-trip — same source
+    # JWTAuthentication.get_user() reads from to resolve request.user elsewhere.
+    user_id = AccessToken(new_access)['user_id']
+    response = Response({
+        'access': new_access, 'refresh': new_refresh,
+        'csrf_token': _generate_csrf_token(user_id),
+    })
     _set_auth_cookies(response, new_access, new_refresh)
     return response
 
@@ -834,6 +900,7 @@ class VendorViewSet(viewsets.ReadOnlyModelViewSet):
 
 class ForgotPasswordView(APIView):
     permission_classes = [AllowAny]
+    authentication_classes = []  # see send_otp's comment above
 
     def post(self, request):
         email = request.data.get('email')
@@ -904,6 +971,7 @@ class ForgotPasswordView(APIView):
 
 class ResetPasswordView(APIView):
     permission_classes = [AllowAny]
+    authentication_classes = []  # see send_otp's comment above
 
     def post(self, request):
         uid = request.data.get('uid')
@@ -1059,3 +1127,20 @@ def heartbeat(request):
     """Lightweight endpoint the frontend pings every 30s to update last_seen."""
     User.objects.filter(pk=request.user.pk).update(last_seen=timezone.now())
     return Response({'status': 'ok'})
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def ensure_csrf_token(request):
+    """
+    GET /api/auth/csrf/ — the frontend calls this whenever it needs a
+    csrf_token and doesn't already have one in memory: on app load for a
+    session that predates this endpoint (cookie already valid, but the
+    frontend never got a token body to read), or after a CSRF rejection
+    (see src/lib/authStore.ts's retry-once-then-refetch handling). Requires
+    the existing access_token cookie — IsAuthenticated, not AllowAny — since
+    the token is bound to request.user.id. GET is a safe method, so
+    accounts.authentication.JWTCookieAuthentication never enforces the CSRF
+    check on this endpoint itself; nothing here is state-changing anyway.
+    """
+    return Response({'csrf_token': _generate_csrf_token(request.user.id)})

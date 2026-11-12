@@ -63,6 +63,7 @@ interface Stats {
   completed_this_week: number;
   total_completed: number;
   daily_counts: { date: string; label: string; count: number }[];
+  delivery_code_required?: boolean;
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -622,7 +623,12 @@ export default function RiderDashboard() {
   const updateStatus = (assignment: Assignment) => {
     const next = STATUS_NEXT[assignment.status];
     if (!next) return;
-    if (next === "completed") {
+    // Mirrors settings.DELIVERY_CODE_REQUIRED on the backend (delivery/
+    // views.py) — the backend no longer rejects a missing/wrong code while
+    // it's off, so skip the modal that asks the rider for one. Defaults to
+    // requiring the modal (stats === null, e.g. still loading) so nothing
+    // changes if the stats fetch ever fails.
+    if (next === "completed" && stats?.delivery_code_required !== false) {
       setModalError("");
       setCodeModal(assignment);
       return;

@@ -4,6 +4,7 @@ import secrets
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import permissions, status
+from django.conf import settings
 from django.utils import timezone
 
 from studex.permissions import IsAdminUser
@@ -390,6 +391,11 @@ class RiderStatsView(APIView):
             'completed_this_week': completed_this_week,
             'total_completed': total_completed,
             'daily_counts': daily_counts,
+            # Lets the rider app skip the delivery-code modal in lockstep
+            # with the backend gate (settings.DELIVERY_CODE_REQUIRED) — one
+            # flag, no risk of the frontend and backend disagreeing about
+            # whether the code is enforced.
+            'delivery_code_required': settings.DELIVERY_CODE_REQUIRED,
         })
 
 
@@ -553,24 +559,29 @@ class RiderUpdateStatusView(APIView):
                 elif new_status == 'at_pickup_point':
                     assignment.at_pickup_point_at = now
                 elif new_status == 'completed':
-                    if assignment.code_locked:
-                        return Response(
-                            {'error': 'Too many incorrect code attempts. Ask an admin to regenerate the delivery code.'},
-                            status=status.HTTP_423_LOCKED,
-                        )
-                    provided_code = str(request.data.get('delivery_code', '')).strip()
-                    if not provided_code or not secrets.compare_digest(provided_code, assignment.delivery_code):
-                        assignment.code_attempts += 1
-                        if assignment.code_attempts >= MAX_CODE_ATTEMPTS:
-                            assignment.code_locked = True
-                        assignment.save(update_fields=['code_attempts', 'code_locked'])
-                        return Response(
-                            {
-                                'error': 'Incorrect delivery code. Ask the buyer for the code '
-                                         'shown on their order page before handing over the package.'
-                            },
-                            status=status.HTTP_400_BAD_REQUEST,
-                        )
+                    # Gate disabled per Ugo (settings.DELIVERY_CODE_REQUIRED,
+                    # default off) — code generation, display to the buyer,
+                    # and this lockout machinery all stay in place untouched;
+                    # a rider just isn't blocked by it while the flag is off.
+                    if settings.DELIVERY_CODE_REQUIRED:
+                        if assignment.code_locked:
+                            return Response(
+                                {'error': 'Too many incorrect code attempts. Ask an admin to regenerate the delivery code.'},
+                                status=status.HTTP_423_LOCKED,
+                            )
+                        provided_code = str(request.data.get('delivery_code', '')).strip()
+                        if not provided_code or not secrets.compare_digest(provided_code, assignment.delivery_code):
+                            assignment.code_attempts += 1
+                            if assignment.code_attempts >= MAX_CODE_ATTEMPTS:
+                                assignment.code_locked = True
+                            assignment.save(update_fields=['code_attempts', 'code_locked'])
+                            return Response(
+                                {
+                                    'error': 'Incorrect delivery code. Ask the buyer for the code '
+                                             'shown on their order page before handing over the package.'
+                                },
+                                status=status.HTTP_400_BAD_REQUEST,
+                            )
                     try:
                         DeliveryVerificationEvent.objects.create(
                             assignment=assignment, event_type='completion', rider=request.user,

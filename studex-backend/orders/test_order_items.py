@@ -12,7 +12,7 @@ from django.test import TestCase
 from django.db import IntegrityError
 
 from accounts.models import User
-from services.models import Category, Listing, MenuItem, AddonGroup, Addon
+from services.models import Category, Listing, MenuItem, AddonGroup, Addon, MenuItemAddonGroup
 from orders.models import Order, OrderItem, OrderItemAddon
 
 
@@ -127,7 +127,8 @@ class OrderItemAddonHistoricalIntegrityTests(TestCase):
             vendor=self.vendor, category=self.category, is_available=True,
         )
         self.menu_item = MenuItem.objects.create(listing=self.listing)
-        self.group = AddonGroup.objects.create(menu_item=self.menu_item, name='Protein')
+        self.group = AddonGroup.objects.create(vendor=self.vendor, name='Protein')
+        MenuItemAddonGroup.objects.create(menu_item=self.menu_item, addon_group=self.group)
         self.addon = Addon.objects.create(group=self.group, name='Chicken', price_delta=Decimal('300.00'))
         self.order = Order.objects.create(
             reference='ORD-ADDON-1', buyer=self.buyer, listing=self.listing, amount=Decimal('1800.00'),

@@ -369,22 +369,27 @@ class ListingSerializer(serializers.ModelSerializer):
                     'prep_time_minutes': menu_item.prep_time_minutes,
                     'allergens': menu_item.allergens,
                     'menu_category': menu_item.menu_category.name if menu_item.menu_category_id else None,
+                    # Each group's rule is this dish's *effective* rule (the
+                    # link's own override if set, else the library group's
+                    # default — see MenuItemAddonGroup.effective_*), never
+                    # the bare group defaults: the same group can be required
+                    # on one dish and optional on another.
                     'addon_groups': [
                         {
-                            'id': group.id,
-                            'name': group.name,
-                            'is_required': group.is_required,
-                            'min_selections': group.min_selections,
-                            'max_selections': group.max_selections,
+                            'id': link.addon_group.id,
+                            'name': link.addon_group.name,
+                            'is_required': link.effective_is_required,
+                            'min_selections': link.effective_min_selections,
+                            'max_selections': link.effective_max_selections,
                             'addons': [
                                 {
                                     'id': addon.id, 'name': addon.name,
                                     'price_delta': str(addon.price_delta), 'is_available': addon.is_available,
                                 }
-                                for addon in group.addons.all()
+                                for addon in link.addon_group.addons.all()
                             ],
                         }
-                        for group in menu_item.addon_groups.all()
+                        for link in menu_item.addon_group_links.all()
                     ],
                 }
         except Exception:

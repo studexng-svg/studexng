@@ -38,6 +38,14 @@ ADMIN_EMAILS = [
 
 DEBUG = config('DEBUG', default='False') == 'True'
 
+# Whether a rider must enter the buyer's delivery_code to mark a
+# DeliveryAssignment "completed" (delivery/views.py). Disabled by default per
+# Ugo — the code generation, display to the buyer, and lockout machinery all
+# stay fully in place; this just skips the gate so a rider can complete
+# delivery without it. Flip to 'True' (env var, no redeploy of code) to
+# re-enable.
+DELIVERY_CODE_REQUIRED = config('DELIVERY_CODE_REQUIRED', default='False') == 'True'
+
 ALLOWED_HOSTS = config(
     'ALLOWED_HOSTS',
     default='localhost,127.0.0.1,.onrender.com,.vercel.app,.railway.app'
@@ -240,6 +248,10 @@ CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_HEADERS = [
     'accept', 'accept-encoding', 'authorization', 'content-type',
     'dnt', 'origin', 'user-agent', 'x-csrftoken', 'x-requested-with',
+    # Double-submit CSRF header (accounts.authentication.JWTCookieAuthentication) —
+    # distinct from 'x-csrftoken' above, which is Django's own admin-panel CSRF,
+    # unrelated to this API's cookie-auth CSRF defense.
+    'x-csrf-token',
 ]
 
 # =======================================

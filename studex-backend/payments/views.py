@@ -1774,7 +1774,7 @@ def preview_addon_price(request):
     addon_selections = request.data.get("addons") or []
     addon_ids = [a.get("id") for a in addon_selections if a.get("id") is not None]
     addons_by_id = {
-        a.id: a for a in Addon.objects.filter(id__in=addon_ids, group__menu_item__listing_id=listing.id)
+        a.id: a for a in Addon.objects.filter(id__in=addon_ids, group__menu_items__listing_id=listing.id)
     }
 
     deltas = []

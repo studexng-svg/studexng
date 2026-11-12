@@ -27,7 +27,7 @@ needs its own coverage.
 from decimal import Decimal
 from unittest.mock import patch
 
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.contrib.auth import get_user_model
 from django.db.models.query import QuerySet
 from rest_framework.test import APIClient
@@ -334,10 +334,14 @@ class RiderUpdateStatusPostgresLockingTests(DeliveryTestBase):
         self.assertEqual(captured[0].get("of"), ("self",))
 
 
+@override_settings(DELIVERY_CODE_REQUIRED=True)
 class CompletionCodeTests(DeliveryTestBase):
     """
     'at_pickup_point' -> 'completed' still requires the buyer's delivery
-    code — that's the actual handoff verification now, no photo alongside it.
+    code when settings.DELIVERY_CODE_REQUIRED is on — that's the actual
+    handoff verification, no photo alongside it. Forced on here regardless
+    of the project's live default (currently off, see settings.py) so this
+    class keeps proving the gate itself is correct.
     """
 
     def test_completion_rejected_without_code(self):
@@ -367,6 +371,51 @@ class CompletionCodeTests(DeliveryTestBase):
         self.assertEqual(assignment.status, "completed")
         self.assertIsNotNone(assignment.completed_at)
         self.assertIsNone(assignment.completion_proof_image)
+
+
+class DeliveryCodeDisabledByDefaultTests(DeliveryTestBase):
+    """
+    settings.DELIVERY_CODE_REQUIRED is off by default (per Ugo) — the code
+    is still generated, still shown to the buyer, and the lockout fields
+    still exist, but a rider is no longer blocked by it. No override_settings
+    here deliberately: this exercises the project's real default, the same
+    way RiderStatsView.delivery_code_required reports it to the frontend.
+    """
+
+    def test_completion_succeeds_with_no_code_when_disabled(self):
+        assignment = self.advance_to_at_pickup_point()
+        self.client.force_authenticate(user=self.rider)
+        response = self.client.post(
+            f"/api/delivery/assignments/{assignment.id}/update-status/",
+            {"status": "completed"},
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        assignment.refresh_from_db()
+        self.assertEqual(assignment.status, "completed")
+        self.assertIsNotNone(assignment.completed_at)
+
+    def test_completion_succeeds_with_wrong_code_when_disabled(self):
+        assignment = self.advance_to_at_pickup_point()
+        response = self.complete(assignment, code="000000")
+        self.assertEqual(response.status_code, 200, response.data)
+        assignment.refresh_from_db()
+        self.assertEqual(assignment.status, "completed")
+
+    def test_wrong_code_does_not_increment_attempts_when_disabled(self):
+        assignment = self.advance_to_at_pickup_point()
+        self.complete(assignment, code="000000")
+        assignment.refresh_from_db()
+        # The gate is skipped entirely while disabled — code_attempts is
+        # untouched, not just under the lockout threshold, so the counter
+        # means exactly what it always did once the flag is flipped back on.
+        self.assertEqual(assignment.code_attempts, 0)
+        self.assertFalse(assignment.code_locked)
+
+    def test_rider_stats_reports_delivery_code_required_false(self):
+        self.client.force_authenticate(user=self.rider)
+        response = self.client.get("/api/delivery/my-stats/")
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.data["delivery_code_required"])
 
 
 class AtPickupPointNotificationTests(DeliveryTestBase):
@@ -601,8 +650,13 @@ class VerificationEventTests(DeliveryTestBase):
         self.assertEqual(event.rider, new_rider)
 
 
+@override_settings(DELIVERY_CODE_REQUIRED=True)
 class CodeLockoutTests(DeliveryTestBase):
-    """Brute-force defense on the 6-digit buyer handoff code."""
+    """
+    Brute-force defense on the 6-digit buyer handoff code. Forced on via
+    DELIVERY_CODE_REQUIRED regardless of the project's live default — see
+    CompletionCodeTests.
+    """
 
     def test_attempts_counter_increments_on_wrong_code(self):
         assignment = self.advance_to_at_pickup_point()
