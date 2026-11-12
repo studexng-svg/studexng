@@ -606,9 +606,16 @@ class MenuCategoryViewSet(ReorderMixin, viewsets.ModelViewSet):
     """
     /api/v1/services/menu-categories/ — a vendor's own menu sections.
     Requires VendorType.supports_menu_ordering=True.
+
+    pagination_class = None — the dashboard always wants every one of the
+    vendor's own rows in a single response (it drives inline drag-reorder
+    and per-item editing), never a paginated subset. Without this, DRF's
+    DEFAULT_PAGINATION_CLASS (PAGE_SIZE=20) silently truncated a vendor
+    with more than 20 rows to just the first page.
     """
     serializer_class = MenuCategorySerializer
     permission_classes = [IsAuthenticated, CanManageMenu]
+    pagination_class = None
 
     def get_queryset(self):
         return MenuCategory.objects.filter(vendor=self.request.user)
@@ -630,9 +637,14 @@ class MenuItemViewSet(viewsets.ModelViewSet):
     concern (and, within a category, a MenuItemAddonGroup/Addon-level
     concern for their own children). Adding the mixin here would register a
     `reorder` action that crashes the instant it's called.
+
+    pagination_class = None — see MenuCategoryViewSet's docstring; a vendor
+    with 25+ menu items must see all of them, not just DRF's default
+    20-per-page slice.
     """
     serializer_class = MenuItemSerializer
     permission_classes = [IsAuthenticated, CanManageMenu]
+    pagination_class = None
 
     def get_queryset(self):
         return (
@@ -648,9 +660,12 @@ class AddonGroupViewSet(ReorderMixin, viewsets.ModelViewSet):
     (Phase 2 — Add-on Library). These are templates owned directly by the
     vendor, no longer scoped through any single MenuItem; linking one to a
     dish is MenuItemAddonGroupViewSet's job, below.
+
+    pagination_class = None — see MenuCategoryViewSet's docstring.
     """
     serializer_class = AddonGroupSerializer
     permission_classes = [IsAuthenticated, CanManageMenu]
+    pagination_class = None
 
     def get_queryset(self):
         return AddonGroup.objects.filter(vendor=self.request.user).prefetch_related('addons', 'menu_items')
@@ -660,9 +675,14 @@ class AddonGroupViewSet(ReorderMixin, viewsets.ModelViewSet):
 
 
 class AddonViewSet(ReorderMixin, viewsets.ModelViewSet):
-    """/api/v1/services/addons/ — individual selectable options within one of the vendor's library groups."""
+    """
+    /api/v1/services/addons/ — individual selectable options within one of
+    the vendor's library groups. pagination_class = None — see
+    MenuCategoryViewSet's docstring.
+    """
     serializer_class = AddonSerializer
     permission_classes = [IsAuthenticated, CanManageMenu]
+    pagination_class = None
 
     def get_queryset(self):
         return Addon.objects.filter(group__vendor=self.request.user).select_related('group')
@@ -675,9 +695,12 @@ class MenuItemAddonGroupViewSet(ReorderMixin, viewsets.ModelViewSet):
     is_required/min_selections/max_selections (Phase 2 — Add-on Library).
     Deleting a link only removes that one dish's use of the group — the
     group, its options, and every other dish's link to it are untouched.
+
+    pagination_class = None — see MenuCategoryViewSet's docstring.
     """
     serializer_class = MenuItemAddonGroupSerializer
     permission_classes = [IsAuthenticated, CanManageMenu]
+    pagination_class = None
 
     def get_queryset(self):
         return (

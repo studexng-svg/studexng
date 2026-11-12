@@ -848,7 +848,8 @@ export default function HomePageClient({ initialVendors, initialListings, initia
 
   return (
     <>
-      <VendorOfMonthModal vendor={vendorOfMonth} />
+      {/* Vendor of the Month popup disabled per Ugo — kept dormant rather than deleted
+          in case it's wanted back; <VendorOfMonthModal vendor={vendorOfMonth} /> */}
       <WhatsAppGroupModal />
 
       {/* ── Disclaimer modal for existing users ── */}

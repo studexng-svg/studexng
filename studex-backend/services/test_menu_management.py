@@ -110,7 +110,8 @@ class MenuCategoryCRUDTests(MenuManagementTestBase):
         MenuCategory.objects.create(vendor=self.other_vendor, name='Drinks')
         response = self.client.get('/api/v1/services/menu-categories/')
         self.assertEqual(response.status_code, 200)
-        names = [c['name'] for c in response.data['results']]
+        # Not paginated (pagination_class = None) — a plain list, not {results: [...]}.
+        names = [c['name'] for c in response.data]
         self.assertEqual(names, ['Mains'])
 
     def test_cannot_retrieve_another_vendors_category(self):
@@ -309,7 +310,8 @@ class AddonGroupCRUDAndValidationTests(MenuManagementTestBase):
         AddonGroup.objects.create(vendor=self.other_vendor, name='Spice')
         response = self.client.get('/api/v1/services/addon-groups/')
         self.assertEqual(response.status_code, 200)
-        names = [g['name'] for g in response.data['results']]
+        # Not paginated (pagination_class = None) — a plain list, not {results: [...]}.
+        names = [g['name'] for g in response.data]
         self.assertEqual(names, ['Protein'])
 
     def test_cannot_retrieve_another_vendors_group(self):
@@ -502,3 +504,71 @@ class AddonCRUDTests(MenuManagementTestBase):
         second.refresh_from_db()
         self.assertEqual(first.display_order, 1)
         self.assertEqual(second.display_order, 0)
+
+
+class NoPaginationTests(MenuManagementTestBase):
+    """
+    Regression test: these five list endpoints must return every one of the
+    vendor's own rows in a single response, never DRF's default 20-per-page
+    slice (REST_FRAMEWORK['PAGE_SIZE'] = 20 in settings.py) — a vendor with
+    more than 20 menu items had their dashboard silently truncated to the
+    first 20 before pagination_class = None was added to each ViewSet.
+    `toArray()` on the frontend accepts either a plain list or a paginated
+    {results: [...]} envelope, so asserting a plain list here is itself part
+    of the regression check — a paginated response would also carry a
+    'results' key, which `isinstance(response.data, list)` rules out.
+    """
+    def setUp(self):
+        super().setUp()
+        self.client.force_authenticate(user=self.vendor)
+
+    def test_menu_items_not_paginated_past_default_page_size(self):
+        for i in range(25):
+            listing = Listing.objects.create(
+                title=f'Dish {i}', description='x', price=Decimal('1000.00'),
+                vendor=self.vendor, category=self.category, is_available=True,
+            )
+            MenuItem.objects.create(listing=listing)
+        response = self.client.get('/api/v1/services/menu-items/')
+        self.assertEqual(response.status_code, 200)
+        self.assertIsInstance(response.data, list)
+        self.assertEqual(len(response.data), 25)
+
+    def test_menu_categories_not_paginated_past_default_page_size(self):
+        for i in range(25):
+            MenuCategory.objects.create(vendor=self.vendor, name=f'Category {i}')
+        response = self.client.get('/api/v1/services/menu-categories/')
+        self.assertEqual(response.status_code, 200)
+        self.assertIsInstance(response.data, list)
+        self.assertEqual(len(response.data), 25)
+
+    def test_addon_groups_not_paginated_past_default_page_size(self):
+        for i in range(25):
+            AddonGroup.objects.create(vendor=self.vendor, name=f'Group {i}')
+        response = self.client.get('/api/v1/services/addon-groups/')
+        self.assertEqual(response.status_code, 200)
+        self.assertIsInstance(response.data, list)
+        self.assertEqual(len(response.data), 25)
+
+    def test_addons_not_paginated_past_default_page_size(self):
+        group = AddonGroup.objects.create(vendor=self.vendor, name='Extras')
+        for i in range(25):
+            Addon.objects.create(group=group, name=f'Option {i}', price_delta=Decimal('0'))
+        response = self.client.get('/api/v1/services/addons/')
+        self.assertEqual(response.status_code, 200)
+        self.assertIsInstance(response.data, list)
+        self.assertEqual(len(response.data), 25)
+
+    def test_addon_group_links_not_paginated_past_default_page_size(self):
+        for i in range(25):
+            listing = Listing.objects.create(
+                title=f'Dish {i}', description='x', price=Decimal('1000.00'),
+                vendor=self.vendor, category=self.category, is_available=True,
+            )
+            item = MenuItem.objects.create(listing=listing)
+            group = AddonGroup.objects.create(vendor=self.vendor, name=f'Group {i}')
+            MenuItemAddonGroup.objects.create(menu_item=item, addon_group=group)
+        response = self.client.get('/api/v1/services/addon-group-links/')
+        self.assertEqual(response.status_code, 200)
+        self.assertIsInstance(response.data, list)
+        self.assertEqual(len(response.data), 25)
