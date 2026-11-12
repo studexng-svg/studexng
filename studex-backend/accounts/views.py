@@ -16,6 +16,7 @@ from django.utils import timezone
 from django.db import transaction as db_transaction
 import resend
 import random
+import secrets
 import string
 from django.core import signing
 
@@ -149,6 +150,9 @@ def send_otp(request):
 
     otp = generate_otp()
     cache.set(f'otp_{email}', otp, timeout=600)
+    # A fresh code means any exhausted guesses against the *old* one
+    # shouldn't still block verifying this one.
+    cache.delete(f'otp_verify_fail:{email}')
 
     try:
         from studex.email import send_email
@@ -183,14 +187,37 @@ def verify_otp(request):
     if not email or not otp:
         return Response({'error': 'Email and OTP are required'}, status=400)
 
+    # Same two-guard shape as login_user/ResetPasswordView: a per-email lock
+    # (blocks brute-forcing one specific outstanding code — 6 digits is only
+    # 1,000,000 combinations, trivially exhausted in the 10-minute window
+    # send_otp already gives it with nothing else stopping unlimited
+    # scripted guesses) plus an IP-wide volumetric guard (blocks a sweep
+    # trying many emails at once). Counts only failures, same as login — a
+    # correct guess clears it, so legitimate retries after a typo aren't
+    # punished.
+    ip = _client_ip(request)
+    if _rate_limited(f'otp_verify_rate:ip:{ip}', max_attempts=20, window_seconds=900):
+        return Response(
+            {'error': 'Too many verification attempts from this network. Please wait 15 minutes and try again.'},
+            status=429,
+        )
+    fail_key = f'otp_verify_fail:{email}'
+    if cache.get(fail_key, 0) >= 5:
+        return Response(
+            {'error': 'Too many incorrect attempts. Please request a new code.'},
+            status=429,
+        )
+
     stored_otp = cache.get(f'otp_{email}')
 
     if not stored_otp:
         return Response({'error': 'OTP expired. Please request a new one.'}, status=400)
 
-    if otp != stored_otp:
+    if not secrets.compare_digest(otp, stored_otp):
+        cache.set(fail_key, cache.get(fail_key, 0) + 1, 600)
         return Response({'error': 'Incorrect code. Please try again.'}, status=400)
 
+    cache.delete(fail_key)
     cache.delete(f'otp_{email}')
     # Mark this email as OTP-verified so register_user can enforce it server-side.
     cache.set(f'otp_verified:{email}', True, 600)  # 10-minute window to complete registration
