@@ -7,6 +7,7 @@ import logging
 import json
 from decimal import Decimal
 from django.conf import settings
+from studex.ip import get_client_ip
 from django.core.cache import cache
 from django.views.decorators.csrf import csrf_exempt
 from django.http import HttpResponse
@@ -1940,9 +1941,9 @@ def paystack_webhook(request):
     # hosting layer doesn't forward the real client IP into X-Forwarded-For).
     skip_ip = (getattr(settings, 'PAYSTACK_SKIP_IP_CHECK', '') or '').lower() == 'true'
     if not skip_ip:
-        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR', '')
-        client_ip = (x_forwarded_for.split(',')[0].strip() if x_forwarded_for
-                     else request.META.get('REMOTE_ADDR', ''))
+        # Trusted client IP only — never the client-controlled left-most XFF value,
+        # which an attacker could set to a Paystack IP to pass this gate.
+        client_ip = get_client_ip(request)
         if client_ip not in PAYSTACK_WEBHOOK_IPS:
             logger.warning(f"Paystack webhook: rejected request from unknown IP {client_ip}")
             return HttpResponse(status=403)

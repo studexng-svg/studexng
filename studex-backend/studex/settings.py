@@ -306,6 +306,13 @@ PAYSTACK_WEBHOOK_SECRET = config('PAYSTACK_WEBHOOK_SECRET', default='')
 # Set PAYSTACK_SKIP_IP_CHECK=true if your hosting layer doesn't forward the real Paystack IP
 PAYSTACK_SKIP_IP_CHECK = config('PAYSTACK_SKIP_IP_CHECK', default='false')
 
+# Header that carries the real, un-spoofable client IP, set by the trusted proxy
+# in front of the app (Cloudflare on Render -> CF-Connecting-IP). Used by
+# studex.ip.get_client_ip for rate limiting and the Paystack webhook allowlist.
+# Override in env (Django META form, e.g. HTTP_TRUE_CLIENT_IP) if the proxy
+# differs. We never trust the left-most X-Forwarded-For value.
+CLIENT_IP_HEADER = config('CLIENT_IP_HEADER', default='HTTP_CF_CONNECTING_IP')
+
 # =======================================
 # CACHE
 # Use Redis if REDIS_URL is set, otherwise in-process memory cache.

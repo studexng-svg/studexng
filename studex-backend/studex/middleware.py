@@ -8,6 +8,8 @@ from django.http import JsonResponse
 from django.conf import settings
 from django.utils.deprecation import MiddlewareMixin
 
+from studex.ip import get_client_ip
+
 
 class RateLimitMiddleware(MiddlewareMixin):
     """
@@ -78,13 +80,13 @@ class RateLimitMiddleware(MiddlewareMixin):
         return None
 
     def get_client_ip(self, request):
-        """Extract client IP from request"""
-        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
-        if x_forwarded_for:
-            ip = x_forwarded_for.split(',')[0].strip()
-        else:
-            ip = request.META.get('REMOTE_ADDR')
-        return ip
+        """Trusted client IP (see studex.ip.get_client_ip).
+
+        Must NOT trust the left-most X-Forwarded-For value: it is client-set,
+        so rotating it would hand an attacker a fresh rate-limit/lockout bucket
+        on every request.
+        """
+        return get_client_ip(request)
 
     def get_rate_limit(self, path):
         """Get rate limit for specific endpoint"""
