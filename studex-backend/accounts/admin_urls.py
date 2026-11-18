@@ -6,6 +6,7 @@ from accounts.admin_views import (
     AdminAnalyticsTimeSeriesView,
     AdminVendorOfMonthView,
     AdminActivityView,
+    AdminPendingCountsView,
     AdminUserListView,
     AdminUserDetailView,
     AdminNotifyUserView,
@@ -59,6 +60,7 @@ urlpatterns = [
     path('analytics/timeseries/', AdminAnalyticsTimeSeriesView.as_view(), name='analytics-timeseries'),
     path('vendor-of-month/', AdminVendorOfMonthView.as_view(), name='vendor-of-month'),
     path('activity/', AdminActivityView.as_view(), name='activity'),
+    path('pending-counts/', AdminPendingCountsView.as_view(), name='pending-counts'),
 
     # Users
     path('users/', AdminUserListView.as_view(), name='user-list'),

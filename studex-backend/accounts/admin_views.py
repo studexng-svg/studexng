@@ -2491,6 +2491,41 @@ class AdminActivityView(APIView):
         })
 
 
+class AdminPendingCountsView(APIView):
+    """GET /api/admin/pending-counts/ — outstanding items that need admin action.
+
+    Powers the WhatsApp-style red count badges and the "guard shield" in the
+    admin sidebar. Counts stay non-zero until the admin resolves each item, then
+    drop to zero on the next poll.
+
+    - listings: new listings awaiting approval. A listing is created with
+      is_available=False and only an admin can flip it true (vendors cannot).
+      We EXCLUDE tracked items sitting at zero stock, because those were already
+      approved once and auto-disabled when they sold out (restock re-enables
+      them) — counting them would be a false "needs approval".
+    - seller_applications: applications still in the 'pending' state.
+    """
+    permission_classes = [IsAdminUser]
+
+    def get(self, request):
+        from services.models import Listing
+        from accounts.models import SellerApplication
+
+        listings = (
+            Listing.objects
+            .filter(is_available=False)
+            .exclude(track_inventory=True, stock_quantity=0)
+            .count()
+        )
+        seller_applications = SellerApplication.objects.filter(status='pending').count()
+
+        return Response({
+            'listings': listings,
+            'seller_applications': seller_applications,
+            'total': listings + seller_applications,
+        })
+
+
 class AdminGroqNotifyView(APIView):
     """
     GET  /api/admin/groq-notify/  — last 20 AI broadcast logs

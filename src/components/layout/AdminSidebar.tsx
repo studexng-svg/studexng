@@ -8,7 +8,7 @@ import {
   Users, Package, DollarSign, Store, FileText, Tag, TrendingUp,
   CreditCard, Star, AlertTriangle, ArrowUpRight, LayoutDashboard,
   ShoppingCart, MessageCircle, Send, Radio, Bot, Percent,
-  ChevronDown, ChevronRight, Home, Truck, MapPin, CalendarClock,
+  ChevronDown, ChevronRight, Home, Truck, MapPin, CalendarClock, Shield,
 } from "lucide-react";
 import { api } from "@/lib/api";
 
@@ -60,7 +60,16 @@ const NAV: {
   },
 ];
 
-function NavItem({ href, icon: Icon, label }: { href: string; icon: React.ElementType; label: string }) {
+// Which nav items carry an outstanding-count badge, keyed by href -> field on
+// the /api/admin/pending-counts/ payload.
+const BADGE_SOURCE: Record<string, "listings" | "seller_applications"> = {
+  "/admin/listings": "listings",
+  "/admin/seller-approvals": "seller_applications",
+};
+
+function NavItem({
+  href, icon: Icon, label, badge = 0,
+}: { href: string; icon: React.ElementType; label: string; badge?: number }) {
   const pathname = usePathname();
   const active   = pathname === href || (href !== "/admin" && pathname.startsWith(href));
   return (
@@ -72,9 +81,30 @@ function NavItem({ href, icon: Icon, label }: { href: string; icon: React.Elemen
       }`}>
       <Icon className={`w-4 h-4 flex-shrink-0 ${active ? "text-teal-600" : "text-stone-400"}`} />
       <span className="flex-1 truncate">{label}</span>
+      {badge > 0 && (
+        <span
+          title={`${badge} awaiting action`}
+          className="flex-shrink-0 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center leading-none tabular-nums">
+          {badge > 99 ? "99+" : badge}
+        </span>
+      )}
       {active && <span className="w-1.5 h-1.5 rounded-full bg-teal-500 flex-shrink-0" />}
     </Link>
   );
+}
+
+/** Polls outstanding admin actions for the nav badges and the guard shield. */
+function usePendingCounts() {
+  return useQuery<{ listings: number; seller_applications: number; total: number }>({
+    queryKey: ["admin-pending-counts"],
+    queryFn: async () => {
+      const r = await api.admin.pendingCounts();
+      if (!r.ok) throw new Error();
+      return r.json();
+    },
+    refetchInterval: () => (document.visibilityState === "hidden" ? false : 45_000),
+    staleTime: 20_000,
+  });
 }
 
 function LiveActivity() {
@@ -141,6 +171,13 @@ export default function AdminSidebar() {
   const router   = useRouter();
   const pathname = usePathname();
 
+  const { data: pending } = usePendingCounts();
+  const counts = { listings: 0, seller_applications: 0, total: 0, ...(pending ?? {}) };
+  const badgeFor = (href: string) => {
+    const key = BADGE_SOURCE[href];
+    return key ? counts[key] : 0;
+  };
+
   return (
     <aside className="hidden lg:flex flex-col w-64 flex-shrink-0 bg-white border-r border-stone-200 h-screen overflow-hidden">
       {/* Brand */}
@@ -160,8 +197,31 @@ export default function AdminSidebar() {
         </button>
       </div>
 
+      {/* Guard shield — outstanding admin actions, red until resolved */}
+      <div className="px-3 pt-3 flex-shrink-0">
+        <div
+          title={counts.total > 0
+            ? `${counts.listings} listing(s) and ${counts.seller_applications} application(s) awaiting action`
+            : "No outstanding admin actions"}
+          className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-semibold transition-colors ${
+            counts.total > 0 ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700"
+          }`}>
+          <div className="relative flex-shrink-0">
+            <Shield className={`w-4 h-4 ${counts.total > 0 ? "text-red-500" : "text-emerald-500"}`} />
+            {counts.total > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 min-w-[14px] h-3.5 px-0.5 bg-red-500 rounded-full text-[9px] font-bold text-white flex items-center justify-center leading-none tabular-nums">
+                {counts.total > 99 ? "99+" : counts.total}
+              </span>
+            )}
+          </div>
+          <span className="flex-1 truncate">
+            {counts.total > 0 ? `${counts.total} need${counts.total === 1 ? "s" : ""} action` : "All clear"}
+          </span>
+        </div>
+      </div>
+
       {/* Dashboard */}
-      <div className="px-3 pt-3 pb-1 flex-shrink-0">
+      <div className="px-3 pt-2 pb-1 flex-shrink-0">
         <Link href="/admin"
           className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-semibold transition-all ${
             pathname === "/admin"
@@ -180,7 +240,7 @@ export default function AdminSidebar() {
           <div key={group}>
             <p className="text-[10px] font-bold tracking-widest uppercase text-stone-400 px-3 py-1">{group}</p>
             <div className="space-y-0.5">
-              {items.map(item => <NavItem key={item.href} {...item} />)}
+              {items.map(item => <NavItem key={item.href} {...item} badge={badgeFor(item.href)} />)}
             </div>
           </div>
         ))}

@@ -597,6 +597,8 @@ export const api = {
 
     activity: () => fetchWithAuth(u("/api/admin/activity/")),
 
+    pendingCounts: () => fetchWithAuth(u("/api/admin/pending-counts/")),
+
     analytics: (days: number) =>
       fetchWithAuth(u(`/api/admin/analytics/timeseries/?days=${days}`)),
 
