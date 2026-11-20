@@ -46,6 +46,9 @@ interface Vendor {
   // updated to include it, so every check below treats undefined as open
   // (same default as everywhere else this field is consumed).
   is_open_now?: boolean;
+  // Vendor's configured opening time as "HH:MM" (24h), or null if unset.
+  // Shown as "Opens 9:00 AM" alongside the Closed badge.
+  opening_time?: string | null;
 }
 
 interface Category {
@@ -68,6 +71,18 @@ function SafeImage({ src, alt, className }: { src: string | null | undefined; al
 }
 
 const BADGE_LABELS: Record<string, string> = { top: "Top Vendor", trusted: "Trusted", rising: "Rising" };
+
+/** "09:00" (24h) -> "9:00 AM". Returns null for empty/malformed input. */
+function formatOpensAt(hhmm?: string | null): string | null {
+  if (!hhmm) return null;
+  const m = /^(\d{1,2}):(\d{2})/.exec(hhmm.trim());
+  if (!m) return null;
+  let h = parseInt(m[1], 10);
+  if (Number.isNaN(h)) return null;
+  const ampm = h >= 12 ? "PM" : "AM";
+  h = h % 12 || 12;
+  return `${h}:${m[2]} ${ampm}`;
+}
 const BADGE_STYLES: Record<string, string> = {
   top: "bg-amber-50 text-amber-700 border border-amber-200",
   trusted: "bg-teal-50 text-teal-700 border border-teal-200",
@@ -739,6 +754,7 @@ export default function HomePageClient({ initialVendors, initialListings, initia
     // Store vs Vendor is a routing distinction only (same underlying data) —
     // is_menu_vendor decides which of the two URL patterns this card links to.
     const profileHref = vendor.is_menu_vendor ? `/store/${vendor.username}` : `/vendor/${vendor.username}`;
+    const opensAt = formatOpensAt(vendor.opening_time);
 
     // Store variant is a genuinely different card shape (landscape photo,
     // store-style subtitle, item count) — not a recolored product/profile card.
@@ -772,7 +788,9 @@ export default function HomePageClient({ initialVendors, initialListings, initia
 
               <div className="absolute bottom-0 left-0 right-0 p-3">
                 {vendor.is_open_now === false && (
-                  <span className="inline-block text-[9px] font-bold text-white bg-red-500/90 px-1.5 py-0.5 rounded-full mb-1 tracking-wide">CLOSED</span>
+                  <span className="inline-block text-[9px] font-bold text-white bg-red-500/90 px-1.5 py-0.5 rounded-full mb-1 tracking-wide">
+                    {opensAt ? `CLOSED · OPENS ${opensAt}` : "CLOSED"}
+                  </span>
                 )}
                 <p className="font-bold text-white text-sm truncate">{vendor.business_name || vendor.username}</p>
                 <p className="text-white/70 text-xs mt-0.5 truncate flex items-center gap-1">
@@ -813,7 +831,9 @@ export default function HomePageClient({ initialVendors, initialListings, initia
               )}
               {vendor.is_open_now === false && (
                 <div className="absolute top-2.5 left-2.5">
-                  <span className="text-xs font-bold text-white bg-red-500/90 px-2 py-0.5 rounded-full shadow-sm">Closed</span>
+                  <span className="text-xs font-bold text-white bg-red-500/90 px-2 py-0.5 rounded-full shadow-sm">
+                    {opensAt ? `Closed · Opens ${opensAt}` : "Closed"}
+                  </span>
                 </div>
               )}
               {vendor.vendor_badge && vendor.vendor_badge !== "none" && (
