@@ -65,6 +65,7 @@ export default function AdminUserDetail() {
   const [error, setError] = useState("");
   const [deliveryFee, setDeliveryFee] = useState("0");
   const [deliveryQuota, setDeliveryQuota] = useState("");
+  const [deliveryFeeMode, setDeliveryFeeMode] = useState("prepaid");
   const [deliverySaving, setDeliverySaving] = useState(false);
   const [riderCampus, setRiderCampus] = useState("pau");
   const [riderCampusSaving, setRiderCampusSaving] = useState(false);
@@ -86,6 +87,7 @@ export default function AdminUserDetail() {
     setDeliveryQuota(
       user?.vendor?.free_delivery_quota != null ? String(user.vendor.free_delivery_quota) : ""
     );
+    setDeliveryFeeMode(user?.vendor?.delivery_fee_mode ?? "prepaid");
     setRiderCampus((user?.school || "pau").toLowerCase());
   }, [user]);
 
@@ -137,6 +139,7 @@ export default function AdminUserDetail() {
       const body: Record<string, unknown> = {
         delivery_fee: deliveryFee.trim() === "" ? "0" : deliveryFee,
         free_delivery_quota: deliveryQuota.trim() === "" ? null : Number(deliveryQuota),
+        delivery_fee_mode: deliveryFeeMode,
       };
       const res = await api.admin.updateUser(id as string, { vendor: body });
       const data = await res.json();
@@ -310,6 +313,33 @@ export default function AdminUserDetail() {
               delivery slot). ₦0 fee (default) means delivery is always free — nothing else here
               matters. Leave the quota blank to always charge the fee with no free-delivery promo.
             </p>
+            <div className="mb-3">
+              <label className="text-xs font-semibold text-stone-500 mb-1.5 block">How is the delivery fee collected?</label>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { key: "prepaid", label: "Charge at checkout" },
+                  { key: "on_delivery", label: "Pay on delivery" },
+                ].map(opt => (
+                  <button
+                    key={opt.key}
+                    type="button"
+                    onClick={() => setDeliveryFeeMode(opt.key)}
+                    className={`px-3 py-2 rounded-xl text-xs font-semibold border transition ${
+                      deliveryFeeMode === opt.key
+                        ? "bg-teal-50 border-teal-400 text-teal-700"
+                        : "bg-white border-stone-200 text-stone-500 hover:border-stone-300"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[11px] text-stone-400 mt-1.5 leading-snug">
+                {deliveryFeeMode === "on_delivery"
+                  ? "The buyer pays the delivery fee in cash when the order arrives. Only the food is charged online — no delivery slot needed."
+                  : "The delivery fee is added to the online total at checkout. Needs an active delivery slot (see below)."}
+              </p>
+            </div>
             <div className="grid grid-cols-2 gap-3 mb-1">
               <div>
                 <label className="text-xs font-semibold text-stone-500 mb-1 block">Delivery fee (₦)</label>
@@ -328,15 +358,18 @@ export default function AdminUserDetail() {
                 />
               </div>
             </div>
-            <div className="flex items-start gap-2 mb-3 rounded-xl bg-amber-50 border border-amber-200 px-3 py-2">
-              <span className="text-amber-600 text-sm leading-5 flex-shrink-0">⚠</span>
-              <p className="text-xs text-amber-700 leading-5">
-                The delivery fee only applies once this vendor has an active{" "}
-                <span className="font-semibold">delivery slot</span>. Without one, checkout shows
-                delivery as <span className="font-semibold">Free</span> and charges nothing — create
-                a slot under <span className="font-semibold">Delivery Slots</span>.
-              </p>
-            </div>
+            {deliveryFeeMode === "prepaid" && (
+              <div className="flex items-start gap-2 mb-3 rounded-xl bg-amber-50 border border-amber-200 px-3 py-2">
+                <span className="text-amber-600 text-sm leading-5 flex-shrink-0">⚠</span>
+                <p className="text-xs text-amber-700 leading-5">
+                  The delivery fee only applies once this vendor has an active{" "}
+                  <span className="font-semibold">delivery slot</span>. Without one, checkout shows
+                  delivery as <span className="font-semibold">Free</span> and charges nothing — create
+                  a slot under <span className="font-semibold">Delivery Slots</span>, or switch to{" "}
+                  <span className="font-semibold">Pay on delivery</span> above.
+                </p>
+              </div>
+            )}
             {user.vendor?.free_delivery_quota != null && (
               <p className="text-xs text-stone-400 mb-3">
                 {user.vendor.free_deliveries_used} used / {user.vendor.free_deliveries_remaining} free deliveries remaining

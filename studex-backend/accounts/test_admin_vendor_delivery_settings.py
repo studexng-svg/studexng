@@ -50,6 +50,7 @@ class AdminVendorDeliverySettingsTests(TestCase):
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertEqual(res.data['vendor'], {
             'delivery_fee': '0.00',
+            'delivery_fee_mode': 'prepaid',
             'free_delivery_quota': None,
             'free_deliveries_used': None,
             'free_deliveries_remaining': None,

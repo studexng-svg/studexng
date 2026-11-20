@@ -269,6 +269,7 @@ class AdminUserDetailView(APIView):
 
         return {
             'delivery_fee': str(v.delivery_fee),
+            'delivery_fee_mode': v.delivery_fee_mode,
             'free_delivery_quota': v.free_delivery_quota,
             'free_deliveries_used': used,
             'free_deliveries_remaining': remaining,
@@ -397,6 +398,10 @@ class AdminUserDetailView(APIView):
                     v.free_delivery_quota = quota
                 if 'delivery_paused' in vendor_data:
                     v.delivery_paused = vendor_data['delivery_paused']
+                if 'delivery_fee_mode' in vendor_data:
+                    mode = vendor_data['delivery_fee_mode']
+                    if mode in ('prepaid', 'on_delivery'):
+                        v.delivery_fee_mode = mode
                 v.save()
 
             serializer = UserSerializer(user)
