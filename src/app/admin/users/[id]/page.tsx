@@ -328,6 +328,15 @@ export default function AdminUserDetail() {
                 />
               </div>
             </div>
+            <div className="flex items-start gap-2 mb-3 rounded-xl bg-amber-50 border border-amber-200 px-3 py-2">
+              <span className="text-amber-600 text-sm leading-5 flex-shrink-0">⚠</span>
+              <p className="text-xs text-amber-700 leading-5">
+                The delivery fee only applies once this vendor has an active{" "}
+                <span className="font-semibold">delivery slot</span>. Without one, checkout shows
+                delivery as <span className="font-semibold">Free</span> and charges nothing — create
+                a slot under <span className="font-semibold">Delivery Slots</span>.
+              </p>
+            </div>
             {user.vendor?.free_delivery_quota != null && (
               <p className="text-xs text-stone-400 mb-3">
                 {user.vendor.free_deliveries_used} used / {user.vendor.free_deliveries_remaining} free deliveries remaining
