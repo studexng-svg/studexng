@@ -21,6 +21,7 @@ import { useNavProgress, isLoading } from "@/lib/navProgressStore";
 import CenteredLoader from "@/components/CenteredLoader";
 import { GRAD, GRAD_TEXT, TEAL, PURPLE } from "@/lib/tokens";
 import VendorOfMonthModal from "@/components/VendorOfMonthModal";
+import ScrollableRow from "@/components/ScrollableRow";
 import { useScrollRestoration } from "@/hooks/useScrollRestoration";
 import WhatsAppGroupModal from "@/components/WhatsAppGroupModal";
 
@@ -1220,11 +1221,11 @@ export default function HomePageClient({ initialVendors, initialListings, initia
                     </div>
                   </div>
                 </div>
-                <div className="flex gap-3 overflow-x-auto pb-1 -mx-1 px-1" style={{ scrollbarWidth: "none", msOverflowStyle: "none" } as React.CSSProperties}>
+                <ScrollableRow className="flex gap-3 overflow-x-auto pb-1 -mx-1 px-1">
                   {storeVendors.map((v, i) => (
                     <div key={v.id} className="flex-shrink-0 w-44">{renderVendorCard(v, i, "restaurant")}</div>
                   ))}
-                </div>
+                </ScrollableRow>
               </div>
             </div>
           )}
