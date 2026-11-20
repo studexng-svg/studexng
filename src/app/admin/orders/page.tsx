@@ -10,24 +10,26 @@ import { fetchAllPages, BASE_URL } from "@/lib/api";
 import { CampusPills, type Campus } from "@/components/admin/CampusPills";
 
 const STATUS_LABELS: Record<string, string> = {
-  pending:          "Pending",
-  paid:             "In Progress",
-  seller_completed: "Awaiting Confirmation",
-  confirmed:        "Confirmed",
-  completed:        "Completed",
-  cancelled:        "Cancelled",
-  disputed:         "Disputed",
+  pending:                "Pending",
+  pending_bank_transfer:  "Awaiting Transfer",
+  paid:                   "In Progress",
+  seller_completed:       "Awaiting Confirmation",
+  confirmed:              "Confirmed",
+  completed:              "Completed",
+  cancelled:              "Cancelled",
+  disputed:               "Disputed",
 };
 const STATUS_STYLE: Record<string, string> = {
-  pending:          "bg-amber-100 text-amber-700",
-  paid:             "bg-amber-100 text-amber-700",
-  seller_completed: "bg-blue-100 text-blue-700",
-  confirmed:        "bg-blue-100 text-blue-700",
-  completed:        "bg-teal-100 text-teal-700",
-  cancelled:        "bg-stone-100 text-stone-500",
-  disputed:         "bg-red-100 text-red-700",
+  pending:                "bg-amber-100 text-amber-700",
+  pending_bank_transfer:  "bg-purple-100 text-purple-700",
+  paid:                   "bg-amber-100 text-amber-700",
+  seller_completed:       "bg-blue-100 text-blue-700",
+  confirmed:              "bg-blue-100 text-blue-700",
+  completed:              "bg-teal-100 text-teal-700",
+  cancelled:              "bg-stone-100 text-stone-500",
+  disputed:               "bg-red-100 text-red-700",
 };
-const STATUS_TABS = ["", "paid", "seller_completed", "completed", "disputed", "cancelled"];
+const STATUS_TABS = ["", "pending_bank_transfer", "paid", "seller_completed", "completed", "disputed", "cancelled"];
 
 export default function AdminOrders() {
   const router = useRouter();
@@ -76,6 +78,7 @@ export default function AdminOrders() {
 
   const counts: Record<string, number> = {
     "": orders.length,
+    pending_bank_transfer: orders.filter(o => o.status === "pending_bank_transfer").length,
     paid: orders.filter(o => o.status === "paid").length,
     seller_completed: orders.filter(o => o.status === "seller_completed").length,
     completed: orders.filter(o => o.status === "completed").length,
@@ -106,8 +109,9 @@ export default function AdminOrders() {
         {/* Status tabs */}
         <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 scrollbar-none [&::-webkit-scrollbar]:hidden">
           {[
-            { key: "",                label: "All" },
-            { key: "paid",            label: "In Progress" },
+            { key: "",                     label: "All" },
+            { key: "pending_bank_transfer", label: "Awaiting Transfer" },
+            { key: "paid",                 label: "In Progress" },
             { key: "seller_completed",label: "Awaiting Confirm" },
             { key: "completed",       label: "Completed" },
             { key: "disputed",        label: "Disputed" },
