@@ -1,7 +1,7 @@
 // src/app/admin/orders/[id]/page.tsx
 "use client";
 
-import { Package, Clock, Truck, MapPin, User } from "lucide-react";
+import { Package, Clock, Truck, MapPin, User, Phone } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import AdminTopBar from "@/components/layout/AdminTopBar";
@@ -169,6 +169,68 @@ export default function AdminOrderDetail() {
           <Row label="Delivery Location" value={order.delivery_location || "Not set"} />
           <Row label="Date"             value={order.created_at ? new Date(order.created_at).toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" }) : undefined} />
         </div>
+
+        {/* Buyer contact — same info the rider dashboard shows, so the admin can
+            call the buyer directly. buyer_phone is admin-only (AdminOrderDetailView). */}
+        <div className="bg-white border border-stone-200 rounded-2xl p-4 shadow-sm">
+          <p className="text-teal-600 text-xs tracking-[0.2em] uppercase font-semibold mb-3">Buyer Contact</p>
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="font-semibold text-stone-900 text-sm truncate">
+                {typeof order.buyer === "string" ? order.buyer : order.buyer?.username}
+              </p>
+              <p className="text-stone-400 text-xs truncate">
+                @{typeof order.buyer === "string" ? order.buyer : order.buyer?.username}
+                {order.buyer_phone ? ` · ${order.buyer_phone}` : ""}
+              </p>
+            </div>
+            {order.buyer_phone ? (
+              <a
+                href={`tel:${order.buyer_phone}`}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold text-white flex-shrink-0 active:scale-95 transition"
+                style={{ background: "#0D9488" }}
+              >
+                <Phone className="w-4 h-4" /> Call
+              </a>
+            ) : (
+              <span className="text-xs text-stone-400 flex-shrink-0">No phone on file</span>
+            )}
+          </div>
+        </div>
+
+        {/* What the buyer ordered — itemized, same as the rider dashboard. */}
+        {Array.isArray(order.items) && order.items.length > 0 && (
+          <div className="bg-white border border-stone-200 rounded-2xl p-4 shadow-sm">
+            <p className="text-teal-600 text-xs tracking-[0.2em] uppercase font-semibold mb-3">
+              What they ordered ({order.items.length} item{order.items.length !== 1 ? "s" : ""})
+            </p>
+            <div className="space-y-3">
+              {order.items.map((item: {
+                id: number; listing_title: string; quantity: number; line_total: string;
+                status?: string; addons?: { name: string; quantity: number }[];
+              }) => (
+                <div key={item.id} className="flex items-start justify-between gap-2 pb-3 border-b border-stone-100 last:border-0 last:pb-0">
+                  <div className="min-w-0">
+                    <p className={`font-semibold text-sm ${item.status === "unavailable" ? "text-stone-400 line-through" : "text-stone-900"}`}>
+                      {item.quantity}× {item.listing_title}
+                    </p>
+                    {item.addons && item.addons.length > 0 && (
+                      <p className="text-xs text-stone-400 mt-0.5 truncate">
+                        {item.addons.map(a => `${a.quantity}× ${a.name}`).join(", ")}
+                      </p>
+                    )}
+                    {item.status === "unavailable" && (
+                      <p className="text-[11px] text-red-500 font-medium mt-0.5">Marked unavailable (refunded)</p>
+                    )}
+                  </div>
+                  <p className="font-semibold text-stone-900 text-sm flex-shrink-0">
+                    ₦{Number(item.line_total).toLocaleString()}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Payment Breakdown — buyer paid vs. vendor payout vs. StudEx's cut,
              from the matching PaymentTransaction (accounts.admin_views.

@@ -718,6 +718,9 @@ try:
                 data = serializer.data
                 data['seller'] = order.listing.vendor.username if order.listing else None
                 data['seller_id'] = order.listing.vendor.id if order.listing else None
+                # Buyer contact — admin-only (IsAdminUser), same detail the rider
+                # dashboard shows, so the admin can call the buyer directly.
+                data['buyer_phone'] = getattr(order.buyer, 'phone', None)
                 data['paid_at'] = order.paid_at.isoformat() if order.paid_at else None
                 data['seller_completed_at'] = order.seller_completed_at.isoformat() if order.seller_completed_at else None
                 data['buyer_confirmed_at'] = order.buyer_confirmed_at.isoformat() if order.buyer_confirmed_at else None
