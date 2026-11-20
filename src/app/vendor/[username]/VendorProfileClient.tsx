@@ -12,6 +12,7 @@ import CenteredLoader from "@/components/CenteredLoader";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { api } from "@/lib/api";
+import { formatOpensAt } from "@/lib/formatTime";
 import { GRAD, TEAL, PURPLE } from "@/lib/tokens";
 import { useAdminMode } from "@/hooks/useAdminMode";
 import { useCart } from "@/lib/cartStore";
@@ -170,6 +171,7 @@ export default function VendorProfileClient() {
   // the exact same check checkout runs) — default to open if the field is somehow
   // missing so an older cached response never falsely shows "closed".
   const isOpenNow = vendor.is_open_now !== false;
+  const opensAt   = formatOpensAt(vendor.opening_time);
   const sorted       = [...listings.filter(l => l.is_available), ...listings.filter(l => !l.is_available)];
   const vendorRating = Number(vendor.rating) || 0;
   const totalReviews = Number(vendor.total_reviews) || 0;
@@ -296,7 +298,7 @@ export default function VendorProfileClient() {
                   )}
                   {!isOpenNow && (
                     <span className="flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full bg-red-50 text-red-600 border border-red-200 flex-shrink-0">
-                      <Clock className="w-3 h-3" /> Closed now
+                      <Clock className="w-3 h-3" /> Closed now{opensAt ? ` · Opens ${opensAt}` : ""}
                     </span>
                   )}
                 </div>

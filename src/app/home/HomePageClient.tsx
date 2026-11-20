@@ -22,6 +22,7 @@ import CenteredLoader from "@/components/CenteredLoader";
 import { GRAD, GRAD_TEXT, TEAL, PURPLE } from "@/lib/tokens";
 import VendorOfMonthModal from "@/components/VendorOfMonthModal";
 import ScrollableRow from "@/components/ScrollableRow";
+import { formatOpensAt } from "@/lib/formatTime";
 import { useScrollRestoration } from "@/hooks/useScrollRestoration";
 import WhatsAppGroupModal from "@/components/WhatsAppGroupModal";
 
@@ -71,18 +72,6 @@ function SafeImage({ src, alt, className }: { src: string | null | undefined; al
 }
 
 const BADGE_LABELS: Record<string, string> = { top: "Top Vendor", trusted: "Trusted", rising: "Rising" };
-
-/** "09:00" (24h) -> "9:00 AM". Returns null for empty/malformed input. */
-function formatOpensAt(hhmm?: string | null): string | null {
-  if (!hhmm) return null;
-  const m = /^(\d{1,2}):(\d{2})/.exec(hhmm.trim());
-  if (!m) return null;
-  let h = parseInt(m[1], 10);
-  if (Number.isNaN(h)) return null;
-  const ampm = h >= 12 ? "PM" : "AM";
-  h = h % 12 || 12;
-  return `${h}:${m[2]} ${ampm}`;
-}
 const BADGE_STYLES: Record<string, string> = {
   top: "bg-amber-50 text-amber-700 border border-amber-200",
   trusted: "bg-teal-50 text-teal-700 border border-teal-200",
