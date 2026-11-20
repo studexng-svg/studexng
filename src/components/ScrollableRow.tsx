@@ -69,11 +69,7 @@ export default function ScrollableRow({
     <div className="relative">
       <div
         ref={ref}
-        // snap-proximity + snap-start on each card makes a free swipe settle on a
-        // card edge too, without the parent having to tag every child. proximity
-        // (not mandatory) so it never fights the ends — the last card can rest
-        // flush at the right instead of being pulled off-screen.
-        className={`${className} snap-x snap-proximity [&>*]:snap-start`}
+        className={className}
         style={{ scrollbarWidth: "none", msOverflowStyle: "none" } as React.CSSProperties}
       >
         {children}
