@@ -20,6 +20,7 @@ import { usePushNotifications } from "@/hooks/usePushNotifications";
 import DraggableAdminShield from "@/components/admin/DraggableAdminShield";
 import { useHeartbeat } from "@/hooks/useHeartbeat";
 import NavigationProgress from "@/components/NavigationProgress";
+import OfflineBanner from "@/components/OfflineBanner";
 
 function CartWishlistSync() {
   const { isLoggedIn, accessToken } = useAuth();
@@ -136,6 +137,10 @@ export default function LayoutClient({ children }: { children: React.ReactNode }
   }
 
   return (
+    <>
+    {/* Global connectivity banner — independent of providers so it still shows
+        if the network dies mid-session, on every page including admin. */}
+    <OfflineBanner />
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <NotificationProvider>
@@ -161,5 +166,6 @@ export default function LayoutClient({ children }: { children: React.ReactNode }
         </NotificationProvider>
       </ThemeProvider>
     </QueryClientProvider>
+    </>
   );
 }

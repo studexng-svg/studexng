@@ -2,6 +2,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { useNavProgress } from "@/lib/navProgressStore";
+import { isNetworkError, reportNetworkFailure, reportNetworkSuccess } from "@/lib/networkStatus";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -363,7 +364,14 @@ export const fetchWithAuth = async (
       }
     }
 
+    // We got a Response, so the server was reachable — we have connectivity.
+    reportNetworkSuccess();
     return response;
+  } catch (err) {
+    // A rejected fetch (not an HTTP error status) means the request never
+    // reached the server: surface the offline banner, then let callers handle it.
+    if (isNetworkError(err)) reportNetworkFailure();
+    throw err;
   } finally {
     endRequest();
   }
