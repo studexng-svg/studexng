@@ -94,6 +94,12 @@ class Order(models.Model):
     # promo quota covered this order — distinct from delivery_fee being ₦0
     # because the vendor simply has no fee configured at all.
     delivery_fee_waived = models.BooleanField(default=False)
+    # True when delivery_fee is collected in cash on arrival (the vendor's
+    # Vendor.delivery_fee_mode was 'on_delivery' at checkout) instead of being
+    # charged online. In that case delivery_fee holds the amount to collect but
+    # is NOT part of `amount` (the food was still paid online). Frozen onto the
+    # order so a later change to the vendor's mode never rewrites past orders.
+    delivery_fee_on_delivery = models.BooleanField(default=False)
 
     def __str__(self):
         return f"Order {self.reference} - {self.buyer.username}"

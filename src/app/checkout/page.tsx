@@ -79,6 +79,9 @@ export default function CheckoutPage() {
     uses_batched_delivery: boolean;
     delivery_fee?: number;
     delivery_fee_waived?: boolean;
+    // Delivery fee this vendor collects in cash on arrival (Vendor
+    // delivery_fee_mode = 'on_delivery'). NOT added to the online total.
+    on_delivery_fee?: number;
     free_deliveries_remaining?: number | null;
     batches: { id: number; display_name: string; delivery_time: string; cutoff_time: string; remaining_slots: number }[];
   } | null>(null);
@@ -132,6 +135,9 @@ export default function CheckoutPage() {
   // is purely the checkout-page preview so the buyer sees it before paying.
   const deliveryFee = usesMenuCheckout ? (batchInfo?.delivery_fee ?? 0) : 0;
   const deliveryFeeWaived = usesMenuCheckout && !!batchInfo?.delivery_fee_waived;
+  // Paid in cash to the rider on arrival — shown to the buyer but deliberately
+  // NOT part of finalTotal (only the food is charged online).
+  const onDeliveryFee = usesMenuCheckout ? (batchInfo?.on_delivery_fee ?? 0) : 0;
   const finalTotal = baseAfterCredits + deliveryFee;
   const useBankTransfer = usesMenuCheckout && !!bankTransferInfo?.enabled;
 
@@ -665,6 +671,8 @@ export default function CheckoutPage() {
                   <span className="text-stone-500">Delivery</span>
                   {deliveryFee > 0 ? (
                     <span className="font-medium text-stone-700">₦{deliveryFee.toLocaleString()}</span>
+                  ) : onDeliveryFee > 0 ? (
+                    <span className="font-semibold text-amber-600">₦{onDeliveryFee.toLocaleString()} on delivery</span>
                   ) : deliveryFeeWaived ? (
                     <span className="font-semibold text-emerald-600">
                       Free (Promo)
@@ -676,6 +684,11 @@ export default function CheckoutPage() {
                     <span className="font-semibold text-emerald-600">Free</span>
                   )}
                 </div>
+                {onDeliveryFee > 0 && (
+                  <p className="text-[11px] text-amber-600 leading-snug">
+                    You pay the ₦{onDeliveryFee.toLocaleString()} delivery fee in cash when your order arrives — only your food is charged now, not the delivery.
+                  </p>
+                )}
               </>
             ) : (
               <div className="flex justify-between items-center text-sm">

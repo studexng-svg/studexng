@@ -340,6 +340,25 @@ class Vendor(models.Model):
     # vendor_uses_batched_delivery) — a vendor with no delivery slots has no
     # concept of a delivery fee regardless of this field's value.
     delivery_fee = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
+    # How the delivery_fee above is collected:
+    #   'prepaid'     — charged online at checkout; requires the vendor to be on
+    #                   batched/slot delivery (delivery.fees.get_delivery_fee_quote
+    #                   returns ₦0 otherwise). Today's only behaviour.
+    #   'on_delivery' — the buyer pays the delivery fee in cash to whoever
+    #                   delivers, on arrival. It is NOT added to the online
+    #                   checkout total (the food is still paid online as normal);
+    #                   the order is flagged so the buyer and rider both see
+    #                   "pay ₦X delivery fee on delivery". No slot required — this
+    #                   is the no-slot alternative to prepaid.
+    DELIVERY_FEE_MODE_CHOICES = (
+        ('prepaid', 'Charge at checkout'),
+        ('on_delivery', 'Pay on delivery'),
+    )
+    delivery_fee_mode = models.CharField(
+        max_length=20, choices=DELIVERY_FEE_MODE_CHOICES, default='prepaid',
+        help_text="prepaid: charged online at checkout (needs a delivery slot). "
+                  "on_delivery: buyer pays the delivery fee in cash on arrival.",
+    )
     # First N delivery orders for this vendor are free (any buyer, running
     # count — not per-buyer). Null (default) means the fee above always
     # applies with no promo. Deliberately no denormalized "used" counter —

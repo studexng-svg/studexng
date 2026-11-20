@@ -87,6 +87,12 @@ def get_delivery_fee_quote(vendor):
     except Vendor.DoesNotExist:
         return Decimal("0"), False
 
+    # on_delivery vendors never charge at checkout — the fee is collected in
+    # cash on arrival instead (see get_on_delivery_fee). Guard here so even a
+    # slotted on_delivery vendor is never double-charged.
+    if getattr(v, 'delivery_fee_mode', 'prepaid') == 'on_delivery':
+        return Decimal("0"), False
+
     fee = v.delivery_fee or Decimal("0")
     if fee <= 0:
         return Decimal("0"), False
@@ -96,3 +102,27 @@ def get_delivery_fee_quote(vendor):
             return Decimal("0"), True
 
     return fee, False
+
+
+def get_on_delivery_fee(vendor):
+    """
+    The delivery fee to collect in cash on arrival, for a vendor whose
+    Vendor.delivery_fee_mode is 'on_delivery'. Returns Decimal("0") for every
+    other vendor (prepaid vendors charge at checkout via get_delivery_fee_quote
+    instead, and a vendor with no fee set has nothing to collect).
+
+    Independent of delivery slots on purpose: 'on_delivery' is the no-slot
+    alternative to prepaid, so it must work for a vendor who has no DeliverySlot.
+    The free-delivery promo quota (a prepaid/slotted concept counted from
+    slotted Order rows) deliberately does NOT apply here — an on_delivery fee is
+    always collected when set.
+    """
+    from accounts.models import Vendor
+    try:
+        v = vendor.vendor
+    except Vendor.DoesNotExist:
+        return Decimal("0")
+    if getattr(v, 'delivery_fee_mode', 'prepaid') != 'on_delivery':
+        return Decimal("0")
+    fee = v.delivery_fee or Decimal("0")
+    return fee if fee > 0 else Decimal("0")

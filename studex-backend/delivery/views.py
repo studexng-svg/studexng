@@ -60,8 +60,15 @@ class VendorEligibleBatchesView(APIView):
         except User.DoesNotExist:
             return Response({'error': 'Vendor not found'}, status=status.HTTP_404_NOT_FOUND)
 
+        from delivery.fees import get_on_delivery_fee
         if not vendor_uses_batched_delivery(vendor):
-            return Response({'uses_batched_delivery': False, 'batches': []})
+            # No delivery slots — but this vendor may still collect a delivery
+            # fee in cash on arrival (Vendor.delivery_fee_mode == 'on_delivery').
+            return Response({
+                'uses_batched_delivery': False,
+                'batches': [],
+                'on_delivery_fee': float(get_on_delivery_fee(vendor)),
+            })
 
         from datetime import datetime
         from delivery.capacity import LAGOS, _cutoff_datetime
@@ -74,6 +81,7 @@ class VendorEligibleBatchesView(APIView):
             'uses_batched_delivery': True,
             'delivery_fee': float(delivery_fee),
             'delivery_fee_waived': delivery_fee_waived,
+            'on_delivery_fee': float(get_on_delivery_fee(vendor)),
             # None when there's no free-delivery promo running at all;
             # otherwise a live count, 0 once it's exhausted.
             'free_deliveries_remaining': get_free_delivery_remaining(vendor),

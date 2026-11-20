@@ -661,9 +661,12 @@ def initialize_cart_payment(request):
     if vendor_uses_batched_delivery(anchor_listing.vendor) and not has_eligible_slot(anchor_listing.vendor, anchor_listing.campus):
         return Response({"error": "No delivery slots are currently available for this vendor. Please try again later."}, status=400)
 
-    from delivery.fees import get_delivery_fee_quote
+    from delivery.fees import get_delivery_fee_quote, get_on_delivery_fee
     delivery_fee, delivery_fee_waived = get_delivery_fee_quote(anchor_listing.vendor)
     total_amount += delivery_fee
+    # Collected in cash on arrival, NOT added to the online total. Frozen into
+    # pay_init so verify_cart_payment stamps it onto the order.
+    on_delivery_fee = get_on_delivery_fee(anchor_listing.vendor)
 
     total_amount_kobo = int(total_amount * 100)
     if total_amount_kobo < 10000:  # Paystack minimum is ₦100 (10000 kobo)
@@ -684,6 +687,7 @@ def initialize_cart_payment(request):
         'max_kobo': _gross_kobo + 50,
         'delivery_fee': str(delivery_fee),
         'delivery_fee_waived': delivery_fee_waived,
+        'on_delivery_fee': str(on_delivery_fee),
     }, 3600)
 
     delivery_location = request.data.get("delivery_location", "")
@@ -743,6 +747,7 @@ def initialize_cart_payment(request):
         "item_count": len(priced_lines),
         "delivery_fee": float(delivery_fee),
         "delivery_fee_waived": delivery_fee_waived,
+        "on_delivery_fee": float(on_delivery_fee),
     })
 
 
@@ -825,10 +830,12 @@ def verify_cart_payment(request):
     if isinstance(pay_init, dict) and 'delivery_fee' in pay_init:
         delivery_fee = Decimal(pay_init['delivery_fee'])
         delivery_fee_waived = bool(pay_init.get('delivery_fee_waived', False))
+        on_delivery_fee = Decimal(pay_init.get('on_delivery_fee', '0'))
     else:
-        from delivery.fees import get_delivery_fee_quote
+        from delivery.fees import get_delivery_fee_quote, get_on_delivery_fee
         delivery_fee, delivery_fee_waived = get_delivery_fee_quote(anchor_listing.vendor)
-    total_amount += delivery_fee
+        on_delivery_fee = get_on_delivery_fee(anchor_listing.vendor)
+    total_amount += delivery_fee  # on_delivery_fee is intentionally NOT added
 
     if min_kobo is None:
         min_kobo = int(total_amount * 100)
@@ -871,12 +878,21 @@ def verify_cart_payment(request):
     # the vendor never had any slots), the whole order creation has already
     # rolled back — refund the buyer exactly like the underpayment/overpayment
     # paths above, since money was collected but no order was created.
+    # An on_delivery fee is stored on the order (so the rider/buyer see what to
+    # collect) but is NOT part of amount_paid. A vendor is one mode or the other,
+    # so these never both apply.
+    if on_delivery_fee > 0:
+        order_delivery_fee, order_fee_waived, order_on_delivery = on_delivery_fee, False, True
+    else:
+        order_delivery_fee, order_fee_waived, order_on_delivery = delivery_fee, delivery_fee_waived, False
+
     from delivery.capacity import NoDeliverySlotCapacityError
     try:
         order, total_payout_amount = create_order_from_priced_lines(
             buyer=request.user, priced_lines=priced_lines, reference=reference,
             amount_paid=amount_paid, delivery_location=delivery_location, batch_id=batch_id,
-            delivery_fee=delivery_fee, delivery_fee_waived=delivery_fee_waived,
+            delivery_fee=order_delivery_fee, delivery_fee_waived=order_fee_waived,
+            delivery_fee_on_delivery=order_on_delivery,
         )
     except NoDeliverySlotCapacityError as e:
         logger.warning(f"verify_cart_payment: no delivery slot capacity for {reference}: {e.detail}")
@@ -1075,20 +1091,29 @@ def initiate_bank_transfer_cart(request):
     if vendor_uses_batched_delivery(anchor_listing.vendor) and not has_eligible_slot(anchor_listing.vendor, anchor_listing.campus):
         return Response({"error": "No delivery slots are currently available for this vendor. Please try again later."}, status=400)
 
-    from delivery.fees import get_delivery_fee_quote
+    from delivery.fees import get_delivery_fee_quote, get_on_delivery_fee
     delivery_fee, delivery_fee_waived = get_delivery_fee_quote(anchor_listing.vendor)
     total_amount += delivery_fee
+    on_delivery_fee = get_on_delivery_fee(anchor_listing.vendor)  # NOT added to total
 
     batch_id = request.data.get("batch_id")
     delivery_location = request.data.get("delivery_location", "")
     reference = f"STX-BANKXFER-{uuid.uuid4().hex[:14].upper()}"
+
+    # One mode or the other — an on_delivery fee is stored on the order but not
+    # added to the amount the buyer transfers.
+    if on_delivery_fee > 0:
+        order_delivery_fee, order_fee_waived, order_on_delivery = on_delivery_fee, False, True
+    else:
+        order_delivery_fee, order_fee_waived, order_on_delivery = delivery_fee, delivery_fee_waived, False
 
     from delivery.capacity import NoDeliverySlotCapacityError
     try:
         order, total_payout_amount = create_order_from_priced_lines(
             buyer=request.user, priced_lines=priced_lines, reference=reference,
             amount_paid=total_amount, delivery_location=delivery_location, batch_id=batch_id,
-            delivery_fee=delivery_fee, delivery_fee_waived=delivery_fee_waived,
+            delivery_fee=order_delivery_fee, delivery_fee_waived=order_fee_waived,
+            delivery_fee_on_delivery=order_on_delivery,
             status="pending_bank_transfer",
         )
     except NoDeliverySlotCapacityError as e:

@@ -129,6 +129,7 @@ def price_vendor_cart(buyer, vendor_id):
 def create_order_from_priced_lines(
     buyer, priced_lines, reference, amount_paid, delivery_location="", batch_id=None,
     delivery_fee=None, delivery_fee_waived=False, status="paid",
+    delivery_fee_on_delivery=False,
 ):
     """
     Creates one Order (anchor = the first priced line's listing — every
@@ -182,6 +183,7 @@ def create_order_from_priced_lines(
             delivery_location=delivery_location or "",
             delivery_fee=delivery_fee or Decimal("0"),
             delivery_fee_waived=delivery_fee_waived,
+            delivery_fee_on_delivery=delivery_fee_on_delivery,
         )
 
         if vendor_uses_batched_delivery(vendor):

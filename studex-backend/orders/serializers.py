@@ -103,13 +103,13 @@ class OrderSerializer(serializers.ModelSerializer):
             'id', 'reference', 'listing', 'listing_id', 'buyer', 'buyer_id',
             'buyer_username', 'buyer_profile_picture',
             'amount', 'quantity', 'status', 'current_status', 'estimated_time',
-            'delivery_location', 'created_at', 'paid_at',
+            'delivery_location', 'delivery_fee', 'delivery_fee_on_delivery', 'created_at', 'paid_at',
             'vendor_accepted_at', 'service_started_at', 'seller_completed_at', 'buyer_confirmed_at',
             'delivery_proof_1', 'delivery_proof_2', 'bank_transfer_proof', 'dispute', 'items', 'has_rider_delivery',
         ]
         read_only_fields = [
             'reference', 'amount', 'quantity', 'status', 'current_status', 'estimated_time',
-            'created_at', 'paid_at',
+            'delivery_fee', 'delivery_fee_on_delivery', 'created_at', 'paid_at',
             'vendor_accepted_at', 'service_started_at', 'seller_completed_at', 'buyer_confirmed_at',
             'delivery_proof_1', 'delivery_proof_2', 'bank_transfer_proof',
         ]
